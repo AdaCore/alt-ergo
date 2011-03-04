@@ -192,8 +192,7 @@ install-prelude: smt_prelude.mlw
 
 install-gui: install-indep
 	cp -f altgr-ergo.opt $(BINDIR)/altgr-ergo$(EXE)
-	#cp -f alt-ergo.lang /usr/share/gtksourceview-1.0/language-specs/
-	cp -f alt-ergo2.lang /usr/share/gtksourceview-2.0/language-specs/alt-ergo.lang
+	cp -f util/gtk-lang/alt-ergo.lang /usr/share/gtksourceview-2.0/language-specs/alt-ergo.lang
 
 
 # documentation
