@@ -1,0 +1,10 @@
+
+   The Alt-ergo theorem prover
+   Copyright (C) 2006-2008
+
+   Sylvain Conchon
+   Evelyne Contejean
+   CNRS-LRI-Universite Paris Sud
+
+ This file is distributed under the terms of the CeCILL-C licence
+

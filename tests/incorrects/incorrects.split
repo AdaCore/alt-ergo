@@ -1,0 +1,45 @@
+$$$typage
+logic P : int -> prop
+
+axiom a1: forall x:int. P(x)
+
+goal g1: forall a:real. P(a)
+$
+logic P : int -> prop
+goal g2: forall a:unit. P(a)
+
+$
+logic Q : 'a tab -> prop
+
+axiom a2 : forall x:'a tab. Q(x)
+
+goal g4: forall a:int. Q(a)
+$
+logic Q : 'a tab -> prop
+
+axiom a2 : forall x:'a tab. Q(x)
+
+goal g5: forall a:real. Q(a)
+$
+logic Q : 'a tab -> prop
+
+axiom a2 : forall x:'a tab. Q(x)
+
+goal g6: forall a:unit. Q(a)
+$
+logic Q : 'a tab -> prop
+
+axiom a2 : forall x:'a tab. Q(x)
+
+type t
+
+goal g7: forall a:t. Q(a)
+$
+logic Q : 'a tab -> prop
+
+axiom a2 : forall x:'a tab. Q(x)
+
+type 'a u
+
+goal g8: forall a:'a u. Q(a)
+
