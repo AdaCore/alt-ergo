@@ -1,0 +1,3852 @@
+$$$ac_arith_mult
+
+logic x,y,z,t1,t2,t3,t4 :int
+goal g1:
+  x * y = t1 * t2 ->
+  x * z = t3 * t4 ->
+  z * t1 * t2 = y * t3 * t4
+
+$
+
+logic x,y,z,t1,t2,t3,t4 :int
+goal g2:
+  x * y = t1 * t2 ->
+  x * z = t3 * t4 ->
+  z * (t1 * t2) = (y * t3) * t4
+
+$
+
+logic x,y,z:int
+
+goal g3:
+  x * y  * z = 12 ->
+  x = 2 -> 
+  y = 3 -> 
+  z = 2
+
+$
+
+goal g4: forall x,y,z:int.
+  x*x*x * y*y * z = 23040 ->
+  x = 4 ->
+  y = 6 ->
+  z = 10
+
+$goal g5: forall x,y,z:int.
+  y = 6 ->
+  x = 4 ->
+  x*x*x * y*y * z = 23040 ->
+  z = 10
+
+$
+goal g6: forall x,y,z:int.
+  y = 6 -> 
+  x = 4 ->
+  x*x*x * y*y * z = 23040 ->
+  4 * y * y * z * z =  360 * z * x
+$
+goal g7: forall x,y,z:int.
+  5*x + x*y = 4*z + 20 ->
+  x = 4 ->
+  y = z
+$
+goal g8: forall x,y,z:int.
+  x * (5 + y) = 4* (z + 5) ->
+  x = 4 ->
+  y = z
+
+$
+goal g9 : forall x:int. x*x = 0 -> x = 0
+
+$
+goal g10 : forall x:int. x*x*x = 1 -> x = 1
+
+$
+logic x,z : int
+
+goal g11 : x*x <= 0 ->  x + z <= 3 -> z <= 3
+
+$
+logic x,z : int
+
+goal g12 : x*x = 0 ->  x + z = 3 -> z = 3
+
+$
+
+logic x,y,z:int
+
+goal g13 : 
+  z * y * x = 20 ->
+  x * y = 4 ->
+  z = 5
+$
+logic x,y,z:int
+logic ac f : int,int -> int
+goal g14 : 
+  4 * f(2,3) = z * y * x -> 
+  x * y = 4 ->
+  f(2,3) = z
+$
+logic a,b,c,d,x,y,z:int
+logic ac f : int,int -> int
+goal g15 : 
+  4 * a*b*c*d = z * y * x -> 
+  x * y = 4 ->
+  4 * a*b*c*d = 4 * z
+
+$
+
+logic x,y:int
+
+goal g16: x*x <=0 -> x + y = 4 -> y = 4
+$
+
+logic x,y:int
+goal g17: x*x*x = -1 -> x + y = 4 -> y = 5
+
+$
+logic x:int
+goal g18: -1<= x <= 1 -> x*x <> 1 -> x = 0
+
+$
+logic x:int      
+goal g19 : 2 <= x*x <= 9 ->  x= -2 or x = -3 or 2 <= x <= 3  
+
+$
+logic x:int
+goal g20 :  x*x*x*x <= 16 -> -2 <= x <= 2
+
+$
+logic x:int
+goal g21 : x >= 0 -> x*x = 9 -> x = 3
+
+$
+logic x:int
+goal g22 : 10 <= x*x*x <= 27 -> x = 3
+
+$
+logic x:int
+goal g23 : x*x*x = 64 -> x = 4
+
+$
+logic x:int
+goal g24 : x*x*x = -1000 -> x = -10
+
+$
+logic y:real
+goal g25 : y*y = 9. -> -3. = y or  y = 3.
+
+$
+(* prouvé grace à la cooperation des intervalles,
+   de arith (solve et subst) et de AC (collapse) *)
+goal g24_bis:
+  forall x:int. x*x*x = x*x -> x*x = 1 -> x = 1
+
+$
+(* inconsistent *)
+goal g24_4:
+  forall x:int. x*x*x = x*x -> x*x = 4 -> false
+
+
+$
+goal g25:
+  forall x:int. x >= 0 -> x <= (x + 1) * (x + 1)
+
+
+$$$arith
+goal g1: forall x:int. x<=x
+$
+goal g2: forall x:int. x-x = 0
+$
+goal g3: forall x:int. 0<=x -> 0=x-x and 0<=x and x<=x
+$
+goal g4: forall x,y,z:int. x<=y and y+z<=x and 0<=z -> x=y
+$
+logic P:prop
+goal g5: forall x:int. x=10 and (3<x -> P) -> P
+$
+logic f: int -> int
+goal g6: forall x,y:int. x+1=y -> f(x+2)=f(y+1)
+$
+logic Q:int -> prop
+goal g7: forall x,y:int. Q(y) -> (y<=x and x<=y) -> Q(x)
+$
+logic f: int -> int
+goal g8:
+  forall x,y,u,v,z:int. 
+    u=v and u<=x+y and x+y<=u and v<=z+x+4 and z+x+4<=v -> f(x+y) = f(z+x+4)
+$
+logic f: int -> int
+goal g9: forall x:int. f(x) = x -> f(2*x - f(x)) = x
+$
+logic f : int -> 'a
+goal g10:
+  forall x,z:int. 
+  forall u,t:'a.
+   f(x+3)=u and f(z+2)=t and x=z-1 -> u=t
+$
+logic f : int -> 'a
+goal g11:
+  forall x,y,z:int. 
+  forall u,t:'a.
+  x=y-1 and f(x)=u and z=2 and f(z)=t and y=3 -> u=t
+$
+goal g12:forall x,z,v,u:int. v<=z+4 and u<=v+2 and z+6<=u -> u+v=z+u+4
+$
+logic P:prop
+goal g13: 1=2 -> P
+$
+goal g14: forall x,y:int. x=y-1 and y=2 -> x=1
+$
+goal g15: forall x:int. x<0 -> -x >=0
+$
+logic p,q : int -> prop
+goal g16 : 
+  (forall k:int. 0 <= k <= 10 -> p(k)) ->
+  p(11) -> 
+  forall k:int. 0 <= k <= 11 -> p(k)
+$
+logic p,q : int -> prop
+goal g17 : 
+  (forall k:int. 0 <= k <= 10 -> (p(k) and q(k))) ->
+  p(11) -> q(11) ->
+  forall k:int. 0 <= k <= 11 -> (p(k) and q(k))
+$
+logic p,q : int -> prop
+goal g18 : 
+  (forall k:int. 0 <= k <= 10 -> p(k) -> q(k)) ->
+  (p(11) -> q(11)) ->
+  forall k:int. 0 <= k <= 11 -> p(k) -> q(k)
+$
+logic p,q : int -> prop
+logic a,b : int
+
+goal g19 : 
+  (forall k:int. a <= k <= b -> p(k)) ->
+  p(b+1) -> 
+  forall k:int. a <= k <= b+1 -> p(k)
+$
+logic p,q : int -> prop
+logic a,b : int
+
+goal g20 : 
+  (forall k:int. a <= k <= b -> (p(k) and q(k))) ->
+  p(b+1) -> q(b+1) ->
+  forall k:int. a <= k <= b+1 -> (p(k) and q(k))
+$
+goal g21:  
+  forall size:int. (0 <= size) -> (size <= size) and (0 = (size - size))
+
+$
+
+logic f : int -> int
+logic t,u,x,y,z : int
+
+goal g22:t=f(0)   -> u=f(4*x+5*y-3*z-3) ->  8*x+10*y=6*z+6 -> t=u
+
+$
+goal g23: forall x:int. x*x>=0 -> 1=1
+
+$
+goal g24: forall x:int. (2+4)*x = (1+1)*x + (2*3)*x -(3-2)*x + (1*x)*(3-4)
+$
+logic a:int
+
+goal g25: a=0 -> 0<=a-1 -> false
+
+$
+goal g26: forall i0:int.(i0 <= 7) -> (i0 <> 6) -> (i0 >= 6) -> i0 = 7
+
+$
+logic f:int ->int
+
+goal g27:
+  forall n:int.
+  forall count:int.
+  forall sum:int.
+  sum = (f(count) * f(count)) ->
+  (sum <= n) ->
+  forall count0:int.
+  (count0 = f(count)) ->
+  (n >= count0 * count0)
+$
+logic q : int
+logic p : int
+logic b : int
+logic a : int
+
+axiom a1: forall x:int. x*0 = 0
+axiom a2: forall x:int. 0*x = 0
+
+axiom x9 : q = a
+axiom x10 : p = 0
+goal g28 : a = p * b + q
+$
+
+logic f : int -> int
+logic u,t,x : int
+
+goal g29: u=f(0) -> t=f(x) -> x=0 -> u=t
+
+$
+
+goal g30: forall x:int. x = 3*x+4 -> x = -2
+
+
+$
+type 't pointer
+
+type ('t, 'v) memory
+
+logic select : ('a2, 'a1) memory, 'a2 pointer -> 'a1
+
+logic store : ('a1, 'a2) memory, 'a1 pointer, 'a2 -> ('a1, 'a2) memory
+
+axiom select_store_eq:
+  (forall m:('a1, 'a2) memory.
+    (forall p1:'a1 pointer.
+      (forall p2:'a1 pointer.
+        (forall a:'a2 [store(m, p1, a), p2].
+          ((p1 = p2) -> (select(store(m, p1, a), p2) = a))))))
+
+axiom select_store_neq:
+  (forall m:('a1, 'a2) memory.
+    (forall p1:'a1 pointer.
+      (forall p2:'a1 pointer.
+        (forall a:'a2 [store(m, p1, a), p2].
+          ((p1 <> p2) -> (select(store(m, p1, a), p2) = select(m, p2)))))))
+
+type int32
+
+logic f : int32 -> int
+
+type int_P
+
+logic aa:int
+
+goal f_ensures_default_po_1:
+  forall p:int_P pointer.
+  forall m1:(int_P, int32) memory.
+  forall result:int32.
+  f(result) = 1 ->
+  forall m2:(int_P, int32) memory.
+  m2 = store(m1, p, result) ->
+  f(select(m2, p)) = 1
+
+$
+
+goal g30_1: forall x:int. x<>1 and 1 <= x and  x <= 2  -> x=2 
+
+$
+
+goal g30_2 : forall x:int. 0 <= x <= 1 -> x=0 or x=1 
+
+$
+
+goal g30_3 : forall x:int. 0 <= x <= 1 -> (x = 0 or x = 1)
+
+$
+
+logic p,q : int -> prop
+
+goal g30_4 : 
+  (forall k:int. 0 <= k <= 10 -> p(k)) ->
+  p(11) -> 
+  forall k:int. 0 <= k <= 11 -> p(k)
+
+$
+
+logic f : int -> int
+
+logic x:int
+
+goal g30_5 : 
+  f(x) <> f(30)  -> 
+  f(x) <> f(31)  -> 
+  2    <= x      -> 
+  f(x) <> f(32)  -> 
+  f(x) <> f(33)  -> 
+  f(x) <> f(100) -> 
+  f(x) <> f(0)   -> 
+  2    <= x  <= 29 
+  or 
+  34   <= x  <= 99
+  or 
+  101 <= x
+
+$
+
+logic P,Q : int -> prop
+axiom a1: forall x:int. x <= 1 -> Q(x)
+axiom a2: forall x:int. P(x)  -> Q(x)
+axiom a3: forall x:int. x >= 6 -> P(x)
+axiom a4: P(5)
+axiom a6: P(4)
+axiom a7: Q(2)
+axiom a8: Q(3)
+
+goal g31 : forall x:int. 0 <= x <= 7 -> Q(x)
+
+$
+goal g32: forall x:real. -1. <= x <= 1. -> (x< -1. or x> 1.) -> false
+
+$
+logic x,y : int
+ 
+goal g33 : x > 0 -> y > 0 -> x/y >=0
+
+$
+logic x : int
+ 
+goal g34 : x<>0 -> x/x = 1
+
+$
+logic x,y,z:int
+
+goal g35: 
+
+x <> 0 -> (-2*x) / x = -2
+
+$
+logic x,y,z:int
+
+goal g36: 
+
+x <> 0 -> x / (-2*x) = -1
+
+$
+logic x,y,z:int
+
+goal g37: 
+
+2*x + 2*y <> 0 -> (4*x + 4*y ) / (2*x + 2*y ) = 2
+
+$
+logic x,y,z:int
+
+goal g38: 
+
+2*x + 2*y +1 <> 0 -> (4*x + 4*y + 2 ) / (2*x + 2*y + 1) = 2
+
+$
+goal g39 (*sqrt_po_8*):
+  forall x,y:int.
+  x <> 0 ->
+  y = (x + 1) / 2 ->
+  y = ((x / x) + x) / 2
+
+$
+goal g40 (*sqrt_po_8*):
+  forall x,y:int.
+  x <> 0 ->
+  (x + 1) / 2 = ((x / x) + x) / 2
+
+$
+goal g40 (*sqrt_po_8*):
+  forall x,y:int.
+  x <> 0 ->
+  y <> 0 ->
+  (x + 1) / y = ((x / x) + x) / y
+
+$
+goal g41:
+  forall x,y,z:int.
+  x > 3  ->
+  y > 0 ->
+  z > 0  ->
+  y > z  ->
+  z = ((x / y) + y) / 2 -> 
+  z > 1 and y > 2
+
+
+$$$bool
+logic A,B,C,P,Q,R,S: prop
+
+goal g1: A or not A
+$
+logic A,B,C,P,Q,R,S: prop
+goal g2: A -> not not A
+$
+logic A,B,C,P,Q,R,S: prop
+goal g3: A -> A
+$
+logic A,B,C,P,Q,R,S: prop
+goal g4: ((A -> B) -> A) -> A
+$
+logic A,B,C,P,Q,R,S: prop
+goal g5: (A -> B)-> (not B -> not A)
+$
+logic A,B,C,P,Q,R,S: prop
+goal g6: ((A -> B) and A) -> B
+$
+logic A,B,C,P,Q,R,S: prop
+goal g7: ((A -> B) and not B) -> not A
+$
+logic A,B,C,P,Q,R,S: prop
+goal g8: ((A -> B) and (B -> C)) -> (A -> C)
+$
+logic A,B,C,P,Q,R,S: prop
+goal g9: (A and (B or C)) -> ((A and B) or (A and C))
+$
+logic A,B,C,P,Q,R,S: prop
+goal g10: ((A and B) or (A and C)) -> (A and (B or C))
+$
+logic A,B,C,P,Q,R,S: prop
+goal g11: (A or (B and C)) -> ((A or B) and (A or C))
+$
+logic A,B,C,P,Q,R,S: prop
+goal g12: ((A or B) and (A or C)) -> (A or (B and C))
+$
+logic A,B,C,P,Q,R,S: prop
+goal g13: (not A -> A) -> A 
+$
+logic A,B,C,P,Q,R,S: prop
+goal g14: ((P -> (Q and R and S)) and not S) -> not P
+$
+logic A,B,C,P,Q,R,S: prop
+goal g15: (P and Q) -> (Q and P)
+$
+logic A,B,C,P,Q,R,S: prop
+goal g16: (A and A) or not A
+$
+logic A,B,C,P,Q,R,S: prop
+goal g17: not not A <-> A
+$
+logic A,B,C,P,Q,R,S: prop
+(* De morgan *)
+goal g18: not(A and B) <-> (not A or not B)
+$
+logic A,B,C,P,Q,R,S: prop
+goal g19: not(A or B) <-> (not A and not B)
+$
+logic A,B,C,P,Q,R,S: prop
+(* Distributivite *)
+goal g20: (A or (B and C)) <-> ((A or B) and (A or C))
+$
+logic A,B,C,P,Q,R,S: prop
+goal g21: (A and (B or C)) <-> ((A and B) or (A and C))
+$$$list
+type 'a list
+
+logic nil : 'a list
+logic cons : 'a, 'a list -> 'a list
+logic hd : 'a list -> 'a
+logic tl : 'a list -> 'a list
+
+axiom hd_cons : forall x:'a. forall l:'a list. hd (cons(x,l)) = x
+axiom tl_cons : forall x:'a. forall l:'a list. tl (cons(x,l)) = l
+
+goal g1 : forall x,y:int. hd(tl(cons(x, cons(y, nil)))) = y
+$
+type 'a list
+
+logic nil : 'a list
+logic cons : 'a, 'a list -> 'a list
+logic hd : 'a list -> 'a
+logic tl : 'a list -> 'a list
+
+axiom hd_cons : forall x:'a. forall l:'a list. hd (cons(x,l)) = x
+axiom tl_cons : forall x:'a. forall l:'a list. tl (cons(x,l)) = l
+
+logic length : 'a list -> int
+
+axiom length_def_1 : length(nil) = 0
+
+axiom length_def_2 : 
+  forall x:'a. forall l:'a list. 
+  length(cons(x,l)) = 1 + length(l)
+
+goal g2 : length(cons(1,cons(2,cons(3,nil)))) = 3
+$
+type 'a list
+
+logic nil : 'a list
+logic cons : 'a, 'a list -> 'a list
+logic hd : 'a list -> 'a
+logic tl : 'a list -> 'a list
+
+axiom hd_cons : forall x:'a. forall l:'a list. hd (cons(x,l)) = x
+axiom tl_cons : forall x:'a. forall l:'a list. tl (cons(x,l)) = l
+
+logic length : 'a list -> int
+
+axiom length_def_1 : length(nil) = 0
+
+axiom length_def_2 : 
+  forall x:'a. forall l:'a list. 
+  length(cons(x,l)) = 1 + length(l)
+
+logic nth : 'a list, int -> 'a
+
+axiom nth_def_1 : 
+  forall x:'a. forall l:'a list. nth(cons(x,l),0) = x
+
+axiom nth_def_2 : 
+  forall x:'a. forall l:'a list. forall n:int.
+  n > 0 -> nth(cons(x,l),n) = nth(l,n-1)
+
+goal g3 : nth(cons(1,cons(2,cons(3,nil))), 1) = 2
+$
+type 'a list
+
+logic nil : 'a list
+logic cons : 'a, 'a list -> 'a list
+logic hd : 'a list -> 'a
+logic tl : 'a list -> 'a list
+
+axiom hd_cons : forall x:'a. forall l:'a list. hd (cons(x,l)) = x
+axiom tl_cons : forall x:'a. forall l:'a list. tl (cons(x,l)) = l
+
+logic length : 'a list -> int
+
+axiom length_def_1 : length(nil) = 0
+
+axiom length_def_2 : 
+  forall x:'a. forall l:'a list. 
+  length(cons(x,l)) = 1 + length(l)
+
+logic nth : 'a list, int -> 'a
+
+axiom nth_def_1 : 
+  forall x:'a. forall l:'a list. nth(cons(x,l),0) = x
+
+axiom nth_def_2 : 
+  forall x:'a. forall l:'a list. forall n:int.
+  n > 0 -> nth(cons(x,l),n) = nth(l,n-1)
+
+logic mem : 'a, 'a list -> prop
+
+axiom mem_def_1 : forall x:'a. not mem(x,nil)
+
+axiom mem_def_2 : 
+  forall x:'a. forall y:'a. forall l:'a list.
+  mem(x, cons(y,l)) <-> (x = y or mem(x,l))
+
+goal g4 : mem(2, cons(1,cons(2,cons(3,nil))))
+$
+type 'a list
+
+logic nil : 'a list
+logic cons : 'a, 'a list -> 'a list
+logic hd : 'a list -> 'a
+logic tl : 'a list -> 'a list
+
+axiom hd_cons : forall x:'a. forall l:'a list. hd (cons(x,l)) = x
+axiom tl_cons : forall x:'a. forall l:'a list. tl (cons(x,l)) = l
+
+logic length : 'a list -> int
+
+axiom length_def_1 : length(nil) = 0
+
+axiom length_def_2 : 
+  forall x:'a. forall l:'a list. 
+  length(cons(x,l)) = 1 + length(l)
+
+logic nth : 'a list, int -> 'a
+
+axiom nth_def_1 : 
+  forall x:'a. forall l:'a list. nth(cons(x,l),0) = x
+
+axiom nth_def_2 : 
+  forall x:'a. forall l:'a list. forall n:int.
+  n > 0 -> nth(cons(x,l),n) = nth(l,n-1)
+
+logic mem : 'a, 'a list -> prop
+
+axiom mem_def_1 : forall x:'a. not mem(x,nil)
+
+axiom mem_def_2 : 
+  forall x:'a. forall y:'a. forall l:'a list.
+  mem(x, cons(y,l)) <-> (x = y or mem(x,l))
+
+logic append : 'a list, 'a list -> 'a list
+
+axiom append_def_1 : 
+  forall l:'a list. append(nil,l) = l
+
+axiom append_def_2 : 
+  forall x:'a. forall l1,l2:'a list.
+  append(cons(x,l1),l2) = cons(x,append(l1,l2))
+
+goal g5 : 
+  append(cons(1,cons(2,nil)), cons(3,cons(4,nil))) = 
+  cons(1, cons(2, cons(3, cons(4, nil))))
+$
+type 'a list
+
+logic nil : 'a list
+logic cons : 'a, 'a list -> 'a list
+logic hd : 'a list -> 'a
+logic tl : 'a list -> 'a list
+
+axiom hd_cons : forall x:'a. forall l:'a list. hd (cons(x,l)) = x
+axiom tl_cons : forall x:'a. forall l:'a list. tl (cons(x,l)) = l
+
+logic length : 'a list -> int
+
+axiom length_def_1 : length(nil) = 0
+
+axiom length_def_2 : 
+  forall x:'a. forall l:'a list. 
+  length(cons(x,l)) = 1 + length(l)
+
+logic nth : 'a list, int -> 'a
+
+axiom nth_def_1 : 
+  forall x:'a. forall l:'a list. nth(cons(x,l),0) = x
+
+axiom nth_def_2 : 
+  forall x:'a. forall l:'a list. forall n:int.
+  n > 0 -> nth(cons(x,l),n) = nth(l,n-1)
+
+logic mem : 'a, 'a list -> prop
+
+axiom mem_def_1 : forall x:'a. not mem(x,nil)
+
+axiom mem_def_2 : 
+  forall x:'a. forall y:'a. forall l:'a list.
+  mem(x, cons(y,l)) <-> (x = y or mem(x,l))
+
+logic append : 'a list, 'a list -> 'a list
+
+axiom append_def_1 : 
+  forall l:'a list. append(nil,l) = l
+
+axiom append_def_2 : 
+  forall x:'a. forall l1,l2:'a list.
+  append(cons(x,l1),l2) = cons(x,append(l1,l2))
+
+logic rev : 'a list -> 'a list
+
+axiom rev_def_1 : rev(nil) = nil
+
+axiom rev_def_2 : 
+  forall x:'a. forall l:'a list.
+  rev(cons(x,l)) = append(rev(l), cons(x,nil))
+
+goal g6 : rev(cons(1,cons(2,nil))) = cons(2,cons(1,nil))
+$
+type 'a list
+
+logic nil : 'a list
+logic cons : 'a, 'a list -> 'a list
+logic hd : 'a list -> 'a
+logic tl : 'a list -> 'a list
+
+axiom hd_cons : forall x:'a. forall l:'a list. hd (cons(x,l)) = x
+axiom tl_cons : forall x:'a. forall l:'a list. tl (cons(x,l)) = l
+
+logic length : 'a list -> int
+
+axiom length_def_1 : length(nil) = 0
+
+axiom length_def_2 : 
+  forall x:'a. forall l:'a list. 
+  length(cons(x,l)) = 1 + length(l)
+
+logic nth : 'a list, int -> 'a
+
+axiom nth_def_1 : 
+  forall x:'a. forall l:'a list. nth(cons(x,l),0) = x
+
+axiom nth_def_2 : 
+  forall x:'a. forall l:'a list. forall n:int.
+  n > 0 -> nth(cons(x,l),n) = nth(l,n-1)
+
+logic mem : 'a, 'a list -> prop
+
+axiom mem_def_1 : forall x:'a. not mem(x,nil)
+
+axiom mem_def_2 : 
+  forall x:'a. forall y:'a. forall l:'a list.
+  mem(x, cons(y,l)) <-> (x = y or mem(x,l))
+
+logic append : 'a list, 'a list -> 'a list
+
+axiom append_def_1 : 
+  forall l:'a list. append(nil,l) = l
+
+axiom append_def_2 : 
+  forall x:'a. forall l1,l2:'a list.
+  append(cons(x,l1),l2) = cons(x,append(l1,l2))
+
+logic rev : 'a list -> 'a list
+
+axiom rev_def_1 : rev(nil) = nil
+
+axiom rev_def_2 : 
+  forall x:'a. forall l:'a list.
+  rev(cons(x,l)) = append(rev(l), cons(x,nil))
+
+logic flatten : 'a list list -> 'a list
+
+axiom flatten_def_1 : 
+  flatten(nil) = nil
+
+axiom flatten_def_2 : 
+  forall x:'a list. forall l:'a list list. 
+  flatten(cons(x,l)) = append(x,flatten(l))
+
+goal g7 : flatten(cons(cons(1,nil), 
+                              cons(cons(2,cons(3,nil)), 
+	                           nil))) = cons(1,cons(2,cons(3,nil)))
+
+$$$quant
+type t
+logic Q:prop
+logic R: 'a -> prop
+logic a:t
+
+axiom a1: Q -> forall x:'a. R(x)
+
+goal g1: Q -> R(a)
+$
+type t
+logic P:prop
+logic T: 'a -> prop
+logic a:t
+logic f: 'a -> 'a
+
+axiom a2: P -> forall x:'a. T(f(f(f(x))))
+
+axiom a3: f(a)=a
+
+goal g2: P -> T(a)
+$
+type t
+logic P,R,T,H,Q: 'a -> prop
+logic G,toto: 'a , 'a -> prop
+logic a,b:t
+logic f: 'a -> 'a
+logic g: 'a,'a -> 'a
+
+axiom a4: forall x:'a. H(x) -> forall y:'a. G(x,y)
+
+goal g3: 
+  H(a) -> G(a,b)
+$
+type t
+logic P,R,T,H,Q: 'a -> prop
+logic G,toto: 'a , 'a -> prop
+logic a,b:t
+logic f: 'a -> 'a
+logic g: 'a,'a -> 'a
+
+axiom a5: forall x:'a. P(x) -> forall y:'a. Q(g(x,y))
+
+goal g4: 
+  P(a) -> Q(g(a,b))
+$
+type t
+logic Q: prop
+logic P,R,T,H,predi: 'a -> prop
+logic G,toto: 'a , 'a -> prop
+logic a,b:t
+logic f: 'a -> 'a
+logic g: 'a,'a -> 'a
+
+
+axiom a7: forall x:'a. forall y:'a. not toto(x,y)
+
+axiom a8: 
+  forall x:'a. (forall y:'a. toto(x,y) -> x=y) -> predi(x)
+
+goal g5: 
+  predi(a)
+$
+type t
+logic P,R,T,H,Q: 'a -> prop
+logic G,toto: 'a , 'a -> prop
+logic a,b:t
+logic g: 'a,'a -> 'a
+
+goal g6: 
+  forall a:'a.
+  (forall x:'a.  P(x) -> forall y:'a. Q(g(x,y))) -> 
+  P(a) -> Q(g(a,a))
+$
+type 'a list
+type t
+
+logic nbocc : t, 'a list -> int
+
+predicate equiv(l1:'a list, l2:'a list) = forall x:t. nbocc(x,l1) = nbocc(x,l2)
+
+goal g7 :
+  forall l1,l2,l3:'a list. equiv(l1,l2) -> equiv(l2,l3) -> equiv(l1,l3)
+$
+type 'a pointer
+type 'a pset
+
+logic P : int -> prop
+logic Q : int , int -> prop
+
+axiom a:
+  (forall x:int.
+     (P(x) <-> 
+	(exists i:int. 
+	   exists r: int. Q(r,i))))
+
+goal g8: Q(1,2) -> P(4)
+$
+logic g: int -> int
+
+axiom a : forall x:int. forall y:int. y=g(x)
+
+goal g9: 0=g(1)
+$
+logic g: int -> int
+
+axiom a : forall x,y:int. y=g(x)
+
+goal g10: 0=g(1)
+$
+type  ilist
+logic ICons : int, ilist -> ilist
+logic INil : ilist
+
+axiom a :
+  (forall x : ilist.
+     (exists x1 : int.exists x2 : ilist.
+	(ICons (x1, x2) = x) or (INil = x))
+   and
+     (forall y : int.forall x1 : ilist.(not (INil = ICons (y, x1)))))
+  
+goal g10 : (not (INil = ICons (1, INil)))
+$$$cc
+type t
+logic a,b,c,d,e: t
+logic f,h : 'a -> 'a
+logic g: 'a , 'a -> 'a
+
+goal g1: 
+  forall x:t. h(x)=x and g(a,x)=a ->  g(g(a,h(x)),x)=a
+$
+type t
+logic a,b,c,d,e,f: t
+	
+goal g2: 
+  a=c and c=e and a<>b and b=d and d=f -> c<>f
+$
+type t
+logic a,b,c,d,e: t
+logic f : 'a -> 'a
+logic g,h: 'a , 'a -> 'a
+
+goal g3: 
+  forall x,y:t. f(f(f(a)))=a and f(f(f(f(f(a)))))=a and g(x,y)=x -> 
+  h(g(g(x,y),y),a)=h(x,f(a))
+
+$
+logic P,Q: int -> prop
+logic f: int -> int
+axiom a : 
+  forall x:int[P(f(x))]. 
+    P(f(x)) -> Q(x)
+goal g4:
+      forall a,b,c:int.
+    P(a) -> a= f(b) -> a = f(c) ->
+    Q(b) and Q(c)
+
+$
+logic P : int -> prop
+
+goal g5 : (exists x:int. P(x)) -> exists y:int. P(y)
+
+
+$$$typage
+logic P : 'a -> prop
+
+axiom a1 : forall x:'a. P(x)
+
+goal g1: forall a:int. P(a)
+
+$
+logic P : 'a -> prop
+axiom a1 : forall x:'a. P(x)
+goal g2: forall a:real. P(a)
+
+$
+
+logic P : 'a -> prop
+axiom a1 : forall x:'a. P(x)
+goal g3: forall a:unit. P(a)
+
+$
+logic P : 'a -> prop
+axiom a1 : forall x:'a. P(x)
+goal g4: forall a:'a. P(a)
+
+$
+logic P : 'a -> prop
+type t
+axiom a1 : forall x:'a. P(x)
+goal g5 : forall a:t. P(a)
+
+$
+logic P : 'a -> prop
+type t
+type 'a u
+axiom a1 : forall x:'a. P(x)
+goal g6: forall a:'a u. P(a)
+
+$
+logic P : 'a -> prop
+type t
+type 'a u
+logic Q : 'a u -> prop
+
+axiom a2: forall x:'a u. Q(x)
+
+goal g7: forall b:int u. Q(b)
+$
+logic P : 'a -> prop
+type t
+type 'a u
+logic Q : 'a u -> prop
+
+axiom a2: forall x:'a u. Q(x)
+goal g8: forall b:'c u. Q(b)
+$
+type g
+
+logic R : g -> prop
+
+axiom a3: forall x:g. R(x)
+
+goal g9: forall v:g. R(v)
+$
+logic P : 'a -> prop
+type t
+type 'a u
+logic Q : 'a u -> prop
+
+type g
+
+logic R : g -> prop
+
+predicate H(x:int) = x=10
+
+goal g10: H(10)
+$$$exist
+logic p : int -> prop
+
+axiom a: forall x:int [x]. p(x) <-> x=0
+
+goal g1 : 0=0 -> exists a:int. p(a)
+$
+logic P : int,int -> prop
+
+axiom a: forall i:int. i<>0 -> exists x:int. P(x,i)
+
+goal g2: forall x:int. x>0 -> exists y:int. P(y,x)
+$
+logic P : int,int -> prop
+
+axiom a: forall i:int. i<>0 -> exists x:int. P(x,i)
+
+goal g3: exists y:int. P(y,4)
+$
+goal g4: forall x:int. exists y:int. x=y
+$$$everything
+logic A,B,C : prop
+
+goal g1 : A -> A
+$
+logic A,B,C : prop
+goal g2 : (A or B) -> (B or A)
+$
+type t
+
+logic c : t
+logic f : t -> t
+logic p,q : t -> prop
+
+goal g3 : (forall x:t. p(x)) -> p(c)
+$
+type t
+
+logic c : t
+logic f : t -> t
+logic p,q : t -> prop
+
+goal g4 : (forall x:t. p(x)) -> p(c)
+$
+type t
+
+logic c : t
+logic f : t -> t
+logic p,q : t -> prop
+
+goal g5 : (forall x:t. p(x) <-> q(x)) -> p(c) -> q(c)
+$
+type t
+
+logic c : t
+logic f : t -> t
+logic p,q : t -> prop
+
+goal g6 : p(c) -> forall x:t. x=c -> p(x)
+$
+goal g7 : forall x:int. x=0 -> x+1=1
+$
+goal g8 : forall x:int. x < 3 -> x <= 2
+$
+type t
+type list
+
+logic nil : list
+logic cons : t, list -> list
+
+logic hd : list -> t
+logic tl : list -> list
+
+axiom hd_cons : forall x:t. forall l:list. hd (cons(x,l)) = x
+axiom tl_cons : forall x:t. forall l:list. tl (cons(x,l)) = l
+
+
+goal g9 :
+    forall x,y:t. hd(tl(cons(x, cons(y, nil)))) = y
+$
+type t
+type list
+logic nbocc : t, list -> int
+
+predicate equiv(l1:list, l2:list) = forall x:t. nbocc(x,l1) = nbocc(x,l2)
+
+goal g10 :
+  forall l1,l2,l3:list. equiv(l1,l2) -> equiv(l2,l3) -> equiv(l1,l3)
+$
+logic ite : bool, 'a1, 'a1 -> 'a1
+
+axiom ite_true: (forall x:'a1. (forall y:'a1. (ite(true, x, y) = x)))
+
+axiom ite_false: (forall x:'a1. (forall y:'a1. (ite(false, x, y) = y)))
+
+goal g11 : 1 = if true then 1 else 2
+$
+logic ite : bool, 'a1, 'a1 -> 'a1
+
+axiom ite_true: (forall x:'a1. (forall y:'a1. (ite(true, x, y) = x)))
+
+axiom ite_false: (forall x:'a1. (forall y:'a1. (ite(false, x, y) = y)))
+
+goal g12 : 2 = if false then 1 else 2
+$$$tab
+type 'a tableau
+
+logic acc : 'a tableau, int -> 'a
+
+logic upd : 'a tableau, int , 'a -> 'a tableau
+
+axiom acc_upd_neq:
+ forall m : 'a tableau.
+ forall p1:int.
+ forall p2:int.
+ forall a:'a [acc(upd(m, p1, a), p2)].
+ (p1 <> p2) ->(acc(upd(m, p1, a), p2) = acc(m, p2))
+
+type pset
+
+logic pset_singleton : int -> pset
+logic not_in_pset : int, pset -> prop
+logic not_assigns : 'a tableau , 'a tableau , pset -> prop
+
+axiom not_not_in_singleton:
+  (forall p:int [pset_singleton(p)].
+     (not not_in_pset(p, pset_singleton(p))))
+
+axiom a1:
+  forall m1: 'a tableau.
+  forall m2: 'a tableau.
+  forall l: pset. 
+  ( forall p:int.
+    (not_in_pset(p, l) -> (acc(m2, p) = acc(m1, p)))) -> not_assigns(m1,m2,l)
+
+goal g:
+  forall i:int.
+  forall a:'a.
+  forall t1:'a tableau.
+  forall t2:'a tableau.
+  t2 = upd(t1,i,a) -> 
+  not_assigns(t1,t2,pset_singleton(i))
+$$$fl
+
+logic P: 'a,'a,int,int -> prop
+logic f: 'a , int -> 'a
+
+axiom sym: 
+  forall x,y:'a. forall l,r:int. P(x,y,l,r) -> P(y,x,l,r)
+
+axiom trans: 
+  forall x,y,z:'a. forall l,r:int. P(x,y,l,r) -> P(y,z,l,r) -> P(x,z,l,r)
+
+axiom swap: 
+  forall x:'a. 
+  forall i:int.
+  forall l,r:int. 
+    P(x,f(x,i),l,r) 
+
+goal g: 
+  forall t,t0,t1:'a. 
+  forall i:int.
+  P(t0,t,0,0) -> t1=f(t0,i) -> P(t1,t,0,0)
+
+
+
+$$$pairs_arith
+type 'a pair
+type elt
+
+logic pair : 'a , 'a -> 'a pair
+logic fst : 'a pair -> 'a
+logic snd : 'a pair -> 'a
+
+
+goal g1: forall a,b:elt. fst(pair(a,b))=a
+$
+type 'a pair
+type elt
+
+logic pair : 'a , 'a -> 'a pair
+logic fst : 'a pair -> 'a
+logic snd : 'a pair -> 'a
+
+goal g2: forall a,b:elt. snd(pair(a,b))=b
+
+$
+type 'a pair
+type elt
+
+logic pair : 'a , 'a -> 'a pair
+logic fst : 'a pair -> 'a
+logic snd : 'a pair -> 'a
+
+goal g3: forall a,b,a',b':elt. pair(a,b) = pair(a',b') -> a=a'
+
+$
+type 'a pair
+type elt
+
+logic pair : 'a , 'a -> 'a pair
+logic fst : 'a pair -> 'a
+logic snd : 'a pair -> 'a
+
+goal g4: forall a,b,a',b':elt. pair(a,b) = pair(a',b') -> b=b'
+
+$
+
+type 'a pair
+type elt
+
+logic pair : 'a , 'a -> 'a pair
+logic fst : 'a pair -> 'a
+logic snd : 'a pair -> 'a
+
+goal g6: forall x,y:int. fst(pair(x,y)) = 2 -> x=2
+
+$
+type 'a pair
+type elt
+
+logic pair : 'a , 'a -> 'a pair
+logic fst : 'a pair -> 'a
+logic snd : 'a pair -> 'a
+
+goal g7: forall x,y:int. fst(pair(x,y)) + 1 = 2 -> x=1
+
+$
+type 'a pair
+type elt
+
+logic pair : 'a , 'a -> 'a pair
+logic fst : 'a pair -> 'a
+logic snd : 'a pair -> 'a
+
+goal g8: forall x,y,z:int. fst(pair(fst(pair(x+3,y)),z)) + 2 = 5 -> x=0
+
+$
+type 'a pair
+type elt
+
+logic pair : 'a , 'a -> 'a pair
+logic fst : 'a pair -> 'a
+logic snd : 'a pair -> 'a
+
+goal g9: forall x,y,z:int. fst(pair(fst(pair(x-x,y)),z)) + 2 = x -> x=2
+
+$
+type 'a pair
+type elt
+
+logic pair : 'a , 'a -> 'a pair
+logic fst : 'a pair -> 'a
+logic snd : 'a pair -> 'a
+
+goal g10: 
+ forall x : int pair. forall y : int. 
+ y = snd(x) -> fst(x) + snd(x) = fst(x) + y
+
+$
+type 'a pair
+type elt
+
+logic pair : 'a , 'a -> 'a pair
+logic fst : 'a pair -> 'a
+logic snd : 'a pair -> 'a
+logic f : elt,elt  -> elt
+
+goal g18 : forall x,y,z,t,x2:elt. f(y,y)=f(t,t) -> f(z,x2)<>f(x,x2) -> pair(z,t)<>pair(x,y)
+
+
+
+
+$$$ac_arith
+
+logic ac f : int,int -> int
+goal g1 : forall a,b,c,x:int. c = a + x  -> a = f(c,b) -> x=1 ->  f(c,b)=c-1
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g2 : 
+  a = b -> 
+  f(a+1,a) = f(a,b+1)
+$
+logic a,b,c,x,beta,gamma,d:int
+
+logic ac f : int,int -> int
+
+goal g3 : 
+     f((f(a,b) + x),c) = gamma -> 
+     x = 0 -> 
+     f(a,c) = a -> 
+     f(a,d) = beta -> 
+     f(b,beta) = f(d,gamma)
+     
+$
+
+logic ac f : int,int -> int
+goal g4 : forall a,b,c,x:int. c = a + x  -> a = f(c,b) -> x=0 ->  f(c,b)=c
+
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g5 : 
+  a = b -> 
+  f(a+1,a) = f(a,b+1)
+
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g6 : 
+  a = b -> 
+  f(a+1,a) = f(a+1,b)
+
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g7 : 
+  a + 1 = b -> 
+  f(a+1,a) = f(a,b)
+
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g8 : 
+  a + 1 = b + x -> 
+  x = 1 -> 
+  f(a,a) = f(a,b)
+
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g9 : a = b -> b = a
+
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g10 : 
+  f(a,a) = a ->
+  a = b ->
+  f(a,b) + a =a + b
+
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g11 : 
+  a = b -> 
+  f(a+1,a+2) = f(a+1,b+2)
+
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g12 : 
+  a + 1 = b + 2 -> 
+  f(a,a-1) = f(a,b)
+
+$
+ 
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g13 : 
+  2 * a = 3 * b -> 
+  f(x,2 * a) = f(3 * b,x)
+ 
+$
+
+logic a,b,c,x:real
+logic ac f : real,real -> real
+goal g14 : 
+  2. * a = 3. * b -> 
+  f(x,2./3. * a) = f(b,x)
+
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g15 : 
+  f(a,a) = a ->
+  a = b ->
+  f(a,b) + a =a + b
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,x,y:int
+
+goal g16: 
+  f(a,b) + x = b -> 
+  x = 0 -> 
+  f(a,f(b,y)) = f(b,y)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g17:
+  f(a,b) = gamma ->
+  x = 0 -> 
+  f(a,c) = beta + x -> 
+  f(c,gamma) = f(b,beta)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g18:
+  f(a,b) = gamma + x ->
+  x = 0 -> 
+  f(a,c) = beta + x -> 
+  f(c,gamma) = f(b,beta)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g19:
+  f(a,b) = gamma ->
+  f(a,c) = beta + x -> 
+  x = 0 -> 
+  f(c,gamma) = f(b,beta)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g20:
+  f(a,b) = gamma + x ->
+  f(a,c) = beta + x -> 
+  x = 0 -> 
+  f(c,gamma) = f(b,beta)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g21:
+  f(a,b) = gamma + x ->
+  f(a,c) = beta -> 
+  x = 0 -> 
+  f(c,gamma) = f(b,beta)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g22:
+  f(a,b) = gamma ->
+  f(a,c) = beta -> 
+  x = 0 -> 
+  f(c,x + gamma) = f(b,beta)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+(* axiome special pour corriger le pb de matching AC *)
+axiom neutre : forall u,v:int. f(u,f(v,0))= f(u,v)
+
+goal g23:
+  f(a,b) = gamma ->
+  f(a,c) = beta -> 
+  x = 0 -> 
+  f(c,gamma) = f(f(b,x),beta)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g24:
+  f(a,b) = gamma ->
+  f(a,c) = beta -> 
+  x = 0 -> 
+  f(c,gamma) = f(b + x,beta)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g25:
+  x = 0 -> 
+  f(a,b) = gamma ->
+  f(a,c) = beta -> 
+  f(c,x + gamma) = f(b,beta)
+
+$
+
+logic a,b,c, beta,gamma,x : int
+logic ac f : int,int -> int
+
+goal g26 : 
+  f(a,b+x) = gamma ->  
+  f(a,c) = beta  -> 
+  x = 1 ->
+  f(b + 1,beta) = f(c,gamma) 
+
+$
+
+logic a,b,c, beta,gamma,x : int
+logic ac f : int,int -> int
+
+goal g27 : 
+  f(a,b+x) = gamma ->  
+  f(a,c) = beta  -> 
+  x = 0 ->
+  f(b,beta) = f(c,gamma) 
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,u,v,w,x:int
+
+goal g28 :
+  x = 0 -> 
+  f(a,b) + x = u -> 
+  f(a,c) = w -> 
+  f(u,c) = f(w,b)
+
+$
+
+logic a,b,c, beta,gamma,x : int
+logic ac f : int,int -> int
+
+goal g29 : 
+  f(b,a) = f(b+x,f(a+x,a+x)) ->  
+  x = 1 ->
+  f(b,c) = beta  -> 
+  f(b+1,f(a+1, f(a+1, c))) = f(a,beta) 
+
+$
+
+logic a,b,c, beta,gamma,x : int
+logic ac f : int,int -> int
+
+goal g30 : 
+  f(b,a) = f(b+x,f(a+x,a+x)) ->  
+  f(b,c) = beta  -> 
+  x = 1 ->
+  f(b + 1,f(a + 1, f(a + 1, c))) = f(a,beta) 
+
+$
+
+logic a,b,c, beta,gamma,x : int
+logic ac f : int,int -> int
+
+goal g31 : 
+  x = 1 ->
+  f(b,a) = f(b+x,f(a+x,a+x)) ->  
+  f(b,c) = beta  -> 
+  f(b + 1,f(a + 1, f(a + 1, c))) = f(a,beta) 
+
+$
+
+logic a,b,c, beta,gamma,x : int
+logic ac f : int,int -> int
+
+goal g32 : 
+  x = 2 ->
+  f(a,b) = f(a,f(b,c)) ->
+  f(a,f(b,gamma)) = f(a,f(b,f(c,gamma)))
+
+$
+
+logic a,b,c, beta,gamma,x : int
+logic ac f : int,int -> int
+
+goal g33 : 
+  x = 1 ->
+  f(a,b) = f(b+x,f(a+x,a+x)) ->  
+  f(b + 1,f(a + 1, f(a + 1, c))) = f(b,f(a,c)) 
+  
+$  
+
+logic a,b,c, beta,gamma,x : int
+logic ac f : int,int -> int
+
+goal g34 : 
+  x = 1 ->
+  f(a,b+x) = gamma ->  
+  f(a,c) = beta  -> 
+  f(gamma,c) = f(beta, b + 1) 
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,u,v,w,x,y:int
+
+goal g35 : 
+  x = 0 ->
+  f(a,b) = u -> 
+  f(a,b) + x = v + y ->
+  f(a,c)=w -> 
+  f(v+y,c) = f(w,b)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,u,v,w,x:int
+
+goal g36 : 
+  x = 0 ->
+  f(a,b) = u -> 
+  f(a,b) + x = v ->
+  f(a,c)=w -> 
+  f(v,c) = f(w,b)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,u,v,w,x:int
+
+goal g37: 
+  f(a,c) = w -> 
+  f(a,b) + x = v -> 
+  x = 0 -> 
+  f(v,c) = f(w,b)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,u,v,w,x:int
+
+goal g38: 
+  f(a,b) = u -> (* ne sert pas! juste une pollution*)
+  f(a,b) + x = v -> 
+  x = 0 -> 
+  f(a,c) = w -> 
+  f(v,c) = f(w,b)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,u,v,w,x:int
+
+goal g39: 
+  f(a,b) = u -> 
+  x = 0 -> 
+  f(a,b) + x = v -> 
+  f(a,c) = w -> 
+  f(v,c) = f(w,b)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g40:
+  x = 0 -> 
+  f(a,b) = gamma ->
+  f(a,c) = beta -> 
+  f(c,gamma) = f(b + x,beta)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g41:
+  x = 0 -> 
+  f(a,b) = gamma + x ->
+  f(a,c) = beta + x -> 
+  f(c,gamma) = f(b,beta)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g42:
+  f(a,b) = gamma + x ->
+  x = 0 -> 
+  f(a,c) = beta -> 
+  f(c,gamma) = f(b,beta)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,u,v,w,x:int
+
+goal g43: 
+  f(a,c) = w -> 
+  f(a,b) + x = b -> 
+  x = 0 -> 
+  f(b,c) = f(w,b)
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,u,v,w,x:int
+
+goal g44: 
+  b = v -> 
+  f(a,c) = w -> 
+  f(a,b) + x = v -> 
+  x = 0 -> 
+  f(v,c) = f(w,b)
+
+$
+
+logic a,b,c,d,e,gamma,beta,x,y,t:int
+logic ac f,g : int,int -> int
+
+goal g45 :
+  f(a+1,b) = gamma ->
+  f(a+t,c) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduit *)
+  g(f(gamma,c),d) = x ->
+  g(f(beta,b),e) = y ->
+  t = 1 -> 
+  g(x,e) = g(y,d)
+
+$
+
+logic a,b,c,d,e,gamma,beta,x,y,t:int
+logic ac f,g : int,int -> int
+
+goal g46 :
+  f(a+1,b) = gamma ->
+  f(a+t,c) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduit *)
+  g(f(gamma,c),d) = x ->
+  t = 1 -> 
+  g(f(beta,b),e) = y ->
+  g(x,e) = g(y,d)
+
+$
+
+logic a,b,c,d,e,gamma,beta,x,y,t:int
+logic ac f,g : int,int -> int
+
+goal g47 :
+  f(a+t,b) = gamma ->
+  f(a+t,c) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduit *)
+  g(f(gamma,c),d) = x ->
+  t = 1 -> 
+  g(f(beta,b),e) = y ->
+  g(x,e) = g(y,d)
+
+$
+
+logic a,b,c,d,e,gamma,beta,x,y,t:int
+logic ac f,g : int,int -> int
+
+goal g48 :
+  f(a,b) = gamma ->
+  f(a+t,c) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduit *)
+  t = 0 -> 
+  g(f(gamma,c),d) = x ->
+  g(f(beta,b),e) = y ->
+  g(x,e) = g(y,d)
+
+
+$
+
+logic a,b,c,d,e,gamma,beta,x,y,t:int
+logic ac f,g : int,int -> int
+
+goal g49 :
+  f(a,b) = gamma ->
+  f(a,c+t) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduit *)
+  g(f(gamma,c+t),d) = x ->
+  g(f(beta,b),e) = y ->
+  g(x,e) = g(y,d)
+
+$
+
+logic a,b,c,d,e,gamma,beta,x,y,t:int
+logic ac f,g : int,int -> int
+
+goal g50 :
+  f(a,b) = gamma ->
+  f(a,c+t) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduit *)
+  g(f(gamma,c+1),d) = x ->
+  g(f(beta,b),e) = y ->
+  t = 1 -> 
+  g(x,e) = g(y,d)
+
+$
+
+logic a,b,c,d,e,gamma,beta,x,y,t:int
+logic ac f,g : int,int -> int
+
+goal g51 :
+  f(a,b) = gamma ->
+  f(a,c+t) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduit *)
+  t = 1 -> 
+  g(f(gamma,c+t),d) = x ->
+  g(f(beta,b),e) = y ->
+  g(x,e) = g(y,d)
+
+$
+
+logic a,b,c,gamma,beta,t2,t4:int
+logic ac f,g : int,int -> int
+
+goal g52 :
+  f(g(a,b+t2),c+t4) = gamma ->
+  g(a,b+t2) = beta ->
+  1 = t2 ->
+  t4 = 2 * t2->
+  f(beta,c+2)= gamma
+  
+$
+
+logic a,b,c,gamma,beta,t3,t1:int
+logic ac f,g : int,int -> int
+
+goal g53 :
+  f(g(a,b+1)+t1,c+2) + t3 = gamma ->
+  g(a+t3,b+1) = beta ->
+  t3 = t1 ->
+  t1 = 0 ->
+  f(beta,c+2)= gamma
+  
+$
+
+logic a,b,c,gamma,beta,t3,t2,t4:int
+logic ac f : int,int -> int
+
+goal g54 :
+  a = beta ->
+  f(a,5) + t3 = gamma ->
+  t3 = 0 ->
+  f(a,5)= gamma
+
+$
+logic ac f : int,int -> int
+logic a,b,c,x : int
+  
+goal g55 :
+  f(a,b) = f(a,x + f(c,f(b,a))) ->
+  x = 0 -> 
+  f(a,b) = f(a,f(c,f(a,b)))
+
+$
+logic ac f,h : int,int -> int
+logic a,b,c,d,x,y,z,beta,gamma : int
+
+goal g56 : 
+  y = 1 ->
+  f(a,b) = gamma ->
+  f(a,c+y) = beta  ->
+  h(f(f(a,b),c+1),d) = f(gamma,beta) ->
+  h(f(gamma,c+y),d) = f(gamma,beta) 
+
+$
+logic ac f,g,h : int,int -> int
+logic a,b,c,d,e,x,y,z,t,m,n,alpha,beta,gamma,delta : int
+
+goal g57 : 
+  f(a+x+y, b+z) = gamma ->
+  f(a+x+1, c+y) = beta  ->
+  h(f(f(a+x+1,b),c+1),d+z) = f(beta,f(a+x+y, b+z)) ->
+  h(f(beta,b+y-1),g(h(z,x),y)) = h(delta,h(delta,beta)) ->
+  x + y = x + 1 ->
+  z + 1 = y ->
+  x = 100 ->
+  h(d+z,h(delta,h(delta,beta))) = h(f(f(a+x+y, b+z),f(a+x+1, c+y)),g(h(x,z),y))
+
+
+$
+
+logic ac f,g,h : int,int -> int
+logic a,b,c,d,e,x,y,z,t,m,n,alpha,beta,gamma,delta : int
+logic aa,bb,cc,dd,ee,ff,gg,hh,ii,jj,kk,ll,mm,nn,oo,pp,qq,rr,ss,tt : int
+
+goal g58 : 
+  f(a+x+y+aa, b+z+kk) = gamma +cc ->
+  f(a+x+1+ff, c+y+ee) = beta +dd ->
+  h(f(f(a+x+1+gg,b+hh),c+1+ii),jj+d+z) = f(kk+beta,f(a+x+y+ll, b+z+mm)) ->
+  h(f(beta+nn,b+y-1+oo),g(h(z+pp,x+qq),y+rr)) = h(delta+ss,h(delta+aa,beta+tt)) ->
+  x +bb + y = ff+ x + 1 ->
+  jj+ z + 1 = y + qq->
+  x = 100 ->
+  bb = ss ->
+  ll = rr ->
+  hh = kk ->
+  cc = nn ->
+  ff = 0 ->
+  ii = aa ->
+  tt = pp ->
+  jj = qq ->
+  qq = tt ->
+  kk = cc ->
+  mm = ll ->
+  ee = jj ->
+  oo = ii ->
+  dd = bb ->
+  gg = ee ->
+  pp = hh ->
+  rr = oo ->
+  nn = dd ->
+  ss = mm ->
+  aa = 0 ->
+  h(d+z,h(delta,h(delta,beta))) = h(f(f(a+x+y, b+z),f(a+x+1, c+y)),g(h(x,z),y))  (*deduct *)
+
+
+
+$$$ac_empty
+
+logic ac m: int,int -> int
+logic t1,t2,t3,t4,t5,t6,t7,t8:int
+
+goal g1: 
+  m(m(m(m(m(m(m(t1,t2),t3),t4),t5),t6),t7),t8) =
+  m(t1,m(t2,m(t3,m(t4,m(t5,m(t6,m(t7,t8)))))))
+
+$
+
+logic a, c, x, y, beta, gamma: int
+logic h: int -> int
+logic ac f: int, int -> int
+
+
+goal g2 :
+  f(a,h(x)) = gamma ->
+  f(a,c)    = beta ->
+  x = y ->
+  f(a,f(h(x),c)) = f(h(y),beta)
+
+$
+
+type set
+logic ac u: set,set -> set
+
+axiom idem : forall x,X: set. u(u(x,x),X)=u(x,X)
+goal g3: forall r,s,t: set. u(t,u(t,s)) = u(s,t)
+
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g4 : 
+  f(a,b) = gamma ->  
+  f(a,c) = beta  -> 
+  f(a,b) = gamma 
+
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+
+goal g5 : 
+  f(a,b) = gamma ->  
+  f(a,c) = beta  -> 
+  f(b,beta) = f(c,gamma) 
+
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g6 : 
+  gamma = f(a,b)->  
+  f(a,c) = beta  -> 
+  f(b,beta) = f(c,gamma) 
+
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g7 : 
+  f(a,b) = gamma ->  
+  beta   = f(a,c) -> 
+  f(b,beta) = f(c,gamma) 
+
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g8 : 
+  gamma  = f(a,b) ->  
+  beta   = f(a,c) -> 
+  f(b,beta) = f(c,gamma) 
+
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g9 : 
+  f(a,b) = gamma ->  
+  f(a,c) = beta  -> 
+  f(c,gamma) = f(b,beta)
+
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g10 : 
+  gamma = f(a,b)->  
+  f(a,c) = beta  -> 
+  f(c,gamma) = f(b,beta) 
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g11 : 
+  f(a,b) = gamma ->  
+  beta   = f(a,c) -> 
+  f(c,gamma) = f(b,beta) 
+
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g12 : 
+  gamma  = f(a,b) ->  
+  beta   = f(a,c) -> 
+  f(c,gamma) = f(b,beta)
+
+$
+logic a,b,c, beta,gamma,lambda : int
+logic ac f : int,int -> int
+
+goal g13 : 
+  f(a,b) = gamma ->  
+  f(a,c) = beta  -> 
+  f(b,f(lambda,beta)) = f(f(c,lambda),gamma) 
+
+$
+
+logic a,b,c, beta,gamma,lambda : int
+logic ac f : int,int -> int
+
+goal g14 : 
+  gamma = f(a,b)->  
+  f(a,c) = beta  -> 
+  f(gamma,f(lambda,f(b,beta))) = f(f(c,gamma),f(lambda,gamma)) 
+
+$
+
+logic a,b,c, beta,gamma,lambda : int
+logic ac f : int,int -> int
+
+goal g15 : 
+  f(a,b) = gamma ->  
+  beta   = f(a,c) -> 
+  f(f(b,beta),lambda) = f(lambda,f(c,gamma)) 
+
+$
+
+logic a,b,c, beta,gamma,lambda : int
+logic ac f : int,int -> int
+
+goal g16 : 
+  gamma  = f(a,b) ->  
+  beta   = f(a,c) -> 
+  f(lambda,f(b,beta)) = f(c,f(lambda,gamma)) 
+
+$
+
+logic a,b,c, beta,gamma,lambda : int
+logic ac f : int,int -> int
+
+goal g17 : 
+  f(a,b) = gamma ->  
+  f(a,c) = beta  -> 
+  f(f(c,gamma),lambda) = f(f(lambda,b),beta)
+
+$
+
+logic a,b,c, beta,gamma,lambda : int
+logic ac f : int,int -> int
+
+goal g18 : 
+  gamma = f(a,b)->  
+  f(a,c) = beta  -> 
+  f(lambda,f(c,gamma)) = f(b,f(beta,lambda)) 
+
+$
+
+logic a,b,c, beta,gamma,lambda : int
+logic ac f : int,int -> int
+
+goal g19 : 
+  f(a,b) = gamma ->  
+  beta   = f(a,c) -> 
+  f(lambda,f(c,gamma)) = f(b,f(lambda,beta)) 
+
+$
+
+logic a,b,c, beta,gamma,lambda : int
+logic ac f : int,int -> int
+
+goal g20 : 
+  gamma  = f(a,b) ->  
+  beta   = f(a,c) -> 
+  f(c,f(gamma,lambda)) = f(f(b,beta),lambda)
+
+$
+
+logic aa,a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g21 : 
+  a = aa ->
+  f(a,b) = gamma ->  
+  f(aa,c) = beta  -> 
+  f(b,beta) = f(c,gamma) 
+
+$
+
+logic aa,a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g22 : 
+  gamma = f(a,b)->  
+  f(aa,c) = beta  -> 
+  a = aa ->
+  f(b,beta) = f(c,gamma) 
+    
+$
+
+logic aa,a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g23 : 
+  f(a,b) = gamma ->  
+  beta   = f(aa,c) -> 
+  a = aa ->
+  f(b,beta) = f(c,gamma) 
+
+$
+
+logic aa,a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g24 : 
+  gamma  = f(a,b) ->  
+  beta   = f(aa,c) -> 
+  a = aa ->
+  f(b,beta) = f(c,gamma) 
+
+$
+
+logic aa,a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g25 : 
+  f(a,b) = gamma ->  
+  f(aa,c) = beta  -> 
+  a = aa ->
+  f(c,gamma) = f(b,beta)
+
+$
+
+logic aa,a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g26 : 
+  gamma = f(a,b)->  
+  f(aa,c) = beta  -> 
+  a = aa ->
+  f(c,gamma) = f(b,beta) 
+
+$
+
+logic aa,a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g27 : 
+  f(a,b) = gamma ->  
+  beta   = f(aa,c) -> 
+  a = aa ->
+  f(c,gamma) = f(b,beta) 
+
+$
+
+logic aa, a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g28 : 
+  gamma  = f(a,b) ->  
+  beta   = f(aa,c) -> 
+  a = aa ->
+  f(c,gamma) = f(b,beta)
+
+$
+
+type a
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g29 : 
+  f(a,b) = gamma ->  
+  f(a,c) = beta  -> 
+  f(a,b) = gamma 
+
+$
+
+type a
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g30 : 
+  f(a,b) = gamma ->  
+  f(a,c) = beta  -> 
+  f(b,beta) = f(c,gamma) 
+
+$
+
+type a
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g31 : 
+  gamma = f(a,b)->  
+  f(a,c) = beta  -> 
+  f(b,beta) = f(c,gamma) 
+
+$
+
+type a
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g32 : 
+  f(a,b) = gamma ->  
+  beta   = f(a,c) -> 
+  f(b,beta) = f(c,gamma) 
+
+$
+
+type a
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g33 : 
+  gamma  = f(a,b) ->  
+  beta   = f(a,c) -> 
+  f(b,beta) = f(c,gamma) 
+
+$
+
+type a
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g34 : 
+  f(a,b) = gamma ->  
+  f(a,c) = beta  -> 
+  f(c,gamma) = f(b,beta)
+
+$
+
+type a
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g35 : 
+  gamma = f(a,b)->  
+  f(a,c) = beta  -> 
+  f(c,gamma) = f(b,beta) 
+
+$
+
+type a
+
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g36 : 
+  f(a,b) = gamma ->  
+  beta   = f(a,c) -> 
+  f(c,gamma) = f(b,beta) 
+
+$
+
+type a
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g37 : 
+  gamma  = f(a,b) ->  
+  beta   = f(a,c) -> 
+  f(c,gamma) = f(b,beta)
+$
+
+(* c = beta *)
+logic a,b,c, gamma : int
+logic ac f : int,int -> int
+
+goal g38 : 
+  c = f(a,c) -> 
+  f(a,b) = gamma ->  
+  f(b,c) = f(c,gamma)
+
+$
+
+(* c = beta *)
+logic a,b,c, gamma : int
+logic ac f : int,int -> int
+
+goal g39 : 
+  f(a,c) = c  -> 
+  f(a,b) = gamma ->  
+  f(b,c) = f(c,gamma)
+    
+$
+
+(* gamma |-> b et beta |-> c *)
+logic a, b, c : int
+logic ac f : int,int -> int
+
+goal g40 : 
+  c = f(a,b) ->  
+  b = f(a,c) -> 
+  f(c,c) = f(b,b)
+
+$
+
+(* gamma |-> b et beta |-> c *)
+logic a, b, c : int
+logic ac f : int,int -> int
+
+goal g41 : 
+  f(a,b) = c ->  
+  f(a,c) = b  -> 
+  f(b,b) = f(c,c)
+$
+
+logic a1, a2, a3, b1, b2, x,y,z ,beta, gamma : int
+logic ac f : int,int -> int
+
+goal g42 : 
+  f(a1,f(a2,f(a3,x))) = gamma ->
+  f(b1,f(b2,f(y,z)))  = beta   -> (* boucle ici*)
+  f(a1,f(a2,a3)) = f(b1,b2) ->
+  f(gamma,f(y,z)) = f(beta,x)
+
+$
+
+logic a1, a2, a3, b1, b2, x,y,z ,beta, gamma : int
+logic ac f : int,int -> int
+
+goal g43 : 
+  f(a1,f(a2,f(a3,x))) = gamma ->
+  f(b1,f(b2,f(y,z)))  = beta   -> (* boucle ici*)
+  f(a1,f(a2,a3)) = f(b1,b2) ->
+  f(gamma,f(y,z)) = f(beta,x)
+
+$
+
+(* une pc car f(a1,a2,a3) = f(b1,b2)*)
+logic a1, a2, a3, b1, b2, y ,beta, gamma : int
+logic ac f : int,int -> int
+
+goal g44 : 
+  f(a1,f(a2,a3)) = gamma ->
+  f(b1,f(b2,y))  = beta   -> (* boucle ici*)
+  f(b1,b2) = f(a1,f(a2,a3)) ->
+  f(gamma,y) = beta
+
+$
+
+(* pc sur a1 = a1 
+   ou seulement pc sur f(a1,a2,a3) = f(a1,b2)*)
+logic a1, a2, a3, b1, b2, x,y,z ,beta, gamma : int
+logic ac f : int,int -> int
+
+goal g45 : 
+  f(a1,f(a2,f(a3,x))) = gamma ->
+  f(a1,f(b2,f(y,z)))  = beta   ->
+  f(a1,f(a2,a3)) = f(a1,b2) ->
+  f(gamma,f(y,z)) = f(beta,x)
+
+$
+    
+(* pc sur a1 = a1 
+   ou seulement pc sur f(a1,a2,a3) = f(a1,b2)*)
+logic a1, a2, a3, b1, b2, x,y,z ,beta, gamma : int
+logic ac f : int,int -> int
+
+goal g46 : 
+  f(a1,f(a2,f(a3,x))) = gamma ->
+  f(a1,f(b2,f(y,z)))  = beta   ->
+  a3 = b2 ->
+  f(gamma,f(y,z)) = f(beta,f(a2,x))
+
+$
+(* pc sur a1 = a1 
+   ou seulement pc sur f(a1,a2,a3) = f(a1,b2)*)
+logic a1, a11, a2, a3, b1, b2, x,y,z ,beta, gamma : int
+logic ac f : int,int -> int
+
+goal g47 : 
+  f(a1,f(a2,f(a3,x))) = gamma ->
+  f(a1,f(b2,f(y,z)))  = beta   ->
+  f(a2,a3) = b2 ->
+  f(gamma,f(y,z)) = f(beta,x)
+
+$
+
+(* pc sur a1 = a1 
+   ou seulement pc sur f(a1,a2,a3) = f(a1,b2)*)
+
+logic a1, a11, a2, a3, b1, b2, x,y,z ,beta, gamma : int
+logic ac f : int,int -> int
+
+goal g48 : 
+  f(a1,f(a2,f(a3,x))) = gamma ->
+  f(a11,f(b2,f(y,z)))  = beta   ->
+  f(a2,f(a3,a1)) = f(b2,a11) ->
+  f(gamma,f(y,z)) = f(beta,x)
+
+$
+
+logic a,b,c,s : int
+logic g : int -> int
+logic ac f : int,int -> int
+
+goal g49: 
+  f(b,c)    = s ->
+  f(g(s),c) = b ->
+  f(g(s),s) = f(b,b)
+
+$
+
+logic a,b,c,s : int
+logic g : int -> int
+logic ac f : int,int -> int
+
+goal g50: 
+  f(b,c)    = s ->
+  f(g(s),c) = b ->
+  g(s) = s ->
+  f(s,s) = f(b,b)
+
+$
+
+logic a,b,c,gamma,beta,x: int
+logic ac f : int , int -> int
+
+goal g51 : 
+  f(a,b) = f(x,gamma) ->
+  f(a,c) = f(x,beta) ->
+  f(x,f(gamma,c)) = f(x,f(beta,b)) 
+
+$
+
+logic a,b,c,gamma,beta,x: int
+logic ac f : int , int -> int
+
+goal g52 : 
+  f(a,b) = f(x,gamma) ->
+  f(a,c) = f(x,beta) ->
+  f(a,f(gamma,c)) = f(a,f(beta,b))
+
+$
+
+logic a,b,c,gamma,beta,x,y : int
+logic ac f : int , int -> int
+
+goal g53 : 
+  f(a,b) = f(x,gamma) ->
+  f(a,c) = f(y,beta) ->
+  f(x,f(gamma,c)) = f(y,f(beta,b))
+
+$
+
+logic a,b,x,y,z : int
+logic ac f: int,int -> int
+
+goal g54:
+ f(a,x) = f(a,y) -> 
+ f(a,z) = b ->
+ f(z,f(a,y)) = f(x,b) and f(z,f(a,x)) = f(y,b)
+
+
+
+
+
+$
+
+logic a,b,c,d,x,y,gamma,beta : int
+logic ac f,g:int,int -> int
+
+goal g55 :
+  g(x,y) = f(a,b) ->
+  f(g(x,y),d) = gamma ->
+  f(a,c)      = beta ->
+  f(gamma,c) = f(beta,f(b,d))
+
+$
+
+logic a,b,c,x,gamma,beta,delta,omega : int
+logic ac f,g:int,int -> int
+
+goal g56 :
+  f(a,b) = gamma ->
+  f(a,c) = beta ->
+  g(x,gamma)= delta ->
+  g(x,beta) = omega ->
+  g(beta,delta) = g(gamma,omega)
+
+$
+
+logic a,b,c,x,gamma,beta,delta,omega : int
+logic ac f,g:int,int -> int
+
+goal g57 :
+  f(a,b) = gamma ->
+  f(a,c) = beta ->
+  g(x,gamma)= delta ->
+  g(x,beta) = omega ->
+  f(b,beta) = f(c,gamma)
+
+$
+
+logic a, b, c, x,y,z : int
+logic ac g : int, int -> int
+
+goal g58: 
+  
+  g(a,b) = g(x,y) -> 
+  g(a,c)=g(x,z) -> 
+  g(b,g(x,z)) = g(c,g(x,y)) 
+  
+$
+
+logic x,y,z,t,b : int
+logic ac f,g : int,int -> int
+
+goal g59:
+  f(z,g(y,x)) = t ->
+  y = b ->
+  f(z,g(x,b)) = t
+
+$
+
+logic x,y,z,t,gamma,beta : int
+logic ac f,g : int,int -> int
+
+goal g60:
+  f(x,g(y,z)) = gamma ->
+  f(x,t)      = beta ->
+  f(gamma,t) = f(beta,g(y,z))
+
+$
+
+logic  b, c,a, d,z,  subst : int
+logic ac f : int, int -> int
+logic g : int -> int
+
+goal g61 : 
+  f(a,c) = a ->
+  f(c, g (f (b, c))) = b -> 
+  g(f (b, c)) = f (b, c) -> 
+  f(b,b) = f(f(b,c),f(b,c))
+
+$
+
+logic  b, c,a, d,z, s : int
+logic ac f : int, int -> int
+logic g : int -> int
+
+goal g62 : 
+  f(b,c) = s ->
+  f(a,c) = a ->
+  f(c,g(s)) = b -> 
+  g(s) = s -> 
+  f(b,b) = f(s,s)
+
+$
+
+logic  b, c,a, d,z, s : int
+logic ac f : int, int -> int
+logic g : int -> int
+
+goal g63 : 
+  f(b,c) = s ->
+  f(a,c) = a ->
+  f(c,g(s)) = b -> 
+  g(s) = s -> 
+  f(b,b) = f(g(s),s)
+
+$
+
+logic  b, c,a, d,z, s : int
+logic ac f : int, int -> int
+logic g : int -> int
+
+goal g64 : 
+  s = f(b,c) ->
+  f(a,c) = a ->
+  f(c,g(s)) = b -> 
+  g(s) = s -> 
+  f(b,b) = f(s,s)
+
+$
+
+logic a,b,c :int
+logic ac f :int,int-> int
+
+goal g65 : a = b -> f(c,a) = f(c,b)
+
+$
+
+logic a, b, c, d, x, y : int
+logic ac g : int, int -> int
+
+goal g66: 
+  g(x,g(a,b)) = g(c,g(y,d)) -> 
+  g(g(a,b),g(b,x)) = g(g(c,d),g(y,b))
+
+$
+
+logic a,b,c,d,e,f,g,h,x,y,z,t : int
+logic ac k : int, int -> int
+ 
+goal g67: 
+  k(a,b)  =x ->
+  k(b,g)  =y ->
+  k(k(a,c),e)=z ->
+  k(g,h)  =t ->
+  k(z,(k(k(t,y),x)))=k(k(a,b),k(k(k(g,e),k(b,k(a,c))),k(h,g)))
+
+$
+
+logic a, b, c, d, x, y,t : int
+logic ac f : int, int -> int
+
+goal g68 : 
+  f(a,a) = a      -> 
+  f(a,b) = c      -> 
+  f(f(a,a),b) = a -> 
+  f(a,f(f(a,a),a)) = f(a,c)
+
+$
+
+logic a,b,aa,x : int
+logic ac f : int,int -> int
+
+goal g69:
+  a = a ->
+  b = b ->
+  aa = aa ->
+  a = aa -> f(a,b) = f(aa,b)
+
+$
+
+logic a,b,aa,x : int
+logic ac f : int,int -> int
+
+goal g70:
+  f(a,b) = x -> a = aa -> a+1=aa+1
+
+$
+
+logic a,b,aa,x : int
+logic ac f : int,int -> int
+
+goal g71:
+  f(a,b) = x -> a = aa -> f(a,b) = f(aa,b) = x
+
+$
+
+logic a,b,c,d,e,gamma,beta,x,y:int
+logic ac f,g : int,int -> int
+
+goal g72 :
+  f(a,b) = gamma ->
+  f(a,c) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduite *)
+  g(f(gamma,c),d) = x ->
+  g(f(beta,b),e) = y ->
+  g(x,e) = g(y,d)
+
+$
+
+logic a,b,c,d,e,gamma,beta,x,y:int
+logic ac f,g : int,int -> int
+
+goal g73 :
+  f(a,b) = gamma ->
+  f(a,c) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduite *)
+  f(f(gamma,c),d) = x ->
+  f(f(beta,b),e) = y ->
+  f(x,e) = f(y,d)
+
+$
+
+logic a,b,c,d,e,gamma,beta,x,y:int
+logic ac f,g : int,int -> int
+
+goal g74 :
+  f(a,b) = gamma ->
+  f(a,c) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduit *)
+  g(f(f(a,c),b),d) = x ->
+  g(f(beta,b),e) = y ->
+  g(x,e) = g(y,d)
+
+$
+
+logic a,b,c,d,e,gamma,beta,x,y:int
+logic ac f : int,int -> int
+logic g : int,int -> int
+
+axiom commut : forall x,y:int. g(x,y) = g(y,x)
+goal g75 :
+  f(a,b) = gamma ->
+  f(a,c) = beta ->
+  g(a,f(gamma,c)) = g(f(a,f(c,b)),a)
+
+
+$
+
+type set
+
+logic a,b :set
+logic ac union : set,set -> set
+
+axiom idem : forall x,X: set. union (union(x,x),X)=union(x,X)
+
+goal g76 : union(a,union(b,a)) = union(a,b)
+
+
+$
+logic a,b :int
+logic ac f : int,int -> int
+axiom idem : forall x,X: int. f (f(x,x),X)=f(x,X)
+
+goal g77 :
+ f(a,f(b,a)) = f(a,b)
+
+
+$
+
+logic a,b :int
+logic ac f : int,int -> int
+
+axiom idem : forall x,X: int. f (f(x,x),X)=f(x,X)
+
+goal g78 :
+ f(f(a,f(a,f(b,a))),f(a,b)) = f(f(a,b),f(b,b))
+
+$
+
+logic ac f : int,int -> int
+logic a,b,c,d,beta,gamma : int
+
+goal g79 : 
+  f(a,b) = gamma ->            (* 1 *)
+  f(a,d) = beta ->             (* 2 *)
+  f(a,c) = gamma ->            (* 3 *)
+  f(b,c) = beta ->             (* 4 *)
+
+    f(gamma , d) = f(beta , b)       (* 1 & 2 *)
+and f(gamma , c) = f(gamma , b)      (* 1 & 3 *) 
+and f(gamma , c) = f(beta , a)       (* 1 & 4 *)
+and f(beta , c)  = f(gamma , d)      (* 2 & 3 *)
+and true                             (* 2 & 4 *)
+and f(gamma , b) = f(beta , a)       (* 3 & 4 *)
+
+$
+
+logic a,b,c,d, x, y , beta , gamma : int
+
+logic ac f : int,int -> int
+
+goal g80 : 
+  (*1*) f(f(a,b),c) = gamma ->
+  (*2*) f(a,b) = x ->
+  (*3*) f(x,y) = beta ->
+  (*4*) f(gamma,y) = f(beta,c)
+
+$
+
+logic ac f : int,int -> int 
+logic a,b,c,beta,gamma : int
+
+goal g81 :
+  f(a,f(b,c)) = gamma ->
+  f(a,b) = gamma ->
+  f(a,c) = beta ->
+  f(beta,gamma) = f(a,gamma)
+
+$
+
+logic a,b,c,d,e,gamma,beta:int
+logic ac f,g : int,int -> int
+
+goal g82 :
+  f(f(a,a),f(a,b)) = f(f(a,a),b)->
+  f(a,b) = gamma ->
+  f(a,c) = beta ->
+  f(gamma,c) = f(beta,b)
+
+$
+
+(* passe grace a la congruence sur les termes touches par recriture et
+non pas par simple substitution *)
+logic ac u : int, int -> int
+logic f : int -> int
+
+goal g83:
+  forall a, b, c, x, gamma, beta, zz, zzz:int.
+    zz = f(u(gamma,u(c,x)))  ->
+    zzz = f(u(beta,u(b,x))) ->
+    u(a,b) = gamma ->
+    u(a,c) = beta ->
+    zz = zzz
+
+$$$ac_bitv
+
+logic ac u : bitv[4],bitv[4] -> bitv[4]
+logic a,b,c,gamma : bitv[4]
+goal g1:
+  u(a,u(a,b)) @ a = u(a,b) @ gamma ->
+  u(gamma,u(gamma,b)) = u(gamma,b)
+
+$
+
+(* assert false dans combine.ml *)
+
+logic ac u : 'a, 'a -> 'a
+logic a,b,c : bitv[1]
+
+goal g2:
+  u(c,u(c,b)) @ c = u(c,b) @ c ->
+  u(c,u(c,b)) = u(a,b) ->
+  true
+
+
+$$$ac_pairs
+
+type set
+type 'a pair
+logic ac u : set, set -> set
+
+logic a,b,c,d,e,f:set
+
+logic pair : 'a,'a -> 'a pair
+
+logic fst : 'a pair -> 'a
+logic snd : 'a pair -> 'a
+
+goal g1 : 
+  pair(u(a,b),c)= pair(u(a,b),d) -> 
+  c = d
+
+$
+
+type set
+type 'a pair
+logic ac u : set, set -> set
+
+logic a,b,c,d,e,f:set
+
+logic pair : 'a,'a -> 'a pair
+
+logic fst : 'a pair -> 'a
+logic snd : 'a pair -> 'a
+
+goal g2 : 
+  pair(u(a,d),c)= pair(u(a,c),d) -> 
+  c = d
+    
+$
+
+type set
+type 'a pair
+logic ac u : set pair, set pair -> set pair 
+logic a,b,c,d,e,f:set
+
+logic pair : 'a,'a -> 'a pair
+logic fst : 'a pair -> 'a
+logic snd : 'a pair -> 'a
+
+goal g3 : 
+  pair(u(pair(a,a),pair(a,b)),pair(a,b))= 
+  pair(u(pair(a,a),pair(a,b)),pair(a,c)) ->
+  b = c 
+
+$
+
+type 'a pair
+type elt
+
+logic pair : 'a , 'a -> 'a pair
+logic fst : 'a pair -> 'a
+logic snd : 'a pair -> 'a
+
+logic a, b, d : int pair
+logic c : int
+logic ac u: int pair, int pair -> int pair
+
+
+goal g10: 
+  u(a,u(b,d)) = u(u(a,b),u(b,d)) ->
+  c = snd(u(a,b)) -> true
+
+
+$$$arith_modulo_uniquement
+
+goal g1: forall a:int. a % 2 = 1 -> (a + 1) % 2 = 1 -> false
+$
+goal g2: forall a:int. a % 2 = 1 -> (a + 1) % 2 = 0
+$
+goal g3: forall a,b:int. a % 2 = 1 -> a = b  -> b % 2 = 1 
+$
+goal g4: forall a:int. a % 2 = (a + 0)% (1+1)
+$
+goal g5: forall a:int. a % 8 = 6 -> a % 4 = 2 and a % 2 = 0
+$
+goal g6: forall a:int. a % 10 = 12 -> false
+$
+goal g7: forall a,m:int. a%10 = m -> 0 <= m < 10
+$
+goal g9: forall a,m,n,k:int. k = m + n -> a % k = a % (m+n)
+$
+goal g10: forall a:int. a % 4 = 1 -> a % 4 <> 0 and a % 4 <> 2 and a % 4 <> 3
+$
+goal g11: forall a,b:int. a % b = 1 -> b = 10 -> a % 10 = 1
+$
+goal g12: forall a:int. a % 2 = (a + 2) % 2
+$
+goal g12: forall a,b:int. a % 2 = (a + 2*b) % 2
+
+
+
+$$$arith_non_lineaire
+
+goal sum_po_7:
+  forall n,i,s:int.
+  n >= 0 -> 2*s = i*(i + 1) and i <= n -> i >= n -> 2 * s = n*(n + 1)
+$
+goal sum_po_3:
+  forall n,i,s:int.
+  n >= 0 -> 2 * s = i * (i + 1) and i <= n ->
+  i < n -> 2 * (s + i + 1) = (i + 1) * (i + 2)
+
+
+
+$$$arith_modulo_div
+
+goal g0: forall a: int. a > 0 -> a / 2 < a
+$
+goal mult_po_9: forall a,b :int. a % 2 <> 1 -> (a / 2) * 2 * b =  a * b
+$
+goal mult_po_8: forall a:int. a > 0 -> a % 2 <> 1 -> a / 2 >= 0
+$
+goal mult_po_6: forall a:int. a > 0 -> a % 2 = 1 -> a / 2 < a
+$
+goal mult_po_4: forall a,b:int. a > 0  -> a % 2 = 1 -> b + (a / 2) * (2 * b) = a * b 
+$
+goal mult_po_3: forall a:int. a > 0 -> a % 2 = 1 -> a / 2 >= 0
+$
+goal mult_po_11: forall a:int. a > 0 -> a % 2 <> 1 -> a/2 < a
+
+
+
+$$$polynomes
+
+goal g1 : (*goal sqrt_po_10*)
+  forall x,y:int.
+  x > 3 ->
+  y = (x + 1) / 2 ->
+  x < (y + 1) * (y + 1)
+
+$
+
+goal g2 :
+  forall x,y,z,t:int.
+    0 <= y + z <= 1  -> 
+    x + t + y + z = 1 -> 
+    y + z <> 0 -> 
+    x + t = 0 
+
+$$$arrays
+
+goal g1:
+  forall t1: int farray.
+  forall t2: int farray. t2 = t1[1<-1] ->
+  forall t3: int farray. t3 = t2[ 2 <- 2] ->
+  forall t4: int farray. t4 = t3[ 3 <- 3] ->
+  forall t5: int farray. t5 = t4[ 4 <- 4] ->
+  forall t6: int farray. t6 = t5[ 5 <- 5] ->
+  forall t7: int farray. t7 = t6[ 6 <- 6] ->
+  forall t8: int farray. t8 = t7[ 7 <- 7] ->
+  forall t9: int farray. t9 = t8[ 8 <- 8] ->
+  forall t10: int farray. t10 = t9[ 9 <- 9] ->
+  forall t11: int farray. t11 = t10[ 10 <- 10] ->
+  t11[1] = 1
+
+$
+goal g2:
+  forall t1: int farray.
+  t1[1<-1,2<-2,3<-3,4<-4,5<-5,6<-6,7<-7,8<-8,9<-9,10<-10][1] = 1
+
+$
+goal g3:
+  forall t1: int farray.
+  t1[1<-1,2<-2,3<-3,4<-4,5<-5,6<-6,7<-7,8<-8,9<-9,10<-10][5] = 5
+
+$
+goal g4:
+  forall t1: int farray.
+  forall x1, x2: int.
+  x1<>x2 -> t1[x1<-1,x2<-2][x1] = 1
+$
+
+goal g5:
+  forall i,j:int.
+  forall v : 'a.
+  forall a,b : 'a farray.
+  i = 1 ->
+  j = 2 -> 
+  a[i] = a[j<-v][i]
+
+$
+
+goal g6 :
+  forall i,j:int.
+  forall v : 'a.
+  forall a,b : 'a farray.
+  i = 1 -> 
+  j = 2 -> 
+  b = a[j<-v] ->
+  a[i] = b[i]
+
+$
+
+goal g7 :
+  forall i,j:int.
+  forall v : 'a.
+  forall a,b : 'a farray.
+  i = 2 ->
+  j = 1 ->
+  b = a[j<-v] ->
+  a[i] = b[i] 
+
+$
+
+goal g8 :
+  forall i,j:int.
+  forall v : 'a.
+  forall a,b : 'a farray.
+  i = j ->
+  v = a[j<-v][i]
+
+$
+
+goal g9 :
+  forall i,j:int.
+  forall v : 'a.
+  forall a,b : 'a farray.
+  i = j ->
+  b = a[j<-v] ->
+  v = b[i]
+
+$
+
+goal g10 :
+  forall i,j:int.
+  forall v : 'a.
+  forall a,b : 'a farray.
+  i = 2 ->
+  j = 2 ->
+  b = a[j<-v] ->
+  v = b[i] 
+
+$
+
+goal g11 :
+  forall i,j:int.
+  forall v : 'a.
+  forall b : 'a farray.
+  i = 1 ->
+  j = 2 ->  
+  v = b[j<-v][i] ->
+  b[i]=v
+
+$
+
+goal g12 :
+  forall i,j:int.
+  forall v : 'a.
+  forall a,b : 'a farray.
+  i = j -> 
+  a = b ->
+  b = b[j <- a[i]]
+$
+
+
+goal g13 :
+  forall i,j:int.
+  forall v : 'a.
+  forall b : 'a farray.
+  i = j -> 
+  b = b[j <- b[i]]
+
+$
+
+goal g14 :
+  forall i,j,k:int.
+  forall v,w : 'a.
+  forall b : 'a farray.
+  i = 1 ->
+  j = 2 -> 
+  k = 3 -> 
+  b = b[j<-b[i],k<-w] ->
+  b[i] = b[j]
+
+$
+
+goal g15 :
+  forall i,j,k:int.
+  forall v,w : 'a.
+  forall b : 'a farray.
+  i = 1 ->
+  j = 2 -> 
+  k = 1 -> 
+  b = b[j<-b[i],k<-w] ->
+  b[i] = b[j]
+
+$
+
+goal g16 :
+  forall i,j,k:int.
+  forall v,w : 'a.
+  forall b : 'a farray.
+  b = b[j<-b[i],k<-w] ->
+  i = 1 ->
+  j = 2 -> 
+  k = 3 -> 
+  b[i] = b[j]
+
+$
+
+goal g17 :
+  forall i,j,k:int.
+  forall v,w : 'a.
+  forall b : 'a farray.
+  b = b[j<-b[i],k<-w] ->
+  i = 1 ->
+  j = 2 -> 
+  k = 1 -> 
+  b[i] = b[j]
+
+$
+
+goal g18 :
+  forall i,j:int.
+  forall v1,v2 : 'a.
+  forall a : 'a farray.
+  i = 1 ->
+  j = 2 -> 
+  a[i<-v1, j<-v2] = a[j<-v2, i<-v1]
+
+$
+
+goal g19 :
+  forall i,j:int.
+  forall v : 'a.
+  forall b : 'a farray.
+  i = 1 -> 
+  j = 2 -> 
+  b = b[j<-b[i]] ->
+  b[i] = b[j]
+
+$
+
+goal g20 :
+  forall i,j:int.
+  forall v : 'a.
+  forall b : 'a farray.
+  b = b[j<-v]->
+  b[j]= v
+
+$
+
+goal g21:
+  forall i,j:int.
+  forall v,w : 'a.
+  forall a,b : 'a farray.
+  a = b -> 
+  b = b[j<-v, i<-w]->
+  i <> j -> 
+  i = 1 -> 
+  j = 2 ->  
+  a[j]= v
+
+$
+    
+goal g22:
+ forall a:int farray. forall i,v:int.
+ a[i] = v ->
+ a = a[i<-v] ->
+ true
+
+$
+(* exemple necessitant un case-split *)
+
+goal g23:
+  forall i,j:int.
+  forall a,b : int farray.
+  a=b ->
+  a[i] = b[j<-a[i]][i]
+
+$
+
+
+goal g24 :
+  forall i,j:int.
+  forall v1,v2 : 'a.
+  forall a : 'a farray.
+  i <> j ->
+  a[i<-v1, j<-v2] = a[j<-v2, i<-v1]
+
+$
+
+
+goal g25:
+  forall a,b : int farray.
+  forall i,j,v,w:int.
+  a[i<-b[i]] = b[i<-a[i]] ->
+  a[j] = b[j]
+
+$
+
+
+goal g26:
+  forall a,b : int farray.
+  forall i,j,v,w:int.
+  v = a[i] ->
+  w = b[i] ->
+  a[i<-w] = b[i<-v] ->
+  a[j] = b[j]
+
+$
+
+goal g27:
+  forall a_1, a_3, a1, a2: int farray.
+  forall i, j, e_0,e_2, v, w :int.
+  v = a1[j] ->
+  w = a2[j] ->
+  a1[i<-a2[i]] = a2[i<-a1[i]] ->
+  v = w
+
+$
+
+goal g28:
+  forall a_1, a_3, a1, a2: int farray.
+  forall i, j, e_0,e_2, v, w :int.
+  a1[i<-a2[i]] = a2[i<-a1[i]] ->
+  v = a1[j] ->
+  w = a2[j] ->
+  v = w
+
+$
+
+goal g29 :
+  forall a1,a2,a3,a4,b1,b2 : int farray.
+  forall i1,i2,i3,e1,e2,e3,e4,e5,e6,k:int.
+  a1=b1[i1<-e1] ->
+  a2=b2[i1<-e2] ->
+  a3=a1[i2<-e3] ->
+  a4=a2[i2<-e4] ->
+  e1=b2[i1] ->
+  e2=b1[i1] ->
+  e3=a2[i2] ->
+  e4=a1[i2] ->
+  a3=a4 ->
+  b2[i3] = b1[i3]
+
+$
+logic t : int farray
+
+axiom a : forall t : 'a farray.
+   t[0] = 1
+
+goal g30 : t[0] = 1
+
+$
+logic t1,t2 : int farray
+
+axiom a : forall t1,t2 : 'a farray.
+  forall a,b:int.
+   t1[a+b] = t2[a-b]
+
+goal g31 : forall x,y:int. t1[3+x] = t2[3-x]
+
+$
+logic t1,t2 : int farray
+
+axiom a : forall t1,t2 : 'a farray.
+  forall a:int. forall b:'a.
+   t1[a <- b][a] = t2[a]
+
+goal g32 :
+     t2[0 <- 1][0] = t1[0]
+
+$
+logic t1,t2 : int farray
+
+axiom a : forall t1,t2 : 'a farray.
+  forall a:int. t1[a] = t2[a]
+
+goal g33 : forall i:int.
+     t2[i] = t1[i]
+$
+logic t1,t2 : int farray
+logic P: 'a -> prop
+logic x:int
+
+axiom a : forall t1: 'a farray. forall i,j:int. forall v:'a.
+  P(t1[i <- v][j])
+
+goal g34 :
+  t2 = t1[0 <- 2] ->
+  x = t2[36] ->
+    P(x)
+
+$
+logic t1,t2,t3,t4,t5 : int farray
+logic P: 'a -> prop
+logic x:int
+
+axiom a : forall t1: 'a farray. forall i,j:int. forall v:'a.
+  P(t1[i <- v, 2 <- 3, j <- v][0 <- 1][36])
+
+goal g35 :
+  t2 = t1[0 <- 2] ->
+  t3 = t2[2 <- 3] ->
+  t4 = t3[5 <- 2] ->
+  t5 = t4[0 <- 1] ->
+  x = t5[36] ->
+    P(x)
+
+$$$ injective
+
+type a
+logic fi : 'b -> a
+logic ti : a -> 'b
+
+axiom Inj : forall x :a. ti(fi(x))=x
+
+goal inj : forall x,y:a. fi(x)=fi(y) -> x = y
+
+$$$poly_arrays
+type a
+logic fi : int -> a
+logic ti : a -> int
+
+axiom Inj : forall x :int [fi(x)]. ti(fi(x))=x
+
+goal g1:
+  forall a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11 : a.
+  forall t1: (a,int) farray.
+  forall t2: (a,int) farray. t2 = t1[ fi(1) <- 1] ->
+  forall t3: (a,int) farray. t3 = t2[ fi(2) <- 2] ->
+  forall t4: (a,int) farray. t4 = t3[ fi(3) <- 3] ->
+  forall t5: (a,int) farray. t5 = t4[ fi(4) <- 4] ->
+  forall t6: (a,int) farray. t6 = t5[ fi(5) <- 5] ->
+  forall t7: (a,int) farray. t7 = t6[ fi(6) <- 6] ->
+  forall t8: (a,int) farray. t8 = t7[ fi(7) <- 7] ->
+  forall t9: (a,int) farray. t9 = t8[ fi(8) <- 8] ->
+  forall t10: (a,int) farray. t10 = t9[ fi(9) <- 9] ->
+  forall t11: (a,int) farray. t11 = t10[ fi(10) <- 10] ->
+  t11[fi(1)] = 1
+
+$
+type a
+logic fi : int -> a
+logic ti : a -> int
+
+axiom Inj : forall x :int [fi(x)]. ti(fi(x))=x
+
+goal g2:
+  forall t1: (a,int) farray.
+  t1[fi(1)<-1,
+     fi(2)<-2,fi(3)<-3,fi(4)<-4,fi(5)<-5,
+     fi(6)<-6,fi(7)<-7,fi(8)<-8,fi(9)<-9,
+     fi(10)<-10][fi(1)] = 1
+
+$
+type a
+logic fi : int -> a
+logic ti : a -> int
+
+axiom Inj : forall x :int [fi(x)]. ti(fi(x))=x
+
+goal g3:
+  forall t1: (a,int) farray.
+  t1[fi(1)<-1,
+     fi(2)<-2,fi(3)<-3,fi(4)<-4,fi(5)<-5,
+     fi(6)<-6,fi(7)<-7,fi(8)<-8,fi(9)<-9,
+     fi(10)<-10][fi(5)] = 5
+$
+type a
+logic fi : int -> a
+logic ti : a -> int
+
+axiom Inj : forall x :int [fi(x)]. ti(fi(x))=x
+
+goal g4:
+  forall t1: (a,int) farray.
+  forall x1, x2: a.
+  x1<>x2 -> t1[x1<-1,x2<-2][x1] = 1
+$
+type a
+logic fi : int -> a
+logic ti : a -> int
+
+axiom Inj : forall x :int [fi(x)]. ti(fi(x))=x
+
+goal g5:
+  forall i,j:a.
+  forall v : 'b.
+  forall a,b : (a,'b) farray.
+  i = fi(1) ->
+  j = fi(2) ->
+  a[i] = a[j<-v][i]
+
+$
+type a
+logic fi : int -> a
+logic ti : a -> int
+
+axiom Inj : forall x :int [fi(x)]. ti(fi(x))=x
+
+goal g6 :
+  forall i,j:a.
+  forall v : 'b.
+  forall a,b : (a,'b) farray.
+  i = fi(1) ->
+  j = fi(2) ->
+  b = a[j<-v] ->
+  a[i] = b[i]
+
+$
+type a
+logic fi : int -> a
+logic ti : a -> int
+
+axiom Inj : forall x :int [fi(x)]. ti(fi(x))=x
+
+goal g7 :
+  forall i,j:a.
+  forall v : 'b.
+  forall a,b : (a,'b) farray.
+  i = fi(2) ->
+  j = fi(1) ->
+  b = a[j<-v] ->
+  a[i] = b[i] 
+
+$
+goal g8 :
+  forall i,j:'a.
+  forall v : 'b.
+  forall a,b : ('a,'b) farray.
+  i = j ->
+  v = a[j<-v][i]
+
+$
+goal g9 :
+  forall i,j:'a.
+  forall v : 'b.
+  forall a,b : ('a,'b) farray.
+  i = j ->
+  b = a[j<-v] ->
+  v = b[i]
+
+$
+
+goal g10 :
+  forall i,j:'a.
+  forall v : 'b.
+  forall a,b : ('a,'b) farray.
+  i = j ->
+  a = b ->
+  b = b[j <- a[i]]
+$
+
+goal g11 :
+  forall i,j:'a.
+  forall v : 'b.
+  forall b : ('a,'b) farray.
+  i = j ->
+  b = b[j <- b[i]]
+
+$
+
+goal g12 :
+  forall i,j:'a.
+  forall v : 'b.
+  forall b : ('a,'b) farray.
+  b = b[j<-v]->
+  b[j]= v
+
+$
+
+goal g13:
+  forall i,j:'a.
+  forall v,w : 'b.
+  forall a,b : ('a,'b) farray.
+  a = b ->
+  b = b[j<-v, i<-w]->
+  i <> j ->
+  a[j]= v
+
+$
+(* exemple necessitant un case-split *)
+
+goal g14:
+  forall i,j:'a.
+  forall a,b : ('a,'b) farray.
+  a=b ->
+  a[i] = b[j<-a[i]][i]
+
+$
+
+
+goal g15 :
+  forall i,j:'a.
+  forall v1,v2 : 'b.
+  forall a : ('a,'b) farray.
+  i <> j ->
+  a[i<-v1, j<-v2] = a[j<-v2, i<-v1]
+
+$
+
+goal g16:
+  forall a,b : ('a,'b) farray.
+  forall i,j : 'a.
+  forall v,w : 'b.
+  a[i<-b[i]] = b[i<-a[i]] ->
+  a[j] = b[j]
+
+$
+
+
+goal g17:
+  forall a,b : ('a,'b) farray.
+  forall i,j : 'a.
+  forall v,w : 'b.
+  v = a[i] ->
+  w = b[i] ->
+  a[i<-w] = b[i<-v] ->
+  a[j] = b[j]
+
+$$$bitv
+
+goal g1: [|10|]=[|10|]
+$
+goal g2: [|10|]@[|01|]=[|1001|]
+$
+goal g3: [|10|]@[|01|]=[|1|]@[|0|]@[|01|]
+$
+goal g4: [|10|]=[|1001|]^{2,3}
+$
+goal g5: [|010|]^{0,1}=[|1100|]^{1,2}
+$
+goal g6: forall x:bitv[3]. x=[|101|] -> x^{0,1} = [|01|]
+$
+goal g7: forall x,y:bitv[2]. x=[|10|] -> y=[|01|] -> x@y=[|1001|]
+$
+goal g8: forall x:bitv[4]. forall y:bitv[2]. 
+         x=y@[|10|] -> x^{2,3}=[|11|] -> x=[|1110|]
+$
+goal g9: forall x,y:bitv[2]. x@y=y@x -> x^{0,0} = y^{0,0}
+$
+goal g10: forall x,y:bitv[2]. x@y=y@x -> x = y
+$
+logic f : 'a -> bitv[2]
+
+goal g11: forall x:bitv[3]. forall y:bitv[2]. forall z:'a.
+          x=y@[|1|] -> f(z)=y -> f(z)^{0,0} = x^{1,1}
+$
+goal g12 : 
+  forall x : bitv[32]. forall y : bitv[32]. forall s : bitv[32]. 
+  s = y^{0,15} @ x^{16,31} -> (s^{16,31} = y^{0,15}  and s^{0,15} = x^{16,31}) 
+
+
+
+$$$let
+
+goal g1: 
+     let x = 3 in x = x
+
+$
+
+goal g2: 
+     let x = 3 in x+2 = 5
+
+$ 
+
+goal g3: 
+     let x = 3 in x=2 -> false
+
+$
+
+type t
+logic P : t, int -> prop
+
+goal g4 : forall x:t. (let y=3 in P(x,y)) ->P(x,3)
+
+$
+logic P : int -> prop
+
+goal g5 : P(let y=4 in y+y) -> P(8)
+
+$$$case_split
+
+goal g1 : forall x,y,z:int.
+  -z <= 0 ->
+   3 * y - 8*x - 6 <= 0 -> 
+  -y + 12*x +3 <= 0 ->
+  y*y*y <= 1
+$
+goal g2 : forall x,y,z:int.
+   3 * y - 8*x - 6 <= 0 -> 
+  -y + 12*x +3 <= 0 ->
+  -y*y*y <= 0 ->
+  false
+
+$$$predicate
+logic f : int -> prop
+logic r : int -> prop
+
+predicate p (x : int) = f(x)
+
+axiom a : forall x : int [p(x) ]. p(x) -> r (x)
+
+goal g1 : forall a : int. f(a) -> r(a)
+
+$$$sum
+
+type t = A | B | C
+
+goal g1: 
+  A <> B and
+  A <> C and 
+  B <> C and 
+  A  = A and 
+  B  = B and 
+  C  = C
+    
+$
+type t = A | B | C
+
+goal g2:
+forall x:t. x = A -> x <> B
+
+$
+type t = A | B | C
+
+goal g3:
+  forall x:t. x = A -> x = B -> false
+
+$
+type t = A | B | C
+
+goal g4:
+  forall x:t.
+  x <> A -> x <> B -> x = C
+
+$
+type t = A | B | C
+
+goal g5:
+  forall x:t. x <> A -> (x = B or x = C)
+
+$
+type t = A | B | C
+
+goal g6:
+  forall x:t. (x = A or x = B or x = C)
+$
+
+type t = A | B | C
+
+goal g7:
+  forall x:t. (x <> A or x <> B)
+
+$
+
+type t = A | B
+
+logic f: t , int -> int
+
+goal g8:
+  forall x:t.
+  forall y:int.
+  f(x,y) = f(A,y) or f(x,y) = f(B,y)
+
+$
+type t = A | B 
+
+logic ac u : t, t -> t
+
+goal g9:
+forall x,y : t.
+  x = u(A,y) ->
+  y <> B ->
+  x = u(A,A)
+    
+$$$sum_poly_arrays
+type t = A | B | C | D
+
+goal g1 :
+     forall a : (t,int) farray.
+     a[A <- 1, B <- 2][A] = 1
+
+$
+type t = A | B | C | D
+type t2 = E | F | G | H
+
+goal g2 :
+     forall a : (t,t2) farray.
+     a[B <- E][A] <> E ->
+     a[C <- F][A] <> F ->
+     a[D <- G][A] <> G ->
+     a[A] = H
+
+$$$set_arrays
+type b = T | F
+(*type 'a set = ('a,b) farray*)
+
+logic union : ('a,b) farray, ('a,b) farray -> ('a,b) farray
+logic for : b, b -> b
+
+axiom for : for(T,T) = T and for(T,F) = T and for(F,T) = T and for(F,F) = F
+
+axiom union : forall s1,s2:('a,b) farray. forall k: 'a.
+      union(s1,s2)[k] = for(s1[k],s2[k])
+
+goal g1 :
+     forall s1,s2 : ('a,b) farray.
+     forall k : 'a.
+     union(s1,s2)[k] = T ->
+     s1[k] = T or s2[k] = T
+
+$
+type b = T | F
+
+logic inter : ('a,b) farray, ('a,b) farray -> ('a,b) farray
+logic fand : b, b -> b
+
+axiom fand : fand(T,T) = T and fand(T,F) = F and fand(F,T) = F and fand(F,F) = F
+
+axiom inter : forall s1,s2:('a,b) farray. forall k: 'a.
+      inter(s1,s2)[k] = fand(s1[k],s2[k])
+
+goal g1 :
+     forall s1,s2 : ('a,b) farray.
+     forall k : 'a.
+     inter(s1,s2)[k] = T ->
+     s1[k] = T and s2[k] = T
+$
+type b
+logic is_true : b -> prop
+
+logic union : ('a,b) farray, ('a,b) farray -> ('a,b) farray
+
+axiom union : forall s1,s2:('a,b) farray. forall k: 'a.
+      is_true (union(s1,s2)[k]) <-> (is_true(s1[k]) or is_true(s2[k]))
+
+goal g1 :
+     forall s1,s2 : ('a,b) farray.
+     forall k : 'a.
+     is_true(union(s1,s2)[k]) ->
+     is_true(s1[k]) or is_true(s2[k])
+
+$
+type b
+logic is_true : b -> prop
+
+logic inter : ('a,b) farray, ('a,b) farray -> ('a,b) farray
+
+axiom inter : forall s1,s2:('a,b) farray. forall k: 'a.
+      is_true(inter(s1,s2)[k]) <-> (is_true(s1[k]) and is_true(s2[k]))
+
+goal g1 :
+     forall s1,s2 : ('a,b) farray.
+     forall k : 'a.
+     is_true(inter(s1,s2)[k]) ->
+     is_true(s1[k]) and is_true(s2[k])
