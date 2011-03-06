@@ -43,3 +43,29 @@ type 'a u
 
 goal g8: forall a:'a u. Q(a)
 
+
+$$$arith
+
+type t
+goal g19 : forall x,y : t. x<y
+
+$ 
+type t
+goal g20 : forall x,y : t. x>y
+
+$ 
+type t
+goal g21 : forall x,y : t. x<=y
+
+$ 
+type t
+goal g22 : forall x,y : t. x>=y
+
+
+$$$opcomp
+
+goal g1: forall x:int. forall y:real. x=y
+
+$
+
+goal g2: forall x:int. forall y:real. x<>y
