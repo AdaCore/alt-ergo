@@ -109,18 +109,6 @@ goal g18:
  2*b + c - 2  <= 0
  -> false
 
-$ 
-type t
-goal g19 : forall x,y : t. x<y
-$ 
-type t
-goal g20 : forall x,y : t. x>y
-$ 
-type t
-goal g21 : forall x,y : t. x<=y
-$ 
-type t
-goal g22 : forall x,y : t. x>=y
 
 $$$bool
 logic A,B : prop
@@ -471,13 +459,6 @@ $$$exists
 goal g : 
      (exists x:int. x=2) -> (exists x:int. x=3) -> false
 
-$$$opcomp
-
-goal g1: forall x:int. forall y:real. x=y
-
-$
-
-goal g2: forall x:int. forall y:real. x<>y
 
 $$$sum_poly_arrays
 type t = A | B | C | D

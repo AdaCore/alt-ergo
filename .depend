@@ -32,26 +32,12 @@ combine.cmx: ty.cmx term.cmx sum.cmx sig.cmi polynome.cmx pairs.cmx \
     options.cmx literal.cmx bitv.cmx arrays.cmx arith.cmx ac.cmx combine.cmi 
 common.cmo: why_ptree.cmi ty.cmi symbols.cmi hstring.cmi common.cmi 
 common.cmx: why_ptree.cmi ty.cmx symbols.cmx hstring.cmx common.cmi 
-congruence.cmo: uf.cmi term.cmi symbols.cmi options.cmi formula.cmi \
-    congruence.cmi 
-congruence.cmx: uf.cmx term.cmx symbols.cmx options.cmx formula.cmx \
-    congruence.cmi 
-constructors.cmo: term.cmi symbols.cmi sig.cmi options.cmi hstring.cmi \
-    constructors.cmi 
-constructors.cmx: term.cmx symbols.cmx sig.cmi options.cmx hstring.cmx \
-    constructors.cmi 
-dioph.cmo: pile.cmi dioph.cmi 
-dioph.cmx: pile.cmx dioph.cmi 
-empty.cmo: term.cmi sig.cmi options.cmi literal.cmi empty.cmi 
-empty.cmx: term.cmx sig.cmi options.cmx literal.cmx empty.cmi 
 exception.cmo: explanation.cmi exception.cmi 
 exception.cmx: explanation.cmx exception.cmi 
 existantial.cmo: why_ptree.cmi symbols.cmi options.cmi existantial.cmi 
 existantial.cmx: why_ptree.cmi symbols.cmx options.cmx existantial.cmi 
 explanation.cmo: formula.cmi explanation.cmi 
 explanation.cmx: formula.cmx explanation.cmi 
-finite.cmo: term.cmi literal.cmi explanation.cmi finite.cmi 
-finite.cmx: term.cmx literal.cmx explanation.cmx finite.cmi 
 fm.cmo: ty.cmi term.cmi symbols.cmi sig.cmi polynome.cmi options.cmi \
     literal.cmi intervals.cmi hstring.cmi explanation.cmi exception.cmi \
     fm.cmi 
@@ -70,8 +56,6 @@ frontend.cmx: why_typing.cmx why_ptree.cmi why_parser.cmx why_lexer.cmx \
     version.cmx smtlib2_to_why.cmx smtlib2_parse.cmx smtlib2_lex.cmx \
     smt_to_why.cmx smt_parser.cmx smt_lex.cmx smt_ast.cmi sat.cmx pruning.cmx \
     options.cmx explanation.cmx cnf.cmx frontend.cmi 
-gergo.cmo: 
-gergo.cmx: 
 gui.cmo: why_ptree.cmi why_lexer.cmo why_connected.cmi why_annoted.cmi \
     sat.cmi pruning.cmi options.cmi loc.cmo frontend.cmi explanation.cmi \
     common.cmi cnf.cmi 
@@ -98,52 +82,26 @@ matching.cmo: ty.cmi term.cmi symbols.cmi subst.cmi options.cmi literal.cmi \
     formula.cmi explanation.cmi matching.cmi 
 matching.cmx: ty.cmx term.cmx symbols.cmx subst.cmx options.cmx literal.cmx \
     formula.cmx explanation.cmx matching.cmi 
-myocamlbuild.cmo: options.cmi 
-myocamlbuild.cmx: options.cmx 
 options.cmo: version.cmo print_color.cmi options.cmi 
 options.cmx: version.cmx print_color.cmx options.cmi 
-pa.cmo: 
-pa.cmx: 
 pairs.cmo: ty.cmi term.cmi symbols.cmi sig.cmi options.cmi hstring.cmi \
     pairs.cmi 
 pairs.cmx: ty.cmx term.cmx symbols.cmx sig.cmi options.cmx hstring.cmx \
     pairs.cmi 
-path.cmo: ty.cmi term.cmi symbols.cmi sig.cmi hstring.cmi path.cmi 
-path.cmx: ty.cmx term.cmx symbols.cmx sig.cmi hstring.cmx path.cmi 
-pile.cmo: pile.cmi 
-pile.cmx: pile.cmi 
 polynome.cmo: ty.cmi term.cmi options.cmi polynome.cmi 
 polynome.cmx: ty.cmx term.cmx options.cmx polynome.cmi 
-pp.cmo: 
-pp.cmx: 
 pretty.cmo: why_ptree.cmi symbols.cmi hstring.cmi pretty.cmi 
 pretty.cmx: why_ptree.cmi symbols.cmx hstring.cmx pretty.cmi 
 print_color.cmo: print_color.cmi 
 print_color.cmx: print_color.cmi 
-printproof.cmo: sig.cmi printproof.cmi 
-printproof.cmx: sig.cmi printproof.cmi 
 pruning.cmo: why_ptree.cmi symbols.cmi hstring.cmi formula.cmi pruning.cmi 
 pruning.cmx: why_ptree.cmi symbols.cmx hstring.cmx formula.cmx pruning.cmi 
-puf.cmo: sig.cmi pa.cmo puf.cmi 
-puf.cmx: sig.cmi pa.cmx puf.cmi 
-run.cmo: why_typing.cmi why_parser.cmi why_lexer.cmo version.cmo \
-    smt_to_why.cmo smt_parser.cmi smt_lex.cmo smt_ast.cmi sat.cmi options.cmi \
-    loc.cmo 
-run.cmx: why_typing.cmx why_parser.cmx why_lexer.cmx version.cmx \
-    smt_to_why.cmx smt_parser.cmx smt_lex.cmx smt_ast.cmi sat.cmx options.cmx \
-    loc.cmx 
 sat.cmo: ty.cmi term.cmi symbols.cmi options.cmi matching.cmi literal.cmi \
     hstring.cmi formula.cmi explanation.cmi exception.cmi combine.cmi cc.cmi \
     sat.cmi 
 sat.cmx: ty.cmx term.cmx symbols.cmx options.cmx matching.cmx literal.cmx \
     hstring.cmx formula.cmx explanation.cmx exception.cmx combine.cmx cc.cmx \
     sat.cmi 
-satbj.cmo: ty.cmi term.cmi options.cmi matching.cmi formula.cmi common.cmi 
-satbj.cmx: ty.cmx term.cmx options.cmx matching.cmx formula.cmx common.cmx 
-simplex.cmo: ty.cmi term.cmi symbols.cmi options.cmi literal.cmi hstring.cmi \
-    exception.cmi 
-simplex.cmx: ty.cmx term.cmx symbols.cmx options.cmx literal.cmx hstring.cmx \
-    exception.cmx 
 smt_lex.cmo: smt_parser.cmi 
 smt_lex.cmx: smt_parser.cmx 
 smt_parser.cmo: smt_ast.cmi smt_parser.cmi 
@@ -156,16 +114,12 @@ smtlib2_lex.cmo: smtlib2_util.cmo smtlib2_parse.cmi
 smtlib2_lex.cmx: smtlib2_util.cmx smtlib2_parse.cmx 
 smtlib2_parse.cmo: smtlib2_ast.cmo smtlib2_parse.cmi 
 smtlib2_parse.cmx: smtlib2_ast.cmx smtlib2_parse.cmi 
-smtlib2_pp.cmo: 
-smtlib2_pp.cmx: 
 smtlib2_to_why.cmo: why_ptree.cmi symbols.cmi smtlib2_ast.cmo options.cmi \
     loc.cmo 
 smtlib2_to_why.cmx: why_ptree.cmi symbols.cmx smtlib2_ast.cmx options.cmx \
     loc.cmx 
 smtlib2_util.cmo: 
 smtlib2_util.cmx: 
-sorting.cmo: smt_ast.cmi 
-sorting.cmx: smt_ast.cmi 
 subst.cmo: symbols.cmi subst.cmi 
 subst.cmx: symbols.cmx subst.cmi 
 sum.cmo: ty.cmi term.cmi symbols.cmi sig.cmi options.cmi literal.cmi \
@@ -178,28 +132,16 @@ term.cmo: ty.cmi symbols.cmi subst.cmi options.cmi hashcons.cmi common.cmi \
     term.cmi 
 term.cmx: ty.cmx symbols.cmx subst.cmx options.cmx hashcons.cmx common.cmx \
     term.cmi 
-test_comb.cmo: 
-test_comb.cmx: 
-testmodrec.cmo: 
-testmodrec.cmx: 
-traces.cmo: term.cmi symbols.cmi options.cmi hstring.cmi 
-traces.cmx: term.cmx symbols.cmx options.cmx hstring.cmx 
 triggers.cmo: why_ptree.cmi ty.cmi symbols.cmi options.cmi triggers.cmi 
 triggers.cmx: why_ptree.cmi ty.cmx symbols.cmx options.cmx triggers.cmi 
 ty.cmo: hstring.cmi hashcons.cmi ty.cmi 
 ty.cmx: hstring.cmx hashcons.cmx ty.cmi 
-typing.cmo: triggers.cmi symbols.cmi options.cmi common.cmi ast.cmi 
-typing.cmx: triggers.cmx symbols.cmx options.cmx common.cmx ast.cmi 
 uf.cmo: why_ptree.cmi ty.cmi term.cmi symbols.cmi subst.cmi sig.cmi \
     options.cmi literal.cmi hstring.cmi formula.cmi explanation.cmi \
     exception.cmi ac.cmi uf.cmi 
 uf.cmx: why_ptree.cmi ty.cmx term.cmx symbols.cmx subst.cmx sig.cmi \
     options.cmx literal.cmx hstring.cmx formula.cmx explanation.cmx \
     exception.cmx ac.cmx uf.cmi 
-ufarith.cmo: term.cmi symbols.cmi options.cmi ufarith.cmi 
-ufarith.cmx: term.cmx symbols.cmx options.cmx ufarith.cmi 
-unionfind.cmo: sig.cmi printproof.cmi options.cmi unionfind.cmi 
-unionfind.cmx: sig.cmi printproof.cmx options.cmx unionfind.cmi 
 use.cmo: ty.cmi term.cmi symbols.cmi sig.cmi options.cmi literal.cmi \
     explanation.cmi use.cmi 
 use.cmx: ty.cmx term.cmx symbols.cmx sig.cmi options.cmx literal.cmx \
@@ -227,21 +169,15 @@ why_typing.cmx: why_ptree.cmi ty.cmx triggers.cmx symbols.cmx options.cmx \
 ac.cmi: ty.cmi term.cmi symbols.cmi sig.cmi literal.cmi 
 arith.cmi: sig.cmi polynome.cmi 
 arrays.cmi: sig.cmi 
-ast.cmi: 
 bitv.cmi: sig.cmi 
 builtin.cmi: hstring.cmi 
 cc.cmi: why_ptree.cmi term.cmi sig.cmi literal.cmi explanation.cmi 
 cnf.cmi: why_ptree.cmi 
 combine.cmi: sig.cmi 
 common.cmi: why_ptree.cmi ty.cmi symbols.cmi 
-congruence.cmi: term.cmi formula.cmi 
-constructors.cmi: term.cmi sig.cmi 
-dioph.cmi: pile.cmi 
-empty.cmi: sig.cmi 
 exception.cmi: explanation.cmi 
 existantial.cmi: why_ptree.cmi 
 explanation.cmi: formula.cmi 
-finite.cmi: sig.cmi literal.cmi explanation.cmi 
 fm.cmi: sig.cmi polynome.cmi 
 formula.cmi: ty.cmi term.cmi symbols.cmi subst.cmi literal.cmi hstring.cmi 
 frontend.cmi: why_typing.cmi why_ptree.cmi smt_ast.cmi sat.cmi \
@@ -254,14 +190,10 @@ literal.cmi: term.cmi symbols.cmi hstring.cmi
 matching.cmi: term.cmi literal.cmi formula.cmi explanation.cmi 
 options.cmi: 
 pairs.cmi: sig.cmi 
-path.cmi: term.cmi sig.cmi 
-pile.cmi: 
 polynome.cmi: ty.cmi term.cmi 
 pretty.cmi: why_ptree.cmi 
 print_color.cmi: 
-printproof.cmi: sig.cmi 
 pruning.cmi: why_ptree.cmi 
-puf.cmi: sig.cmi 
 sat.cmi: why_ptree.cmi term.cmi formula.cmi explanation.cmi 
 sig.cmi: ty.cmi term.cmi symbols.cmi literal.cmi formula.cmi explanation.cmi 
 smt_ast.cmi: 
@@ -274,8 +206,6 @@ term.cmi: ty.cmi symbols.cmi subst.cmi
 triggers.cmi: why_ptree.cmi 
 ty.cmi: hstring.cmi 
 uf.cmi: why_ptree.cmi term.cmi sig.cmi literal.cmi explanation.cmi 
-ufarith.cmi: term.cmi 
-unionfind.cmi: sig.cmi 
 use.cmi: term.cmi symbols.cmi sig.cmi literal.cmi explanation.cmi 
 why_annoted.cmi: why_typing.cmi why_ptree.cmi ty.cmi symbols.cmi hstring.cmi 
 why_connected.cmi: why_annoted.cmi 
