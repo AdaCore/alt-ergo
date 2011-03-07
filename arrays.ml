@@ -292,44 +292,23 @@ module Make(X : ALIEN) = struct
         ) env.gets (env,acc)
         
     (* XXX on peut faire mieux si on a directement le type *)
-    let ext_2 acc t1 t2 = 
-      let {T.f=f; xs=xs; ty=ty} = T.view t1 in
-        match Sy.is_set f, xs with
-          | true, [_;i;v] -> 
-              let {T.ty=ty_i} = T.view i in
-              let {T.ty=ty_v} = T.view v in
-              let index = T.fresh_name ty_i in
-              let g1 = T.make (Sy.Op Sy.Get) [t1;index] ty_v in
-              let g2 = T.make (Sy.Op Sy.Get) [t2;index] ty_v in
-              A.LT.Set.add (A.LT.make (A.Neq(g1,g2))) acc
-          | _ ->
-              let {T.f=f; xs=xs; ty=ty} = T.view t2 in
-              match xs with
-                | [_;i;v] -> 
-                    let {T.ty=ty_i} = T.view i in
-                    let {T.ty=ty_v} = T.view v in
-                    let index = T.fresh_name ty_i in
-                    let g1 = T.make (Sy.Op Sy.Get) [t1;index] ty_v in
-                    let g2 = T.make (Sy.Op Sy.Get) [t2;index] ty_v in
-                    A.LT.Set.add (A.LT.make (A.Neq(g1,g2))) acc
-                | _ -> acc
-
-    (* XXX on peut faire mieux si on a directement le type *)
     let ext_1 acc r1 r2 class_of =
-      match X.type_info r1 with
-        | Ty.Tint | Ty.Treal | Ty.Tbool 
-	| Ty.Tunit | Ty.Tbitv _ | Ty.Tsum _  -> acc
+      match X.type_info r1, X.term_extract r1, X.term_extract r2 with
 
-        | Ty.Tvar _ | Ty.Tfarray _ | Ty.Text _ -> 
-            match X.term_extract r1, X.term_extract r2 with
-              | Some t1, Some t2 ->
-                  L.fold_left
-                    (fun acc t1 ->
-                       L.fold_left 
-                         (fun acc t2 -> ext_2 acc t1 t2) acc (class_of t2)
-                    ) acc (class_of t1)
-                    
-              | _ -> acc
+        | Ty.Tfarray (ty_key, ty_val), Some t1, Some t2  -> 
+            L.fold_left
+              (fun acc t1 ->
+                 L.fold_left 
+                   (fun acc t2 -> 
+                      let index = T.fresh_name ty_key in
+                      let g1 = T.make (Sy.Op Sy.Get) [t1;index] ty_val in
+                      let g2 = T.make (Sy.Op Sy.Get) [t2;index] ty_val in
+                      A.LT.Set.add (A.LT.make (A.Neq(g1,g2))) acc
+                   ) acc (class_of t2)
+              ) acc (class_of t1)
+
+        | _ -> acc
+
 
     (* nouvelles disegalites par instantiation du premier
        axiome d'exentionnalite *)

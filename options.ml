@@ -72,9 +72,11 @@ let types = ref false
 let all_models = ref false
 let goal_directed = ref false
 let proof = ref false
-let max_split = ref 1000000
+let max_split = ref (Num.Int 1000000)
 
 let show_version () = Format.printf "Alt-Ergo %s@." Version.version; exit 0
+
+let set_max_split s = max_split := Num.num_of_string s
 
 let spec = [
   "-rwt", Arg.Set rewriting, " use rewriting instead of axiomatic approach";
@@ -133,9 +135,9 @@ let spec = [
   " instantiate lemmas only with the terms from the goal";
   "-bouclage", Arg.Set_int bouclage,
   " number of instantiations at each matching round";
-  "-max-split", Arg.Set_int max_split,
-  (Format.sprintf " maximum size of case-split (default value : %d)" 
-     !max_split);
+  "-max-split", Arg.String set_max_split,
+  (Format.sprintf " maximum size of case-split (default value : %s)" 
+     (Num.string_of_num !max_split));
 
 ]
 
@@ -204,6 +206,6 @@ let debug_combine = !dcombine
 let smt_arrays = ! smt_arrays
 let goal_directed = !goal_directed
 let bouclage = ! bouclage
-let max_split = Num.Int (!max_split)
+let max_split = !max_split
 let rewriting = !rewriting
 let proof = !proof
