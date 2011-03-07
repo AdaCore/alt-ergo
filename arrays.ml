@@ -177,8 +177,8 @@ module Make(X : ALIEN) = struct
             
     (* met a jour gets et tbset en utilisant l'ensemble des termes donne*)
     let update_gets_sets st acc =
-      T.Set.fold
-        (fun t (gets,tbset) ->
+      List.fold_left
+        (fun (gets,tbset) t ->
            let {T.f=f;xs=xs;ty=ty} = T.view t in 
            match Sy.is_get f, Sy.is_set f, xs with
              | true , false, [a;i]   -> 
@@ -191,7 +191,7 @@ module Make(X : ALIEN) = struct
                  (gets,tbset)
 
              | _  -> assert false
-        ) st acc
+        ) acc st
         
     (* met a jour les composantes gets et tbset de env avec les termes 
        contenus dans les atomes de la *)
@@ -202,8 +202,10 @@ module Make(X : ALIEN) = struct
              L.fold_left
                (fun acc r ->
                   match X.term_extract r with
-                  | Some t -> update_gets_sets (T.subterms T.Set.empty t) acc
-                  | None   -> acc
+                    | Some t -> 
+                        let {T.xs=xs} = T.view t in
+                        update_gets_sets (t::xs) acc
+                    | None   -> acc
                ) acc (leaves_of_atom a)
           ) (env.gets,env.tbset) la
       in 
@@ -346,7 +348,7 @@ module Make(X : ALIEN) = struct
     let case_split env = 
       try
         let a = Aset.choose env.split in
-        if true || debug_arrays then 
+        if debug_arrays then 
           fprintf fmt "[Arrays.case-split] %a@." LR.print(LR.make a);
 	(* Taille du case split est tjs 2 : a ou (not a) *)
         [(a, None), (Num.Int 2)]
