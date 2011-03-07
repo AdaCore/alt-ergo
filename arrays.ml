@@ -291,7 +291,6 @@ module Make(X : ALIEN) = struct
            get_and_set gt_info accu class_of
         ) env.gets (env,acc)
         
-    (* XXX on peut faire mieux si on a directement le type *)
     let ext_1 acc r1 r2 class_of =
       match X.type_info r1, X.term_extract r1, X.term_extract r2 with
 
