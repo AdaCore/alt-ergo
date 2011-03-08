@@ -63,6 +63,9 @@ let tag_callback t env sbuf ~origin:y z i =
         if List.mem !last_tag !search_tags then 
           !last_tag#set_properties 
 	    [`BACKGROUND "gold"; `UNDERLINE_SET false]
+	else if List.mem !last_tag !proof_tags then 
+          !last_tag#set_properties 
+	    [`BACKGROUND "pale green"; `UNDERLINE_SET false]
 	else
           !last_tag#set_properties 
 	    [`BACKGROUND_SET false; `UNDERLINE_SET false];
