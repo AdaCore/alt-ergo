@@ -1248,3 +1248,16 @@ let findtags_dep at l =
   let sl = listsymbols at [] in
   List.fold_left (fun acc (td, _) -> findtags_atyped_delc_dep sl td acc) [] l
   
+
+let findproof_atyped_decl lems td acc =
+  match td.c with
+    | AAxiom (_, name, _)
+    | ARewriting (_, name , _) -> 
+      if List.mem name lems then td.tag::acc else acc
+    | _ -> acc
+
+let findtags_proof expl l =
+  match Explanation.lemmas_of expl with
+    | None -> []
+    | Some lems -> 
+      List.fold_left (fun acc (td, _) -> findproof_atyped_decl lems td acc) [] l

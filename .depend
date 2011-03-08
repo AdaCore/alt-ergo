@@ -149,9 +149,9 @@ use.cmx: ty.cmx term.cmx symbols.cmx sig.cmi options.cmx literal.cmx \
 version.cmo: 
 version.cmx: 
 why_annoted.cmo: why_typing.cmi why_ptree.cmi ty.cmi symbols.cmi options.cmi \
-    hstring.cmi why_annoted.cmi 
+    hstring.cmi explanation.cmi why_annoted.cmi 
 why_annoted.cmx: why_typing.cmx why_ptree.cmi ty.cmx symbols.cmx options.cmx \
-    hstring.cmx why_annoted.cmi 
+    hstring.cmx explanation.cmx why_annoted.cmi 
 why_connected.cmo: why_typing.cmi why_parser.cmi why_lexer.cmo \
     why_annoted.cmi ty.cmi symbols.cmi options.cmi common.cmi \
     why_connected.cmi 
@@ -207,7 +207,8 @@ triggers.cmi: why_ptree.cmi
 ty.cmi: hstring.cmi 
 uf.cmi: why_ptree.cmi term.cmi sig.cmi literal.cmi explanation.cmi 
 use.cmi: term.cmi symbols.cmi sig.cmi literal.cmi explanation.cmi 
-why_annoted.cmi: why_typing.cmi why_ptree.cmi ty.cmi symbols.cmi hstring.cmi 
+why_annoted.cmi: why_typing.cmi why_ptree.cmi ty.cmi symbols.cmi hstring.cmi \
+    explanation.cmi 
 why_connected.cmi: why_annoted.cmi 
 why_parser.cmi: why_ptree.cmi 
 why_ptree.cmi: ty.cmi term.cmi symbols.cmi literal.cmi hstring.cmi \

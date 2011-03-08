@@ -146,3 +146,7 @@ val findtags_using :
 
 val findtags_dep : 
   aterm -> (atyped_decl annoted * Why_typing.env) list -> GText.tag list 
+
+val findtags_proof : 
+  Explanation.t -> (atyped_decl annoted * Why_typing.env) list -> GText.tag list
+

@@ -7,6 +7,7 @@ open Options
 
 let last_tag = ref (GText.tag ())
 let search_tags = ref []
+let proof_tags = ref []
     
 let rec prune r t dep =
   r.pruned <- true;
@@ -677,3 +678,11 @@ let connect_atyped_decl env td =
 	
 let connect env =
   List.iter (fun (t, _) -> connect_atyped_decl env t) env.ast
+
+
+let show_used_lemmas env expl =
+  List.iter (fun t -> t#set_property (`BACKGROUND_SET false)) !proof_tags;
+  let tags = findtags_proof expl env.ast in
+  proof_tags := tags;
+  List.iter (fun t -> t#set_property (`BACKGROUND "pale green")) tags
+  

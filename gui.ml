@@ -55,7 +55,7 @@ let pop_error ?(error=false) ~message () =
 
 
 
-let update_status image label d s steps =
+let update_status image label env d s steps =
   let satmode = !smtfile or !smt2file or !satmode in 
   match s with
     | Frontend.Unsat dep ->
@@ -63,7 +63,10 @@ let update_status image label d s steps =
 	if not satmode then Loc.report d.st_loc;
 	if satmode then printf "@{<C.F_Red>unsat@}@."
 	else printf "@{<C.F_Green>Valid@} (%2.4f) (%Ld)@." time steps;
-	if proof then printf "Proof:\n%a@." Explanation.print_proof dep;
+	if proof then begin 
+	  printf "Proof:\n%a@." Explanation.print_proof dep;
+	  show_used_lemmas env dep
+	end;
 	image#set_stock `YES;
 	label#set_text (sprintf "  Valid (%2.4f)" time)
 	  
@@ -151,7 +154,7 @@ let rec run buttonrun buttonstop image label thread env () =
 	       (* Thread.yield (); *)
 	       let cnf = Cnf.make dcl in
 	       ignore (Queue.fold
-			 (Frontend.process_decl (update_status image label))
+			 (Frontend.process_decl (update_status image label env))
 			 (Sat.empty,true, Explanation.empty) cnf)
 	    ) ast_pruned
 	with 
