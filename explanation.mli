@@ -34,3 +34,5 @@ val remove : Formula.t -> t -> t
 val print : Format.formatter -> t -> unit
 
 val print_proof : Format.formatter -> t -> unit
+
+val lemmas_of : t -> string list option

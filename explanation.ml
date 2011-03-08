@@ -76,3 +76,16 @@ let print_proof fmt = function
 	| (Dep f | BJ f) -> Format.fprintf fmt "  %a@." Formula.print f
 	(* | BJ f  -> Format.fprintf fmt "  %a@." Formula.print f *)
       ) s
+
+let lemmas_of = function
+  | None -> None
+  | Some s -> 
+    Some (ES.fold (fun e (lems (*, lits*)) -> 
+      let f = match e with
+	| Dep f | BJ f -> f in
+      match Formula.view f with
+	(* | Formula.Literal a -> lems, a::lits *)
+	| Formula.Lemma l -> 
+	  l.Formula.name::lems (*, lits*)
+	| _ -> lems (*, lits*)
+    ) s ([] (*,[]*)))
