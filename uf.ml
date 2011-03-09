@@ -31,8 +31,8 @@ module type S = sig
 
   val mem : t -> Term.t -> bool
 
-  val find : t -> Term.t -> R.r
-  val find_r : t -> R.r -> R.r
+  val find : t -> Term.t -> R.r * Explanation.t
+  val find_r : t -> R.r -> R.r * Explanation.t
     
   val union : 
     t -> R.r -> R.r -> Explanation.t -> t * (R.r * (R.r * R.r * Explanation.t) list * R.r) list
@@ -1042,9 +1042,9 @@ module Make ( R : Sig.X ) = struct
     if not (R.equal r1 r2) then Ex.union ex1 ex2 
     else raise NotCongruent
       
-  let find env t = fst (lookup_by_t t env)
+  let find env t = lookup_by_t t env
 
-  let find_r env r = fst (lookup_by_r r env)
+  let find_r env r = lookup_by_r r env
 
   let print = Print.all 
 

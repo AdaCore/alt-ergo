@@ -113,7 +113,7 @@ module Make (X : Sig.X) = struct
   let concat_leaves uf l = 
     let one, _ = X.make (Term.make (S.name "@bottom") [] Ty.Tint) in 
     let rec concat_rec acc t = 
-      match  X.leaves (Uf.find uf t) , acc with
+      match  X.leaves (fst (Uf.find uf t)) , acc with
 	  [] , _ -> one::acc
 	| res, [] -> res
 	| res , _ -> List.rev_append res acc
@@ -125,19 +125,20 @@ module Make (X : Sig.X) = struct
   let semantic_view env a = 
     match Literal.LT.view a with
       | Literal.Eq(t1,t2) -> 
-	  Literal.Eq(Uf.find env.uf t1, Uf.find env.uf t2)
+	  Literal.Eq(fst (Uf.find env.uf t1), fst (Uf.find env.uf t2))
       | Literal.Neq(t1, t2) -> 
-	  Literal.Neq(Uf.find env.uf t1, Uf.find env.uf t2)
+	  Literal.Neq(fst (Uf.find env.uf t1), fst (Uf.find env.uf t2))
       | Literal.Builtin(b,s,l) -> 
-	  Literal.Builtin(b,s,List.map (Uf.find env.uf) l)
+	  Literal.Builtin(b,s,List.map (fun x -> fst (Uf.find env.uf x)) l)
 
   let rec close_up t1 t2 dep env =
     if debug_cc then 
       printf "@{<C.Bold>[cc]@} close_up: %a = %a@." T.print t1 T.print t2;
 
     (* we merge equivalence classes of t1 and t2 *)
-    let r1 = Uf.find env.uf t1 in
-    let r2 = Uf.find env.uf t2 in
+    let r1, ex1 = Uf.find env.uf t1 in
+    let r2, ex2 = Uf.find env.uf t2 in
+    let dep = Explanation.union (Explanation.union ex1 ex2) dep in
     close_up_r r1 r2 dep env
 
   and close_up_r r1 r2 dep env =
@@ -204,8 +205,8 @@ module Make (X : Sig.X) = struct
            | Literal.Eq(r1,r2) -> 
 	       let env = { env with uf =
                    Uf.add_semantic (Uf.add_semantic env.uf r1) r2 } in
-               let r1 = Uf.find_r env.uf r1 in
-	       let r2 = Uf.find_r env.uf r2 in
+               let r1,_ = Uf.find_r env.uf r1 in
+	       let r2,_ = Uf.find_r env.uf r2 in
 	       let st_r1, sa_r1 = Use.find r1 env.use in
 	       let st_r2, sa_r2 = Use.find r2 env.use in
 	       let sa_r1', sa_r2' = match a with 
@@ -255,7 +256,7 @@ module Make (X : Sig.X) = struct
       (* we update uf and use *)
       let nuf, ctx  = Uf.add env.uf t in (* XXX *)
       if debug_fm then Print.make_cst t ctx;
-      let rt   = Uf.find nuf t in
+      let rt,_   = Uf.find nuf t in
       let nuse = Use.up_add env.use t rt (concat_leaves nuf xs) in
       
       (* If finitetest is used we add the term to the relation *)
@@ -338,8 +339,9 @@ module Make (X : Sig.X) = struct
 	  let env = replay_atom env (SetA.singleton (a, dep)) [] dep in
 	  if Options.nocontracongru then env
 	  else begin
-	    let r1 = Uf.find env.uf t1 in
-	    let r2 = Uf.find env.uf t2 in
+	    let r1, ex1 = Uf.find env.uf t1 in
+	    let r2, ex2 = Uf.find env.uf t2 in
+	    let dep = Explanation.union (Explanation.union ex1 ex2) dep in
 	    begin
 	      match T.view t1,T.view t2 with
 		| {T.f = f1; xs = [a]},{T.f = f2; xs = [b]}
