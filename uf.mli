@@ -27,8 +27,8 @@ module type S = sig
 
   val mem : t -> Term.t -> bool
 
-  val find : t -> Term.t -> R.r
-  val find_r : t -> R.r -> R.r
+  val find : t -> Term.t -> R.r * Explanation.t
+  val find_r : t -> R.r -> R.r * Explanation.t
 
   val union : 
     t -> R.r -> R.r -> Explanation.t -> t * (R.r * (R.r * R.r * Explanation.t) list * R.r) list
