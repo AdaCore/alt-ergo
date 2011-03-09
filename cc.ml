@@ -122,14 +122,23 @@ module Make (X : Sig.X) = struct
 	[] -> [one]
       | res -> res
 
-  let semantic_view env a = 
+  let semantic_view env a ex_a = 
     match Literal.LT.view a with
-      | Literal.Eq(t1,t2) -> 
-	  Literal.Eq(fst (Uf.find env.uf t1), fst (Uf.find env.uf t2))
+      (*| Literal.Eq(t1,t2) -> 
+	  Literal.Eq(fst (Uf.find env.uf t1), fst (Uf.find env.uf t2)) *)
       | Literal.Neq(t1, t2) -> 
 	  Literal.Neq(fst (Uf.find env.uf t1), fst (Uf.find env.uf t2))
-      | Literal.Builtin(b,s,l) -> 
-	  Literal.Builtin(b,s,List.map (fun x -> fst (Uf.find env.uf x)) l)
+
+      | Literal.Builtin(b, s, l) -> 
+	  let lr, ex  = 
+	    List.fold_left 
+	      (fun (lr, ex) x -> 
+		 let rx, ex_x = Uf.find env.uf x in
+		 rx::lr, Ex.union ex_x ex)
+	      ([], ex_a) l
+	  in
+	  Literal.Builtin(b, s, List.rev lr), ex
+      | _ -> assert false
 
   let rec close_up t1 t2 dep env =
     if debug_cc then 
@@ -186,7 +195,10 @@ module Make (X : Sig.X) = struct
 
   and replay_atom env sa eqs_nonlin dep = 
     let sa = SetA.fold 
-      (fun (a,e) acc -> (semantic_view env a, Some a, e)::acc) sa eqs_nonlin 
+      (fun (a, ex_a) acc -> 
+	 let ra, ex_ra = semantic_view env a ex_a in
+	 (ra, Some a, ex_ra)::acc) 
+      sa eqs_nonlin 
     in
     replay_atom_r env sa dep
 	
@@ -232,12 +244,12 @@ module Make (X : Sig.X) = struct
 
       ) env leqs
 
-  and congruents e t s acc = 
+  and congruents env t s acc = 
     SetT.fold 
       (fun t2 acc ->
 	 if T.equal t t2 then acc
 	 else 
-	   try (t,t2,terms_congr e t t2)::acc
+	   try (t,t2,terms_congr env t t2)::acc
 	   with
                Exception.NotCongruent
              | Exception.Interpreted_Symbol -> acc
@@ -257,7 +269,8 @@ module Make (X : Sig.X) = struct
       let nuf, ctx  = Uf.add env.uf t in (* XXX *)
       if debug_fm then Print.make_cst t ctx;
       let rt,_   = Uf.find nuf t in
-      let nuse = Use.up_add env.use t rt (concat_leaves nuf xs) in
+      let lvs = concat_leaves nuf xs in
+      let nuse = Use.up_add env.use t rt lvs in
       
       (* If finitetest is used we add the term to the relation *)
       let rel = X.Rel.add env.relation rt in
@@ -267,7 +280,6 @@ module Make (X : Sig.X) = struct
 
       (* we compute terms to consider for congruence *)
       (* we do this only for non-atomic terms with uninterpreted head-symbol *)
-      let lvs = concat_leaves nuf xs in
       let st_uset = Use.congr_add nuse lvs in
       
       (* we check the congruence of each term *)

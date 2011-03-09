@@ -58,7 +58,8 @@ module Make (X : Sig.X) = struct
     match lvs with
 	[]    -> ST.empty
       | x::ls -> 
-	  L.fold_left (fun acc y -> ST.inter (fst(find y g)) acc)
+	  L.fold_left 
+	    (fun acc y -> ST.inter (fst(find y g)) acc)
 	    (fst(find x g)) ls
 	    
   let up_close_up g p v = 
