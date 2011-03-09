@@ -124,8 +124,6 @@ module Make (X : Sig.X) = struct
 
   let semantic_view env a ex_a = 
     match Literal.LT.view a with
-      (*| Literal.Eq(t1,t2) -> 
-	  Literal.Eq(fst (Uf.find env.uf t1), fst (Uf.find env.uf t2)) *)
       | Literal.Neq(t1, t2) ->
 	  let r1, ex1 = Uf.find env.uf t1 in
 	  let r2, ex2 = Uf.find env.uf t2 in
@@ -136,7 +134,6 @@ module Make (X : Sig.X) = struct
 	    List.fold_left 
 	      (fun (lr, ex) x -> 
 		 let rx, ex_x = Uf.find env.uf x in
-		 printf "uf.find: %a - %a@." Term.print x Ex.print ex_x;
 		 rx::lr, Ex.union ex_x ex)
 	      ([], ex_a) l
 	  in
@@ -200,7 +197,6 @@ module Make (X : Sig.X) = struct
     let sa = SetA.fold 
       (fun (a, ex_a) acc -> 
 	 let ra, ex_ra = semantic_view env a ex_a in
-	 printf "replay_atom: %a - %a@." Literal.LT.print a Ex.print ex_ra;
 	 (ra, Some a, ex_ra)::acc) 
       sa eqs_nonlin 
     in

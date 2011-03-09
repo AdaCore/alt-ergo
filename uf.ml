@@ -666,15 +666,16 @@ module Make ( R : Sig.X ) = struct
     let filter_leaves r = 
       L.fold_left 
 	(fun (p,q) r -> match R.ac_extract r with 
-	  | None    -> SetR.add r p,q
-	  | Some ac -> p,SetAc.add ac q
+	  | None    -> SetR.add r p, q
+	  | Some ac -> p, SetAc.add ac q
 	)(SetR.empty,SetAc.empty) (R.leaves r)
 	
     let canon_empty st env = 	
       SetR.fold
-	(fun p z -> 
-          let q,_ = lookup_by_r p env in 
-	  if R.equal p q then z else (p,q)::z )st []
+	(fun p ((z, ex) as acc) -> 
+          let q, ex_q = lookup_by_r p env in 
+	  if R.equal p q then acc else (p,q)::z, Ex.union ex_q ex)
+	st ([], Ex.empty)
 
     let canon_ac st env = 
       SetAc.fold
@@ -685,20 +686,21 @@ module Make ( R : Sig.X ) = struct
 	
     let canon_aux rx = L.fold_left (fun r (p,v) -> R.subst p v r) rx
       
-    let rec canon env r = 
-      let se,sac = filter_leaves r in
-      let se = canon_empty se env in
-      let sac= canon_ac sac env in
-      let r2 = canon_aux (canon_aux r sac) se in
-      let r2 = 
+    let rec canon env r ex_r = 
+      let se, sac = filter_leaves r in
+      let subst, ex_subst = canon_empty se env in
+      let sac = canon_ac sac env in (* explications? *)
+      let r2 = canon_aux (canon_aux r sac) subst in
+      let r2 = (* explications ? *)
         if Options.rewriting then
           URS.canon env.u_rs (class_of env) r2 
         else r2
       in
-      if R.equal r r2 then r2, Ex.empty else canon env r2
+      let ex_r2 = Ex.union ex_r ex_subst in
+      if R.equal r r2 then r2, ex_r2 else canon env r2 ex_r2
 
     let canon env r =
-      let rr,ex = canon env r in
+      let rr, ex = canon env r Ex.empty in
       if rewriting && verbose then 
         fprintf fmt "canon %a = %a@." R.print r R.print rr;
       rr,ex
