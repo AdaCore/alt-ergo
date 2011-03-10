@@ -373,8 +373,8 @@ and back_tracking env stop max_size =  match env.delta with
 	  (fun env ({f=f; age=g; name=lem; gf=gf},_) -> 
 	     add_terms env (F.terms f) gf g lem) env l1 
       in
-      (match l1,l2 with
-	   [], [] -> 
+      (match l1, l2 with
+	 | [], [] -> 
 	     let m = extract_model env in
 	     if all_models then 
 	       begin
