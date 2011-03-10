@@ -351,7 +351,7 @@ let print_pred_type_list fmt = function
 
 (**************** to delete *******************)
 
-let rec print_tterm fmt {tt_desc = tt_desc} =
+let rec print_tterm fmt {Why_ptree.c= {tt_desc = tt_desc}} =
   print_tt_desc fmt tt_desc
 
 and print_tterm_list se fmt = function
@@ -380,17 +380,17 @@ and print_tt_desc fmt = function
   | TTget (t, t1) ->
       fprintf fmt "%a[%a]" print_tterm t print_tterm t1
 
-let print_tatom fmt = function
+let print_tatom fmt a = match a.Why_ptree.c with
   | TAtrue -> fprintf fmt "true" 
   | TAfalse -> fprintf fmt "false"
-  | TAeq (_, tl) -> print_tterm_list " = " fmt tl
-  | TAneq (_, tl) -> print_tterm_list " <> " fmt tl
-  | TAdistinct (_, tl) ->
+  | TAeq tl -> print_tterm_list " = " fmt tl
+  | TAneq tl -> print_tterm_list " <> " fmt tl
+  | TAdistinct tl ->
       fprintf fmt "distinct(%a)" (print_tterm_list ",") tl
-  | TAle (_, tl) -> print_tterm_list " <= " fmt tl
-  | TAlt (_, tl) -> print_tterm_list " < " fmt tl
-  | TApred (_, t) -> print_tterm fmt t
-  | TAbuilt (_, h, tl) -> print_tterm_list (" "^(Hstring.view h)^" ") fmt tl
+  | TAle tl -> print_tterm_list " <= " fmt tl
+  | TAlt tl -> print_tterm_list " < " fmt tl
+  | TApred t -> print_tterm fmt t
+  | TAbuilt (h, tl) -> print_tterm_list (" "^(Hstring.view h)^" ") fmt tl
 
 let print_oplogic fmt = function
   | OPand -> fprintf fmt "and"
@@ -419,15 +419,15 @@ and print_triggers fmt = function
   | [ts] -> print_tterm_list "," fmt ts
   | ts::l -> fprintf fmt "%a | %a" (print_tterm_list ",") ts print_triggers l
 
-and print_tform fmt = function
-  | TFatom (_, a) -> print_tatom fmt a
-  | TFop (_, op, tfl) -> print_tform_list op fmt tfl
-  | TFforall (_, qf) -> fprintf fmt "forall %a" print_quant_form qf
-  | TFexists (_, qf) -> fprintf fmt "exists %a" print_quant_form qf
-  | TFlet (_, vs, s, t, tf) -> 
+and print_tform fmt f = match f.Why_ptree.c with
+  | TFatom a -> print_tatom fmt a
+  | TFop (op, tfl) -> print_tform_list op fmt tfl
+  | TFforall qf -> fprintf fmt "forall %a" print_quant_form qf
+  | TFexists qf -> fprintf fmt "exists %a" print_quant_form qf
+  | TFlet (vs, s, t, tf) -> 
       fprintf fmt "let %a = %a in\n %a" 
 	Symbols.print s print_tterm t print_tform tf
-  | TFnamed (_, _, tf) -> print_tform fmt tf
+  | TFnamed (_, tf) -> print_tform fmt tf
 
 and print_tform_list op fmt = function
   | [] -> ()
@@ -435,21 +435,21 @@ and print_tform_list op fmt = function
   | tf::l -> fprintf fmt "%a %a %a"
       print_tform tf print_oplogic op (print_tform_list op) l
 
-let print_typed_decl fmt = function
-  | TAxiom (_,_, s, tf) -> fprintf fmt "axiom %s : %a" s print_tform tf
-  | TRewriting (_,_, s, rwtl) -> 
+let print_typed_decl fmt td = match td.Why_ptree.c with
+  | TAxiom (_, s, tf) -> fprintf fmt "axiom %s : %a" s print_tform tf
+  | TRewriting (_, s, rwtl) -> 
     fprintf fmt "rewriting %s : %a" s print_rwt_list rwtl
-  | TGoal (_,_, s, tf) -> fprintf fmt "goal %s : %a" s print_tform tf
-  | TLogic (_,_, ls, ty) ->
+  | TGoal (_, s, tf) -> fprintf fmt "goal %s : %a" s print_tform tf
+  | TLogic (_, ls, ty) ->
       fprintf fmt "logic %a : %a" print_string_list ls print_plogic_type ty
-  | TPredicate_def (_,_, p, spptl, tf) ->
+  | TPredicate_def (_, p, spptl, tf) ->
       fprintf fmt "predicate %s %a = %a" p
 	print_pred_type_list spptl print_tform tf
-  | TFunction_def (_,_, f, spptl, ty, tf) ->
+  | TFunction_def (_, f, spptl, ty, tf) ->
       fprintf fmt "function %s (%a) : %a = %a" f
 	print_string_ppure_type_list spptl print_ppure_type ty print_tform tf
-  | TTypeDecl (_, _, ls, s, []) -> fprintf fmt "type %a %s" print_astring_list ls s
-  | TTypeDecl (_, _, ls, s, lc) -> 
+  | TTypeDecl (_, ls, s, []) -> fprintf fmt "type %a %s" print_astring_list ls s
+  | TTypeDecl (_, ls, s, lc) -> 
     fprintf fmt "type %a %s = %a" print_astring_list ls s 
       (print_string_sep " | ") lc
 
@@ -604,14 +604,15 @@ let new_annot (buffer:sbuffer) c id =
 let annot_of_tconstant (buffer:sbuffer)  t =
   new_annot buffer t
 
-let rec of_tterm (buffer:sbuffer) (id, t) =
-  {at_desc = of_tt_desc buffer t.tt_desc; at_ty = t.tt_ty }
+let rec of_tterm (buffer:sbuffer) t =
+  {at_desc = of_tt_desc buffer t.Why_ptree.c.tt_desc;
+   at_ty = t.Why_ptree.c.tt_ty }
 
-and annot_of_tterm (buffer:sbuffer) ((_, id) as t) =
+and annot_of_tterm (buffer:sbuffer) t =
   let c = of_tterm buffer t in
-  new_annot buffer c id
+  new_annot buffer c t.Why_ptree.annot
 
-and of_tt_desc (buffer:sbuffer)  = function
+and of_tt_desc (buffer:sbuffer) = function
   | TTconst c -> (ATconst c)
   | TTvar s  ->(ATvar s)
   | TTapp (s, tts)  ->
@@ -627,16 +628,16 @@ and of_tt_desc (buffer:sbuffer)  = function
   | TTconcat (t1, t2) -> ATconcat (of_tterm buffer t1, of_tterm buffer t2)
   | TTlet (s, t1, t2) -> ATlet (s, of_tterm buffer t1, of_tterm buffer t2)
 
-let of_tatom (buffer:sbuffer)  = function
+let of_tatom (buffer:sbuffer) a = match a.Why_ptree.c with
   | TAtrue -> AAtrue
   | TAfalse -> AAfalse
-  | TAeq (_, tl) -> AAeq (List.map (annot_of_tterm buffer ) tl)
-  | TAneq (_, tl) -> AAneq (List.map (annot_of_tterm buffer ) tl)
-  | TAdistinct (_, tl) -> AAdistinct (List.map (annot_of_tterm buffer ) tl)
-  | TAle (_, tl) -> AAle (List.map (annot_of_tterm buffer ) tl)
-  | TAlt (_, tl) -> AAlt (List.map (annot_of_tterm buffer ) tl)
-  | TApred (_, t) -> AApred (of_tterm buffer  t)
-  | TAbuilt (_, h, tl) -> AAbuilt (h, (List.map (annot_of_tterm buffer ) tl))
+  | TAeq tl -> AAeq (List.map (annot_of_tterm buffer ) tl)
+  | TAneq tl -> AAneq (List.map (annot_of_tterm buffer ) tl)
+  | TAdistinct tl -> AAdistinct (List.map (annot_of_tterm buffer ) tl)
+  | TAle tl -> AAle (List.map (annot_of_tterm buffer ) tl)
+  | TAlt tl -> AAlt (List.map (annot_of_tterm buffer ) tl)
+  | TApred t -> AApred (of_tterm buffer  t)
+  | TAbuilt (h, tl) -> AAbuilt (h, (List.map (annot_of_tterm buffer ) tl))
 
 let of_oplogic (buffer:sbuffer)  = function
   | OPand -> AOPand
@@ -651,13 +652,13 @@ let rec of_quant_form (buffer:sbuffer)
   { aqf_bvars = bv;
     aqf_upvars = uv;
     aqf_triggers = List.map (List.map (annot_of_tterm buffer )) trs;
-    aqf_form = new_annot buffer (of_tform buffer tf) }
+    aqf_form = new_annot buffer (of_tform buffer tf) tf.Why_ptree.annot }
 
 and annot_of_quant_form (buffer:sbuffer) qf =
-  new_annot buffer (of_quant_form buffer qf)
+  new_annot buffer (of_quant_form buffer qf) (-1)
 
-and of_tform (buffer:sbuffer)  = function
-  | TFatom a -> AFatom (of_tatom buffer  a)
+and of_tform (buffer:sbuffer) f = match f.Why_ptree.c with
+  | TFatom a -> AFatom (of_tatom buffer a)
   | TFop (op, tfl) ->
       AFop (of_oplogic buffer  op,
 	    List.map (annot_of_tform buffer ) tfl)
@@ -668,38 +669,34 @@ and of_tform (buffer:sbuffer)  = function
   | TFnamed (n, tf) -> 
       AFnamed (n, annot_of_tform buffer tf)
 
-and annot_of_tform (buffer:sbuffer)  t =
-  let c = of_tform buffer  t in
-  new_annot buffer  c
+and annot_of_tform (buffer:sbuffer) t =
+  let c = of_tform buffer t in
+  new_annot buffer c t.Why_ptree.annot
 
-let annot_of_typed_decl (buffer:sbuffer)  = function
-  | TAxiom (loc, s, tf) ->
-      let c = AAxiom (loc, s, of_tform buffer  tf) in
-      new_annot buffer  c
-  | TRewriting (loc, s, rwtl) ->
+let annot_of_typed_decl (buffer:sbuffer) td = 
+  let c = match td.Why_ptree.c with
+    | TAxiom (loc, s, tf) -> AAxiom (loc, s, of_tform buffer tf)
+    | TRewriting (loc, s, rwtl) ->
       let arwtl = List.map 
 	(fun rwt ->
 	  new_annot buffer
 	    { rwt with 
 	      rwt_left = of_tterm buffer rwt.rwt_left;
 	      rwt_right = of_tterm buffer rwt.rwt_right }
+	    td.Why_ptree.annot
 	) rwtl in
-      let c = ARewriting (loc, s, arwtl) in
-      new_annot buffer  c
-  | TGoal (loc, s, tf) ->
-      let c = AGoal (loc, s, new_annot buffer (of_tform buffer tf)) in
-      new_annot buffer  c
-  | TLogic (loc, ls, ty) ->
-      let c = ALogic (loc, ls, ty) in
-      new_annot buffer  c
-  | TPredicate_def (loc, p, spptl, tf) ->
-      let c = APredicate_def (loc, p,  spptl, of_tform buffer  tf) in
-      new_annot buffer  c
-  | TFunction_def (loc, f, spptl, ty, tf) ->
-      let c = AFunction_def (loc, f,  spptl, ty, of_tform buffer  tf) in
-      new_annot buffer  c
-  | TTypeDecl (loc, ls, s, lc) -> new_annot buffer  (ATypeDecl (loc, ls, s, lc))
-
+      ARewriting (loc, s, arwtl)
+    | TGoal (loc, s, tf) ->
+        let g = new_annot buffer (of_tform buffer tf) tf.Why_ptree.annot in
+        AGoal (loc, s, g)
+    | TLogic (loc, ls, ty) -> ALogic (loc, ls, ty)
+    | TPredicate_def (loc, p, spptl, tf) ->
+        APredicate_def (loc, p,  spptl, of_tform buffer  tf)
+    | TFunction_def (loc, f, spptl, ty, tf) ->
+        AFunction_def (loc, f,  spptl, ty, of_tform buffer  tf)
+    | TTypeDecl (loc, ls, s, lc) -> ATypeDecl (loc, ls, s, lc)
+  in
+  new_annot buffer c td.Why_ptree.annot
 
 
 let annot (buffer:sbuffer) ast =
@@ -707,45 +704,50 @@ let annot (buffer:sbuffer) ast =
 
 (* Translation from annoted/pruned AST to AST *)
 
-let rec to_tterm {at_desc = at_desc; at_ty = at_ty } =
-  { tt_desc = to_tt_desc at_desc; tt_ty = at_ty }
+let rec to_tterm id {at_desc = at_desc; at_ty = at_ty } =
+  {Why_ptree.c = { tt_desc = to_tt_desc at_desc; tt_ty = at_ty };
+   Why_ptree.annot = id }
 
 and from_aaterm_list = function
   | [] -> []
   | at::l ->
       if at.pruned then from_aaterm_list l
-      else (to_tterm at.c)::(from_aaterm_list l)
+      else (to_tterm at.id at.c)::(from_aaterm_list l)
 
 and to_tt_desc = function
     | ATconst c -> TTconst c
     | ATvar s  -> TTvar s
-    | ATapp (s, atl)  -> TTapp (s, List.map to_tterm atl)
-    | ATinfix (t1, s, t2) -> TTinfix (to_tterm t1, s, to_tterm t2)
-    | ATprefix (s, t) -> TTprefix (s, to_tterm t)
-    | ATget (t1, t2) -> TTget (to_tterm t1, to_tterm t2)
-    | ATset (t1, t2, t3) -> TTset (to_tterm t1, to_tterm t2, to_tterm t3)
+    | ATapp (s, atl)  -> TTapp (s, List.map (to_tterm 0) atl)
+    | ATinfix (t1, s, t2) -> TTinfix (to_tterm 0 t1, s, to_tterm 0 t2)
+    | ATprefix (s, t) -> TTprefix (s, to_tterm 0 t)
+    | ATget (t1, t2) -> TTget (to_tterm 0 t1, to_tterm 0 t2)
+    | ATset (t1, t2, t3) -> TTset (to_tterm 0 t1, to_tterm 0 t2, to_tterm 0 t3)
     | ATextract (t1, t2, t3) ->
-	TTextract (to_tterm t1, to_tterm t2, to_tterm t3)
-    | ATconcat (t1, t2) -> TTconcat (to_tterm t1, to_tterm t2)
-    | ATlet (s, t1, t2) -> TTlet (s, to_tterm t1, to_tterm t2)
+	TTextract (to_tterm 0 t1, to_tterm 0 t2, to_tterm 0 t3)
+    | ATconcat (t1, t2) -> TTconcat (to_tterm 0 t1, to_tterm 0 t2)
+    | ATlet (s, t1, t2) -> TTlet (s, to_tterm 0 t1, to_tterm 0 t2)
 
-let to_tatom = function
-  | AAtrue -> TAtrue
-  | AAfalse -> TAfalse
-  | AAeq atl -> TAeq (from_aaterm_list atl)
-  | AAneq atl -> TAneq (from_aaterm_list atl)
-  | AAdistinct atl -> TAdistinct (from_aaterm_list atl)
-  | AAle atl -> TAle (from_aaterm_list atl)
-  | AAlt atl -> TAlt (from_aaterm_list atl)
-  | AApred at -> TApred (to_tterm at)
-  | AAbuilt (h, atl) -> TAbuilt (h, (from_aaterm_list atl))
+let to_tatom aa id = 
+  let c = match aa with 
+    | AAtrue -> TAtrue
+    | AAfalse -> TAfalse
+    | AAeq atl -> TAeq (from_aaterm_list atl)
+    | AAneq atl -> TAneq (from_aaterm_list atl)
+    | AAdistinct atl -> TAdistinct (from_aaterm_list atl)
+    | AAle atl -> TAle (from_aaterm_list atl)
+    | AAlt atl -> TAlt (from_aaterm_list atl)
+    | AApred at -> TApred (to_tterm 0 at)
+    | AAbuilt (h, atl) -> TAbuilt (h, (from_aaterm_list atl))
+  in 
+  { Why_ptree.c = c;
+    Why_ptree.annot = id }
 
 let to_oplogic = function
   | AOPand -> OPand
   | AOPor -> OPor
   | AOPimp  -> OPimp
   | AOPnot -> OPnot
-  | AOPif at -> OPif (to_tterm at)
+  | AOPif at -> OPif (to_tterm 0 at)
   | AOPiff -> OPiff
 
 let rec to_quant_form
@@ -753,7 +755,7 @@ let rec to_quant_form
   { qf_bvars = bv;
     qf_upvars = uv;
     qf_triggers = to_triggers trs;
-    qf_form = to_tform aaf.c
+    qf_form = to_tform aaf
   }
   
 and to_triggers = function
@@ -762,23 +764,29 @@ and to_triggers = function
       let l' = from_aaterm_list atl in
       if l' = [] then to_triggers l
       else l'::(to_triggers l)
-      
-and to_tform = function
-  | AFatom a -> TFatom (to_tatom a)
-  | AFop (op, afl) ->
+
+and void_to_tform af id = 
+  let c = match af with
+    | AFatom a -> TFatom (to_tatom a id)
+    | AFop (op, afl) ->
       let tfl = from_aaform_list afl in
       let op = to_oplogic op in
       begin
 	match tfl, op with
 	  | [], _ -> failwith "Empty logic operation"
 	  | [tf], OPnot -> TFop (op, tfl)
-	  | [tf], _ -> tf
+	  | [tf], _ -> tf.Why_ptree.c
 	  | _ -> TFop (op, tfl)
       end
-  | AFforall qf -> TFforall (to_quant_form qf.c)
-  | AFexists qf -> TFexists (to_quant_form qf.c)
-  | AFlet (vs, s, t, aaf) -> TFlet (vs, s, to_tterm t, to_tform aaf.c)
-  | AFnamed (n, aaf) -> TFnamed (n, to_tform aaf.c)
+    | AFforall qf -> TFforall (to_quant_form qf.c)
+    | AFexists qf -> TFexists (to_quant_form qf.c)
+    | AFlet (vs, s, t, aaf) -> TFlet (vs, s, to_tterm 0 t, to_tform aaf)
+    | AFnamed (n, aaf) -> TFnamed (n, to_tform aaf)
+  in
+  { Why_ptree.c = c;
+    Why_ptree.annot = id }
+      
+and to_tform aaf = void_to_tform aaf.c aaf.id
 
 and from_aaform_list = function
   | [] -> []
@@ -786,33 +794,39 @@ and from_aaform_list = function
       if aaf.pruned then from_aaform_list l
       else
 	let l = from_aaform_list l in
-	try (to_tform aaf.c)::l
+	try (to_tform aaf)::l
 	with Failure "Empty logic operation" -> l
 
-let to_typed_decl = function
-  | AAxiom (loc, s, af) -> TAxiom (loc, s, to_tform af)
-  | ARewriting (loc, s, arwtl) -> 
+let to_typed_decl td =
+  let c = match td.c with
+    | AAxiom (loc, s, af) -> 
+      let af = void_to_tform af td.id in
+      TAxiom (loc, s, af)
+    | ARewriting (loc, s, arwtl) -> 
       let rwtl = List.fold_left (fun rwtl ar ->
 	if ar.pruned then rwtl
 	else { rwt_vars = ar.c.rwt_vars;
-	       rwt_left = to_tterm ar.c.rwt_left;
-	       rwt_right = to_tterm ar.c.rwt_right }::rwtl
+	       rwt_left = to_tterm ar.id ar.c.rwt_left;
+	       rwt_right = to_tterm ar.id ar.c.rwt_right}::rwtl
       ) [] arwtl in
       TRewriting (loc, s, rwtl)
-  | AGoal (loc, s, aaf) -> TGoal (loc, s, to_tform aaf.c)
-  | ALogic (loc, ls, ty) -> TLogic (loc, ls, ty)
-  | APredicate_def (loc, p, spptl, af) ->
-      TPredicate_def (loc, p, spptl, to_tform af)
-  | AFunction_def (loc, f, spptl, ty, af) ->
-      TFunction_def (loc, f, spptl, ty, to_tform af)
-  | ATypeDecl (loc, ls, s, lc) -> TTypeDecl (loc, ls, s, lc)
+    | AGoal (loc, s, aaf) -> TGoal (loc, s, to_tform aaf)
+    | ALogic (loc, ls, ty) -> TLogic (loc, ls, ty)
+    | APredicate_def (loc, p, spptl, af) ->
+      TPredicate_def (loc, p, spptl, void_to_tform af td.id)
+    | AFunction_def (loc, f, spptl, ty, af) ->
+      TFunction_def (loc, f, spptl, ty, void_to_tform af td.id)
+    | ATypeDecl (loc, ls, s, lc) -> TTypeDecl (loc, ls, s, lc)
+  in
+  { Why_ptree.c = c;
+    Why_ptree.annot = td.id }
 
 
 let rec to_ast = function
   | [] -> []
   | (atd, _)::l ->
       if atd.pruned then to_ast l
-      else (to_typed_decl atd.c)::(to_ast l)
+      else (to_typed_decl atd)::(to_ast l)
 
 
 
