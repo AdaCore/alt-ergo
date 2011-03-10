@@ -46,21 +46,24 @@ and view =
   | Let of llet (* a binding of a term *)
 
 val mk_not : t -> t
-val mk_and : t -> t -> t
-val mk_or : t -> t -> t
-val mk_imp : t -> t -> t
-val mk_if : Term.t -> t -> t -> t
-val mk_iff : t -> t -> t
-val mk_lit : Literal.LT.t -> t
-val mk_forall : Term.Set.t -> Term.Set.t -> Term.t list list -> t -> string -> t
-val mk_exists : Term.Set.t -> Term.Set.t -> Term.t list list -> t -> string -> t
-val mk_let : Term.Set.t -> Symbols.t -> Term.t -> t -> t
+val mk_and : t -> t -> int -> t
+val mk_or : t -> t -> int -> t
+val mk_imp : t -> t -> int -> t
+val mk_if : Term.t -> t -> t -> int -> t
+val mk_iff : t -> t -> int -> t
+val mk_lit : Literal.LT.t -> int -> t
+val mk_forall : Term.Set.t -> Term.Set.t -> Term.t list list -> t ->
+  string -> int -> t
+val mk_exists : Term.Set.t -> Term.Set.t -> Term.t list list -> t ->
+  string -> int -> t
+val mk_let : Term.Set.t -> Symbols.t -> Term.t -> t -> int -> t
 
 val add_label : Hstring.t -> t -> unit
 val label : t -> Hstring.t
 
 val view : t -> view
 val size : t -> int
+val id : t -> int
 
 val print : Format.formatter -> t -> unit
 

@@ -16,4 +16,4 @@
 (**************************************************************************)
 
 
-val make : (Why_ptree.tdecl * bool) list -> Why_ptree.sat_tdecl Queue.t
+val make : (int Why_ptree.tdecl * bool) list -> Why_ptree.sat_tdecl Queue.t

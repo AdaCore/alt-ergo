@@ -92,50 +92,50 @@ type tconstant =
   | Tfalse
   | Tvoid
 
-type tterm = 
-    { tt_ty : Ty.t; tt_desc : tt_desc }
-and tt_desc = 
+type 'a tterm = 
+    { tt_ty : Ty.t; tt_desc : 'a tt_desc; tt_annot : 'a }
+and 'a tt_desc = 
   | TTconst of tconstant
   | TTvar of Symbols.t
-  | TTinfix of tterm * Symbols.t * tterm
-  | TTprefix of Symbols.t * tterm 
-  | TTapp of Symbols.t * tterm list
-  | TTget of tterm * tterm
-  | TTset of tterm * tterm * tterm
-  | TTextract of tterm * tterm * tterm
-  | TTconcat of tterm * tterm
-  | TTlet of Symbols.t * tterm * tterm
+  | TTinfix of 'a tterm * Symbols.t * 'a tterm
+  | TTprefix of Symbols.t * 'a tterm 
+  | TTapp of Symbols.t * 'a tterm list
+  | TTget of 'a tterm * 'a tterm
+  | TTset of 'a tterm * 'a tterm * 'a tterm
+  | TTextract of 'a tterm * 'a tterm * 'a tterm
+  | TTconcat of 'a tterm * 'a tterm
+  | TTlet of Symbols.t * 'a tterm * 'a tterm
 
-type tatom = 
+type 'a tatom = 
   | TAtrue
   | TAfalse
-  | TAeq of tterm list
-  | TAdistinct of tterm list
-  | TAneq of tterm list
-  | TAle of tterm list
-  | TAlt of tterm list
-  | TApred of tterm
-  | TAbuilt of Hstring.t * tterm list
+  | TAeq of 'a * 'a tterm list
+  | TAdistinct of 'a * 'a tterm list
+  | TAneq of 'a * 'a tterm list
+  | TAle of 'a * 'a tterm list
+  | TAlt of 'a * 'a tterm list
+  | TApred of 'a * 'a tterm
+  | TAbuilt of 'a * Hstring.t * 'a tterm list
 
-type oplogic = OPand |OPor | OPimp | OPnot | OPif of tterm | OPiff 
+type 'a oplogic = OPand |OPor | OPimp | OPnot | OPif of 'a tterm | OPiff 
 
-type quant_form = {       
+type 'a quant_form = {       
   (* quantified variables that appear in the formula *)
   qf_bvars : (Symbols.t * Ty.t) list ;
 
   qf_upvars : (Symbols.t * Ty.t) list ;
 
-  qf_triggers : tterm list list ;
-  qf_form : tform
+  qf_triggers : 'a tterm list list ;
+  qf_form : 'a tform
 }
 
-and tform =
-  | TFatom of tatom
-  | TFop of oplogic * tform list
-  | TFforall of quant_form
-  | TFexists of quant_form
-  | TFlet of (Symbols.t * Ty.t) list * Symbols.t * tterm * tform
-  | TFnamed of Hstring.t * tform
+and 'a tform =
+  | TFatom of 'a * 'a tatom
+  | TFop of 'a * 'a oplogic * 'a tform list
+  | TFforall of 'a * 'a quant_form
+  | TFexists of 'a * 'a quant_form
+  | TFlet of 'a * (Symbols.t * Ty.t) list * Symbols.t * 'a tterm * 'a tform
+  | TFnamed of 'a * Hstring.t * 'a tform
 
 
 type 'a rwt_rule = {
@@ -144,15 +144,15 @@ type 'a rwt_rule = {
   rwt_right : 'a
 }
 
-type tdecl = 
-  | TAxiom of loc * string * tform
-  | TRewriting of loc * string * (tterm rwt_rule) list
-  | TGoal of loc * string * tform
-  | TLogic of loc * string list * plogic_type
-  | TPredicate_def of loc * string * (string * ppure_type) list * tform
+type 'a tdecl = 
+  | TAxiom of 'a * loc * string * 'a tform
+  | TRewriting of 'a * loc * string * ('a tterm rwt_rule) list
+  | TGoal of 'a * loc * string * 'a tform
+  | TLogic of 'a * loc * string list * plogic_type
+  | TPredicate_def of 'a * loc * string * (string * ppure_type) list * 'a tform
   | TFunction_def 
-      of loc * string * (string * ppure_type) list * ppure_type * tform
-  | TTypeDecl of loc * string list * string * string list
+      of 'a * loc * string * (string * ppure_type) list * ppure_type * 'a tform
+  | TTypeDecl of 'a * loc * string list * string * string list
 
 
 (* Sat entry *)

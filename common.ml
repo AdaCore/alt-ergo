@@ -146,17 +146,17 @@ let print_atom fmt a =
 	  fprintf fmt "True"
       | TAfalse ->
 	  fprintf fmt "True"
-      | TAeq [t1; t2] -> 
+      | TAeq (_, [t1; t2]) -> 
 	  fprintf fmt "%a = %a" print_term t1 print_term t2
-      | TAneq [t1; t2] ->
+      | TAneq (_, [t1; t2]) ->
 	  fprintf fmt "%a <> %a" print_term t1 print_term t2
-      | TAle [t1; t2] ->
+      | TAle (_, [t1; t2]) ->
 	  fprintf fmt "%a <= %a" print_term t1 print_term t2
-      | TAlt [t1; t2] ->
+      | TAlt (_, [t1; t2]) ->
 	  fprintf fmt "%a < %a" print_term t1 print_term t2
-      | TApred t -> 
+      | TApred (_, t) -> 
 	  print_term fmt t
-      | TAbuilt(s, l) ->
+      | TAbuilt(_, s, l) ->
 	  fprintf fmt "%s(%a)" (Hstring.view s) print_term_list l
       | _ -> assert false
 
@@ -178,17 +178,17 @@ let print_triggers fmt ll =
  
 let rec print_formula fmt f = 
   match f with
-  | TFatom a -> 
+  | TFatom (_, a) -> 
       print_atom fmt a
-  | TFop(OPnot, [f]) -> 
+  | TFop(_, OPnot, [f]) -> 
       fprintf fmt "not %a" print_formula f
-  | TFop(OPif(t), [f1;f2]) -> 
+  | TFop(_, OPif(t), [f1;f2]) -> 
       fprintf fmt "if %a then %a else %a" 
 	print_term t print_formula f1 print_formula f2
-  | TFop(op, [f1; f2]) -> 
+  | TFop(_, op, [f1; f2]) -> 
       fprintf fmt "%a %s %a" print_formula f1 (string_of_op op) print_formula f2
 
-  | TFforall {qf_bvars = l; qf_triggers = t; qf_form = f} -> 
+  | TFforall (_, {qf_bvars = l; qf_triggers = t; qf_form = f}) -> 
       fprintf fmt "forall %a [%a]. %a" 
 	print_binders l print_triggers t print_formula f
   | _ -> assert false

@@ -16,4 +16,4 @@
 (**************************************************************************)
 
 val split_and_prune :
-  int -> Why_ptree.tdecl list -> (Why_ptree.tdecl * bool) list list
+  int -> int Why_ptree.tdecl list -> (int Why_ptree.tdecl * bool) list list

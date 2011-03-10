@@ -162,7 +162,7 @@ let symbs_of_term add set pol concl t =
 
 let symbs_in_formula add set f = 
   let rec symbs_rec pol concl = function
-    | TFatom (TApred {tt_desc =  TTapp(Symbols.Name (hs,_), l)}) -> 
+    | TFatom (_, TApred (_, {tt_desc =  TTapp(Symbols.Name (hs,_), l)})) -> 
 	let spos , sneg , cpos , cneg , args = PInfo.find hs in
 	SetH.iter (add pol false) spos;
 	SetH.iter (add (Polarite.not pol) false) sneg;
@@ -184,29 +184,31 @@ let symbs_in_formula add set f =
 		  ) l args
 	end
 
-    | TFatom (TAbuilt(_,l)  | TAeq l | TAneq l | TAle l | TAlt l) ->
+    | TFatom (_, 
+	      (TAbuilt(_,_,l)  | TAeq (_,l) | TAneq (_,l) 
+		  | TAle (_,l) | TAlt (_,l))) ->
 	List.iter (symbs_of_term add set pol concl) l
 
     | TFatom _ -> ()
 
-    | TFop((OPand | OPor),fl) ->
+    | TFop(_, (OPand | OPor),fl) ->
 	List.iter (symbs_rec pol concl) fl
 
-    | TFop(OPnot,[f]) ->
+    | TFop(_, OPnot,[f]) ->
 	symbs_rec (Polarite.not pol) concl f
 
-    | TFop(OPimp,[f1;f2]) ->
+    | TFop(_, OPimp,[f1;f2]) ->
 	symbs_rec (Polarite.not pol) false f1;
 	symbs_rec pol concl f2
 
-    | TFop(OPiff,[f1;f2]) ->
-	let imp f1 f2 = TFop(OPimp,[f1;f2]) in
-	symbs_rec pol concl (TFop(OPand,[imp f1 f2; imp f2 f1]))
+    | TFop(_, OPiff,[f1;f2]) ->
+	let imp f1 f2 = TFop(0(*dummy*), OPimp,[f1;f2]) in
+	symbs_rec pol concl (TFop(0(*dummy*),OPand,[imp f1 f2; imp f2 f1]))
 
-    | TFop(OPif _,[f1;f2]) ->
+    | TFop(_, OPif _,[f1;f2]) ->
 	failwith "OPif is not implemented"
 
-    | TFforall {qf_form = f} | TFexists {qf_form = f} -> 
+    | TFforall (_, {qf_form = f}) | TFexists (_,{qf_form = f}) -> 
 	symbs_rec pol concl f
 
     | TFlet _ ->
@@ -251,18 +253,18 @@ let analyze_formula s g f =
 let analyze_deps decl_list =
   List.fold_left
     (fun (g,gls) d -> match d with
-       | TAxiom (_,s,f) ->
+       | TAxiom (_, _,s,f) ->
 	   analyze_formula s g f, gls
        | TPredicate_def 
-	   (_,s,_,TFforall {qf_form = TFop(OPiff,[f1;f2]); 
-			    qf_bvars = lvars}) ->
+	   (_,_,s,_,TFforall (_, {qf_form = TFop(_,OPiff,[f1;f2]); 
+			    qf_bvars = lvars})) ->
 	   let l , _ = List.split lvars in
 	   let s = Hstring.make s in
 	   PInfo.init s l;
 	   symbs_in_formula (PInfo.add s) (PInfo.set s) f2;
 	   (g, gls)
        | TPredicate_def _ -> assert false
-       | TGoal (l,s,f) -> (g, (s,f)::gls)
+       | TGoal (_,l,s,f) -> (g, (s,f)::gls)
        | _ -> (g,gls))
     (GF.empty, []) decl_list
 
@@ -348,12 +350,12 @@ let split_and_prune depth decl_list =
 	       end;
 	     List.fold_right
 	       (fun f acc -> match f with
-		  | TAxiom(_,s',TFforall{qf_bvars=_::_}) -> 
+		  | TAxiom(_,_,s',TFforall(_, {qf_bvars=_::_})) -> 
 		      if SetS.mem s' df then (f,true)::acc else acc
-		  | TAxiom(loc,s',f') -> 
+		  | TAxiom(id,loc,s',f') -> 
 		      if SetS.mem s' df then (f,true)::acc
-		      else (TAxiom(loc,s',f'),false)::acc
-		  | TGoal (_,s',_) -> if s = s' then (f,true)::acc else acc
+		      else (TAxiom(id,loc,s',f'),false)::acc
+		  | TGoal (_,_,s',_) -> if s = s' then (f,true)::acc else acc
 		  | _ -> (f,true)::acc) decl_list [])
 	  goals
 

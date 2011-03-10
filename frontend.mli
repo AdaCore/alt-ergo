@@ -34,8 +34,8 @@ val process_decl:
 
 val open_file:
   string -> Lexing.lexbuf -> 
-  (Why_ptree.tdecl * Why_typing.env) list list * Smt_ast.status
+  (int Why_ptree.tdecl * Why_typing.env) list list * Smt_ast.status
 
 val processing:
   (Why_ptree.sat_tdecl -> output -> int64 -> 'a) -> 
-  (Why_ptree.tdecl * Why_typing.env) list list -> unit
+  (int Why_ptree.tdecl * Why_typing.env) list list -> unit

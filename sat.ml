@@ -326,9 +326,11 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 
             | F.Let {F.lvar=lvar;lterm=lterm;lsubst=lsubst;lf=lf} ->
                 let f' = F.apply_subst (lsubst,Ty.esubst) lf in
+		let id = F.id f' in
                 let v = Symbols.Map.find lvar lsubst in
-                let env = assume env ({f=F.mk_lit (A.LT.make (A.Eq(v,lterm)));
-				       age=age;name=lem;mf=mf;gf=gf},dep) 
+                let env = assume env 
+		  ({f=F.mk_lit (A.LT.make (A.Eq(v,lterm))) id;
+		    age=age;name=lem;mf=mf;gf=gf},dep) 
 		in
                 assume env ({f=f';age=age;name=lem;mf=mf;gf=gf},dep)
       end

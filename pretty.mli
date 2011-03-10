@@ -15,7 +15,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val print_term : Format.formatter -> Why_ptree.tterm -> unit
-val print_term_list : Format.formatter -> Why_ptree.tterm list -> unit
+val print_term : Format.formatter -> 'a Why_ptree.tterm -> unit
+val print_term_list : Format.formatter -> 'a Why_ptree.tterm list -> unit
 
-val print_form : Format.formatter -> Why_ptree.tform -> unit
+val print_form : Format.formatter -> 'a Why_ptree.tform -> unit

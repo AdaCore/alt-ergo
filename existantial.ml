@@ -23,11 +23,11 @@ let eq_var x t =
     | _ -> false
 
 let rec find_eq x eqs = function
-  | TFatom (TAeq [t1;t2]) -> 
+  | TFatom (_, (TAeq (_, [t1;t2]))) -> 
       if eq_var x t1 then (x,t2)::eqs 
       else if eq_var x t2 then (x,t1)::eqs
       else eqs
-  | TFop(OPand,l) -> List.fold_left (find_eq x) eqs l
+  | TFop(_, OPand,l) -> List.fold_left (find_eq x) eqs l
   | _ -> eqs (* XXX: TODO *)
 
 let find_equalities lv f = 
@@ -49,19 +49,19 @@ let rec apply_subst_term env t =
 
 let rec apply_subst_formula env f = 
   match f with
-    | TFatom ( TAeq l | TAneq l | TAle l | TAlt l | TAbuilt(_,l) as e ) -> 
-	let l' = List.map (apply_subst_term env) l in
+    | TFatom (ida, e) -> 
 	let a = match e with
-	    TAeq _ -> TAeq l' 
-	  | TAneq _ -> TAneq l' 
-	  | TAle _ -> TAle l' 
-	  | TAlt _ -> TAlt l' 
-	  | TAbuilt(s,_) -> TAbuilt(s,l')
-	  | _ -> assert false
-	in TFatom a
-    | TFatom(TApred t) -> TFatom(TApred (apply_subst_term env t))
-    | TFop(op,lf) ->
-	TFop(op,List.map (apply_subst_formula env) lf)
+	  | TAeq (ide, l) -> TAeq (ide, List.map (apply_subst_term env) l) 
+	  | TAneq (ide, l) -> TAneq (ide, List.map (apply_subst_term env) l)
+	  | TAdistinct (ide, l) -> TAdistinct (ide, List.map (apply_subst_term env) l)
+	  | TAle (ide, l) -> TAle (ide, List.map (apply_subst_term env) l)
+	  | TAlt (ide, l) -> TAlt (ide, List.map (apply_subst_term env) l)
+	  | TAbuilt(ide,s,l) -> TAbuilt(ide,s,List.map (apply_subst_term env) l)
+	  | TApred (ide, t) -> TApred (ide, apply_subst_term env t)
+	  | TAfalse | TAtrue -> assert false
+	in TFatom (ida, a)
+    | TFop(ido, op,lf) ->
+	TFop(ido, op, List.map (apply_subst_formula env) lf)
     | TFforall _ | TFexists _ -> f (* XXX: TODO *)
     | _ -> f
 	
@@ -71,7 +71,8 @@ let make_instance f =
 
 let make f = 
   if Options.no_rm_eq_existential 
-  then TFexists f
+  then TFexists (0, f)
   else
-    try (*TFop(OPor,[TFexists f;*)make_instance f(*])*) with Not_found -> TFexists f
+    try (*TFop(OPor,[TFexists f;*)make_instance f(*])*) 
+    with Not_found -> TFexists (0, f)
 

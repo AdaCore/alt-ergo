@@ -15,4 +15,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val make : Why_ptree.quant_form -> Why_ptree.tform
+val make : int Why_ptree.quant_form -> int Why_ptree.tform
