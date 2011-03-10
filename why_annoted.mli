@@ -2,8 +2,13 @@ open Why_ptree
 
 type sbuffer = GSourceView2.source_buffer
 
+
 type 'a annoted =
-    { mutable c : 'a; mutable pruned : bool; tag : GText.tag; buf : sbuffer }
+    { mutable c : 'a; 
+      mutable pruned : bool;
+      tag : GText.tag;
+      id : int;
+      buf : sbuffer }
 
 type aterm = 
     { at_ty : Ty.t; at_desc : at_desc }
@@ -72,22 +77,22 @@ module MDep : (Map.S with type key = atyped_decl annoted)
 
 
 
-  type env = {
-    buffer : sbuffer;
-    inst_buffer : sbuffer;
-    st_ctx : GMisc.statusbar_context;
-    mutable ast : (atyped_decl annoted * Why_typing.env)list;
-    mutable ctrl : bool;
-    dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t
-  }
+type env = {
+  buffer : sbuffer;
+  inst_buffer : sbuffer;
+  st_ctx : GMisc.statusbar_context;
+  mutable ast : (atyped_decl annoted * Why_typing.env)list;
+  mutable ctrl : bool;
+  dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t
+}
 
-  val create_env :
-    sbuffer -> 
-    sbuffer ->
-    GMisc.statusbar_context ->
-    (atyped_decl annoted * Why_typing.env) list -> 
-    (atyped_decl annoted list * atyped_decl annoted list) MDep.t ->
-    env
+val create_env :
+  sbuffer -> 
+  sbuffer ->
+  GMisc.statusbar_context ->
+  (atyped_decl annoted * Why_typing.env) list -> 
+  (atyped_decl annoted list * atyped_decl annoted list) MDep.t ->
+  env
 
 
 
@@ -116,14 +121,14 @@ val make_dep :
   (atyped_decl annoted  * Why_typing.env) list ->
   (atyped_decl annoted list * atyped_decl annoted list) MDep.t
 
-val new_annot : sbuffer -> 'a -> 'a annoted
+val new_annot : sbuffer -> 'a -> int -> 'a annoted
 
 val annot : 
-  sbuffer ->  (int Why_ptree.tdecl * Why_typing.env) list -> 
+  sbuffer -> ((int tdecl, int) Why_ptree.annoted * Why_typing.env) list -> 
   (atyped_decl annoted * Why_typing.env) list
 
 val annot_of_tterm : 
-  sbuffer -> int Why_ptree.tterm -> aterm annoted
+  sbuffer -> (int tterm, int) Why_ptree.annoted -> aterm annoted
 
 val add_aaterm_list_at : sbuffer ->
   GText.tag list -> GText.iter -> string -> aterm annoted list -> unit
@@ -133,13 +138,13 @@ val add_aaform : sbuffer -> int -> GText.tag list ->
 
 val to_ast : 
   (atyped_decl annoted * Why_typing.env) list -> 
-  int Why_ptree.tdecl list
+  (int tdecl, int) Why_ptree.annoted list
 
 val add_to_buffer : 
   sbuffer -> (atyped_decl annoted * Why_typing.env) list -> unit
 
 val print_typed_decl_list  :
-  Format.formatter -> int Why_ptree.tdecl list -> unit
+  Format.formatter -> (int tdecl, int) Why_ptree.annoted list -> unit
 
 val findtags_using : 
   atyped_decl -> (atyped_decl annoted * Why_typing.env) list -> GText.tag list 
