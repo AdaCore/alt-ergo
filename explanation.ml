@@ -40,7 +40,7 @@ let singleton ?(bj = true) l =
   Some (ES.singleton (if bj then BJ l else Dep l))
 
 let make_deps sf = 
-  Some (Formula.Set.fold (fun l acc -> ES.add (Dep l) acc) sf ES.empty)
+  Some (Formula.Set.fold (fun l acc -> ES.add (BJ l) acc) sf ES.empty)
 
 let union d1 d2 = match d1,d2 with
     None , _ | _ , None -> None
