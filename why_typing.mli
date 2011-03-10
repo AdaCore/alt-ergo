@@ -17,11 +17,11 @@
 
 type env
 
-val file : Why_ptree.file -> (Why_ptree.tdecl * env) list 
+val file : Why_ptree.file -> (int Why_ptree.tdecl * env) list 
 
 val split_goals : 
-  (Why_ptree.tdecl * env) list -> (Why_ptree.tdecl * env) list list
+  (int Why_ptree.tdecl * env) list -> (int Why_ptree.tdecl * env) list list
 
-val term : env -> (Symbols.t * Ty.t) list -> Why_ptree.lexpr -> Why_ptree.tterm
+val term : env -> (Symbols.t * Ty.t) list -> Why_ptree.lexpr -> int Why_ptree.tterm
 
 

@@ -214,6 +214,15 @@ module Env = struct
       
 end
 
+
+
+let new_id = 
+  let r = ref 0 in 
+  let next () = 
+    r := !r+1; !r 
+  in next
+
+
 let rec freevars_term acc t = match t.tt_desc with
   | TTvar x -> Sy.add x acc
   | TTapp (_,lt) -> List.fold_left freevars_term acc lt
@@ -224,19 +233,20 @@ let rec freevars_term acc t = match t.tt_desc with
   | _ -> acc
       
 let freevars_atom = function
-  | TAeq lt | TAneq lt | TAle lt | TAlt lt | TAbuilt(_,lt) | TAdistinct lt ->
+  | TAeq (_, lt) | TAneq (_, lt) | TAle (_, lt)
+  | TAlt (_, lt) | TAbuilt(_, _,lt) | TAdistinct (_, lt) ->
       List.fold_left freevars_term Sy.empty lt
-  | TApred t -> freevars_term  Sy.empty t
+  | TApred (_, t) -> freevars_term  Sy.empty t
   | _ -> Sy.empty
       
 let rec freevars_form = function
-  | TFatom a -> freevars_atom a
-  | TFop(_,lf) -> List.fold_left Sy.union Sy.empty (List.map freevars_form lf)
-  | TFforall qf | TFexists qf -> 
+  | TFatom (_, a) -> freevars_atom a
+  | TFop(_,_,lf) -> List.fold_left Sy.union Sy.empty (List.map freevars_form lf)
+  | TFforall (_,qf) | TFexists (_,qf) -> 
       let s = freevars_form qf.qf_form in
       List.fold_left (fun acc (s,_) -> Sy.remove s acc) s qf.qf_bvars
-  | TFlet(up,v,t,f) -> freevars_term (Sy.remove v (freevars_form f)) t
-  | TFnamed(_, f) -> freevars_form f
+  | TFlet(_,up,v,t,f) -> freevars_term (Sy.remove v (freevars_form f)) t
+  | TFnamed(_,_, f) -> freevars_form f
 
 let symbol_of = function
     PPadd -> Symbols.Op Symbols.Plus
@@ -248,7 +258,7 @@ let symbol_of = function
 
 let rec type_term env f = 
   let e,t = type_term_desc env f.pp_loc f.pp_desc in
-  { tt_desc = e ; tt_ty = t }
+  { tt_desc = e ; tt_ty = t; tt_annot=new_id () }
 
 and type_term_desc env loc = function
   | PPconst ConstTrue -> 
@@ -435,26 +445,33 @@ let make_le_or_lt p l =
   let s = match p with PPle -> "<=" | PPlt -> "<" | _ -> assert false in
   try 
     let _ = Builtin.is_builtin s in 
-    (match p with PPle -> TAle l | PPlt -> TAlt l | _ -> assert false)
+    (match p with 
+      | PPle -> TAle (new_id (), l) 
+      | PPlt -> TAlt (new_id (), l)
+      | _ -> assert false)
   with Not_found -> 
     let s = Symbols.name s in (* XXX *)
-    let t = {tt_desc=TTapp(s,l);tt_ty=Ty.Tbool} in 
-    TAeq [t;{tt_desc=TTconst Ttrue;tt_ty=Ty.Tbool}]
+    let t2 = {tt_desc=TTconst Ttrue;tt_ty=Ty.Tbool; tt_annot=new_id ()} in
+    let t1 = {tt_desc=TTapp(s,l);tt_ty=Ty.Tbool; tt_annot=new_id ()} in 
+    TAeq (new_id (), [t1;t2])
 
 let rec type_form env f = match f.pp_desc with
   | PPconst ConstTrue -> 
-      TFatom TAtrue, Sy.empty
+      TFatom (new_id (), TAtrue), Sy.empty
   | PPconst ConstFalse -> 
-      TFatom TAfalse, Sy.empty
+      TFatom (new_id (), TAfalse), Sy.empty
   | PPvar p ->
       let r = begin
 	match Env.fresh_type env p f.pp_loc with
 	  | s, ([] ,Ty.Tbool) -> 
 	      (try 
-		 TFatom (TAbuilt(Builtin.is_builtin p,[]))
+		 TFatom (new_id (), TAbuilt(new_id (), Builtin.is_builtin p,[]))
 	       with Not_found -> 
-		 let t1 = {tt_desc=TTvar s;tt_ty=Ty.Tbool} in
-		 TFatom (TAeq [t1;{tt_desc=TTconst Ttrue;tt_ty=Ty.Tbool}]))
+		 let t2 = {tt_desc=TTconst Ttrue; 
+			   tt_ty=Ty.Tbool; tt_annot=new_id ()} in
+		 let t1 = {tt_desc=TTvar s;
+			   tt_ty=Ty.Tbool; tt_annot=new_id ()} in
+		 TFatom (new_id (), TAeq (new_id (), [t1;t2])))
 	  | _ -> error (NotAPropVar p) f.pp_loc
       end in r, freevars_form r
 
@@ -469,11 +486,12 @@ let rec type_form env f = match f.pp_desc with
 		  try
 		    List.iter2 Ty.unify lt lt_args;
 		    (try 
-		       TFatom (TAbuilt(Builtin.is_builtin p,te_args))
+		       TFatom (new_id (), TAbuilt(new_id (), Builtin.is_builtin p,te_args))
 		     with Not_found -> 
-		       let t1 = {tt_desc=TTapp(s,te_args);tt_ty=Ty.Tbool} in 
+		       let t1 = {tt_desc=TTapp(s,te_args);
+				 tt_ty=Ty.Tbool; tt_annot=new_id ()} in
 		       (*TFatom (TAeq[t1;{tt_desc=TTtrue;tt_ty=Ty.Tbool}])) *)
-		       TFatom (TApred t1))
+		       TFatom (new_id (), TApred (new_id (), t1)))
 		  with 
 		      Ty.TypeClash(t1,t2) -> error (Unification(t1,t2)) f.pp_loc
 		    | Invalid_argument _ -> error (WrongNumberofArgs p) f.pp_loc
@@ -493,7 +511,7 @@ let rec type_form env f = match f.pp_desc with
 	    | [] -> raise (Invalid_argument "distinct")
 	  in
 	  List.iter (Ty.unify t) lt_args; 
-	  TFatom (TAdistinct(te_args))
+	  TFatom (new_id (), TAdistinct(new_id (), te_args))
 	with 
 	  | Ty.TypeClash(t1,t2) -> 
 	      error (Unification(t1,t2)) f.pp_loc
@@ -509,7 +527,7 @@ let rec type_form env f = match f.pp_desc with
         let q = { pp_desc = PPinfix (a, r, b); pp_loc = f.pp_loc } in
         let f1,_ = type_form env p in
         let f2,_ = type_form env q in
-        TFop(OPand,[f1;f2])
+        TFop(new_id (), OPand,[f1;f2])
       in r, freevars_form r
   | PPinfix(t1, (PPlt | PPgt | PPle | PPge | PPeq | PPneq as op) ,t2) -> 
       let r = begin
@@ -518,39 +536,47 @@ let rec type_form env f = match f.pp_desc with
 	try
 	  Ty.unify tt1.tt_ty tt2.tt_ty;
 	  match op with
-	    | PPeq -> TFatom (TAeq [tt1;tt2])
-	    | PPneq -> TFatom (TAneq [tt1;tt2])
+	    | PPeq -> TFatom (new_id (), TAeq (new_id (), [tt1;tt2]))
+	    | PPneq -> TFatom (new_id (), TAneq (new_id (), [tt1;tt2]))
 	    | _ ->
 		let ty = Ty.shorten tt1.tt_ty in
 		match ty with
 		  | Ty.Tint | Ty.Treal -> begin 
 		      match op with
-			| PPle -> TFatom (make_le_or_lt PPle [tt1;tt2])
-			| PPge -> TFatom (make_le_or_lt PPle [tt2;tt1])
+			| PPle ->
+			  TFatom (new_id (), make_le_or_lt PPle [tt1;tt2])
+			| PPge ->
+			  TFatom (new_id (), make_le_or_lt PPle [tt2;tt1])
 			| PPlt -> begin match ty with
 			    | Ty.Tint -> 
 				let one = 
-				  {tt_ty=Ty.Tint ; tt_desc=TTconst(Tint "1")} in
+				  {tt_ty=Ty.Tint ;
+				   tt_desc=TTconst(Tint "1");
+				   tt_annot=new_id ()} in
 				let desc = 
-				  TTinfix(tt2, Symbols.Op Symbols.Minus,one) 
+				  TTinfix(tt2, Symbols.Op Symbols.Minus,one)
 				in
-				TFatom 
+				TFatom (new_id (),
 				  (make_le_or_lt PPle 
-				     [tt1;{tt2 with tt_desc=desc}])
+				     [tt1;{tt2 with tt_desc=desc}]))
 			      | _ -> 
-				  TFatom (make_le_or_lt PPlt [tt1;tt2])
+				  TFatom (new_id (),
+					  make_le_or_lt PPlt [tt1;tt2])
 			  end
 			| PPgt -> begin match ty with
 			    | Ty.Tint ->
 				let one = 
-				  {tt_ty=Ty.Tint ; tt_desc=TTconst(Tint "1")} in
+				  {tt_ty=Ty.Tint ;
+				   tt_desc=TTconst(Tint "1");
+				   tt_annot=new_id ()} in
 				let desc = 
 				  TTinfix(tt1, Symbols.Op Symbols.Minus, one) 
 				in
-				TFatom 
+				TFatom (new_id (),
 				  (make_le_or_lt 
-				     PPle [tt2;{tt1 with tt_desc=desc}])
-			    | _ -> TFatom (make_le_or_lt PPlt [tt2;tt1])
+				     PPle [tt2;{tt1 with tt_desc=desc}]))
+			    | _ -> 
+			      TFatom (new_id (), make_le_or_lt PPlt [tt2;tt1])
 			  end
 			| _ -> assert false
 		    end
@@ -563,23 +589,23 @@ let rec type_form env f = match f.pp_desc with
 	let f2,fv2 = type_form env f2 in
 	((match op with
 	  | PPand -> 
-	      TFop(OPand,[f1;f2])
-	  | PPor -> TFop(OPor,[f1;f2])
-	  | PPimplies -> TFop(OPimp,[f1;f2])
-	  | PPiff -> TFop(OPiff,[f1;f2])
+	      TFop(new_id (), OPand,[f1;f2])
+	  | PPor -> TFop(new_id (), OPor,[f1;f2])
+	  | PPimplies -> TFop(new_id (), OPimp,[f1;f2])
+	  | PPiff -> TFop(new_id (), OPiff,[f1;f2])
 	  | _ -> assert false), Sy.union fv1 fv2)
       end
   | PPprefix(PPnot,f) -> 
-      let f, fv = type_form env f in TFop(OPnot,[f]),fv
+      let f, fv = type_form env f in TFop(new_id (), OPnot,[f]),fv
   | PPif(f1,f2,f3) -> 
       let f1 = type_term env f1 in
       let f2,fv2 = type_form env f2 in
       let f3,fv3 = type_form env f3 in
-      TFop(OPif f1,[f2;f3]), Sy.union fv2 fv3
+      TFop(new_id (), OPif f1,[f2;f3]), Sy.union fv2 fv3
   | PPnamed(lbl,f) -> 
       let f, fv = type_form env f in
       let lbl = Hstring.make lbl in
-      TFnamed(lbl, f), fv
+      TFnamed(new_id (), lbl, f), fv
   | PPforall _ | PPexists _ ->
       let ty_vars, ty, triggers, f' = 
 	match f.pp_desc with 
@@ -608,7 +634,7 @@ let rec type_form env f = match f.pp_desc with
 	qf_form = f'}
       in
       (match f.pp_desc with 
-	   PPforall _ -> TFforall qf_form  
+	   PPforall _ -> TFforall (new_id (), qf_form)
 	 | _ -> Existantial.make qf_form), 
       (List.fold_left (fun acc (l,_) -> Sy.remove l acc) fv bvars)
   | PPlet (var,t,f) -> 
@@ -618,14 +644,14 @@ let rec type_form env f = match f.pp_desc with
       let env = {env with 
 		   Env.var_map = M.add var (svar, ttype) env.Env.var_map} in
       let f,fv = type_form env f in
-      TFlet (up ,svar , tt, f), freevars_term (Sy.remove svar fv) tt
+      TFlet (new_id (), up ,svar , tt, f), freevars_term (Sy.remove svar fv) tt
   | _ -> error ShouldHaveTypeProp f.pp_loc
 
 
 let make_rules loc = function
-  | TFforall {qf_bvars = vars; qf_form = TFatom (TAeq [t1; t2])} ->
+  | TFforall (_, {qf_bvars = vars; qf_form = TFatom (_, (TAeq (_, [t1; t2])))}) ->
       {rwt_vars = vars; rwt_left = t1; rwt_right = t2}
-  | TFatom (TAeq [t1; t2]) -> 
+  | TFatom (_, (TAeq (_, [t1; t2]))) -> 
       {rwt_vars = []; rwt_left = t1; rwt_right = t2}
   | _ -> error SyntaxError loc
 
@@ -840,7 +866,7 @@ let rec max_terms acc f =
 
 let max_terms f = try max_terms [] f with Exit -> []
 
-let rec mono_term {tt_ty=tt_ty; tt_desc=tt_desc} = 
+let rec mono_term {tt_ty=tt_ty; tt_desc=tt_desc; tt_annot=tt_annot} = 
   let tt_desc = match tt_desc with
     | TTconst _ | TTvar _ -> 
         tt_desc
@@ -861,41 +887,41 @@ let rec mono_term {tt_ty=tt_ty; tt_desc=tt_desc} =
     | TTlet (sy,t1,t2)-> 
         TTlet (sy, mono_term t1, mono_term t2)
   in 
-  {tt_ty = Ty.monomorphize tt_ty; tt_desc=tt_desc}
+  {tt_ty = Ty.monomorphize tt_ty; tt_desc=tt_desc; tt_annot=tt_annot}
  
 
 let monomorphize_atom tat =
   match tat with 
   | TAtrue | TAfalse -> tat
-  | TAeq tl -> TAeq (List.map mono_term tl)
-  | TAneq tl-> TAneq (List.map mono_term tl)
-  | TAle tl-> TAle (List.map mono_term tl)
-  | TAlt tl -> TAlt (List.map mono_term tl)
-  | TAdistinct tl -> TAdistinct (List.map mono_term tl)
-  | TApred t -> TApred (mono_term t)
-  | TAbuilt (hs, tl) -> TAbuilt(hs, List.map mono_term tl)
+  | TAeq (id, tl) -> TAeq (id, List.map mono_term tl)
+  | TAneq (id, tl) -> TAneq (id, List.map mono_term tl)
+  | TAle (id, tl) -> TAle (id, List.map mono_term tl)
+  | TAlt (id, tl) -> TAlt (id, List.map mono_term tl)
+  | TAdistinct (id, tl) -> TAdistinct (id, List.map mono_term tl)
+  | TApred (id, t) -> TApred (id, mono_term t)
+  | TAbuilt (id, hs, tl) -> TAbuilt(id, hs, List.map mono_term tl)
 
 let rec monomorphize_form tf = 
   match tf with
-    | TFatom tat -> TFatom (monomorphize_atom tat)
-    | TFop (oplogic , tfl) ->
-        TFop(oplogic, List.map monomorphize_form tfl)
-    | TFforall qf ->
-        TFforall
+    | TFatom (id, tat) -> TFatom (id, monomorphize_atom tat)
+    | TFop (id, oplogic , tfl) ->
+        TFop(id, oplogic, List.map monomorphize_form tfl)
+    | TFforall (id, qf) ->
+        TFforall (id, 
           {qf with
              qf_form = monomorphize_form qf.qf_form;
-             qf_triggers = List.map (List.map mono_term) qf.qf_triggers}
+             qf_triggers = List.map (List.map mono_term) qf.qf_triggers})
 
-    | TFexists qf ->
-        TFexists
+    | TFexists (id, qf) ->
+        TFexists (id, 
           {qf with
              qf_form = monomorphize_form qf.qf_form;
-             qf_triggers = List.map (List.map mono_term) qf.qf_triggers}
+             qf_triggers = List.map (List.map mono_term) qf.qf_triggers})
 
-    | TFlet (l,sy,tt,tf) ->
-        TFlet(l,sy, mono_term tt, monomorphize_form tf)
-    | TFnamed (hs,tf) ->
-        TFnamed(hs, monomorphize_form tf)
+    | TFlet (id, l, sy, tt, tf) ->
+        TFlet(id, l,sy, mono_term tt, monomorphize_form tf)
+    | TFnamed (id, hs,tf) ->
+        TFnamed(id, hs, monomorphize_form tf)
 
 let axioms_of_rules loc name lf acc env =
   let acc = 
@@ -903,7 +929,7 @@ let axioms_of_rules loc name lf acc env =
       (fun acc (f, _) ->
         let f = Triggers.make false f in
         let name = (Common.fresh_string ()) ^ "_" ^ name in
-        let td = TAxiom(loc,name,f) in
+        let td = TAxiom(new_id (), loc,name,f) in
 	(td, env)::acc
       ) acc lf
   in 
@@ -914,20 +940,20 @@ let type_decl (acc, env) d =
     match d with
       | Logic (loc, ac, lp, ty) -> 
 	  let env' = Env.add_logics env loc ac lp ty in
-	  let td = TLogic(loc,lp,ty) in
+	  let td = TLogic(new_id (), loc,lp,ty) in
 	  (td, env)::acc, env'
 
       | Axiom(loc,name,f) -> 
 	  let f, _ = type_form env f in 
 	  let f = Triggers.make false f in
-	  let td = TAxiom(loc,name,f) in
+	  let td = TAxiom(new_id (), loc,name,f) in
 	  (td, env)::acc, env
 
       | Rewriting(loc, name, lr) -> 
 	  let lf = List.map (type_form env) lr in
           if Options.rewriting then
             let rules = List.map (fun (f,_) -> make_rules loc f) lf in
-	    let td = TRewriting(loc, name, rules)in
+	    let td = TRewriting(new_id (), loc, name, rules)in
 	    (td, env)::acc, env
           else
             axioms_of_rules loc name lf acc env
@@ -944,12 +970,12 @@ let type_decl (acc, env) d =
 		 let f,_ = type_form env' f in
 		 let f = monomorphize_form f in
                  let f = Triggers.make false f in
-		 (TAxiom(loc, fresh_axiom_name(), f), env')::acc) acc axioms
+		 (TAxiom(new_id (), loc, fresh_axiom_name(), f), env')::acc) acc axioms
 	  in
 	  let goal, _ = type_form env' goal in
           let goal = monomorphize_form goal in
 	  let goal = Triggers.make true goal in
-	  let td = TGoal(loc, n, goal) in
+	  let td = TGoal(new_id (), loc, n, goal) in
 	  (td, env')::acc, env
 
       | Predicate_def(loc,n,l,e) 
@@ -978,18 +1004,18 @@ let type_decl (acc, env) d =
 	  let f = Triggers.make false f in
 	  let td = 
 	    match d with 
-	      | Function_def(_,_,_,t,_) -> TFunction_def(loc,n,l,t,f)
-	      | _ ->  TPredicate_def(loc,n,l,f)
+	      | Function_def(_,_,_,t,_) -> TFunction_def(new_id (), loc,n,l,t,f)
+	      | _ ->  TPredicate_def(new_id (), loc,n,l,f)
 	  in
 	  (td, env)::acc, env
 
       | TypeDecl(loc, ls, s, lc) -> 
 	  let env1 = Env.add_type_decl env ls s lc loc in
-	  let td1 =  TTypeDecl(loc, ls, s, lc) in
+	  let td1 =  TTypeDecl(new_id (), loc, ls, s, lc) in
           let tls = List.map (fun s -> PPTvarid (s,loc)) ls in
 	  let ty = PFunction([], PPTexternal(tls, s, loc)) in
 	  let env2 = Env.add_logics env1 loc Symbols.Constructor lc ty in
-	  let td2 = TLogic(loc, lc, ty) in
+	  let td2 = TLogic(new_id (), loc, lc, ty) in
 	  (td1, env1)::(td2,env2)::acc, env2
 
   with Warning(e,loc) -> 
@@ -1010,7 +1036,7 @@ let split_goals l =
       (fun (ctx, hyp, ret) ( (td, env) as x) -> 
 	 match td with 
 	   | TGoal _ -> ctx, [], (x::(hyp@ctx))::ret
-	   | TAxiom (_, s, _) when String.length s > 0 && s.[0] = '_' ->
+	   | TAxiom (_, _, s, _) when String.length s > 0 && s.[0] = '_' ->
 	       ctx, x::hyp, ret
 	   | _ -> x::ctx, hyp, ret) ([],[],[]) l
   in 

@@ -53,7 +53,7 @@ and view =
 
 and iview = { pos : view ; neg : view ; size : int}
 
-and t = iview hash_consed
+and t = iview hash_consed * int
     
 module View = struct
   type t = iview
@@ -85,7 +85,7 @@ module View = struct
     | _, Let _ -> 1
     | Skolem s1 , Skolem s2 -> compare_skolem s1 s2
 	
-  and compare_t t1 t2  = Pervasives.compare t1.tag t2.tag
+  and compare_t (t1,_) (t2,_)  = Pervasives.compare t1.tag t2.tag
   and compare_view v1 v2 = 
     let c = compare_pclause v1.pos v2.pos in
     if c<>0 then c else compare_pclause v1.neg v2.neg
@@ -150,18 +150,19 @@ module View = struct
   let hashllt = List.fold_left (fun acc x->acc*19 + hashlt 0 x)
     
   let hashc acc = function 
-      Unit l -> List.fold_left (fun acc f -> acc * 19 + f.tag) 1 (sort l)
-    | Clause(f1,f2) -> 
+    | Unit l -> 
+	List.fold_left (fun acc (f,_) -> acc * 19 + f.tag) 1 (sort l)
+    | Clause((f1,_),(f2,_)) -> 
 	let min = min f1.tag f2.tag in
 	let max = max f1.tag f2.tag in
 	(acc*19 + min)*19 + max
-    | Lemma({qvars = vars;triggers = trs; main = f}) -> 
+    | Lemma({qvars = vars;triggers = trs; main = (f,_)}) -> 
 	hashllt (Hashtbl.hash (f.tag,vars)) trs
     | Literal x -> Literal.LT.hash x
-    | Skolem{ssubst=s;sf=f} -> 
+    | Skolem{ssubst=s;sf=(f,_)} -> 
 	Sy.Map.fold 
 	  (fun s t acc ->acc * 19 + Sy.hash s) s f.tag
-    | Let ({lvar=lvar;lterm=lterm;lsubst=lsubst;lf=lf}) -> 
+    | Let ({lvar=lvar;lterm=lterm;lsubst=lsubst;lf=(lf,_)}) -> 
         Sy.Map.fold (fun s t acc ->acc * 19 + Sy.hash s) lsubst 
           (lf.tag * 19 * 19 + Sy.hash lvar * 19 + acc)
 	  
@@ -175,7 +176,8 @@ module H = Make(View)
 let tbl = H.create 100007
 let iview f = f.node
 
-let view t = t.node.pos
+let view (t,_) = t.node.pos
+let id (_,id) = id
 
 let rec print fmt f = match view f with
   | Literal a -> 
@@ -191,7 +193,7 @@ let rec print fmt f = match view f with
 
   | Unit l -> Print_color.print_list "& " print fmt l
 
-  | Clause(f1,f2) -> fprintf fmt "(%a v %a) " print f1 print f2
+  | Clause(f1, f2) -> fprintf fmt "(%a v %a) " print f1 print f2
 
   | Skolem{sf=f} -> fprintf fmt "<sko> (%a)" print f
 
@@ -204,9 +206,10 @@ let union_subst s1 ((s2,s2_ty) as subst) =
     (fun k x s2 -> Sy.Map.add k x s2) (Sy.Map.map (T.apply_subst subst)  s1) s2
 
 (* this function should only be applied with ground substitutions *)
-let rec apply_subst subst f = 
+let rec apply_subst subst (f, id) = 
   let {pos=p;neg=n;size=s} = iview f in
-  H.hashcons tbl {pos=iapply_subst subst p; neg=iapply_subst subst n; size=s}
+  (H.hashcons tbl 
+     {pos=iapply_subst subst p; neg=iapply_subst subst n; size=s}, id)
 
 and iapply_subst ((s_t,s_ty) as subst) = function
   | Literal a -> 
@@ -222,8 +225,8 @@ and iapply_subst ((s_t,s_ty) as subst) = function
   | Unit l -> 
       Unit(List.map (apply_subst subst) l)
 
-  | Clause(f1,f2) -> 
-      Clause(apply_subst subst f1,apply_subst subst f2)
+  | Clause(f1, f2) -> 
+      Clause(apply_subst subst f1, apply_subst subst f2)
 
   | Skolem e -> 
       Skolem{e with 
@@ -236,22 +239,23 @@ and iapply_subst ((s_t,s_ty) as subst) = function
      Let {e with 
 	    lsubst=lsubst;lsubst_ty=Ty.union_subst lsubst_ty s_ty; lterm=lterm;}
    
-let size t = t.node.size
+let size (t,_) = t.node.size
 
-let compare f1 f2 = 
+let compare ((v1,_) as f1) ((v2,_) as f2)= 
   let c = Pervasives.compare (size f1) (size f2) in 
-  if c=0 then compare f1.tag f2.tag else c
+  if c=0 then compare v1.tag v2.tag else c
 	  
-let equal f1 f2 = f1.tag == f2.tag
+let equal (f1,_) (f2,_) = f1.tag == f2.tag
 
 
 (* smart constructors *)
 
-let mk_lit a = 
-  H.hashcons tbl {pos = Literal a; neg = Literal (Literal.LT.neg a); size = 1}
+let mk_lit a id = 
+  (H.hashcons tbl 
+     {pos = Literal a; neg = Literal (Literal.LT.neg a); size = 1}, id)
   
-let mk_not f = 
-  let f = iview f in H.hashcons tbl ({pos=f.neg;neg=f.pos;size=f.size})	  
+let mk_not (f,id) = 
+  let f = iview f in (H.hashcons tbl ({pos=f.neg;neg=f.pos;size=f.size}), id)
 
 let mk_skolem_subst bv v = 
   T.Set.fold 
@@ -268,57 +272,61 @@ let symbols_of_terms v =
     v Sy.Set.empty
   
 (* name: (forall bv [trs]. f[fv]) *)
-let mk_forall up bv trs f name = 
+let mk_forall up bv trs f name id = 
   let sy = symbols_of_terms bv in
   let lem = {qvars = sy; triggers = trs; main = f ; name=name} in
   let sko = {ssubst = mk_skolem_subst up bv;
              ssubst_ty = Ty.esubst;
              sf = mk_not f} in
-    H.hashcons tbl {pos=Lemma(lem) ; neg=Skolem(sko); size=size f }
+    (H.hashcons tbl {pos=Lemma(lem) ; neg=Skolem(sko); size=size f }, id)
     
 (* forall upbv.  name: (exists bv [trs]. f) *)
-let mk_exists up bv trs f name = 
+let mk_exists up bv trs f name id= 
   let sy = symbols_of_terms bv in
   let lem = {qvars = sy; triggers = trs; main = mk_not f; name=name} in
   let sko = {ssubst = mk_skolem_subst up bv;
              ssubst_ty = Ty.esubst;
              sf = f} in
-  H.hashcons tbl {pos=Skolem(sko)  ; neg=Lemma(lem) ; size = size f}
+  (H.hashcons tbl {pos=Skolem(sko)  ; neg=Lemma(lem) ; size = size f}, id)
 
 (* forall up. let bv = t in f *)
-let mk_let up bv t f =
+let mk_let up bv t f id =
   let {Term.ty=ty} = Term.view t in
   let up = T.Set.fold (fun y acc-> y::acc) up [] in
   let subst = Sy.Map.add bv (T.make (Sy.fresh "let") up ty) Sy.Map.empty in
-   H.hashcons tbl 
+   (H.hashcons tbl 
      {pos=Let{lvar=bv;lsubst=subst;lsubst_ty=Ty.esubst;lterm=t;lf=f};
-      neg=Let{lvar=bv;lsubst=subst;lsubst_ty=Ty.esubst;lterm=t;lf=mk_not f}; 
-      size=size f }
+      neg=Let{lvar=bv;lsubst=subst;lsubst_ty=Ty.esubst;lterm=t;lf=mk_not f};
+      size=size f }, id)
     
-let mk_and f1 f2 =
+let mk_and f1 f2 id =
   if equal f1 f2 then f1 else
     let size = size f1 + size f2 in
-    H.hashcons tbl {pos=Unit([f1;f2]); neg=Clause(mk_not f1,mk_not f2); size=size}
+    (H.hashcons tbl 
+       {pos=Unit([f1;f2]); neg=Clause(mk_not f1,mk_not f2); size=size}, id)
 	
-let mk_or f1 f2 = 
+let mk_or f1 f2 id = 
   if equal f1 f2 then f1 else
     let size = size f1 + size f2 in
-    H.hashcons tbl {pos=Clause(f1,f2); neg=Unit([mk_not f1;mk_not f2]); size=size}
+    (H.hashcons tbl 
+       {pos=Clause(f1,f2); neg=Unit([mk_not f1;mk_not f2]); size=size}, id)
       
-let mk_imp f1 f2 = 
+let mk_imp f1 f2 id = 
   let size = size f1 + size f2 in
-  H.hashcons tbl {pos=Clause(mk_not f1,f2); neg=Unit([f1;mk_not f2]); size=size}
+  (H.hashcons tbl 
+     {pos=Clause(mk_not f1,f2); neg=Unit([f1;mk_not f2]); size=size}, id)
 
-let mk_if t f2 f3 = 
-  let lit = mk_lit (Literal.LT.mk_pred t) in
-  mk_or (mk_and lit f2) (mk_and (mk_not lit) f3)
+let mk_if t f2 f3 id = 
+  let lit = mk_lit (Literal.LT.mk_pred t) id in
+  mk_or (mk_and lit f2 id) (mk_and (mk_not lit) f3 id) id
     
-let mk_iff f1 f2 = 
-  let a = mk_or f1 f2 in
-  let b = mk_or (mk_not f1) (mk_not f2) in
-  let c = mk_or (mk_not f1) f2 in
-  let d = mk_or f1 (mk_not f2) in
-  H.hashcons tbl {pos=Unit([c;d]); neg=Unit([a;b]) ; size=2*(size f1+size f2)}
+let mk_iff f1 f2 id = 
+  let a = mk_or f1 f2 id in
+  let b = mk_or (mk_not f1) (mk_not f2) id in
+  let c = mk_or (mk_not f1) f2 id in
+  let d = mk_or f1 (mk_not f2) id in
+  (H.hashcons tbl 
+     {pos=Unit([c;d]); neg=Unit([a;b]) ; size=2*(size f1+size f2)}, id)
 
 let add_label lbl f = 
   match view f with
