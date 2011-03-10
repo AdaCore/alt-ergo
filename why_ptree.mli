@@ -84,6 +84,10 @@ type file = decl list
 
 (*** typed ast *)
 
+type ('a, 'b) annoted =
+    { c : 'a;
+      annot : 'b }
+
 type tconstant =
   | Tint of string
   | Treal of Num.num
@@ -93,49 +97,49 @@ type tconstant =
   | Tvoid
 
 type 'a tterm = 
-    { tt_ty : Ty.t; tt_desc : 'a tt_desc; tt_annot : 'a }
+    { tt_ty : Ty.t; tt_desc : 'a tt_desc }
 and 'a tt_desc = 
   | TTconst of tconstant
   | TTvar of Symbols.t
-  | TTinfix of 'a tterm * Symbols.t * 'a tterm
-  | TTprefix of Symbols.t * 'a tterm 
-  | TTapp of Symbols.t * 'a tterm list
-  | TTget of 'a tterm * 'a tterm
-  | TTset of 'a tterm * 'a tterm * 'a tterm
-  | TTextract of 'a tterm * 'a tterm * 'a tterm
-  | TTconcat of 'a tterm * 'a tterm
-  | TTlet of Symbols.t * 'a tterm * 'a tterm
+  | TTinfix of ('a tterm, 'a) annoted * Symbols.t * ('a tterm, 'a) annoted
+  | TTprefix of Symbols.t * ('a tterm, 'a) annoted 
+  | TTapp of Symbols.t * ('a tterm, 'a) annoted list
+  | TTget of ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
+  | TTset of ('a tterm, 'a) annoted * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
+  | TTextract of ('a tterm, 'a) annoted * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
+  | TTconcat of ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
+  | TTlet of Symbols.t * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
 
 type 'a tatom = 
   | TAtrue
   | TAfalse
-  | TAeq of 'a * 'a tterm list
-  | TAdistinct of 'a * 'a tterm list
-  | TAneq of 'a * 'a tterm list
-  | TAle of 'a * 'a tterm list
-  | TAlt of 'a * 'a tterm list
-  | TApred of 'a * 'a tterm
-  | TAbuilt of 'a * Hstring.t * 'a tterm list
+  | TAeq of ('a tterm, 'a) annoted list
+  | TAdistinct of ('a tterm, 'a) annoted list
+  | TAneq of ('a tterm, 'a) annoted list
+  | TAle of ('a tterm, 'a) annoted list
+  | TAlt of ('a tterm, 'a) annoted list
+  | TApred of ('a tterm, 'a) annoted
+  | TAbuilt of Hstring.t * ('a tterm, 'a) annoted list
 
-type 'a oplogic = OPand |OPor | OPimp | OPnot | OPif of 'a tterm | OPiff 
+type 'a oplogic = OPand |OPor | OPimp | OPnot | OPiff 
+		  | OPif of ('a tterm, 'a) annoted
 
 type 'a quant_form = {       
   (* quantified variables that appear in the formula *)
   qf_bvars : (Symbols.t * Ty.t) list ;
-
   qf_upvars : (Symbols.t * Ty.t) list ;
-
-  qf_triggers : 'a tterm list list ;
-  qf_form : 'a tform
+  qf_triggers : ('a tterm, 'a) annoted list list ;
+  qf_form : ('a tform, 'a) annoted
 }
 
 and 'a tform =
-  | TFatom of 'a * 'a tatom
-  | TFop of 'a * 'a oplogic * 'a tform list
-  | TFforall of 'a * 'a quant_form
-  | TFexists of 'a * 'a quant_form
-  | TFlet of 'a * (Symbols.t * Ty.t) list * Symbols.t * 'a tterm * 'a tform
-  | TFnamed of 'a * Hstring.t * 'a tform
+  | TFatom of ('a tatom, 'a) annoted
+  | TFop of 'a oplogic * (('a tform, 'a) annoted) list
+  | TFforall of 'a quant_form
+  | TFexists of 'a quant_form
+  | TFlet of (Symbols.t * Ty.t) list * Symbols.t * 
+      ('a tterm, 'a) annoted * ('a tform, 'a) annoted
+  | TFnamed of Hstring.t * ('a tform, 'a) annoted
 
 
 type 'a rwt_rule = {
@@ -145,14 +149,15 @@ type 'a rwt_rule = {
 }
 
 type 'a tdecl = 
-  | TAxiom of 'a * loc * string * 'a tform
-  | TRewriting of 'a * loc * string * ('a tterm rwt_rule) list
-  | TGoal of 'a * loc * string * 'a tform
-  | TLogic of 'a * loc * string list * plogic_type
-  | TPredicate_def of 'a * loc * string * (string * ppure_type) list * 'a tform
-  | TFunction_def 
-      of 'a * loc * string * (string * ppure_type) list * ppure_type * 'a tform
-  | TTypeDecl of 'a * loc * string list * string * string list
+  | TAxiom of loc * string * ('a tform, 'a) annoted
+  | TRewriting of loc * string * (('a tterm, 'a) annoted rwt_rule) list
+  | TGoal of loc * string * ('a tform, 'a) annoted
+  | TLogic of loc * string list * plogic_type
+  | TPredicate_def of 
+      loc * string * (string * ppure_type) list * ('a tform, 'a) annoted
+  | TFunction_def of 
+      loc * string * (string * ppure_type) list * ppure_type * ('a tform, 'a) annoted
+  | TTypeDecl of loc * string list * string * string list
 
 
 (* Sat entry *)

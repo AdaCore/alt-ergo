@@ -12,8 +12,11 @@ let general_font = ref (Pango.Font.from_string "sans")
 type sbuffer = GSourceView2.source_buffer
 
 type 'a annoted =
-    { mutable c : 'a; mutable pruned : bool; tag : GText.tag; buf : sbuffer }
-
+    { mutable c : 'a; 
+      mutable pruned : bool;
+      tag : GText.tag;
+      id : int;
+      buf : sbuffer }
 
 type aterm = 
     { at_ty : Ty.t; at_desc : at_desc }
@@ -380,14 +383,14 @@ and print_tt_desc fmt = function
 let print_tatom fmt = function
   | TAtrue -> fprintf fmt "true" 
   | TAfalse -> fprintf fmt "false"
-  | TAeq tl -> print_tterm_list " = " fmt tl
-  | TAneq tl -> print_tterm_list " <> " fmt tl
-  | TAdistinct tl ->
+  | TAeq (_, tl) -> print_tterm_list " = " fmt tl
+  | TAneq (_, tl) -> print_tterm_list " <> " fmt tl
+  | TAdistinct (_, tl) ->
       fprintf fmt "distinct(%a)" (print_tterm_list ",") tl
-  | TAle tl -> print_tterm_list " <= " fmt tl
-  | TAlt tl -> print_tterm_list " < " fmt tl
-  | TApred t -> print_tterm fmt t
-  | TAbuilt (h, tl) -> print_tterm_list (" "^(Hstring.view h)^" ") fmt tl
+  | TAle (_, tl) -> print_tterm_list " <= " fmt tl
+  | TAlt (_, tl) -> print_tterm_list " < " fmt tl
+  | TApred (_, t) -> print_tterm fmt t
+  | TAbuilt (_, h, tl) -> print_tterm_list (" "^(Hstring.view h)^" ") fmt tl
 
 let print_oplogic fmt = function
   | OPand -> fprintf fmt "and"
@@ -417,14 +420,14 @@ and print_triggers fmt = function
   | ts::l -> fprintf fmt "%a | %a" (print_tterm_list ",") ts print_triggers l
 
 and print_tform fmt = function
-  | TFatom a -> print_tatom fmt a
-  | TFop (op, tfl) -> print_tform_list op fmt tfl
-  | TFforall qf -> fprintf fmt "forall %a" print_quant_form qf
-  | TFexists qf -> fprintf fmt "exists %a" print_quant_form qf
-  | TFlet (vs, s, t, tf) -> 
+  | TFatom (_, a) -> print_tatom fmt a
+  | TFop (_, op, tfl) -> print_tform_list op fmt tfl
+  | TFforall (_, qf) -> fprintf fmt "forall %a" print_quant_form qf
+  | TFexists (_, qf) -> fprintf fmt "exists %a" print_quant_form qf
+  | TFlet (_, vs, s, t, tf) -> 
       fprintf fmt "let %a = %a in\n %a" 
 	Symbols.print s print_tterm t print_tform tf
-  | TFnamed (_, tf) -> print_tform fmt tf
+  | TFnamed (_, _, tf) -> print_tform fmt tf
 
 and print_tform_list op fmt = function
   | [] -> ()
@@ -433,20 +436,20 @@ and print_tform_list op fmt = function
       print_tform tf print_oplogic op (print_tform_list op) l
 
 let print_typed_decl fmt = function
-  | TAxiom (_, s, tf) -> fprintf fmt "axiom %s : %a" s print_tform tf
-  | TRewriting (_, s, rwtl) -> 
+  | TAxiom (_,_, s, tf) -> fprintf fmt "axiom %s : %a" s print_tform tf
+  | TRewriting (_,_, s, rwtl) -> 
     fprintf fmt "rewriting %s : %a" s print_rwt_list rwtl
-  | TGoal (_, s, tf) -> fprintf fmt "goal %s : %a" s print_tform tf
-  | TLogic (_, ls, ty) ->
+  | TGoal (_,_, s, tf) -> fprintf fmt "goal %s : %a" s print_tform tf
+  | TLogic (_,_, ls, ty) ->
       fprintf fmt "logic %a : %a" print_string_list ls print_plogic_type ty
-  | TPredicate_def (_, p, spptl, tf) ->
+  | TPredicate_def (_,_, p, spptl, tf) ->
       fprintf fmt "predicate %s %a = %a" p
 	print_pred_type_list spptl print_tform tf
-  | TFunction_def (_, f, spptl, ty, tf) ->
+  | TFunction_def (_,_, f, spptl, ty, tf) ->
       fprintf fmt "function %s (%a) : %a = %a" f
 	print_string_ppure_type_list spptl print_ppure_type ty print_tform tf
-  | TTypeDecl (_, ls, s, []) -> fprintf fmt "type %a %s" print_astring_list ls s
-  | TTypeDecl (_, ls, s, lc) -> 
+  | TTypeDecl (_, _, ls, s, []) -> fprintf fmt "type %a %s" print_astring_list ls s
+  | TTypeDecl (_, _, ls, s, lc) -> 
     fprintf fmt "type %a %s = %a" print_astring_list ls s 
       (print_string_sep " | ") lc
 
@@ -595,18 +598,18 @@ let make_dep annoted_ast =
 
 let tag (buffer:sbuffer) = buffer#create_tag []
 
-let new_annot (buffer:sbuffer) c =
-  { c = c; pruned = false; tag = (tag buffer); buf = buffer }
+let new_annot (buffer:sbuffer) c id =
+  { c = c; pruned = false; tag = (tag buffer); id = id; buf = buffer }
 
 let annot_of_tconstant (buffer:sbuffer)  t =
   new_annot buffer t
 
-let rec of_tterm (buffer:sbuffer)  t =
-  {at_desc = of_tt_desc buffer  t.tt_desc; at_ty = t.tt_ty }
+let rec of_tterm (buffer:sbuffer) (id, t) =
+  {at_desc = of_tt_desc buffer t.tt_desc; at_ty = t.tt_ty }
 
-and annot_of_tterm (buffer:sbuffer)  t =
-  let c = of_tterm buffer  t in
-  new_annot buffer  c
+and annot_of_tterm (buffer:sbuffer) ((_, id) as t) =
+  let c = of_tterm buffer t in
+  new_annot buffer c id
 
 and of_tt_desc (buffer:sbuffer)  = function
   | TTconst c -> (ATconst c)
@@ -627,13 +630,13 @@ and of_tt_desc (buffer:sbuffer)  = function
 let of_tatom (buffer:sbuffer)  = function
   | TAtrue -> AAtrue
   | TAfalse -> AAfalse
-  | TAeq tl -> AAeq (List.map (annot_of_tterm buffer ) tl)
-  | TAneq tl -> AAneq (List.map (annot_of_tterm buffer ) tl)
-  | TAdistinct tl -> AAdistinct (List.map (annot_of_tterm buffer ) tl)
-  | TAle tl -> AAle (List.map (annot_of_tterm buffer ) tl)
-  | TAlt tl -> AAlt (List.map (annot_of_tterm buffer ) tl)
-  | TApred t -> AApred (of_tterm buffer  t)
-  | TAbuilt (h, tl) -> AAbuilt (h, (List.map (annot_of_tterm buffer ) tl))
+  | TAeq (_, tl) -> AAeq (List.map (annot_of_tterm buffer ) tl)
+  | TAneq (_, tl) -> AAneq (List.map (annot_of_tterm buffer ) tl)
+  | TAdistinct (_, tl) -> AAdistinct (List.map (annot_of_tterm buffer ) tl)
+  | TAle (_, tl) -> AAle (List.map (annot_of_tterm buffer ) tl)
+  | TAlt (_, tl) -> AAlt (List.map (annot_of_tterm buffer ) tl)
+  | TApred (_, t) -> AApred (of_tterm buffer  t)
+  | TAbuilt (_, h, tl) -> AAbuilt (h, (List.map (annot_of_tterm buffer ) tl))
 
 let of_oplogic (buffer:sbuffer)  = function
   | OPand -> AOPand

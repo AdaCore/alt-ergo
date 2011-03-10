@@ -25,9 +25,9 @@ module Vtype = Set.Make(struct type t=int let compare=Pervasives.compare end)
 
 module STRS = Set.Make(
   struct
-    type t = int Why_ptree.tterm * Vterm.t * Vtype.t
+    type t = (int tterm, int) annoted * Vterm.t * Vtype.t
 
-    let rec compare_term t1 t2 = match t1.tt_desc,t2.tt_desc with
+    let rec compare_term t1 t2 = match t1.c.tt_desc, t2.c.tt_desc with
       | TTvar s1 , TTvar s2 -> Symbols.compare s1 s2
       | TTapp (s1,l1) , TTapp(s2,l2) ->
 	  let c = Symbols.compare s1 s2 in
@@ -64,7 +64,7 @@ let compare_tconstant c1 c2 =
     | _ -> Pervasives.compare c1 c2
 
 let rec depth_tterm t =
-  match t.tt_desc with
+  match t.c.tt_desc with
     | TTconst _ | TTvar _->  0
     | TTapp (_, tl) ->
 	1 + (List.fold_left
@@ -82,7 +82,7 @@ exception Out of int
 
   (* pourquoi cette fonction de comparaison est-elle si compliquee? *)
 let rec compare_tterm t1 t2 =
-  match t1.tt_desc, t2.tt_desc with
+  match t1.c.tt_desc, t2.c.tt_desc with
     | TTconst c1, TTconst c2 -> compare_tconstant c1 c2
     | TTconst _, _ -> -1
     | _, TTconst _ -> 1
@@ -194,7 +194,7 @@ let at_most n l =
   in
   List.rev (atmost [] n l)
 
-let is_var t = match t.tt_desc with
+let is_var t = match t.c.tt_desc with
   | TTvar _ -> true
   | TTapp (_,l) -> l=[]
   | _ -> false
@@ -202,7 +202,7 @@ let is_var t = match t.tt_desc with
 module SLLT = 
   Set.Make(
     struct 
-      type t = int Why_ptree.tterm list * Vterm.t * Vtype.t
+      type t = (int tterm, int) annoted list * Vterm.t * Vtype.t
       let compare (_, y1, _) (_, y2, _)  = 
 	Vterm.compare y1 y2
     end)
@@ -249,7 +249,7 @@ let simplification bv_a vty_a =
 	else  simpl_rec (e::acc) l
   in simpl_rec []
 
-let rec vars_of_term bv acc t = match t.tt_desc with
+let rec vars_of_term bv acc t = match t.c.tt_desc with
   | TTvar x -> if Vterm.mem x bv then Vterm.add x acc else acc
   | TTapp (_,lt) -> List.fold_left (vars_of_term bv) acc lt
   | TTinfix (t1,_,t2) -> List.fold_left (vars_of_term bv) acc [t1;t2]
@@ -259,7 +259,7 @@ let rec vars_of_term bv acc t = match t.tt_desc with
 
 let underscoring_term mvars underscores t = 
   let rec under_rec t =  
-    { t with tt_desc = under_rec_desc t.tt_desc}
+    { t with c={ t.c with tt_desc = under_rec_desc t.c.tt_desc}}
   and under_rec_desc t = match t with
     | TTvar x when Vterm.mem x mvars -> 
 	if not (Vterm.mem x !underscores) then 
@@ -308,26 +308,27 @@ let rec vty_ty acc t =
     | _ -> acc
     
 let rec vty_term acc t = 
-  let acc = vty_ty acc t.tt_ty in
-  match t.tt_desc with
+  let acc = vty_ty acc t.c.tt_ty in
+  match t.c.tt_desc with
     | TTapp (_,l) -> List.fold_left vty_term acc l
     | TTinfix (t1,_,t2) -> vty_term (vty_term acc t1) t2
     | TTset (t1, t2, t3) -> List.fold_left vty_term acc [t1;t2;t3]
     | TTget (t1, t2) -> List.fold_left vty_term acc [t1;t2]
     | _ -> acc
 
-let rec vty_form acc = function
-  | TFatom (_, (TAeq (_,l) | TAneq (_,l) | TAle (_,l) | TAlt (_,l) | TAbuilt(_,_,l)))-> 
+let rec vty_form acc f = match f.c with
+  | TFatom {c=(TAeq l | TAneq l | TAdistinct l 
+	       | TAle l | TAlt l | TAbuilt(_,l))}-> 
       List.fold_left vty_term acc l
-  | TFatom (_, TApred (_, t)) -> vty_term acc t
-  | TFop(_,_,l) -> List.fold_left vty_form acc l
+  | TFatom {c=TApred t} -> vty_term acc t
+  | TFop(_,l) -> List.fold_left vty_form acc l
   | _ -> acc (* we don't go through quantifiers *)
 
 let csort = Symbols.name "c_sort"
 
 let filter_mono vterm vtype (t, bv_t, vty_t) = 
   Vterm.subset vterm bv_t && Vtype.subset vtype vty_t && 
-    match t.tt_desc with
+    match t.c.tt_desc with
       | TTapp(s,_) -> 
 	  not (Symbols.equal s csort)
       | _ -> true
@@ -339,7 +340,7 @@ let as_tyv vty s = not (Vtype.is_empty (Vtype.inter vty s))
 let potential_triggers = 
   let rec potential_rec ((bv,vty) as vars) acc t = 
     let vty_t = vty_term Vtype.empty t in
-    match t.tt_desc with
+    match t.c.tt_desc with
       | TTvar x ->
 	  if Vterm.mem x bv or as_tyv vty vty_t then
 	    STRS.add (t,Vterm.singleton x, vty_t) acc
@@ -403,29 +404,29 @@ let make_triggers gopt vterm vtype trs =
 	if glouton then ll@(multi_triggers gopt vterm vtype trs) else ll
 
 let rec make_rec gopt vterm vtype f = 
-  match f with
-  | TFatom (_, (TAfalse | TAtrue)) ->
-      f, STRS.empty
-  | TFatom (_,a) ->
+  let c, trs = match f.c with
+    | TFatom {c=(TAfalse | TAtrue)} ->
+      f.c, STRS.empty
+    | TFatom a ->
       if Vterm.is_empty vterm && Vtype.is_empty vtype then 
-	f, STRS.empty
+	f.c, STRS.empty
       else 
-	let l = match a with    
-	  | TAeq (_,l) | TAneq (_,l) | TAle (_,l) 
-	  | TAlt (_,l) | TAbuilt(_,_,l) -> l
-	  | TApred (_, t) -> [t]
+	let l = match a.c with    
+	  | TAeq l | TAneq l | TAle l | TAlt l | TAbuilt(_,l) -> l
+	  | TApred t -> [t]
 	  | _ -> assert false
 	in
-	f, potential_triggers (vterm, vtype) l
-  | TFop(id, op, lf) -> 
+	f.c, potential_triggers (vterm, vtype) l
+    | TFop(op, lf) -> 
       let lf, trs = 
 	List.fold_left
 	  (fun (lf, trs1) f ->
-	     let f, trs2 = make_rec gopt vterm vtype f in
-	     f::lf, STRS.union trs1 trs2) ([], STRS.empty) lf in
-      TFop(id, op,List.rev lf), trs
+	    let f, trs2 = make_rec gopt vterm vtype f in
+	    f::lf, STRS.union trs1 trs2) ([], STRS.empty) lf in
+      TFop(op,List.rev lf), trs
 
-  | TFforall (idf, ({ qf_form=TFop(ido, OPiff,[TFatom _ as f1;f2])} as qf)) -> 
+    | TFforall ({ qf_form= {c = TFop(OPiff,[{c=TFatom _} as f1;f2]); 
+			    annot = ido}} as qf) -> 
       let vtype' = vty_form Vtype.empty qf.qf_form in
       let vterm' = 
 	List.fold_left (fun b (s,_) -> Vterm.add s b) Vterm.empty qf.qf_bvars 
@@ -454,18 +455,19 @@ let rec make_rec gopt vterm vtype f =
 	STRS.filter 
 	  (fun (_, bvt, _) -> Vterm.is_empty (Vterm.inter bvt vterm')) 
 	  (STRS.union trs1 trs2) in
-      let r  = { qf with 
-		   qf_triggers = trs12 ; 
-		   qf_form = TFop(ido, OPiff,[f1'; f2'])}
+      let r  = 
+	{ qf with 
+	  qf_triggers = trs12 ; 
+	  qf_form = {c=TFop(OPiff,[f1'; f2']); annot = ido} }
       in
       begin
-	match f with 
-	  | TFforall _ -> TFforall (idf, r), trs 
-	  | _ -> TFexists (idf, r) , trs
+	match f.c with 
+	  | TFforall _ -> TFforall r, trs 
+	  | _ -> TFexists r , trs
       end
 
 
-  | TFforall (idf, qf) | TFexists (idf, qf) -> 
+  | TFforall qf | TFexists qf -> 
       let vtype' = vty_form Vtype.empty qf.qf_form in
       let vterm' = 
 	List.fold_left (fun b (s,_) -> Vterm.add s b) Vterm.empty qf.qf_bvars in
@@ -484,29 +486,31 @@ let rec make_rec gopt vterm vtype f =
 	STRS.filter 
 	  (fun (_,bvt,_) -> Vterm.is_empty (Vterm.inter bvt vterm')) trs in
       let r  = {qf with qf_triggers = trs' ; qf_form = f'} in
-      (match f with 
-	| TFforall _ -> TFforall (idf, r) , trs 
-	| _ -> TFexists (idf, r) , trs)
+      (match f.c with 
+	| TFforall _ -> TFforall r , trs 
+	| _ -> TFexists r , trs)
 
-  | TFlet (id, up, v, t, f) -> 
+  | TFlet (up, v, t, f) -> 
       let f, trs = make_rec gopt vterm vtype f in 
-      TFlet (id, up, v, t, f), trs
+      TFlet (up, v, t, f), trs
 
-  | TFnamed(id, lbl, f) -> 
+  | TFnamed(lbl, f) -> 
       let f, trs = make_rec gopt vterm vtype f in
-      TFnamed(id, lbl, f), trs
+      TFnamed(lbl, f), trs
+  in
+  { f with c = c }, trs
 	  
-let make gopt f = match f with
+let make gopt f = match f.c with
   | TFforall _ | TFexists _ -> 
       let f, _ = make_rec gopt Vterm.empty Vtype.empty f in
       f
-  | TFatom (id,_) | TFop (id,_,_) | TFlet (id,_,_,_,_) | TFnamed (id,_,_) ->
+  | _  ->  
       let vty = vty_form Vtype.empty f in
       let f, trs = make_rec gopt Vterm.empty vty f in
       if Vtype.is_empty vty then f
       else 
 	let trs = STRS.elements trs in
 	let trs = make_triggers gopt Vterm.empty vty trs in
-	TFforall (id,
-	  {qf_bvars=[]; qf_upvars=[]; qf_triggers=trs; qf_form=f })
+	{ f with c = TFforall 
+	  {qf_bvars=[]; qf_upvars=[]; qf_triggers=trs; qf_form=f }}
 

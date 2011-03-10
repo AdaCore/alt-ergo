@@ -50,8 +50,10 @@ val report : Format.formatter -> error -> unit
 val error : error -> loc -> 'a
 val warning : error -> loc -> 'a
 
-val print_term : Format.formatter -> 'a Why_ptree.tterm -> unit
-val print_formula : Format.formatter -> 'a Why_ptree.tform -> unit
+val print_term : Format.formatter -> ('a tterm, 'a) annoted -> unit
+val print_formula : Format.formatter -> ('a tform, 'a) annoted 
+  -> unit
 val print_binders : Format.formatter -> (Symbols.t * Ty.t) list -> unit
-val print_triggers : Format.formatter -> 'a Why_ptree.tterm list list -> unit
+val print_triggers : Format.formatter -> ('a tterm, 'a) annoted list list 
+  -> unit
 val fresh_string : unit -> string
