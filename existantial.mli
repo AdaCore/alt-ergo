@@ -15,4 +15,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val make : int Why_ptree.quant_form -> int Why_ptree.tform
+open Why_ptree
+
+val make : int quant_form -> int tform

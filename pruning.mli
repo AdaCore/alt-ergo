@@ -15,5 +15,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Why_ptree
+
 val split_and_prune :
-  int -> int Why_ptree.tdecl list -> (int Why_ptree.tdecl * bool) list list
+  int -> (int tdecl, int) annoted list -> 
+  ((int tdecl,int) annoted * bool) list list

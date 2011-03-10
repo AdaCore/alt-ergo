@@ -15,7 +15,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val print_term : Format.formatter -> 'a Why_ptree.tterm -> unit
-val print_term_list : Format.formatter -> 'a Why_ptree.tterm list -> unit
+open Why_ptree
 
-val print_form : Format.formatter -> 'a Why_ptree.tform -> unit
+val print_term : Format.formatter -> ('a tterm, 'a) annoted -> unit
+val print_term_list : Format.formatter -> ('a tterm, 'a) annoted list -> unit
+
+val print_form : Format.formatter -> ('a tform, 'a) annoted -> unit

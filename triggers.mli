@@ -15,7 +15,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Why_ptree
 
 (* make b f computes the triggers for a formula f 
    if b is true then variables are authorized in mutli-triggers *)
-val make : bool -> int Why_ptree.tform -> int Why_ptree.tform
+val make : bool -> (int tform, int) annoted -> (int tform, int) annoted
+

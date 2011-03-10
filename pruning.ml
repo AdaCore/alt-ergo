@@ -150,7 +150,7 @@ end
 let symbs_of_term add set pol concl t = 
   let pol = ref pol in
   let rec symb_rec t = 
-    match t.tt_desc with
+    match t.c.tt_desc with
       | TTvar (Symbols.Name (hs,_)) -> add !pol concl hs
       | TTvar (Symbols.Var hs) -> set !pol concl hs
       | TTapp (Symbols.Name (hs,_), l) ->
@@ -161,8 +161,8 @@ let symbs_of_term add set pol concl t =
   in symb_rec t
 
 let symbs_in_formula add set f = 
-  let rec symbs_rec pol concl = function
-    | TFatom (_, TApred (_, {tt_desc =  TTapp(Symbols.Name (hs,_), l)})) -> 
+  let rec symbs_rec pol concl f = match f.c with 
+    | TFatom {c = TApred {c={tt_desc = TTapp (Symbols.Name (hs,_), l)}}} -> 
 	let spos , sneg , cpos , cneg , args = PInfo.find hs in
 	SetH.iter (add pol false) spos;
 	SetH.iter (add (Polarite.not pol) false) sneg;
@@ -184,31 +184,32 @@ let symbs_in_formula add set f =
 		  ) l args
 	end
 
-    | TFatom (_, 
-	      (TAbuilt(_,_,l)  | TAeq (_,l) | TAneq (_,l) 
-		  | TAle (_,l) | TAlt (_,l))) ->
+    | TFatom {c = (TAbuilt(_,l)  | TAeq l | TAneq l | TAdistinct l
+		  | TAle l | TAlt l)} ->
 	List.iter (symbs_of_term add set pol concl) l
 
     | TFatom _ -> ()
 
-    | TFop(_, (OPand | OPor),fl) ->
+    | TFop ((OPand | OPor), fl) ->
 	List.iter (symbs_rec pol concl) fl
 
-    | TFop(_, OPnot,[f]) ->
+    | TFop (OPnot, [f]) ->
 	symbs_rec (Polarite.not pol) concl f
 
-    | TFop(_, OPimp,[f1;f2]) ->
+    | TFop (OPimp,[f1;f2]) ->
 	symbs_rec (Polarite.not pol) false f1;
 	symbs_rec pol concl f2
 
-    | TFop(_, OPiff,[f1;f2]) ->
-	let imp f1 f2 = TFop(0(*dummy*), OPimp,[f1;f2]) in
-	symbs_rec pol concl (TFop(0(*dummy*),OPand,[imp f1 f2; imp f2 f1]))
+    | TFop (OPiff,[f1;f2]) ->
+	let imp f1 f2 = { c = TFop(OPimp,[f1;f2]); annot = 0 } in
+	symbs_rec pol concl 
+	  {c = TFop(OPand,[imp f1 f2; imp f2 f1]);
+	   annot = 0}
 
-    | TFop(_, OPif _,[f1;f2]) ->
+    | TFop(OPif _,[f1;f2]) ->
 	failwith "OPif is not implemented"
 
-    | TFforall (_, {qf_form = f}) | TFexists (_,{qf_form = f}) -> 
+    | TFforall {qf_form = f} | TFexists {qf_form = f} -> 
 	symbs_rec pol concl f
 
     | TFlet _ ->
@@ -252,19 +253,19 @@ let analyze_formula s g f =
 	  
 let analyze_deps decl_list =
   List.fold_left
-    (fun (g,gls) d -> match d with
-       | TAxiom (_, _,s,f) ->
+    (fun (g,gls) d -> match d.c with
+       | TAxiom (_,s,f) ->
 	   analyze_formula s g f, gls
        | TPredicate_def 
-	   (_,_,s,_,TFforall (_, {qf_form = TFop(_,OPiff,[f1;f2]); 
-			    qf_bvars = lvars})) ->
+	   (_,s,_, {c = TFforall {qf_form = {c=TFop(OPiff,[f1;f2])}; 
+				  qf_bvars = lvars}}) ->
 	   let l , _ = List.split lvars in
 	   let s = Hstring.make s in
 	   PInfo.init s l;
 	   symbs_in_formula (PInfo.add s) (PInfo.set s) f2;
 	   (g, gls)
        | TPredicate_def _ -> assert false
-       | TGoal (_,l,s,f) -> (g, (s,f)::gls)
+       | TGoal (l,s,f) -> (g, (s,f)::gls)
        | _ -> (g,gls))
     (GF.empty, []) decl_list
 
@@ -349,13 +350,15 @@ let split_and_prune depth decl_list =
 		 flush stdout;
 	       end;
 	     List.fold_right
-	       (fun f acc -> match f with
-		  | TAxiom(_,_,s',TFforall(_, {qf_bvars=_::_})) -> 
+	       (fun f acc -> match f.c with
+		  | TAxiom(_, s',{c=TFforall {qf_bvars=_::_}}) -> 
 		      if SetS.mem s' df then (f,true)::acc else acc
-		  | TAxiom(id,loc,s',f') -> 
+		  | TAxiom(loc,s',f') -> 
 		      if SetS.mem s' df then (f,true)::acc
-		      else (TAxiom(id,loc,s',f'),false)::acc
-		  | TGoal (_,_,s',_) -> if s = s' then (f,true)::acc else acc
+		      else 
+			let f = { c = TAxiom(loc,s',f'); annot = f.annot} in
+			(f,false)::acc
+		  | TGoal (_,s',_) -> if s = s' then (f,true)::acc else acc
 		  | _ -> (f,true)::acc) decl_list [])
 	  goals
 

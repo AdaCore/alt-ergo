@@ -15,5 +15,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Why_ptree
 
-val make : (int Why_ptree.tdecl * bool) list -> Why_ptree.sat_tdecl Queue.t
+val make : ((int tdecl, int) annoted * bool) list -> sat_tdecl Queue.t

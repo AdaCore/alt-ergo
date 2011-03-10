@@ -21,7 +21,7 @@ open Why_ptree
 (* not quite ''pretty''-printing, but helps for quick debugging *)
 
 let rec print_term fmt t = 
-  print_term_desc fmt t.tt_desc
+  print_term_desc fmt t.c.tt_desc
 and print_term_desc fmt =  function
   | TTconst Ttrue -> fprintf fmt "true"
   | TTconst Tfalse -> fprintf fmt "false"
@@ -35,16 +35,16 @@ and print_term_desc fmt =  function
   | _ -> failwith "not implemented"
 and print_term_list fmt = List.iter (fprintf fmt "%a," print_term)
 
-let rec print_atom fmt = function
+let rec print_atom fmt a = match a.c with
   | TAtrue -> fprintf fmt "@true"
   | TAfalse -> fprintf fmt "@false"
-  | TAeq (_, tl) -> fprintf fmt "=(%a)" print_term_list tl
-  | TAneq (_, tl) -> fprintf fmt "<>(%a)" print_term_list tl
-  | TAdistinct (_, tl) -> fprintf fmt "distinct(%a)" print_term_list tl
-  | TAle (_, tl) -> fprintf fmt "<=(%a)" print_term_list tl
-  | TAlt (_, tl) -> fprintf fmt "<(%a)" print_term_list tl
-  | TApred (_, t) -> fprintf fmt "%a" print_term t 
-  | TAbuilt(_,s, tl) -> fprintf fmt "%s(%a)" (Hstring.view s) print_term_list tl
+  | TAeq tl -> fprintf fmt "=(%a)" print_term_list tl
+  | TAneq tl -> fprintf fmt "<>(%a)" print_term_list tl
+  | TAdistinct tl -> fprintf fmt "distinct(%a)" print_term_list tl
+  | TAle tl -> fprintf fmt "<=(%a)" print_term_list tl
+  | TAlt tl -> fprintf fmt "<(%a)" print_term_list tl
+  | TApred t -> fprintf fmt "%a" print_term t 
+  | TAbuilt(s, tl) -> fprintf fmt "%s(%a)" (Hstring.view s) print_term_list tl
 
 let print_op fmt = function
   | OPand -> fprintf fmt "/\\"
@@ -54,11 +54,11 @@ let print_op fmt = function
   | OPif t -> fprintf fmt "if (%a) " print_term t
   | OPiff -> fprintf fmt "<=>"
 
-let rec print_form fmt = function
-  | TFatom (_, a) -> fprintf fmt "%a" print_atom a
-  | TFop(_, op,tl) -> fprintf fmt "%a(%a)" print_op op print_form_list tl
-  | TFforall (_, qf) -> fprintf fmt "forall ..., %a" print_form qf.qf_form
-  | TFexists (_, qf) -> fprintf fmt "exists ..., %a" print_form qf.qf_form
-  | TFlet (_, up,var,t,f) -> fprintf fmt "let ..., %a" print_form f
-  | TFnamed(_, lbl, f) -> fprintf fmt "%s:%a" (Hstring.view lbl) print_form f
+let rec print_form fmt f = match f.c with
+  | TFatom a -> fprintf fmt "%a" print_atom a
+  | TFop (op,tl) -> fprintf fmt "%a(%a)" print_op op print_form_list tl
+  | TFforall qf -> fprintf fmt "forall ..., %a" print_form qf.qf_form
+  | TFexists qf -> fprintf fmt "exists ..., %a" print_form qf.qf_form
+  | TFlet (up,var,t,f) -> fprintf fmt "let ..., %a" print_form f
+  | TFnamed(lbl, f) -> fprintf fmt "%s:%a" (Hstring.view lbl) print_form f
 and print_form_list fmt = List.iter (fprintf fmt "%a," print_form)

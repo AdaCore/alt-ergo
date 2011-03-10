@@ -32,7 +32,7 @@ let varset_of_list =
     (fun acc (s,ty) -> 
        Term.Set.add (Term.make s [] (Ty.shorten ty)) acc) Term.Set.empty
 
-let rec make_term { tt_ty = ty; tt_desc = tt } = 
+let rec make_term {c = { tt_ty = ty; tt_desc = tt }} = 
   let ty = Ty.shorten ty in
   match tt with
     | TTconst Ttrue -> 
@@ -80,87 +80,87 @@ let rec make_term { tt_ty = ty; tt_desc = tt } =
 
 
 let make_form name f = 
-  let rec make_form acc = function
-    | TFatom (id, a) ->
-	let a , lit = match a with
+  let rec make_form acc c id = match c with
+    | TFatom a ->
+	let a , lit = match a.c with
 	  | TAtrue -> 
 	      A.LT.vrai , A.LT.vrai::acc
 	  | TAfalse -> 
 	      A.LT.faux , A.LT.faux::acc
-	  | TAeq (_, [t1;t2]) -> 
+	  | TAeq [t1;t2] -> 
 	      let lit = A.LT.make (A.Eq (make_term t1, make_term t2)) in
 	      lit , lit::acc
-	  | TApred (_, t) ->
+	  | TApred t ->
 	      let lit = A.LT.mk_pred (make_term t) in
 	      lit , lit::acc
-	  | TAneq (_, [t1;t2]) -> 
+	  | TAneq [t1;t2] -> 
 	      let lit = A.LT.make (A.Neq (make_term t1, make_term t2)) in
 	      lit , lit::acc
-	  | TAle (_, [t1;t2]) -> 
+	  | TAle [t1;t2] -> 
 	      (try 
 		 let ale = Builtin.is_builtin "<=" in
 		 let lit = 
 		   A.LT.make (A.Builtin(true,ale,[make_term t1;make_term t2]))
 		 in lit , lit::acc
 	       with Not_found -> assert false)
-	  | TAlt (_, [t1;t2]) ->  
+	  | TAlt [t1;t2] ->  
 	      (try 
 		 let alt = Builtin.is_builtin "<" in
 		 let lit = 
 		   A.LT.make (A.Builtin(true,alt,[make_term t1;make_term t2])) 
 		 in lit , lit::acc
 	       with Not_found -> assert false)
-	  | TAbuilt(_, n,lt) ->
+	  | TAbuilt(n,lt) ->
 	      let lit = A.LT.make (A.Builtin(true,n,List.map make_term lt)) in
 	      lit , lit::acc
 	  | _ -> assert false
 	in F.mk_lit a id, lit
 
-    | TFop(id, ((OPand | OPor) as op),[f1;f2]) -> 
-	let ff1 , lit1 = make_form acc f1 in
-	let ff2 , lit2 = make_form lit1 f2 in
+    | TFop(((OPand | OPor) as op),[f1;f2]) -> 
+	let ff1 , lit1 = make_form acc f1.c f1.annot in
+	let ff2 , lit2 = make_form lit1 f2.c f2.annot in
 	let mkop = match op with 
 	  | OPand -> F.mk_and ff1 ff2 id
 	  | _ -> F.mk_or ff1 ff2 id in
 	mkop , lit2
-    | TFop(id, OPimp,[f1;f2]) -> 
-	let ff1 , _ = make_form acc f1 in
-	let ff2 , lit = make_form acc f2 in
+    | TFop(OPimp,[f1;f2]) -> 
+	let ff1 , _ = make_form acc f1.c f1.annot in
+	let ff2 , lit = make_form acc f2.c f2.annot in
 	F.mk_imp ff1 ff2 id, lit
-    | TFop(id, OPnot,[f]) -> 
-	let ff , lit = make_form acc f in
+    | TFop(OPnot,[f]) -> 
+	let ff , lit = make_form acc f.c f.annot in
 	F.mk_not ff , lit
-    | TFop(id, OPif t,[f2;f3]) -> 
+    | TFop(OPif t,[f2;f3]) -> 
 	let tt = make_term t in
-	let ff2 , lit2 = make_form acc f2 in
-	let ff3 , lit3 = make_form lit2 f3 in
+	let ff2 , lit2 = make_form acc f2.c f2.annot in
+	let ff3 , lit3 = make_form lit2 f3.c f3.annot in
 	F.mk_if tt ff2 ff3 id, lit3
-    | TFop(id, OPiff,[f1;f2]) -> 
-	let ff1 , lit1 = make_form acc f1 in
-	let ff2 , lit2 = make_form lit1 f2 in
+    | TFop(OPiff,[f1;f2]) -> 
+	let ff1 , lit1 = make_form acc f1.c f1.annot in
+	let ff2 , lit2 = make_form lit1 f2.c f2.annot in
 	F.mk_iff ff1 ff2 id, lit2
-    | (TFforall (id, qf) | TFexists (id, qf)) as f -> 
+    | (TFforall qf | TFexists qf) as f -> 
 	let bvars = varset_of_list qf.qf_bvars in
 	let upvars = varset_of_list qf.qf_upvars in
 	let trs = List.map (List.map make_term) qf.qf_triggers in
-	let ff , lit = make_form acc qf.qf_form in
+	let ff , lit = make_form acc qf.qf_form.c qf.qf_form.annot in
 	begin match f with
 	  | TFforall _ -> F.mk_forall upvars bvars trs ff name id, lit
 	  | TFexists _ -> F.mk_exists upvars bvars trs ff name id, lit
 	  | _ -> assert false
 	end
-    | TFlet(id,up,lvar,lterm,lf) -> 
-	let ff, lit = make_form acc lf in
+    | TFlet(up,lvar,lterm,lf) -> 
+	let ff, lit = make_form acc lf.c lf.annot in
         F.mk_let (varset_of_list up) lvar (make_term lterm) ff id, lit
 
-    | TFnamed(id, lbl, f) ->
-	let ff, lit = make_form acc f in
+    | TFnamed(lbl, f) ->
+	let ff, lit = make_form acc f.c f.annot in
 	F.add_label lbl ff; 
 	ff, lit
 
     | _ -> assert false
   in
-  make_form [] f
+  make_form [] f.c f.annot
 
 let push_assume f name loc match_flag = 
   let ff , _ = make_form name f in
@@ -183,14 +183,14 @@ let make l =
       Types.clear();*)
   clear();
   List.iter
-    (fun (d,b) -> match d with
-       | TAxiom(id, loc, name, f) -> push_assume f name loc b
-       | TRewriting(id, loc, name, lr) -> 
+    (fun (d,b) -> match d.c with
+       | TAxiom(loc, name, f) -> push_assume f name loc b
+       | TRewriting(loc, name, lr) -> 
 	   Queue.push 
 	     {st_decl=RwtDef(List.map make_rule lr); st_loc=loc} queue
-       | TGoal(id, loc, n, f) -> push_query n f loc
-       | TPredicate_def(id, loc, n, [], f) -> push_assume f n loc b
-       | TPredicate_def(id, loc, n, _, f) -> push_preddef f n loc b
-       | TFunction_def(id, loc, n, _, _, f) -> push_assume f n loc b
+       | TGoal(loc, n, f) -> push_query n f loc
+       | TPredicate_def(loc, n, [], f) -> push_assume f n loc b
+       | TPredicate_def(loc, n, _, f) -> push_preddef f n loc b
+       | TFunction_def(loc, n, _, _, f) -> push_assume f n loc b
        | TTypeDecl _ | TLogic _  -> ()) l;
   queue
