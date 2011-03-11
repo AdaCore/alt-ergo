@@ -509,15 +509,27 @@ let intersect ({ints=l1; expl=e1; is_int=is_int} as uints1) {ints=l2; expl=e2} =
 	let cul = compare_bu_bl up1 lo2 in
 	if cul < 0 then
 	  let expl = 
-	    if r1 <> [] && compare_bornes (snd (List.hd r1)) lo2 < 0 then expl
-	    else Explanation.union (explain_borne up1) 
-	      (Explanation.union (explain_borne lo2) expl) in
+	    (*if r1 <> [] && compare_bu_bl (snd (List.hd r1)) lo2 < 0 then expl
+	      else Explanation.union (explain_borne up1) 
+	      (Explanation.union (explain_borne lo2) expl) *)
+	    if r1 = [] || (r1 <> [] && acc = [] &&
+		not (compare_bl_bu lo2 (snd (List.hd r1)) > 0)) then
+	      Explanation.union (explain_borne up1) 
+		(Explanation.union (explain_borne lo2) expl) 
+	    else expl
+	  in
 	  step (r1, l2) acc expl
 	else if clu > 0 then 
 	  let expl = 
-	    if r2 <> [] && compare_bornes (snd (List.hd r2)) lo1 < 0 then expl
-	    else Explanation.union (explain_borne up2) 
-	      (Explanation.union (explain_borne lo1) expl) in
+	    (*if r2 <> [] && compare_bu_bl (snd (List.hd r2)) lo1 < 0 then expl
+	      else Explanation.union (explain_borne up2) 
+	      (Explanation.union (explain_borne lo1) expl) *)
+	    if r2 = [] || (r2 <> [] && acc = [] &&
+		not (compare_bl_bu lo1 (snd (List.hd r2)) > 0)) then 
+	      Explanation.union (explain_borne up2) 
+		(Explanation.union (explain_borne lo1) expl)
+	    else expl 
+	  in
 	  step (l1, r2) acc expl
 	else if cll <= 0 && cuu >= 0 then 
 	  step (l1, r2) ((lo2,up2)::acc) expl
@@ -528,9 +540,9 @@ let intersect ({ints=l1; expl=e1; is_int=is_int} as uints1) {ints=l2; expl=e2} =
 	else if cll >= 0 && cuu >= 0 && clu <= 0 then 
 	  step (l1, r2) ((lo1,up2)::acc) expl
 	else assert false
-      | [], _ | _, [] ->  List.rev acc, expl
-  in
-  let l, expl = step (l1,l2) [] Explanation.empty in
+      | [], _ | _, [] ->  List.rev acc, expl 
+    in
+  let l, expl = step (l1,l2) [] (Explanation.union e1 e2) in
   if l = [] then raise (NotConsistent expl)
   else { uints1 with ints = l; expl = expl }
 

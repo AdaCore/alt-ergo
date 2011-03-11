@@ -48,7 +48,7 @@ module type S = sig
   val print : Format.formatter -> t -> unit
 
   val distinct_r : 
-    t -> R.r -> R.r -> Explanation.t -> Explanation.t -> Explanation.t -> t
+    t -> R.r -> R.r -> Explanation.t -> t
 
   val rewrite_system : t -> (Term.t Why_ptree.rwt_rule) list -> t
     
@@ -958,12 +958,12 @@ module Make ( R : Sig.X ) = struct
     in
     { env with neqs = neqs}
 
-  let rec distinct_r env r1 r2 ex1 ex2 dep =
+  let rec distinct_r env r1 r2 dep =
     let r1, ex1 = lookup_by_r r1 env in
     let r2, ex2 = lookup_by_r r2 env in
     let dep' = Ex.union ex1 (Ex.union ex2 dep) in
     (* r1 and r2 could not be equal *)
-    if R.equal r1 r2 then raise (Inconsistent dep);
+    if R.equal r1 r2 then raise (Inconsistent dep');
     let env = make_distinct env r1 r2 dep' in
     let repr r = fst (lookup_by_r r env) in
     (*
@@ -986,12 +986,13 @@ module Make ( R : Sig.X ) = struct
        let env = add (add env t1) t2 in*)
     let r1, ex1 = lookup_by_t t1 env in
     let r2, ex2 = lookup_by_t t2 env in
+    let dep = Ex.union ex1 (Ex.union ex2 dep) in
     if debug_uf then 
       begin
 	printf "[uf] delta (%a) = %a@." T.print t1 R.print r1;
 	printf "[uf] delta (%a) = %a@." T.print t2 R.print r2
       end;
-    distinct_r env r1 r2 ex1 ex2 dep
+    distinct_r env r1 r2 dep
 
   let equal env t1 t2 = 
     let r1, _ = lookup_by_t t1 env in

@@ -234,7 +234,7 @@ module Make (X : Sig.X) = struct
            | Literal.Neq(r1,r2) -> 
                (*let dep = Ex.everything in*)
 	       let env = 
-		 {env with uf = Uf.distinct_r env.uf r1 r2 dep dep dep} in
+		 {env with uf = Uf.distinct_r env.uf r1 r2 dep} in
 	       (*TODO ou ex U dep*)
                let env = replay_atom_r env [ra, None, ex] dep in
                env
@@ -389,7 +389,7 @@ module Make (X : Sig.X) = struct
               Uf.add_semantic (Uf.add_semantic env.uf r1) r2} in
           close_up_r r1 r2 dep env
       | Literal.Neq(r1, r2)->
-	  let env = {env with uf = Uf.distinct_r env.uf r1 r2 dep dep dep} in
+	  let env = {env with uf = Uf.distinct_r env.uf r1 r2 dep} in
           let env = replay_atom_r env [ra, None, dep] dep in
           env
       | _ ->
