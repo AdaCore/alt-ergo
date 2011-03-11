@@ -31,7 +31,8 @@ module type S = sig
   val find_r : t -> R.r -> R.r * Explanation.t
 
   val union : 
-    t -> R.r -> R.r -> Explanation.t -> t * (R.r * (R.r * R.r * Explanation.t) list * R.r) list
+    t -> R.r -> R.r -> Explanation.t -> 
+    t * (R.r * (R.r * R.r * Explanation.t) list * R.r) list
   
   val distinct : t -> Term.t -> Term.t -> Explanation.t -> t
 
@@ -45,7 +46,7 @@ module type S = sig
   val print : Format.formatter -> t -> unit
 
   val distinct_r : 
-    t -> R.r -> R.r -> Explanation.t -> Explanation.t -> Explanation.t -> t
+    t -> R.r -> R.r -> Explanation.t -> t
 
   val rewrite_system : t -> (Term.t Why_ptree.rwt_rule) list -> t
 
