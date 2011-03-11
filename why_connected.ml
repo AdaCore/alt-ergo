@@ -189,7 +189,7 @@ let rec remove_doublons = function
 
 
 let unquantify_aaterm (buffer:sbuffer) at =
-  new_annot buffer at.c
+  new_annot buffer at.c at.id
 
 let unquantify_aatom (buffer:sbuffer) = function
   | AAtrue -> AAtrue
@@ -203,39 +203,41 @@ let unquantify_aatom (buffer:sbuffer) = function
   | AAbuilt (h,aatl) -> AAbuilt (h, (List.map (unquantify_aaterm buffer) aatl))
 
 let rec unquantify_aform (buffer:sbuffer) vars f =
-  match f with
-  | AFatom aa -> AFatom (unquantify_aatom buffer aa)
-  | AFop (op, afl) ->
+  let c = match f with
+    | AFatom aa -> AFatom (unquantify_aatom buffer aa)
+    | AFop (op, afl) ->
       AFop (op, List.map
-	 (fun af -> new_annot buffer (unquantify_aform buffer vars af.c)) afl)
-  | AFforall aaqf | AFexists aaqf ->
+	(fun af -> unquantify_aform buffer vars af.c) afl)
+    | AFforall aaqf | AFexists aaqf ->
       let {aqf_bvars = bv; aqf_upvars = uv; aqf_triggers = atll; aqf_form = af}=
 	aaqf.c in
       let aqf_bvars = List.filter (fun v -> not (List.mem v vars)) bv in
       let aform = unquantify_aform buffer vars af.c in
-      if aqf_bvars = [] then aform
+      if aqf_bvars = [] then aform.c
       else 
 	let aqf_triggers = 
 	  List.map (List.map (unquantify_aaterm buffer)) atll in
 	let aqf_triggers = List.filter
 	  (fun aatl ->	   
-	     List.filter (fun aat -> is_quantified_term vars aat.c) aatl <> []
+	    List.filter (fun aat -> is_quantified_term vars aat.c) aatl <> []
 	  ) aqf_triggers in
-	if aqf_triggers = [] then aform
+	if aqf_triggers = [] then aform.c
 	else let c =
-	  { aqf_bvars = List.filter (fun v -> not (List.mem v vars)) bv;
-	    aqf_upvars = List.filter (fun v -> not (List.mem v vars)) uv;
-	    aqf_triggers =  aqf_triggers;
-	    aqf_form = new_annot buffer (aform)} in
-	(match f with
-	   | AFforall _ -> AFforall (new_annot buffer c)
-	   | AFexists _ -> AFexists (new_annot buffer c)
-	   | _ -> assert false)
-  | AFlet (uv, s, at, aaf) ->
+	       { aqf_bvars = List.filter (fun v -> not (List.mem v vars)) bv;
+		 aqf_upvars = List.filter (fun v -> not (List.mem v vars)) uv;
+		 aqf_triggers =  aqf_triggers;
+		 aqf_form = aform} in
+	     (match f with
+	       | AFforall _ -> AFforall (new_annot buffer c aaqf.id)
+	       | AFexists _ -> AFexists (new_annot buffer c aaqf.id)
+	       | _ -> assert false)
+    | AFlet (uv, s, at, aaf) ->
       AFlet (List.filter (fun v -> not (List.mem v vars)) uv, s, at,
-	     new_annot buffer (unquantify_aform buffer vars aaf.c))
-  | AFnamed (n, aaf) ->
-      unquantify_aform buffer vars aaf.c
+	     unquantify_aform buffer vars aaf.c)
+    | AFnamed (n, aaf) ->
+      (unquantify_aform buffer vars aaf.c).c
+  in
+  new_annot buffer c (Why_typing.new_id ())
       
   
 
@@ -257,7 +259,7 @@ let rec aterm_used_vars goal_vars at =
 
 
 let make_instance (buffer:sbuffer) vars (entries:GEdit.entry list)
-    af goal_form tyenv =
+    afc goal_form tyenv =
   let goal_vars = list_vars_in_form goal_form.c in
   let terms, used_vars, vars = List.fold_left2
     (fun (l,u,vl) e v ->
@@ -271,8 +273,9 @@ let make_instance (buffer:sbuffer) vars (entries:GEdit.entry list)
        else l, u, vl
     ) ([],[],[]) entries (List.rev vars) in
   let aform = List.fold_left2
-    (fun af (s, ty) (at, u) -> AFlet (u, s, at.c, new_annot buffer af))
-    (unquantify_aform buffer vars af) vars (List.combine terms used_vars)
+    (fun af (s, ty) (at, u) -> 
+      new_annot buffer (AFlet (u, s, at.c, af)) af.id)
+    (unquantify_aform buffer vars afc) vars (List.combine terms used_vars)
   in
   let all_used_vars = remove_doublons (List.flatten used_vars) in
   (* new_annot buffer *) aform, all_used_vars
@@ -319,8 +322,8 @@ let rec add_instance env vars entries af aname =
   let ln_form = least_nested_form used_vars goal_form in
   env.inst_buffer#place_cursor  ~where:env.inst_buffer#end_iter;
   if ln_form = goal_form then begin
-    let hy = AAxiom (loc, (sprintf "%s%s" "_instance_" aname), instance) in
-    let ahy = new_annot env.inst_buffer hy in
+    let hy = AAxiom (loc, (sprintf "%s%s" "_instance_" aname), instance.c) in
+    let ahy = new_annot env.inst_buffer hy instance.id in
     let rev_ast = List.rev env.ast in
     let rev_ast = match rev_ast with 
       | (g,te)::l -> (g,te)::(ahy, te)::l
@@ -328,11 +331,11 @@ let rec add_instance env vars entries af aname =
     in
     env.ast <- List.rev rev_ast;
     connect_tag env env.inst_buffer ahy.tag;
-    connect_aform env env.inst_buffer instance;
+    connect_aaform env env.inst_buffer instance;
     add_to_buffer env.inst_buffer [ahy, tyenv] 
   end
   else begin
-    let instance = new_annot env.inst_buffer instance in
+    let instance = new_annot env.inst_buffer instance.c instance.id in
     ln_form.c <- 
       AFop 
       (AOPimp, 

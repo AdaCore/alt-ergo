@@ -35,4 +35,4 @@ val print : Format.formatter -> t -> unit
 
 val print_proof : Format.formatter -> t -> unit
 
-val lemmas_of : t -> string list option
+val ids_of : t -> int list option

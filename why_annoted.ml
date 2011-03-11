@@ -1265,16 +1265,37 @@ let findtags_dep at l =
   let sl = listsymbols at [] in
   List.fold_left (fun acc (td, _) -> findtags_atyped_delc_dep sl td acc) [] l
   
+let rec findproof_aform ids af acc =
+  match af with
+    | AFatom at -> acc
+    | AFop (_, aafl) ->
+      List.fold_left
+	(fun acc aaf -> findproof_aaform ids aaf acc)
+	acc aafl
+    | AFforall aaqf | AFexists aaqf ->
+      let acc = if List.mem aaqf.id ids then aaqf.tag::acc else acc in
+      findproof_aaform ids aaqf.c.aqf_form acc
+    | AFlet (_,_,_, aaf) | AFnamed (_, aaf) ->
+      findproof_aaform ids aaf acc
 
-let findproof_atyped_decl lems td acc =
+and findproof_aaform ids aaf acc =
+  let acc = if List.mem aaf.id ids then aaf.tag::acc else acc in
+  findproof_aform ids aaf.c acc 
+
+let findproof_atyped_decl ids td acc =
+  let acc = if List.mem td.id ids then td.tag::acc else acc in
   match td.c with
-    | AAxiom (_, name, _)
-    | ARewriting (_, name , _) -> 
-      if List.mem name lems then td.tag::acc else acc
-    | _ -> acc
+    | ARewriting (_,_, arwtl) -> assert false
+
+    | ALogic _ | ATypeDecl _
+    | APredicate_def (_,_,_, _) 
+    | AFunction_def (_,_,_,_, _) -> acc
+      
+    | AAxiom (_, name, af) -> findproof_aform ids af acc 
+    | AGoal (_,_, aaf) -> findproof_aaform ids aaf acc
 
 let findtags_proof expl l =
-  match Explanation.lemmas_of expl with
+  match Explanation.ids_of expl with
     | None -> []
-    | Some lems -> 
-      List.fold_left (fun acc (td, _) -> findproof_atyped_decl lems td acc) [] l
+    | Some ids -> 
+      List.fold_left (fun acc (td, _) -> findproof_atyped_decl ids td acc) [] l
