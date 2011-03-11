@@ -116,29 +116,32 @@ module View = struct
     List.fold_left 
 	(fun acc x -> match acc with
 	     [] -> [x]
-	   | h::l when x==h -> acc
+	   | h::l when fst x == fst h -> acc
 	   | _ -> x::acc) [] l
       
   let eqc c1 c2 = match c1,c2 with
       Unit l1 , Unit l2 -> 
-	(try List.for_all2 (==) (sort l1) (sort l2)
+	(try List.for_all2 (fun (f1,_) (f2,_) -> f1 == f2) (sort l1) (sort l2)
 	 with Invalid_argument _ -> false)
 
-    | Clause(f1,f2) , Clause(g1,g2) -> f1==g1 && f2==g2 || f1==g2 && f2==g1
+    | Clause((f1, _), (f2, _)) , Clause((g1,_), (g2,_)) ->
+      f1==g1 && f2==g2 || f1==g2 && f2==g1
 
     | Literal x , Literal y -> Literal.LT.equal x y
 
-    | Lemma({triggers = lt1; main = f1}), Lemma({triggers = lt2; main = f2}) -> 
+    | Lemma({triggers = lt1; main = (f1,_)}),
+      Lemma({triggers = lt2; main = (f2,_)}) -> 
 	(try List.for_all2 (List.for_all2 T.equal) lt1 lt2 && f1==f2
 	 with Invalid_argument _ -> false)
 
-    | Skolem {ssubst=s1;ssubst_ty=ty1;sf=f1}, Skolem{ssubst=s2;ssubst_ty=ty2;sf=f2} -> 
+    | Skolem {ssubst=s1;ssubst_ty=ty1;sf=(f1,_)},
+	Skolem {ssubst=s2;ssubst_ty=ty2;sf=(f2,_)} -> 
 	f1==f2 
 	&& (Sy.Map.compare T.compare s1 s2 = 0)
 	&& Ty.compare_subst ty1 ty2 = 0
 
     | Let l1, Let l2 -> 
-	l1.lf == l2.lf 
+	fst l1.lf == fst l2.lf 
 	&& Sy.equal l1.lvar l2.lvar 
 	&& Term.equal l1.lterm l2.lterm 
         && (Sy.Map.compare T.compare l1.lsubst l2.lsubst = 0)
