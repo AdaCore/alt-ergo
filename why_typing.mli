@@ -28,4 +28,4 @@ val split_goals :
 val term : env -> (Symbols.t * Ty.t) list -> Why_ptree.lexpr -> 
   (int tterm, int) annoted
 
-
+val new_id : unit -> int
