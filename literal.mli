@@ -25,7 +25,7 @@ end
 
 type 'a view = 
   | Eq of 'a * 'a 
-  | Neq of 'a * 'a 
+  | Distinct of 'a list
   | Builtin of bool * Hstring.t * 'a list
 
 module type S = sig

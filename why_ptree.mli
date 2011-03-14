@@ -105,8 +105,10 @@ and 'a tt_desc =
   | TTprefix of Symbols.t * ('a tterm, 'a) annoted 
   | TTapp of Symbols.t * ('a tterm, 'a) annoted list
   | TTget of ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
-  | TTset of ('a tterm, 'a) annoted * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
-  | TTextract of ('a tterm, 'a) annoted * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
+  | TTset of 
+      ('a tterm, 'a) annoted * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
+  | TTextract of 
+      ('a tterm, 'a) annoted * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
   | TTconcat of ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
   | TTlet of Symbols.t * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
 
@@ -121,8 +123,9 @@ type 'a tatom =
   | TApred of ('a tterm, 'a) annoted
   | TAbuilt of Hstring.t * ('a tterm, 'a) annoted list
 
-type 'a oplogic = OPand |OPor | OPimp | OPnot | OPiff 
-		  | OPif of ('a tterm, 'a) annoted
+type 'a oplogic = 
+    OPand |OPor | OPimp | OPnot | OPiff 
+  | OPif of ('a tterm, 'a) annoted
 
 type 'a quant_form = {       
   (* quantified variables that appear in the formula *)
@@ -156,7 +159,8 @@ type 'a tdecl =
   | TPredicate_def of 
       loc * string * (string * ppure_type) list * ('a tform, 'a) annoted
   | TFunction_def of 
-      loc * string * (string * ppure_type) list * ppure_type * ('a tform, 'a) annoted
+      loc * string * (string * ppure_type) list * 
+	ppure_type * ('a tform, 'a) annoted
   | TTypeDecl of loc * string list * string * string list
 
 

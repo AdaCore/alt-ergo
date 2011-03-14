@@ -513,15 +513,13 @@ let rec type_form env f =
 	  try
 	    let t = match lt_args with
 	      | t::_ -> t
-	      | [] -> raise (Invalid_argument "distinct")
+	      | [] ->
+		  error (WrongNumberofArgs "distinct") f.pp_loc
 	    in
 	    List.iter (Ty.unify t) lt_args; 
 	    TFatom { c = TAdistinct te_args; annot=new_id () }
 	  with 
-	    | Ty.TypeClash(t1,t2) -> 
-	      error (Unification(t1,t2)) f.pp_loc
-	    | Invalid_argument _ -> 
-	      error (WrongNumberofArgs "distinct") f.pp_loc
+	    | Ty.TypeClash(t1,t2) -> error (Unification(t1,t2)) f.pp_loc
 	end
       in r, freevars_form r
 
