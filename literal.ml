@@ -19,7 +19,7 @@ open Hashcons
 
 type 'a view = 
   | Eq of 'a * 'a 
-  | Neq of 'a * 'a 
+  | Distinct of 'a list
   | Builtin of bool * Hstring.t * 'a list
 
 module type OrderedType = sig
@@ -62,9 +62,12 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
 	
     let equal a1 a2 = 
       match a1, a2 with
-	| Eq(t1, t2), Eq(u1, u2) 
-	| Neq(t1, t2), Neq(u1, u2) -> 
+	| Eq(t1, t2), Eq(u1, u2) -> 
 	    X.compare t1 u1 = 0 && X.compare t2 u2 = 0
+	| Distinct lt1, Distinct lt2 ->
+	    (try 
+	       List.for_all2 (fun x y -> X.compare x y = 0) lt1 lt2
+	     with Invalid_argument _ -> false)
 	| Builtin(b1, n1, l1), Builtin(b2, n2, l2) -> 
 	    (try 
 	       b1 = b2 && Hstring.equal n1 n2 
@@ -74,14 +77,14 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
 	| _ -> false
 	    
     let hash a = match a with
-      | Eq(t1, t2) | Neq(t1, t2) -> 
-	  let k = match a with  Eq _ -> 1 | Neq _-> 3 | _ -> assert false in
-	  abs ((k*19 + X.hash t1)*19 + X.hash t2)
+      | Eq(t1, t2) -> abs (19 * (X.hash t1 + X.hash t2))
+      | Distinct lt ->
+	  abs (17 * List.fold_left (fun acc t -> (X.hash t) + acc ) 0 lt)
       | Builtin(b, n, l) -> 
-	  let x = if b then 1 else 0 in
+	  let x = if b then 7 else 23 in
 	  abs 
 	    (List.fold_left 
-	       (fun acc t-> acc*19 + X.hash t) (Hstring.hash n+x) l)
+	       (fun acc t-> acc*13 + X.hash t) (Hstring.hash n+x) l)
   end
 
   module H = Make(V)

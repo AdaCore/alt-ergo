@@ -93,8 +93,9 @@ let make_form name f =
 	  | TApred t ->
 	      let lit = A.LT.mk_pred (make_term t) in
 	      lit , lit::acc
-	  | TAneq [t1;t2] -> 
-	      let lit = A.LT.make (A.Neq (make_term t1, make_term t2)) in
+	  | TAneq lt | TAdistinct lt -> 
+	      let lt = List.map make_term lt in
+	      let lit = A.LT.make (A.Distinct lt) in
 	      lit , lit::acc
 	  | TAle [t1;t2] -> 
 	      (try 
