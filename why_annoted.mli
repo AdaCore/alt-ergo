@@ -83,6 +83,9 @@ type env = {
   st_ctx : GMisc.statusbar_context;
   mutable ast : (atyped_decl annoted * Why_typing.env)list;
   mutable ctrl : bool;
+  mutable last_tag : GText.tag;
+  mutable search_tags : GText.tag list;
+  mutable proof_tags : GText.tag list;
   dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t
 }
 
