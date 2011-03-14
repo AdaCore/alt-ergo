@@ -5,9 +5,8 @@ open Format
 open Options
 
 let indent_size = 4
-
-let monospace_font = ref (Pango.Font.from_string "mono")
-let general_font = ref (Pango.Font.from_string "sans")
+let monospace_font = Pango.Font.from_string "mono"
+let general_font = Pango.Font.from_string "sans"
 
 type sbuffer = GSourceView2.source_buffer
 

@@ -491,7 +491,7 @@ and popup_trigger t env (sbuf:sbuffer) offset () =
     ~packing:pop_w#vbox#add () in
   let tv1 = GSourceView2.source_view ~source_buffer:buf1 ~packing:(sw1#add) 
 	 ~show_line_numbers:true ~wrap_mode:`CHAR() in
-  let _ = tv1#misc#modify_font !monospace_font in
+  let _ = tv1#misc#modify_font monospace_font in
   let _ = tv1#set_editable true in
 		
   let errors_l = GMisc.label ~text:"" ~packing:pop_w#vbox#pack () in
