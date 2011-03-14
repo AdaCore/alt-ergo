@@ -2,7 +2,6 @@ open Why_ptree
 
 type sbuffer = GSourceView2.source_buffer
 
-
 type 'a annoted =
     { mutable c : 'a; 
       mutable pruned : bool;
@@ -89,6 +88,10 @@ type env = {
   dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t
 }
 
+val indent_size : int
+val monospace_font : Pango.font_description
+val general_font : Pango.font_description
+
 val create_env :
   sbuffer -> 
   sbuffer ->
@@ -96,13 +99,6 @@ val create_env :
   (atyped_decl annoted * Why_typing.env) list -> 
   (atyped_decl annoted list * atyped_decl annoted list) MDep.t ->
   env
-
-
-
-
-val indent_size : int
-val monospace_font : Pango.font_description ref
-val general_font : Pango.font_description ref
 
 val find : 
   GText.tag -> sbuffer -> (atyped_decl annoted * Why_typing.env) list -> 
