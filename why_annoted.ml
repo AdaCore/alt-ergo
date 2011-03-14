@@ -89,30 +89,32 @@ module MDep = Map.Make (
   end)
 
 
+type env = {
+  buffer : sbuffer;
+  inst_buffer : sbuffer;
+  st_ctx : GMisc.statusbar_context;
+  mutable ast : (atyped_decl annoted * Why_typing.env) list;
+  mutable ctrl : bool;
+  mutable last_tag : GText.tag;
+  mutable search_tags : GText.tag list;
+  mutable proof_tags : GText.tag list;
+  dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t
+}
 
-
-  type env = {
-    buffer : sbuffer;
-    inst_buffer : sbuffer;
-    st_ctx : GMisc.statusbar_context;
-    mutable ast : (atyped_decl annoted * Why_typing.env) list;
-    mutable ctrl : bool;
-    dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t
+let create_env buf1 (buf2:sbuffer) st_ctx ast dep  =
+  let titag = buf2#create_tag [`WEIGHT `BOLD; `UNDERLINE `SINGLE] in
+  buf2#insert ~tags:[titag] "Instanciated axioms:\n\n";
+  {
+    buffer = buf1;
+    inst_buffer = buf2;
+    st_ctx = st_ctx;
+    ast = ast;
+    dep = dep;
+    ctrl = false;
+    last_tag = GText.tag ();
+    search_tags = [];
+    proof_tags = [];
   }
-
-  let create_env buf1 (buf2:sbuffer) st_ctx ast dep  =
-    let titag = buf2#create_tag [`WEIGHT `BOLD; `UNDERLINE `SINGLE] in
-    buf2#insert ~tags:[titag] "Instanciated axioms:\n\n";
-    {
-      buffer = buf1;
-      inst_buffer = buf2;
-      st_ctx = st_ctx;
-      ast = ast;
-      ctrl = false;
-      dep = dep
-    }
-
-
 
 
 let rec findin_aterm tag buffer { at_desc = at_desc } =

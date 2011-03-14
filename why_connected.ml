@@ -38,17 +38,17 @@ let toggle_prune_nodep r t =
     end
 
 let search_using t sbuf env =
-  List.iter (fun t -> t#set_property (`BACKGROUND_SET false)) !search_tags;
+  List.iter (fun t -> t#set_property (`BACKGROUND_SET false)) env.search_tags;
   match find t sbuf env.ast with
     | None -> ()
     | Some an -> match an with
 	| AD (r,_) ->
 	  let tags = findtags_using r.c env.ast in
-	  search_tags := tags;
+	  env.search_tags <- tags;
 	  List.iter (fun t -> t#set_property (`BACKGROUND "gold")) tags
 	| AT {c = at} | AF {c = AFatom (AApred at)} ->
 	  let tags = findtags_dep at env.ast in
-	  search_tags := tags;
+	  env.search_tags <- tags;
 	  List.iter (fun t -> t#set_property (`BACKGROUND "orange")) tags
 	| AF _ | QF _ -> ()
     
@@ -60,14 +60,14 @@ let search_using t sbuf env =
 let tag_callback t env sbuf ~origin:y z i =
   match GdkEvent.get_type z with
     | `MOTION_NOTIFY ->
-        if List.mem !last_tag !search_tags then 
-          !last_tag#set_properties 
+        if List.mem env.last_tag env.search_tags then 
+          env.last_tag#set_properties 
 	    [`BACKGROUND "gold"; `UNDERLINE_SET false]
-	else if List.mem !last_tag !proof_tags then 
-          !last_tag#set_properties 
+	else if List.mem env.last_tag env.proof_tags then 
+          env.last_tag#set_properties 
 	    [`BACKGROUND "pale green"; `UNDERLINE_SET false]
 	else
-          !last_tag#set_properties 
+          env.last_tag#set_properties 
 	    [`BACKGROUND_SET false; `UNDERLINE_SET false];
         if env.ctrl then
 	  begin
@@ -78,7 +78,7 @@ let tag_callback t env sbuf ~origin:y z i =
 	  begin
 	    t#set_property (`BACKGROUND "light blue")
 	  end;                         
-	last_tag := t;
+	env.last_tag <- t;
 	true
     | `TWO_BUTTON_PRESS ->
 	begin
@@ -687,8 +687,8 @@ let connect env =
 
 
 let show_used_lemmas env expl =
-  List.iter (fun t -> t#set_property (`BACKGROUND_SET false)) !proof_tags;
+  List.iter (fun t -> t#set_property (`BACKGROUND_SET false)) env.proof_tags;
   let tags = findtags_proof expl env.ast in
-  proof_tags := tags;
+  env.proof_tags <- tags;
   List.iter (fun t -> t#set_property (`BACKGROUND "pale green")) tags
   
