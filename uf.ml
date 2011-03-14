@@ -583,7 +583,10 @@ module Make ( R : Sig.X ) = struct
 	MapR.fold 
 	  (fun k ex1 (m,neqs) -> 
 	    if MapR.mem k m2 then
-	      m , MapR.add k (MapR.remove r1 (MapR.find k neqs)) neqs
+	      (* XXX: re-add with dependency *)
+	      let ex = Ex.union ex1 dep in
+	      let mk = MapR.add r2 ex (MapR.remove r1 (MapR.find k neqs)) in
+	      m , MapR.add k mk neqs
 	    else
 	      let ex = Ex.union ex1 dep in
 	      let mk = MapR.add r2 ex (MapR.remove r1 (MapR.find k neqs)) in
@@ -903,9 +906,10 @@ module Make ( R : Sig.X ) = struct
      env, tch, (rp,rv) :: psi
   *)
 
-  let x_solve env r1 r2 = 
-    let rr1, _ = lookup_by_r r1 env in
-    let rr2, _ = lookup_by_r r2 env in
+  let x_solve env r1 r2 dep = 
+    (* XXX: added dep *)
+    let rr1, ex_r1 = lookup_by_r r1 env in
+    let rr2, ex_r2 = lookup_by_r r2 env in
     if debug_uf then 
       printf "[uf] x-solve: %a = %a@." R.print rr1 R.print rr2;
 
@@ -915,12 +919,14 @@ module Make ( R : Sig.X ) = struct
         (* if rr1 is known to be different from rr2, there is inconsistency *)
         let nq_rr1 = lookup_for_neqs env rr1 in
         let nq_rr2 = lookup_for_neqs env rr2 in
-	(try let exs1 =  MapR.find rr2 nq_rr1 in raise (Inconsistent exs1)
+	(try 
+	   let exs1 = Ex.union (Ex.union (MapR.find rr2 nq_rr1) ex_r1) dep in
+	   raise (Inconsistent exs1)
 	 with Not_found -> ());
-	(try let exs2 =  MapR.find rr1 nq_rr2 in raise (Inconsistent exs2)
+	(try 
+	   let exs2 = Ex.union (Ex.union (MapR.find rr1 nq_rr2) ex_r2) dep in
+	   raise (Inconsistent exs2)
 	 with Not_found -> ());
-	(* if MapR.mem rr2 nq_rr1 then raise Inconsistent; *)
-        (* if MapR.mem rr1 nq_rr2 then raise Inconsistent; *)
 
         (* solve the equation rr1 = rr2 *)
         let repr r = fst (lookup_by_r r env) in
@@ -935,14 +941,14 @@ module Make ( R : Sig.X ) = struct
       if debug_uf then 
 	printf "[uf] ac(x): delta (%a) = delta (%a)@." 
 	  R.print r1 R.print r2;
-      let sbs = x_solve env r1 r2 in
+      let sbs = x_solve env r1 r2 dep in
       let sbs = List.map (fun (x, y) -> x, y, dep) sbs in
       let env, tch = L.fold_left ac_solve (env,tch) sbs in
       if debug_uf then Print.all fmt env;
       ac_x env tch
       
   let union env r1 r2 dep =
-    try 
+    try
       Queue.clear equations;
       Queue.push (r1,r2, dep) equations;
       ac_x env []
@@ -963,7 +969,7 @@ module Make ( R : Sig.X ) = struct
     let r2, ex2 = lookup_by_r r2 env in
     let dep' = Ex.union ex1 (Ex.union ex2 dep) in
     (* r1 and r2 could not be equal *)
-    if R.equal r1 r2 then raise (Inconsistent dep');
+    if R.equal r1 r2 then raise (Inconsistent dep'); (*XXX dep / dep' *)
     let env = make_distinct env r1 r2 dep' in
     let repr r = fst (lookup_by_r r env) in
     (*
@@ -973,7 +979,7 @@ module Make ( R : Sig.X ) = struct
     *)
     try match R.solve repr r1 r2 with
       | [a,b] -> make_distinct env a b dep'
-      | []  -> raise (Inconsistent dep)
+      | []  -> raise (Inconsistent dep') (*XXX dep / dep' *)
       | _   -> env
     with Unsolvable -> env
 
