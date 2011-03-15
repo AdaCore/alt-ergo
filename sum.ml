@@ -224,7 +224,7 @@ module Make(X : ALIEN) = struct
       List.fold_left
         (fun (env,eqs) -> function
           | A.Eq(r1,r2) , _, e -> aux true  r1 r2 expl e env eqs (values_of r1)
-          | A.Neq(r1,r2), _, e -> aux false r1 r2 expl e env eqs (values_of r1)
+  (*        | A.Neq(r1,r2), _, e -> aux false r1 r2 expl e env eqs (values_of r1) *) (* A FAIRE *)
           | _                  -> env, eqs
         ) (env,[]) la
 

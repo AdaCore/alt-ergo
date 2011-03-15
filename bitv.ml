@@ -787,8 +787,8 @@ module Make(X : ALIEN) = struct
 	List.fold_left 
           (fun acc (a, root, e) ->
 	     let ex = Explanation.union e ex in 
-             match a with
-               | Literal.Neq(rx1,rx2) ->
+             match a with (* A FAIRE *)
+               (*| Literal.Neq(rx1,rx2) ->
                    begin
 		     match X.extract rx1, X.extract rx2 with
                        | Some [r1], Some [r2] when r1.sz = 1 -> 
@@ -803,7 +803,7 @@ module Make(X : ALIEN) = struct
                                | _ -> acc
 			   end
                        | _ -> acc
-                   end
+                   end*)
                | _ -> acc) [] la
       in 
       env, leqs
