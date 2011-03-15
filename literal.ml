@@ -107,8 +107,9 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
   let view a = a.node
 
   let neg a = match view a with
-    | Eq(x, y) -> make (Neq (x, y))
-    | Neq(x, y) -> make (Eq (x, y))
+    | Eq(x, y) -> make (Distinct [x; y])
+    | Distinct [x; y] -> make (Eq (x, y))
+    | Distinct _ -> assert false
     | Builtin(b, n, l) -> make (Builtin (not b, n, l))
 
 
@@ -132,11 +133,13 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
     match view a with
       | Eq (z1, z2) -> 
 	  Format.fprintf fmt "%s%a=%a" lbl X.print z1 X.print z2
-      | Neq (z1, z2) -> 
-	  Format.fprintf fmt "%s%a<>%a" lbl X.print z1 X.print z2
+      | Distinct (z::l) -> 
+	  Format.fprintf fmt "%s%a" lbl X.print z;
+	  List.iter (fun x -> Format.fprintf fmt "<>%a" X.print x) l
       | Builtin (b, n, l) ->
 	  let b = if b then "" else "~" in
 	  Format.fprintf fmt "%s%s%s(%a)" lbl b (Hstring.view n) print_list l
+      | _ -> assert false
     
   module Set = Set.Make(T)
   module Map = Map.Make(T)
@@ -181,15 +184,15 @@ module LT : S_Term = struct
    let f = Term.apply_subst subst in
    let v = match view a with
      | Eq (t1, t2) -> Eq(f t1, f t2)
-     | Neq (t1, t2) -> Neq(f t1, f t2)
+     | Distinct lt -> Distinct (List.map f lt)
      | Builtin (b, n, l) -> Builtin(b, n, List.map f l)
    in
    make v
 
  let terms_of a = 
    let l = match view a with 
-     | Eq (t1, t2) | Neq (t1, t2) -> [t1; t2] 
-     | Builtin (_, _, l) -> l 
+     | Eq (t1, t2) -> [t1; t2] 
+     | Distinct l | Builtin (_, _, l) -> l 
    in
    List.fold_left Term.subterms Term.Set.empty l
 

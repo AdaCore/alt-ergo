@@ -204,13 +204,14 @@ let new_facts mode env =
 
 
 let mround predicate mode env max_size =
+  Format.eprintf "debut mround@.";
   let round mode =
     Print.mround max_size;
     let axioms = if predicate then env.definitions else env.lemmas in
     let env, max_size = mtriggers env axioms max_size in
     let rec bouclage n (env, lf) = 
       if n <=0 then (env, lf)
-      else
+      else 
         let env = 
 	  List.fold_left 
 	    (fun env (f,_) -> add_terms env (F.terms f.f) mode f.age None)
@@ -222,8 +223,12 @@ let mround predicate mode env max_size =
     max_size, lf 
   in
   let max_size, lf = round (mode || Options.goal_directed) in 
-  if Options.goal_directed && lf = [] then round false 
-  else max_size, lf
+  let r = 
+    if Options.goal_directed && lf = [] then round false 
+    else max_size, lf
+  in
+  Format.eprintf "fin mround@.";
+  r
   
 
 let extract_model t = 

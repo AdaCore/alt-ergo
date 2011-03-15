@@ -56,7 +56,7 @@ module Make
          type t = r L.view * L.LT.t option * Explanation.t
          let compare (a, _, _) (b, _, _) = 
            let values_of x = match x with
-             | L.Eq (r1, r2) | L.Neq (r1, r2) 
+             | L.Eq (r1, r2) (* | L.Neq (r1, r2) *) (* A FAIRE *)
 	     | L.Builtin (_, _, [r1; r2]) -> r1, r2
              | _ -> assert false 
            in 
@@ -761,11 +761,12 @@ module Make
 		   let env = replace_inequation env root ineq in
 		   env, eqs, true, expl
 
-	       | L.Neq(r1, r2) when is_num r1 && is_num r2 -> 
+(* A FAIRE *)
+(*	       | L.Neq(r1, r2) when is_num r1 && is_num r2 -> 
 		   let p = P.sub (P.poly_of r1) (P.poly_of r2) in
 		   let env = init_monomes env p SX.empty expl in
 		   let env, eqs = add_disequality env eqs p expl in
-                   env, eqs, new_ineqs, expl
+                   env, eqs, new_ineqs, expl*)
 		     
 	       | L.Eq(r1, r2) when is_num r1 && is_num r2 -> 
 		   let p = P.sub (P.poly_of r1) (P.poly_of r2) in
