@@ -54,16 +54,16 @@ module Make
     Set.Make
       (struct
          type t = r L.view * L.LT.t option * Explanation.t
-         let compare (a, _, _) (b, _, _) = 
-           let values_of x = match x with
-             | L.Eq (r1, r2) (* | L.Neq (r1, r2) *) (* A FAIRE *)
-	     | L.Builtin (_, _, [r1; r2]) -> r1, r2
+         let compare (a, _, _) (b, _, _) = assert false
+(*           let values_of x = match x with
+             | L.Eq (r1, r2) | L.Builtin (_, _, [r1; r2]) -> [r1; r2]
+	     | L.Distinct lr -> lr
              | _ -> assert false 
            in 
-           let r1, r2 = values_of a in
-           let s1, s2 = values_of b in
+           let lra = values_of a in
+           let lrb = values_of b in
            let c = X.compare r1 s1 in
-           if c <> 0 then c else X.compare r2 s2
+           if c <> 0 then c else X.compare r2 s2*)
        end)
 
       

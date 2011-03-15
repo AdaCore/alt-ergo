@@ -35,7 +35,8 @@ module type S = sig
   val find_r : t -> R.r -> R.r * Explanation.t
     
   val union : 
-    t -> R.r -> R.r -> Explanation.t -> t * (R.r * (R.r * R.r * Explanation.t) list * R.r) list
+    t -> R.r -> R.r -> Explanation.t -> 
+    t * (R.r * (R.r * R.r * Explanation.t) list * R.r) list
 
   val distinct : t -> Term.t -> Term.t -> Explanation.t -> t
 
@@ -68,6 +69,9 @@ module Make ( R : Sig.X ) = struct
   module SetT = Term.Set
   module SetF = Formula.Set
     
+  module Lit = Literal.Make(struct type t = R.r include R end)
+  module MapL = Lit.Map  
+
   let equations = Queue.create ()
 
   module MapR = Map.Make(struct type t = R.r let compare = R.compare end)
@@ -370,66 +374,7 @@ module Make ( R : Sig.X ) = struct
         let tr = R.term_of r in 
         let t = canon_rec dn class_of tr in
         fst (R.make t)
-(*
 
-        let toplevel = true in
-        let tl = [ tr, T.view tr ] in 
-        let res = match_term toplevel class_of tl dn in
-        if verbose then Debug.print_matched res;
-        match res with
-          | [] -> r
-          | [syl, tyl, (s,tset)] when Tset.cardinal tset = 1 -> 
-            begin
-              try
-                let (sbT, sbsTy) as sbt = make_subst () syl tyl s in
-                let t = Tset.choose tset in
-                if verbose then 
-                  fprintf fmt ">>subst: %a | %a @."
-                    SubstT.print sbT Ty.print_subst sbsTy;
-                let inst = T.apply_subst sbt t in
-                if verbose then 
-                  fprintf fmt "> applying this subst on %a@. yields %a@."
-                    T.print t T.print inst;
-                if Sy.Set.is_empty (T.vars_of inst) && 
-                  Ty.Svty.is_empty (T.vty_of inst) then
-                  let rinst = fst (R.make inst) in
-                  if R.compare r rinst > 0 then 
-                    rinst
-                  else 
-                    let _ = 
-                      if verbose then 
-                        fprintf fmt "Warning! Bad reduction: NOT(%a > %a)@."
-                          R.print r R.print rinst in
-                    rinst
-                else 
-                  let _ = 
-                    fprintf fmt 
-                      "Bad rewrite rule: NOT(Vars(%a) in Vars(%a))@."
-                      T.print s T.print t in
-                  assert false
-              with Unif_fails -> r
-            end 
-          | [syl, tyl, (s,tset)] -> 
-            if verbose then 
-              begin
-                fprintf fmt "Pb de Confluence I ??@.";
-                fprintf fmt "--->@.%a@.<----@."
-                  T.print_list (Tset.elements tset)
-              end;
-            assert false
-
-          | l -> 
-            if verbose then 
-              begin
-                fprintf fmt "Pb de Confluence II ??@.";
-                List.iter
-                  (fun (syl, tyl, (s,tset)) ->
-                    fprintf fmt "--->@.%a@.<----@."
-                      T.print_list (Tset.elements tset)
-                  )l
-              end;
-            assert false
-*)
       let canon dn class_of r =
         let sbsl = 
           List.map (fun lf -> lf, (canon_leaf dn class_of lf)) (R.leaves r) 
@@ -460,7 +405,7 @@ module Make ( R : Sig.X ) = struct
     gamma : SetR.t MapR.t; 
     
     (* the disequations map *)
-    neqs: Ex.t MapR.t MapR.t; 
+    neqs: Ex.t MapL.t MapR.t; 
     
     (*AC rewrite system *)
     ac_rs : SetRL.t RS.t;
@@ -482,8 +427,8 @@ module Make ( R : Sig.X ) = struct
   module Print = struct
 
     let rs_print fmt = SetR.iter (fprintf fmt "\t%a@." R.print)
-    let rm_print fmt = 
-      MapR.iter (fun k dep -> fprintf fmt "%a %a" R.print k Ex.print dep)
+    let lm_print fmt = 
+      MapL.iter (fun k dep -> fprintf fmt "%a %a" Lit.print k Ex.print dep)
 
     let t_print fmt = SetT.iter (fprintf fmt "%a " T.print)
       
@@ -517,7 +462,7 @@ module Make ( R : Sig.X ) = struct
 	
     let pneqs fmt m = 
       fprintf fmt "------------- UF: Disequations map--------------------@.";
-      MapR.iter (fun k s -> fprintf fmt "%a -> %a\n" R.print k rm_print s) m
+      MapR.iter (fun k s -> fprintf fmt "%a -> %a\n" R.print k lm_print s) m
 
     let all fmt env = 
       fprintf fmt "------------------------------------------------------@.";
@@ -543,7 +488,7 @@ module Make ( R : Sig.X ) = struct
     try MapR.find r env.repr with Not_found -> r, Ex.empty
 
   let lookup_for_neqs env r =
-    try MapR.find r env.neqs with Not_found -> MapR.empty
+    try MapR.find r env.neqs with Not_found -> MapL.empty
       
   let class_of env t = 
     try 
@@ -551,14 +496,6 @@ module Make ( R : Sig.X ) = struct
       SetT.elements (MapR.find rt env.classes)
     with Not_found -> [t]
 
-(*
-  let class_of env t = 
-    let l = class_of env t in
-    if rewriting then l
-    else 
-      List.fold_left
-        (fun acc t -> (URS.canon_term env.u_rs (class_of env) t) :: acc )l l
-*)
   
   module Env = struct
 
@@ -733,7 +670,7 @@ module Make ( R : Sig.X ) = struct
 	gamma   = add_to_gamma mkr rp env.gamma;
 	neqs    = 
 	  if MapR.mem rp env.neqs then env.neqs 
-	  else MapR.add rp MapR.empty env.neqs}, ctx
+	  else MapR.add rp MapL.empty env.neqs}, ctx
 
 
     let add_cp env (x, y, dep) = 
@@ -954,51 +891,47 @@ module Make ( R : Sig.X ) = struct
       ac_x env []
     with Unsolvable -> raise (Inconsistent dep)
 
-  let make_distinct env r1 r2 dep = 
-    let d1 = lookup_for_neqs env r1 in
-    let d2 = lookup_for_neqs env r2 in
-    let neqs = 
-      if MapR.mem r2 d1 then env.neqs else 
-	MapR.add r1 (MapR.add r2 dep d1) 
-	  (MapR.add r2 (MapR.add r1 dep d2) env.neqs) 
+  let rec distinct env rl dep =
+    let d = Lit.make (Literal.Distinct rl) in
+    if debug_uf then fprintf fmt "[uf] distinct %a@." Lit.print d;
+    let neqs, _, newds = 
+      List.fold_left
+	(fun (neqs, mapr, newds) r -> 
+	   let rr, ex = lookup_by_r r env in 
+	   try 
+	     raise (Inconsistent (Ex.union ex (MapR.find rr mapr)))
+	   with Not_found ->
+	     let uex = Ex.union ex dep in
+	     let mdis = 
+	       try MapR.find rr neqs with Not_found -> MapL.empty in
+	     let mdis = 
+	       try 
+		 MapL.add d (Ex.merge uex (MapL.find d mdis)) mdis
+	       with Not_found -> 
+		 MapL.add d uex mdis
+	     in
+	     MapR.add rr mdis neqs, MapR.add rr uex mapr, (rr, ex, mapr)::newds
+	)
+	(env.neqs, MapR.empty, [])
+	rl
     in
-    { env with neqs = neqs}
-
-  let rec distinct_r env r1 r2 dep =
-    let r1, ex1 = lookup_by_r r1 env in
-    let r2, ex2 = lookup_by_r r2 env in
-    let dep' = Ex.union ex1 (Ex.union ex2 dep) in
-    (* r1 and r2 could not be equal *)
-    if R.equal r1 r2 then raise (Inconsistent dep'); (*XXX dep / dep' *)
-    let env = make_distinct env r1 r2 dep' in
-    let repr r = fst (lookup_by_r r env) in
-    (*
-      match (try R.solve repr r1 r2 with Unsolvable -> []) with
-      [a,b] -> make_distinct env a b dep'
-      | _     -> env
-    *)
-    try match R.solve repr r1 r2 with
-      | [a,b] -> make_distinct env a b dep'
-      | []  -> raise (Inconsistent dep') (*XXX dep / dep' *)
-      | _   -> env
-    with Unsolvable -> env
-
-
-  let rec distinct env t1 t2 dep = 
-    if debug_uf then 
-      printf "[uf] distinct %a <> %a@." T.print t1 T.print t2;
-    
-    (* add is already done in Cc.assume ? 
-       let env = add (add env t1) t2 in*)
-    let r1, ex1 = lookup_by_t t1 env in
-    let r2, ex2 = lookup_by_t t2 env in
-    let dep = Ex.union ex1 (Ex.union ex2 dep) in
-    if debug_uf then 
-      begin
-	printf "[uf] delta (%a) = %a@." T.print t1 R.print r1;
-	printf "[uf] delta (%a) = %a@." T.print t2 R.print r2
-      end;
-    distinct_r env r1 r2 dep
+    let env = { env with neqs = neqs } in
+    List.fold_left 
+      (fun env (r1, ex1, mapr) -> 
+	 MapR.fold (fun r2 ex2 env -> 
+		      let ex = Ex.union r1 (Ex.union r2 dep) in
+		      let repr = fun x -> fst (find_r env x) in
+		      try match R.solve repr r1 r2 with
+			| [a, b] -> 
+			    if (R.equal a r1 && R.equal b r2) ||
+			      (R.equal a r2 && R.equal b r1) then env
+			    else
+			      distinct env a b ex
+			| []  -> raise (Inconsistent ex) 
+			| _   -> env
+		      with Unsolvable -> env) mapr env)
+      env newds
+			  
 
   let equal env t1 t2 = 
     let r1, _ = lookup_by_t t1 env in
