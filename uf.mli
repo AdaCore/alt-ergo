@@ -28,13 +28,14 @@ module type S = sig
   val mem : t -> Term.t -> bool
 
   val find : t -> Term.t -> R.r * Explanation.t
+
   val find_r : t -> R.r -> R.r * Explanation.t
+
+  val distinct : t -> R.r list -> Explanation.t -> t
 
   val union : 
     t -> R.r -> R.r -> Explanation.t -> 
     t * (R.r * (R.r * R.r * Explanation.t) list * R.r) list
-  
-  val distinct : t -> Term.t -> Term.t -> Explanation.t -> t
 
   val equal : t -> Term.t -> Term.t -> bool
   val are_distinct : t -> Term.t -> Term.t -> bool
@@ -44,9 +45,6 @@ module type S = sig
   val neq_explain : t -> Term.t -> Term.t -> Explanation.t
   
   val print : Format.formatter -> t -> unit
-
-  val distinct_r : 
-    t -> R.r -> R.r -> Explanation.t -> t
 
   val rewrite_system : t -> (Term.t Why_ptree.rwt_rule) list -> t
 

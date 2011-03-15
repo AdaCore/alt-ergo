@@ -25,22 +25,17 @@ module type S = sig
   type t
 
   val empty : unit -> t
-(*  val add : Literal.LT.t -> Explanation.t -> t -> t*)
   val assume : Literal.LT.t -> Explanation.t -> t -> t * int
   val query : Literal.LT.t -> t -> Explanation.t option
   val class_of : t -> Term.t -> Term.t list
   val explain : Literal.LT.t -> t -> Explanation.t
-  val extract_model : t -> Literal.LT.t list * Literal.LT.t list
   val rewrite_system : t -> (Term.t Why_ptree.rwt_rule) list -> t
 end
 
 module Make (X : Sig.X) = struct    
 
   module Ex = Explanation
-  module SetA = (*Set.Make(struct
-    type t = Literal.LT.t * Explanation.t
-    let compare (s1,_) (s2,_) = Literal.LT.compare s1 s2
-  end)*) Use.SA (*Literal.LT.Set*)
+  module SetA = Use.SA
   module Use = Use.Make(X)
   module Uf = Uf.Make(X)
   module SetF = Formula.Set
@@ -124,11 +119,12 @@ module Make (X : Sig.X) = struct
 
   let semantic_view env a ex_a = 
     match Literal.LT.view a with
-      | Literal.Neq(t1, t2) ->
+(* A FAIRE *)
+(*      | Literal.Neq(t1, t2) ->
 	  let r1, ex1 = Uf.find env.uf t1 in
 	  let r2, ex2 = Uf.find env.uf t2 in
 	  let ex = Ex.union (Ex.union ex1 ex2) ex_a in
-	  Literal.Neq(r1, r2), ex
+	  Literal.Neq(r1, r2), ex*)
       | Literal.Builtin(b, s, l) -> 
 	  let lr, ex  = 
 	    List.fold_left 
@@ -231,7 +227,7 @@ module Make (X : Sig.X) = struct
 	       close_up_r r1 r2 (Ex.union ex dep) { env with use = use}
            (* XXX: les tableaux peuvent retourner des diseq aussi ! 
               Il faut factoriser un peu le code par la suite *)
-           | Literal.Neq(r1,r2) -> 
+(*           | Literal.Neq(r1,r2) -> 
                (*let dep = Ex.everything in*)
 	       let env = 
 		 {env with uf = Uf.distinct_r env.uf r1 r2 dep} in
@@ -239,7 +235,7 @@ module Make (X : Sig.X) = struct
                let env = replay_atom_r env [ra, None, ex] dep in
                env
             (* XXX fin *)
-
+*) (* A FAIRE *)
            | _ -> assert false
 
       ) env leqs
@@ -299,7 +295,7 @@ module Make (X : Sig.X) = struct
 	     (fun e (x,y,dep) -> close_up x y dep e) env ct) st env
     in 
     match Literal.LT.view a with
-      | Literal.Eq _ | Literal.Neq _ -> env
+      | Literal.Eq _ (*| Literal.Neq _ *) (* A FAIRE *) -> env
       | _ ->
 	  let lvs = concat_leaves env.uf (Term.Set.elements st) in
 	  List.fold_left
@@ -316,7 +312,9 @@ module Make (X : Sig.X) = struct
 	    (fun acc t2 ->
 	       match T.view t2 with
 		   {T.f=f2 ; xs=[b]} when S.equal f1 f2 ->
-		       (Literal.LT.make (Literal.Neq(a,b))) :: acc
+		     assert false
+		       (*(Literal.LT.make (Literal.Neq(a,b))) :: acc*)
+		       (* A FAIRE *)
 		 | _ -> acc
 	  
 	    )[] (Uf.class_of uf bol)
@@ -345,7 +343,7 @@ module Make (X : Sig.X) = struct
               end;
 	    List.fold_left (assume_rec dep) env facts
 	  end
-      | Literal.Neq(t1, t2)-> 
+(*      | Literal.Neq(t1, t2)-> 
 	  (*let dep = Ex.union dep (Explanation.singleton (Formula.mk_lit a)) in*)
 	  let env = {env with uf = Uf.distinct env.uf t1 t2 dep} in
 	  let env = replay_atom env (SetA.singleton (a, dep)) [] dep in
@@ -365,6 +363,7 @@ module Make (X : Sig.X) = struct
 		| _,_ -> env
 	    end
 	  end
+*) (* A FAIRE *)
 	    
       | _ -> replay_atom env (SetA.singleton (a, dep)) [] dep
     end with Inconsistent dep' -> raise (Inconsistent (Ex.union dep dep'))
@@ -388,10 +387,10 @@ module Make (X : Sig.X) = struct
           let env = {env with uf =
               Uf.add_semantic (Uf.add_semantic env.uf r1) r2} in
           close_up_r r1 r2 dep env
-      | Literal.Neq(r1, r2)->
+(*      | Literal.Neq(r1, r2)->
 	  let env = {env with uf = Uf.distinct_r env.uf r1 r2 dep} in
           let env = replay_atom_r env [ra, None, dep] dep in
-          env
+          env*) (* A FAIRE *)
       | _ ->
           replay_atom_r env [ra, None, dep] dep
 
@@ -478,7 +477,8 @@ module Make (X : Sig.X) = struct
     try
       (match Literal.LT.view a with
 	 | Literal.Eq (x, y) -> Uf.explain env.uf x y
-	 | Literal.Neq (x, y) -> Uf.neq_explain env.uf x y
+	     (* A FAIRE *)
+(*	 | Literal.Neq (x, y) -> Uf.neq_explain env.uf x y*)
 	 | _ -> Ex.everything)
     with Exception.NotCongruent -> assert false
 
@@ -519,10 +519,10 @@ module Make (X : Sig.X) = struct
     }
     in
     let t = { gamma = env; gamma_finite = env; choices = [] } in
+    assert false
+(*
     fst (assume (Literal.LT.make (Literal.Neq (T.vrai, T.faux))) Ex.empty t)
-
-  let extract_model env = 
-    [], []
+*) (* A FAIRE *)
       
   let rewrite_system ({gamma=g; gamma_finite=gf} as env) rs = 
     let g  = {g  with uf = Uf.rewrite_system g.uf  rs} in

@@ -25,12 +25,10 @@ module type S = sig
   type t
 
   val empty : unit -> t
-(*  val add : Literal.LT.t -> Explanation.t -> t -> t*)
   val assume : Literal.LT.t -> Explanation.t -> t -> t * int
   val query : Literal.LT.t -> t -> Explanation.t option
   val class_of : t -> Term.t -> Term.t list
   val explain : Literal.LT.t -> t -> Explanation.t
-  val extract_model : t -> Literal.LT.t list * Literal.LT.t list
   val rewrite_system : t -> (Term.t Why_ptree.rwt_rule) list -> t
 end
 
