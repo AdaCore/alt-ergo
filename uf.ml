@@ -808,8 +808,6 @@ module Make ( R : Sig.X ) = struct
       let rr, ex = Env.canon env r in
       Env.add_sm (*Ex.everything*) ex  env r rr
 
-
-
   let ac_solve  (env,tch) (p, v, dep) = 
     if debug_uf then 
       printf "[uf] ac-solve: %a |-> %a %a@." R.print p R.print v Ex.print dep;
@@ -844,32 +842,25 @@ module Make ( R : Sig.X ) = struct
   *)
 
   let x_solve env r1 r2 dep = 
-    (* XXX: added dep *)
     let rr1, ex_r1 = lookup_by_r r1 env in
     let rr2, ex_r2 = lookup_by_r r2 env in
     if debug_uf then 
       printf "[uf] x-solve: %a = %a@." R.print rr1 R.print rr2;
-
     if R.equal rr1 rr2 then [] (* Remove rule *)
     else 
       begin
-        (* if rr1 is known to be different from rr2, there is inconsistency *)
         let nq_rr1 = lookup_for_neqs env rr1 in
         let nq_rr2 = lookup_for_neqs env rr2 in
-	(try 
-	   let exs1 = Ex.union (Ex.union (MapR.find rr2 nq_rr1) ex_r1) dep in
-	   raise (Inconsistent exs1)
-	 with Not_found -> ());
-	(try 
-	   let exs2 = Ex.union (Ex.union (MapR.find rr1 nq_rr2) ex_r2) dep in
-	   raise (Inconsistent exs2)
-	 with Not_found -> ());
-
-        (* solve the equation rr1 = rr2 *)
+	MapL.iter 
+	  (fun l1 ex1 ->  
+	     MapL.iter 
+	       (fun l2 ex2 -> 
+		  if Lit.equal l1 l2 then 
+		    let ex = Ex.union (Ex.union ex1 ex2) dep in (* VERIF *)
+		    raise (Inconsistency ex) nq_rr2) nq_rr1;
         let repr r = fst (lookup_by_r r env) in
         R.solve repr rr1 rr2 
       end
-        
         
   let rec ac_x env tch = 
     if Queue.is_empty equations then env, tch
@@ -880,7 +871,7 @@ module Make ( R : Sig.X ) = struct
 	  R.print r1 R.print r2;
       let sbs = x_solve env r1 r2 dep in
       let sbs = List.map (fun (x, y) -> x, y, dep) sbs in
-      let env, tch = L.fold_left ac_solve (env,tch) sbs in
+      let env, tch = List.fold_left ac_solve (env, tch) sbs in
       if debug_uf then Print.all fmt env;
       ac_x env tch
       
@@ -932,7 +923,6 @@ module Make ( R : Sig.X ) = struct
 		      with Unsolvable -> env) mapr env)
       env newds
 			  
-
   let equal env t1 t2 = 
     let r1, _ = lookup_by_t t1 env in
     let r2, _ = lookup_by_t t2 env in
