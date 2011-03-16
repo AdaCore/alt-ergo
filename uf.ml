@@ -50,8 +50,6 @@ module type S = sig
 
   val distinct_r : 
     t -> R.r -> R.r -> Explanation.t -> t
-
-  val rewrite_system : t -> (Term.t Why_ptree.rwt_rule) list -> t
     
 end
   
@@ -96,298 +94,6 @@ module Make ( R : Sig.X ) = struct
     let remove_rule (ac,d) m = add ac.h (SetRL.remove (ac,d) (find ac.h m)) m
   end
 
-  (**********************************************************)
-  module URS : sig
-    type t
-    val empty : t
-    val add : t -> Term.t Why_ptree.rwt_rule -> t
-    val canon : t -> (T.t -> T.t list) -> R.r -> R.r
-    val canon_term : t -> (T.t -> T.t list) -> Term.t -> Term.t
-  end = struct
-
-
-    open Why_ptree
-    open Options
-    module Smap = Sy.Map
-    module Tset = T.Set
-    module Tmap = T.Map
-    module SubstT = Subst.Make(T)
-
-    type t = Lf of T.t * Tset.t | Nd of t Smap.t
-    
-    let star  = Symbols.var "*"
-
-    let empty = Nd Smap.empty 
-
-    module Debug = struct
-      
-      let prule_aux fmt (s,t) =
-        fprintf fmt "%a --> %a" T.print s T.print t
-
-      let prule fmt {rwt_left=s; rwt_right=t} = prule_aux fmt (s,t)
-
-      let rec print_dn_aux sep fmt = function
-        | Lf (_,st) -> 
-          if (Tset.is_empty st) then fprintf fmt "@."
-          else fprintf fmt "{%a}@." T.print_list (Tset.elements st)
-        | Nd mp -> 
-          fprintf fmt "@.";
-          Smap.iter 
-            (fun sy sb_dn -> 
-              fprintf fmt "%s-(%a)->%a" 
-                sep Sy.print sy (print_dn_aux (sep^"   ")) sb_dn) mp
-            
-            
-      let print_dn fmt dn =
-        fprintf fmt "@.-- Discrimination Net (lhs of rules) ---------";
-        fprintf fmt "%a" (print_dn_aux "") dn;
-        fprintf fmt "------------------------------------------------@."
-
-      let print_matched l =
-        fprintf fmt "@.-- Matched rules -----------------------------@.";
-        List.iter
-          (fun (_,_,(s,tset)) ->
-            Tset.iter (fun t -> fprintf fmt "%a@." prule_aux (s,t)) tset
-          )l;
-        fprintf fmt "------------------------------------------------@."
-
-    end
-
-    let typed_string_repr t =
-      let rec srepr acc t  = 
-        let {T.f=f; xs=xs; ty=ty} = T.view t in
-        let acc1, acc2 = L.fold_left srepr acc (L.rev xs) in
-        (match f with Sy.Var _ -> f :: acc1 | _ -> acc1), ty::acc2
-      in 
-      srepr ([],[]) t
-
-    (* representation applatie en pre-ordre de t *)
-    let string_repr t =
-      let rec srepr acc t  = 
-        let {T.f=f; xs=xs; ty=ty} = T.view t in
-        let acc = L.fold_left srepr acc (L.rev xs) in
-        match f with Sy.Var _ -> star::acc | _ -> f::acc 
-      in
-      srepr [] t
-
-      let rec dn_of s t = function
-        | []    -> Lf (s, Tset.singleton t)
-        | sy::r -> Nd (Smap.add sy (dn_of s t r) Smap.empty)
-
-      let add dn ({rwt_left=s; rwt_right=t} as rwt) = 
-        if verbose then fprintf fmt "[URS] add_rule %a@." Debug.prule rwt;
-        let rec add_rec dn l = 
-          match dn, l with
-            | Lf (s,st), [] -> Lf (s, Tset.add t st)
-            | Lf (_,st) , _::_  -> dn_of s t l
-            | Nd mp , sy::r -> 
-              let dn' = 
-                try add_rec (Smap.find sy mp) r
-                with Not_found -> dn_of s t r in
-              Nd (Smap.add sy dn' mp)
-
-            | _ -> assert false
-        in 
-        let new_dn = add_rec dn (string_repr s) in
-        if verbose then fprintf fmt "%a@." Debug.print_dn new_dn;
-        new_dn
-
-
-      let x_query class_of t1 t2 = 
-        let r1, _ = R.make t1 in 
-        let r2, _ = R.make t2 in
-        R.equal r1 r2
-
-      (***)
-
-      exception Unif_fails
-
-      let mk_sy_subst uf pt_l sb_l = 
-        assert (L.length pt_l = L.length sb_l);
-        L.fold_left2
-          (fun sT x v -> 
-            if false then fprintf fmt "unif %a avec %a@." Sy.print x T.print v;
-            try
-              let v' = SubstT.find x sT in
-              if not (x_query uf v v') then raise Unif_fails;
-              sT
-            with Not_found -> SubstT.add x v sT
-              
-          ) SubstT.empty pt_l sb_l
-
-      let mk_ty_subst pt_l sb_l = 
-        assert (L.length pt_l = L.length sb_l);
-        L.fold_left2
-          (fun sTy pty tty-> 
-            if verbose then 
-              fprintf fmt "unif %a avec %a@." Ty.print pty Ty.print tty;
-            try Ty.matching sTy pty tty
-            with e -> 
-              if verbose then fprintf fmt "fails@.";
-              raise e
-          ) Ty.esubst pt_l sb_l
-
-      let make_subst uf syl tyl pt = 
-        try 
-          if verbose then fprintf fmt "---pat = %a@." T.print pt;
-          let varl, vtyl = typed_string_repr pt in
-          mk_sy_subst uf varl syl , mk_ty_subst vtyl tyl
-        with Unif_fails | Ty.TypeClash _ -> raise Unif_fails
-        
-      module MatchR = Set.Make
-        (struct
-          type t = T.t list * Ty.t list * (T.t * Tset.t)
-
-          let compare (_,_,(s1,tset1)) (_,_,(s2,tset2)) =
-            let c = T.compare s1 s2 in
-            if c <> 0 then c 
-            else Tset.compare tset1 tset2
-         end)
-      
-      (* pas de filtrage modulo pour le moment *)
-      let filter_good class_of tau sy =
-        L.fold_left
-          (fun acc t ->
-            let ({T.f=f;xs=xs} as v) = T.view t in
-            if Sy.equal sy f then
-              let _ = 
-                if verbose then
-                  fprintf fmt " :::: %a = %a modulo eq@." 
-                    T.print tau T.print t 
-              in
-              (t,v)::acc 
-            else acc
-          )[] (class_of tau)
-        
-
-      let ty_mapping ty l = 
-        L.fold_left (fun acc (sT,sTy,pts) -> (sT, ty::sTy, pts) :: acc) [] l 
-
-      let sy_mapping t l = 
-        L.fold_left (fun acc (sT,sTy,pts) -> (t::sT, sTy, pts) :: acc) [] l
-
-      let rec match_star class_of (t,v) l sb_dn = 
-        if verbose then 
-          fprintf fmt "    match star %a |-> %a@." Sy.print star T.print t;
-        let tmp = T.make v.T.f [] v.T.ty in
-        sy_mapping t (match_ty class_of (t, T.view tmp) l sb_dn)
-
-      and match_ty class_of (t,v) l sb_dn = 
-        if verbose then fprintf fmt "  TY of %a@." T.print t;
-        let l = 
-          L.fold_left 
-            (fun acc t -> 
-              (t, T.view t)::acc) l (L.rev v.T.xs) in
-        ty_mapping v.T.ty (match_term false class_of l sb_dn)
-
-      and match_sy not_mod_eq class_of tl sy sb_dn =
-        match tl with
-          | [] -> []
-          | (t,v) :: l ->
-            if verbose then 
-              fprintf fmt "  SY %a with:\t%a@." Sy.print sy T.print t;
-            if Sy.equal sy star then match_star class_of (t,v) l sb_dn
-            else 
-              if not_mod_eq then 
-                if Sy.equal sy v.T.f then match_ty class_of (t,v) l sb_dn
-                else []
-              else 
-                L.fold_left
-                  (fun acc tv -> (match_ty class_of tv l sb_dn) @ acc)
-                  [] (filter_good class_of t sy)
-                  
-      and match_term toplevel class_of tl = function
-        | Lf (s,ps) -> 
-          if verbose then fprintf fmt "Le lhs %a -> OK@." T.print s;
-          [[],[],(s,ps)]
-        | Nd mp ->
-          Smap.fold 
-            (fun sy sb_dn acc -> 
-              (match_sy toplevel class_of tl sy sb_dn) @ acc) mp []
-          
-
-      let canon_term dn class_of tr =
-        (* astuce pour appliquer le canonizer de la theorie. 
-           Cela se fait en une seule etape dans AC(X) *)
-        let tr = R.term_of (fst (R.make tr)) in
-        let res = match_term true class_of [tr, T.view tr] dn in
-        let st = List.fold_left (fun s e -> MatchR.add e s) MatchR.empty res in
-        let res  = MatchR.elements st in
-
-        if verbose then Debug.print_matched res;
-        match res with
-          | [] -> tr
-          | [syl, tyl, (s,tset)] when Tset.cardinal tset = 1 -> 
-            begin
-              try
-                let (sbT, sbsTy) as sbt = make_subst () syl tyl s in
-                let t = Tset.choose tset in
-                if verbose then 
-                  fprintf fmt ">>subst: %a | %a @."
-                    SubstT.print sbT Ty.print_subst sbsTy;
-                let inst = T.apply_subst sbt t in
-                if verbose then 
-                  fprintf fmt "> applying this subst on %a@. yields %a@."
-                    T.print t T.print inst;
-                if Sy.Set.is_empty (T.vars_of inst) && 
-                  Ty.Svty.is_empty (T.vty_of inst) then
-                  inst
-                else 
-                  let _ = 
-                    fprintf fmt 
-                      "Bad rewrite rule: NOT(Vars(%a) in Vars(%a))@."
-                      T.print s T.print t in
-                  assert false
-              with Unif_fails -> tr
-            end 
-          | [syl, tyl, (s,tset)] -> 
-            if verbose then 
-              begin
-                fprintf fmt "Pb de Confluence I ??@.";
-                fprintf fmt "--->@.%a@.<----@."
-                  T.print_list (Tset.elements tset)
-              end;
-            assert false
-
-          | l -> 
-            if verbose then 
-              begin
-                fprintf fmt "Pb de Confluence II ??@.";
-                List.iter
-                  (fun (syl, tyl, (s,tset)) ->
-                    fprintf fmt "--->@.%a@.<----@."
-                      T.print_list (Tset.elements tset)
-                  )l
-              end;
-            tr
-      (* assert false*)
-
-      let rec canon_rec dn class_of t = 
-        if verbose then fprintf fmt "[URS] canon du terme %a@." T.print t;
-        let {T.f=f; xs=xs; ty=ty} = T.view t in
-        let xs = List.map (canon_rec dn class_of) xs in
-        let t = T.make f xs ty in
-        canon_term dn class_of t
-               
-      let canon_leaf dn class_of r =
-        if verbose then fprintf fmt "@.[URS] canon de la valeur %a@." R.print r;
-        let tr = R.term_of r in 
-        let t = canon_rec dn class_of tr in
-        fst (R.make t)
-
-      let canon dn class_of r =
-        let sbsl = 
-          List.map (fun lf -> lf, (canon_leaf dn class_of lf)) (R.leaves r) 
-        in
-        L.fold_left
-          (fun r (p,v) ->
-            if R.equal p v then r 
-            else R.subst p v r
-          ) r sbsl
-            
-  end
-
-  (**********************************************************)
 
   type t = { 
 
@@ -409,9 +115,6 @@ module Make ( R : Sig.X ) = struct
     
     (*AC rewrite system *)
     ac_rs : SetRL.t RS.t;
-
-    (* user rewrite system*)
-    u_rs : URS.t;
   }
       
   let empty = { 
@@ -420,8 +123,7 @@ module Make ( R : Sig.X ) = struct
     classes = MapR.empty; 
     gamma = MapR.empty;
     neqs = MapR.empty;
-    ac_rs = RS.empty;
-    u_rs = URS.empty
+    ac_rs = RS.empty
   }
 
   module Print = struct
@@ -443,7 +145,7 @@ module Make ( R : Sig.X ) = struct
 	  fprintf fmt "%a --> %a %a\n" R.print r R.print rr Ex.print dep) m
 
     let prules fmt s = 
-      fprintf fmt "------------- UF: Rewrite rules ----------------------@.";
+      fprintf fmt "------------- UF: AC rewrite rules ----------------------@.";
       RS.iter
 	(fun k srl -> 
 	  SetRL.iter
@@ -476,29 +178,23 @@ module Make ( R : Sig.X ) = struct
 
   end
 
-  let mem env t = MapT.mem t env.make
-    
-  let lookup_by_t t env =
-    try MapR.find (MapT.find t env.make) env.repr
-    with Not_found -> 
-      if debug_uf then fprintf fmt "Uf: Not_found %a@." Term.print t;
-      assert false (*R.make t, Ex.empty*) (* XXXX *)
-
-  let lookup_by_r r env = 
-    try MapR.find r env.repr with Not_found -> r, Ex.empty
-
-  let lookup_for_neqs env r =
-    try MapR.find r env.neqs with Not_found -> MapL.empty
-      
-  let class_of env t = 
-    try 
-      let rt, _ = MapR.find (MapT.find t env.make) env.repr in
-      SetT.elements (MapR.find rt env.classes)
-    with Not_found -> [t]
-
   
   module Env = struct
 
+    let mem env t = MapT.mem t env.make
+      
+    let lookup_by_t t env =
+      try MapR.find (MapT.find t env.make) env.repr
+      with Not_found -> 
+	if debug_uf then fprintf fmt "Uf: Not_found %a@." Term.print t;
+	assert false (*R.make t, Ex.empty*) (* XXXX *)
+	  
+    let lookup_by_r r env = 
+      try MapR.find r env.repr with Not_found -> r, Ex.empty
+	
+    let lookup_for_neqs env r =
+      try MapR.find r env.neqs with Not_found -> MapL.empty
+	
     let add_to_classes t r classes =  
       MapR.add r 
 	(SetT.add t (try MapR.find r classes with Not_found -> SetT.empty))
@@ -631,11 +327,6 @@ module Make ( R : Sig.X ) = struct
       let subst, ex_subst = canon_empty se env in
       let sac = canon_ac sac env in (* explications? *)
       let r2 = canon_aux (canon_aux r sac) subst in
-      let r2 = (* explications ? *)
-        if Options.rewriting then
-          URS.canon env.u_rs (class_of env) r2 
-        else r2
-      in
       let ex_r2 = Ex.union ex_r ex_subst in
       if R.equal r r2 then r2, ex_r2 else canon env r2 ex_r2
 
@@ -649,7 +340,7 @@ module Make ( R : Sig.X ) = struct
       try MapR.find r env.repr with Not_found -> canon env r
 
     (* A revoir *)
-    let add_sm dep env r rr = 
+    let add_sm env r rr dep = 
       if debug_uf then 
         fprintf fmt "add_sm:  %a --> %a@." R.print r R.print rr;
       if MapR.mem r env.repr then env 
@@ -679,8 +370,8 @@ module Make ( R : Sig.X ) = struct
       let ex = Ex.union dep (Ex.union ex_rx ex_ry) in
       if R.equal rx ry then env
       else 
-	let env = add_sm Ex.empty env rx rx in
-	let env = add_sm Ex.empty env ry ry in
+	let env = add_sm env rx rx Ex.empty in
+	let env = add_sm env ry ry Ex.empty in
         if debug_ac then
           fprintf fmt "[uf] critical pair: %a = %a@." R.print rx R.print ry;
         Queue.push (rx, ry, ex) equations;
@@ -720,8 +411,8 @@ module Make ( R : Sig.X ) = struct
 	        {env with ac_rs= RS.add_rule (g,d2) env.ac_rs}
 	      else 
 	      (* collapse *)
-	        let env = add_sm Ex.empty env g2 g2 in
-	        let env = add_sm Ex.empty env d2 d2 in
+	        let env = add_sm env g2 g2 Ex.empty in
+	        let env = add_sm env d2 d2 Ex.empty in
                 if debug_ac then
                   fprintf fmt "[uf] collapse: %a = %a@." R.print g2 R.print d2;
                 Queue.push (g2, d2, ex) equations;
@@ -729,16 +420,17 @@ module Make ( R : Sig.X ) = struct
 	    ) rls env
 	) env.ac_rs env
 	
-    let update_rs env (p, v, dep) = 
+    (* TODO explications: ajout de dep dans ac_rs *)
+    let apply_sigma_ac env ((p, v, dep) as sigma) = 
       match R.ac_extract p with
 	| None -> 
-	  comp_collapse env (p, v, dep)
-	| Some ac -> 
-	  let env = {env with ac_rs = RS.add_rule (ac,v) env.ac_rs} in
-	  let env = comp_collapse env (p, v, dep) in
-	  head_cp env (ac, v, dep)
+	    comp_collapse env sigma
+	| Some r -> 
+	    let env = {env with ac_rs = RS.add_rule (r, v) env.ac_rs} in
+	    let env = comp_collapse env sigma in
+	    head_cp env (r, v, dep)
 	    
-    let up_uf_sigma env tch (p, v, dep) =
+    let apply_sigma_uf env tch (p, v, dep) =
       let use_p = 
 	try 
 	  MapR.find p env.gamma
@@ -793,9 +485,11 @@ module Make ( R : Sig.X ) = struct
             env, (r,[r,nrr,ex],nrr)::tch
 	)env.repr (env,tch)
 
-    let update_uf env tch (p, v, dep) =  
-      let env, touched = up_uf_sigma env tch (p, v, dep) in 
-      up_uf_rs dep env ((p,touched,v) :: tch)
+    let apply_sigma env tch ((p, v, _) as sigma) = 
+      let env = add_sm env p p Ex.empty in
+      let env = apply_sigma_ac env sigma in
+      let env, touched = apply_sigma_uf env tch sigma in 
+      up_uf_rs dep env ((p, touched, v) :: tch)
 	
   end
     
@@ -806,44 +500,20 @@ module Make ( R : Sig.X ) = struct
     if MapR.mem r env.repr then env 
     else 
       let rr, ex = Env.canon env r in
-      Env.add_sm (*Ex.everything*) ex  env r rr
+      Env.add_sm (*Ex.everything*) env r rr ex
 
-  let ac_solve  (env,tch) (p, v, dep) = 
+  let ac_solve dep (env, tch) (p, v) = 
     if debug_uf then 
       printf "[uf] ac-solve: %a |-> %a %a@." R.print p R.print v Ex.print dep;
-
-    let rp, ex_rp = Env.find_or_canon env p in
+    assert ( let rp, _ = Env.find_or_canon env p in R.equal p rp);
     let rv, ex_rv = Env.find_or_canon env v in
-
-    let ex = Ex.union (Ex.union ex_rp ex_rv) dep in
-    
-    if R.equal p rp then
-      (*pour garder les représentants des valeurs ac sinon ça cause pb*)
-      let env = match R.ac_extract p with
-        | None    -> Env.add_sm Ex.empty env p p  (*env *)
-        | Some ac -> Env.add_sm dep env p v 
-      in
-      let env      = Env.update_rs env (rp, rv, ex) in
-      let env, tch = Env.update_uf env tch (rp, rv, ex) in
-      env, tch
-    else
-      begin
-        fprintf fmt "@.[uf] ac_solve: %a |-> %a, but we have@." 
-	  R.print p R.print v;
-        fprintf fmt "[uf] ac_solve: repr (%a) = %a !! bad substitution !@."
-          R.print p R.print rp;
-        assert false
-      end
-  (* XXX : pas util puisque les substs doivent être 
-     triées vis à vis du membre gauche 
-     let env = Env.add_sm dep env rp rp in
-     let env = Env.add_sm dep env rv rv in
-     env, tch, (rp,rv) :: psi
-  *)
+    let dep = Ex.union ex_rv dep in
+    Env.apply_sigma env tch (p, rv, dep)
 
   let x_solve env r1 r2 dep = 
-    let rr1, ex_r1 = lookup_by_r r1 env in
-    let rr2, ex_r2 = lookup_by_r r2 env in
+    let rr1, ex_r1 = Env.find_or_canon env r1 in
+    let rr2, ex_r2 = Env.find_or_canon env r2 in
+    let dep = Ex.union dep (Ex.union ex_r1 ex_r2) in
     if debug_uf then 
       printf "[uf] x-solve: %a = %a@." R.print rr1 R.print rr2;
     if R.equal rr1 rr2 then [] (* Remove rule *)
@@ -857,7 +527,7 @@ module Make ( R : Sig.X ) = struct
 	       (fun l2 ex2 -> 
 		  if Lit.equal l1 l2 then 
 		    let ex = Ex.union (Ex.union ex1 ex2) dep in (* VERIF *)
-		    raise (Inconsistency ex) nq_rr2) nq_rr1;
+		    raise (Inconsistent ex)) nq_rr2) nq_rr1;
         let repr r = fst (lookup_by_r r env) in
         R.solve repr rr1 rr2 
       end
@@ -870,8 +540,7 @@ module Make ( R : Sig.X ) = struct
 	printf "[uf] ac(x): delta (%a) = delta (%a)@." 
 	  R.print r1 R.print r2;
       let sbs = x_solve env r1 r2 dep in
-      let sbs = List.map (fun (x, y) -> x, y, dep) sbs in
-      let env, tch = List.fold_left ac_solve (env, tch) sbs in
+      let env, tch = List.fold_left (ac_solve dep) (env, tch) sbs in
       if debug_uf then Print.all fmt env;
       ac_x env tch
       
@@ -888,7 +557,7 @@ module Make ( R : Sig.X ) = struct
     let neqs, _, newds = 
       List.fold_left
 	(fun (neqs, mapr, newds) r -> 
-	   let rr, ex = lookup_by_r r env in 
+	   let rr, ex = Env.find_or_canon env r in 
 	   try 
 	     raise (Inconsistent (Ex.union ex (MapR.find rr mapr)))
 	   with Not_found ->
@@ -924,8 +593,8 @@ module Make ( R : Sig.X ) = struct
       env newds
 			  
   let equal env t1 t2 = 
-    let r1, _ = lookup_by_t t1 env in
-    let r2, _ = lookup_by_t t2 env in
+    let r1, _ = Env.lookup_by_t t1 env in
+    let r2, _ = Env.lookup_by_t t2 env in
     R.equal r1 r2
 
   let are_in_neqs env r1 r2 = 
@@ -940,7 +609,7 @@ module Make ( R : Sig.X ) = struct
       else
 	are_in_neqs env r1 r2 ||
           try 
-            let repr r = fst (lookup_by_r r env) in
+            let repr r = fst (Env.lookup_by_r r env) in
 	    L.exists 
 	      (fun (a,b) -> are_in_neqs env a b) 
 	      (R.solve repr r1 r2)
@@ -973,16 +642,17 @@ module Make ( R : Sig.X ) = struct
     let r2, ex2 = lookup_by_t t2 env in
     if not (R.equal r1 r2) then Ex.union ex1 ex2 
     else raise NotCongruent
+
+  let class_of env t = 
+    try 
+      let rt, _ = MapR.find (MapT.find t env.make) env.repr in
+      SetT.elements (MapR.find rt env.classes)
+    with Not_found -> [t]
       
   let find env t = lookup_by_t t env
 
-  let find_r env r = lookup_by_r r env
+  let find_r = Env.find_or_canon
 
   let print = Print.all 
-
-  let rewrite_system env rules = 
-    if Options.rewriting then 
-      {env with u_rs = List.fold_left URS.add env.u_rs rules}
-    else env
 
 end

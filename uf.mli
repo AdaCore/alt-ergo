@@ -46,8 +46,6 @@ module type S = sig
   
   val print : Format.formatter -> t -> unit
 
-  val rewrite_system : t -> (Term.t Why_ptree.rwt_rule) list -> t
-
 end
 
 module Make ( X : Sig.X ) : S with module R = X
