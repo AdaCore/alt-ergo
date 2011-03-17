@@ -46,6 +46,9 @@ let union d1 d2 = match d1,d2 with
     None , _ | _ , None -> None
   | Some s1 , Some s2 -> Some (ES.union s1 s2)
 
+
+let merge d1 d2 = d1
+
 let remove f = function
   | None -> None
   | Some s when ES.mem (BJ f) s -> Some (ES.remove (BJ f) s)

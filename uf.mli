@@ -31,18 +31,20 @@ module type S = sig
 
   val find_r : t -> R.r -> R.r * Explanation.t
 
-  val distinct : t -> R.r list -> Explanation.t -> t
-
   val union : 
     t -> R.r -> R.r -> Explanation.t -> 
     t * (R.r * (R.r * R.r * Explanation.t) list * R.r) list
 
-  val equal : t -> Term.t -> Term.t -> bool
+  val distinct : t -> R.r list -> Explanation.t -> t
+
+  val are_equal : t -> Term.t -> Term.t -> bool
   val are_distinct : t -> Term.t -> Term.t -> bool
+
+
   val class_of : t -> Term.t -> Term.t list
     
-  val explain : t -> Term.t -> Term.t -> Explanation.t
-  val neq_explain : t -> Term.t -> Term.t -> Explanation.t
+  val explain_equal : t -> Term.t -> Term.t -> Explanation.t
+  val explain_distinct : t -> Term.t -> Term.t -> Explanation.t
   
   val print : Format.formatter -> t -> unit
 

@@ -53,8 +53,7 @@ let process_decl report (env, consistent, dep) d =
       |	PredDef f -> 
 	Sat.pred_def env f , consistent, dep
 
-      | RwtDef r ->
-	Sat.rewrite_system env r , consistent, dep
+      | RwtDef r -> assert false
 
       | Query(n, f, lits)-> 
 	  let dep = 

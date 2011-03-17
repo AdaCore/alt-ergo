@@ -434,7 +434,5 @@ let empty = {
   definitions = MF.empty
 } 
 
-let rewrite_system env rs = {env with tbox = CcX.rewrite_system env.tbox rs}
-
 let start () = steps := 0L
 let stop () = !steps

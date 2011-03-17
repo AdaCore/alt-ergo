@@ -52,7 +52,7 @@ module Make(X : ALIEN) = struct
   let subst _ _ _    = assert false 
   let make _         = assert false
   let term_of my_v   = assert false
-  let solve _ _ _    = assert false
+  let solve _ _    = assert false
 
 
   (* == La partie Relation de Arrays =====================================*)

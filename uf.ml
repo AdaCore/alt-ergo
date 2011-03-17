@@ -38,19 +38,17 @@ module type S = sig
     t -> R.r -> R.r -> Explanation.t -> 
     t * (R.r * (R.r * R.r * Explanation.t) list * R.r) list
 
-  val distinct : t -> Term.t -> Term.t -> Explanation.t -> t
+  val distinct : t -> R.r list -> Explanation.t -> t
 
-  val equal : t -> Term.t -> Term.t -> bool
+  val are_equal : t -> Term.t -> Term.t -> bool
   val are_distinct : t -> Term.t -> Term.t -> bool
+
   val class_of : t -> Term.t -> Term.t list
 
-  val explain : t -> Term.t -> Term.t -> Explanation.t
-  val neq_explain : t -> Term.t -> Term.t -> Explanation.t
+  val explain_equal : t -> Term.t -> Term.t -> Explanation.t
+  val explain_distinct : t -> Term.t -> Term.t -> Explanation.t
   val print : Format.formatter -> t -> unit
-
-  val distinct_r : 
-    t -> R.r -> R.r -> Explanation.t -> t
-    
+ 
 end
   
 module Make ( R : Sig.X ) = struct
@@ -203,7 +201,7 @@ module Make ( R : Sig.X ) = struct
     let update_classes c nc classes = 
       let s1 = try MapR.find c classes with Not_found -> SetT.empty in
       let s2 = try MapR.find nc classes with Not_found -> SetT.empty in
-      MapR.add nc (SetT.union s1 s2) classes
+      MapR.remove c (MapR.add nc (SetT.union s1 s2) classes)
 	
     let add_to_gamma r c gamma = 
       L.fold_left
@@ -211,39 +209,21 @@ module Make ( R : Sig.X ) = struct
 	  let s = try MapR.find x gamma with Not_found -> SetR.empty in
 	  MapR.add x (SetR.add r s) gamma) gamma (R.leaves c)
 	
-    let merge r1 m1 r2 m2 dep neqs = 
-      let m , neqs = 
-	MapR.fold 
-	  (fun k ex1 (m,neqs) -> 
-	    if MapR.mem k m2 then
-	      (* XXX: re-add with dependency *)
-	      let ex = Ex.union ex1 dep in
-	      let mk = MapR.add r2 ex (MapR.remove r1 (MapR.find k neqs)) in
-	      m , MapR.add k mk neqs
-	    else
-	      let ex = Ex.union ex1 dep in
-	      let mk = MapR.add r2 ex (MapR.remove r1 (MapR.find k neqs)) in
-	      MapR.add k ex m , MapR.add k mk neqs
-	  )
-	  m1 (m2,neqs)
-      in
-      MapR.add r2 m neqs
-
     let update_neqs r1 r2 dep env = 
-      let neqs, m1 = 
-	try env.neqs, MapR.find r1 env.neqs 
-	with Not_found -> MapR.add r1 MapR.empty env.neqs, MapR.empty in
-      let neqs, m2 = 
-	try neqs, MapR.find r2 neqs 
-	with Not_found -> MapR.add r2 MapR.empty neqs, MapR.empty in
-      (try let exs1 =  Ex.union dep (MapR.find r2 m1) in 
-           raise (Inconsistent exs1)
-       with Not_found -> ());
-      (try let exs2 =  Ex.union dep (MapR.find r1 m2) in 
-           raise (Inconsistent exs2)
-       with Not_found -> ());	
-      (* if MapR.mem r2 m1 or MapR.mem r1 m2 then raise Inconsistent; *)
-      merge r1 m1 r2 m2 dep neqs
+      let nq_r1 = lookup_for_neqs env r1 in
+      let nq_r2 = lookup_for_neqs env r2 in
+      let mapl = 
+	MapL.fold
+	  (fun l1 ex1 mapl ->  
+	     try 
+	       let ex2 = MapL.find l1 mapl in
+	       let ex = Ex.union (Ex.union ex1 ex2) dep in (* VERIF *)
+	       raise (Inconsistent ex)
+	     with Not_found -> 
+	       MapL.add l1 (Ex.union ex1 dep) mapl) 
+	  nq_r1 nq_r2
+      in
+      MapR.add r2 mapl (MapR.add r1 mapl env.neqs)
 
     let disjoint_union l_1 l_2 = 
       let rec di_un (l1,c,l2) (l_1,l_2)= 
@@ -277,27 +257,25 @@ module Make ( R : Sig.X ) = struct
 	      else if cmp > 0 then di_un ((a,m)::l1) r ((b,n)::s)
 	      else raise List_minus_exn
       in di_un [] l_1 l_2
-
-
-    exception Not_possible of Ac.t * bool
         
-    let rec apply_rule (p,v) (ar,fixpoint) =
-      let c = Ac.compare ar p in
-      if c = 0 then {ar with l=[v,1]}, fixpoint
-      else if c < 0 then raise (Not_possible (ar,fixpoint))
-      else 
-        try 
-          let ar = {ar with l=Ac.add ar.h (v,1) (list_minus ar.l p.l)} in
-          apply_rule (p,v) (ar, false)
-        with List_minus_exn -> (ar,fixpoint)
-
-
-    let rec apply_rs ac rls = 
-      let ac2,fixpoint = 
-        try SetRL.fold apply_rule rls (ac,true) 
-        with Not_possible (ac2, fixpoint) -> ac2,fixpoint in
-      if fixpoint then ac2 else apply_rs ac2 rls
-  	
+    let apply_rs r rls = 
+      let fp = ref true in
+      let r = ref r in
+      let rec apply_rule (p, v) =
+	let c = Ac.compare !r p in
+	if c = 0 then r := {!r with l=[v, 1]}
+	else if c < 0 then raise Exit
+	else 
+          try 
+            r := {!r with l = Ac.add !r.h (v, 1) (list_minus !r.l p.l)};
+	    fp := false;
+            apply_rule (p, v)
+          with List_minus_exn -> ()
+      in
+      let rec fixpoint () = 
+        (try SetRL.iter apply_rule rls with Exit -> ());
+	if !fp then !r else (fp := true; fixpoint ())
+      in fixpoint()
 
     let filter_leaves r = 
       L.fold_left 
@@ -380,12 +358,12 @@ module Make ( R : Sig.X ) = struct
     let head_cp env (({h=h} as ac), v, dep) = 
       try 
         SetRL.fold
-	  (fun (p,_P) env ->
-	    match disjoint_union ac.l p.l with
+	  (fun (g, d) env ->
+	    match disjoint_union ac.l g.l with
 	      | _  , [] , _  -> env
 	      | l1 , cm , l2 -> 
-		let x = {ac with l = Ac.add h (_P,1) l1} in
-		let y = {p  with l = Ac.add h (v,1)  l2} in
+		let x = {ac with l = Ac.add h (d,1) l1} in
+		let y = {g  with l = Ac.add h (v,1) l2} in
 		add_cp env (R.color x, R.color y, dep)
 	  )(RS.find h env.ac_rs) env
       with Not_found -> env
@@ -397,20 +375,21 @@ module Make ( R : Sig.X ) = struct
 	    (fun (g, d) env ->
 	      let env = {env with ac_rs = RS.remove_rule (g,d) env.ac_rs} in
 	      let gx = R.color g in
+	      (* TODO : ajouter les explications dans ac_rs *)
 	      let ex_g = 
                 try snd (MapR.find gx env.repr) 
 	        with Not_found -> Ex.empty in
 	      let ex_d = 
                 try snd (MapR.find d env.repr)
 	        with Not_found -> Ex.empty in
-	      let g2, _ = canon env (Ac.subst p v g) in
-	      let d2, _ = canon env (R.subst p v d) in
+	      let g2, ex_g2 = canon env (Ac.subst p v g) in
+	      let d2, ex_d2 = canon env (R.subst p v d) in
 	      let ex = Ex.union (Ex.union ex_g ex_d) dep in
 	      if R.equal g2 gx then 
-	      (* compose *)
-	        {env with ac_rs= RS.add_rule (g,d2) env.ac_rs}
+		(* compose *)
+	        {env with ac_rs = RS.add_rule (g,d2) env.ac_rs}
 	      else 
-	      (* collapse *)
+		(* collapse *)
 	        let env = add_sm env g2 g2 Ex.empty in
 	        let env = add_sm env d2 d2 Ex.empty in
                 if debug_ac then
@@ -430,65 +409,50 @@ module Make ( R : Sig.X ) = struct
 	    let env = comp_collapse env sigma in
 	    head_cp env (r, v, dep)
 	    
-    let apply_sigma_uf env tch (p, v, dep) =
-      let use_p = 
-	try 
-	  MapR.find p env.gamma
-	with Not_found ->
-          fprintf fmt "The key %a is not found@." R.print p;
-          assert false
-      in
-      try SetR.fold 
-	    (fun r (env, touched) -> 
-	      let rr,ex = lookup_by_r r env in
-	      let nrr   = R.subst p v rr in
-	      if R.equal rr nrr then env, touched
-	      else 
-	        let ex  = Ex.union ex dep in
-	        let env = {
-	          env with
-		    repr = MapR.add r (nrr,ex) env.repr;
-		    classes = update_classes rr nrr env.classes;
-		    gamma = add_to_gamma r nrr env.gamma ;
-		    neqs = update_neqs rr nrr dep env } in
-	        env, (r,nrr,ex)::touched
-	    ) use_p (env,[])
+    let apply_sigma_uf env (p, v, dep) =
+      assert (MapR.mem p env.gamma);
+      let use_p = MapR.find p env.gamma in
+      try 
+	SetR.fold 
+	  (fun r (env, touched) -> 
+	     let rr, ex = MapR.find r env.repr in
+	     let nrr = R.subst p v rr in
+	     if R.equal rr nrr then env, touched
+	     else 
+	       let ex  = Ex.union ex dep in
+	       let env = { 
+		 env with
+		   repr = MapR.add r (nrr, ex) env .repr;
+		   classes = update_classes rr nrr env.classes;
+		   gamma = add_to_gamma r nrr env.gamma ;
+		   neqs = update_neqs rr nrr dep env } 
+	       in
+	       env, (r, nrr, ex)::touched
+	  ) use_p (env, [])
       with Not_found -> assert false
-    (* il faut faire le menage dans les maps *)
 
-    (* quelle vraie valeur pour dep ? 
-       let up_uf_rs dep env =
-       MapR.fold
-       (fun r (rr,ex) env ->
-       let nrr,_ = canon env rr in
-       if R.equal nrr rr then env 
-       else 
-       {env with
-       repr = MapR.add r (nrr,ex) env.repr;
-       classes = update_classes rr nrr env.classes;
-       gamma = add_to_gamma r nrr env.gamma ;
-       neqs = update_neqs rr nrr dep env }
-       )env.repr env
-    *)
     let up_uf_rs dep env tch =
-      MapR.fold
-	(fun r (rr,ex) (env,tch) ->
-	  let nrr,_ = canon env rr in
-	  if R.equal nrr rr then env, tch
-	  else 
-            let env = 
-	      {env with
-	        repr = MapR.add r (nrr,ex) env.repr;
-	        classes = update_classes rr nrr env.classes;
-	        gamma = add_to_gamma r nrr env.gamma ;
-	        neqs = update_neqs rr nrr dep env } in
-            env, (r,[r,nrr,ex],nrr)::tch
-	)env.repr (env,tch)
-
-    let apply_sigma env tch ((p, v, _) as sigma) = 
+      if RS.is_empty env.ac_rs then env, tch
+      else
+	MapR.fold
+	  (fun r (rr,ex) (env,tch) ->
+	     let nrr, ex_nrr = canon env rr in
+	     if R.equal nrr rr then env, tch
+	     else 
+	       let ex = Ex.union ex ex_nrr in
+               let env = 
+		 {env with
+	            repr = MapR.add r (nrr, ex) env.repr;
+	            classes = update_classes rr nrr env.classes;
+	            gamma = add_to_gamma r nrr env.gamma ;
+	            neqs = update_neqs rr nrr dep env } in
+               env, (r,[r, nrr, ex],nrr)::tch
+	  ) env.repr (env, tch)
+	  
+    let apply_sigma env tch ((p, v, dep) as sigma) = 
       let env = add_sm env p p Ex.empty in
       let env = apply_sigma_ac env sigma in
-      let env, touched = apply_sigma_uf env tch sigma in 
+      let env, touched = apply_sigma_uf env sigma in 
       up_uf_rs dep env ((p, touched, v) :: tch)
 	
   end
@@ -519,17 +483,8 @@ module Make ( R : Sig.X ) = struct
     if R.equal rr1 rr2 then [] (* Remove rule *)
     else 
       begin
-        let nq_rr1 = lookup_for_neqs env rr1 in
-        let nq_rr2 = lookup_for_neqs env rr2 in
-	MapL.iter 
-	  (fun l1 ex1 ->  
-	     MapL.iter 
-	       (fun l2 ex2 -> 
-		  if Lit.equal l1 l2 then 
-		    let ex = Ex.union (Ex.union ex1 ex2) dep in (* VERIF *)
-		    raise (Inconsistent ex)) nq_rr2) nq_rr1;
-        let repr r = fst (lookup_by_r r env) in
-        R.solve repr rr1 rr2 
+	ignore (Env.update_neqs rr1 rr2 dep env);
+        R.solve rr1 rr2 
       end
         
   let rec ac_x env tch = 
@@ -579,69 +534,54 @@ module Make ( R : Sig.X ) = struct
     List.fold_left 
       (fun env (r1, ex1, mapr) -> 
 	 MapR.fold (fun r2 ex2 env -> 
-		      let ex = Ex.union r1 (Ex.union r2 dep) in
-		      let repr = fun x -> fst (find_r env x) in
-		      try match R.solve repr r1 r2 with
+		      let ex = Ex.union ex1 (Ex.union ex2 dep) in
+		      try match R.solve r1 r2 with
 			| [a, b] -> 
 			    if (R.equal a r1 && R.equal b r2) ||
 			      (R.equal a r2 && R.equal b r1) then env
 			    else
-			      distinct env a b ex
+			      distinct env [a; b] ex
 			| []  -> raise (Inconsistent ex) 
 			| _   -> env
 		      with Unsolvable -> env) mapr env)
       env newds
 			  
-  let equal env t1 t2 = 
+  let are_equal env t1 t2 = 
     let r1, _ = Env.lookup_by_t t1 env in
     let r2, _ = Env.lookup_by_t t2 env in
     R.equal r1 r2
 
-  let are_in_neqs env r1 r2 = 
-    (try MapR.mem r1 (MapR.find r2 env.neqs) with Not_found -> false) ||
-      (try MapR.mem r2 (MapR.find r1 env.neqs) with Not_found -> false)
+  let are_in_neqs env (r1, r2) =
+    try ignore (Env.update_neqs r1 r2 Ex.empty env); false
+    with Inconsistent _ -> true
 
   let are_distinct env t1 t2 = 
-    let b= 
-      let r1,_ = lookup_by_t t1 env in
-      let r2,_ = lookup_by_t t2 env in
-      if R.equal r1 r2 then false
-      else
-	are_in_neqs env r1 r2 ||
-          try 
-            let repr r = fst (Env.lookup_by_r r env) in
-	    L.exists 
-	      (fun (a,b) -> are_in_neqs env a b) 
-	      (R.solve repr r1 r2)
-          (* True because r1=r2 <-> /\_{(a,b)in(R.solve r1 r2)}  a=b *)
-          with Unsolvable -> true
-    (*      try
-	    match T.view t1 , T.view t2 with
-	    {T.f=S.Int n1} , {T.f=S.Int n2} -> HS.compare n1 n2 <> 0
-	    | _ -> 
-	    let nt1 = MapR.find (find m t1) m.neqs in
-	    let nt2 = MapR.find (find m t2) m.neqs in
-	    SetT.mem t1 nt2 || SetT.mem t2 nt1
-            with Not_found -> false*)
+    let res = 
+      let r1, _ = Env.lookup_by_t t1 env in
+      let r2, _ = Env.lookup_by_t t2 env in
+      not (R.equal r1 r2) && 
+	( are_in_neqs env (r1, r2) ||
+	    try
+	      List.exists (are_in_neqs env) (R.solve r1 r2)
+	    with Unsolvable -> true )
     in     
     if debug_uf then
-      printf " [uf] are_distinct %a <> %a ? %b@." 
-	T.print t1 T.print t2 b; 
-    b
+      printf " [uf] are_distinct %a <> %a ? %b@." T.print t1 T.print t2 res; 
+    res
 
-  let explain env t1 t2 = 
+  let explain_equal env t1 t2 = 
     if Term.equal t1 t2 then Ex.empty
     else
-      let r1, ex1 = MapR.find (MapT.find t1 env.make) env.repr in
-      let r2, ex2 = MapR.find (MapT.find t2 env.make) env.repr in
-      if R.equal r1 r2 then Ex.union ex1 ex2 
-      else raise NotCongruent
+      let r1, ex1 = Env.lookup_by_t t1 env in
+      let r2, ex2 = Env.lookup_by_t t2 env in
+      if not (R.equal r1 r2) then raise NotCongruent;
+      Ex.union ex1 ex2 
 
-  let neq_explain env t1 t2 = 
-    let r1, ex1 = lookup_by_t t1 env in
-    let r2, ex2 = lookup_by_t t2 env in
-    if not (R.equal r1 r2) then Ex.union ex1 ex2 
-    else raise NotCongruent
+  let explain_distinct env t1 t2 = 
+    let r1, ex1 = Env.lookup_by_t t1 env in
+    let r2, ex2 = Env.lookup_by_t t2 env in
+    if R.equal r1 r2 then raise NotCongruent;
+    Ex.union ex1 ex2 
 
   let class_of env t = 
     try 
@@ -649,10 +589,12 @@ module Make ( R : Sig.X ) = struct
       SetT.elements (MapR.find rt env.classes)
     with Not_found -> [t]
       
-  let find env t = lookup_by_t t env
+  let find env t = Env.lookup_by_t t env
 
   let find_r = Env.find_or_canon
 
   let print = Print.all 
+
+  let mem = Env.mem
 
 end

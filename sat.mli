@@ -44,7 +44,5 @@ val pred_def : t -> Formula.t -> t
    [size]. Raises Sat if [f] is satisfiable in [env] *)
 val unsat : t -> gformula -> int -> Explanation.t
 
-val rewrite_system : t -> (Term.t Why_ptree.rwt_rule) list -> t
-
 val start : unit -> unit
 val stop : unit -> int64
