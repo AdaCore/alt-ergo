@@ -376,7 +376,7 @@ module Make (X : ALIEN) = struct
       (** we search all kinds of equations *)
       find_fst_pair uf (find_snd_pair uf (find_pair_pair uf []))
 	
-  let solve repr r1 r2 = 
+  let solve r1 r2 = 
     let leaves t = 
       let rec leaves t = 
 	match (normalize t) with

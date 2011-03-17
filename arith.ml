@@ -478,7 +478,7 @@ module Make
       (fst (P.to_list pp)) then p else pp
 
 
-  let solve_aux repr r1 r2 =
+  let solve_aux r1 r2 =
     if debug_arith then 
       fprintf fmt "[arith] we solve %a=%a@." X.print r1 X.print r2;
     let p1 = embed r1 in
@@ -488,8 +488,8 @@ module Make
     let pp = safe_distribution p in
     if ty = Ty.Treal then solve_real pp else solve_int pp
 
-  let solve repr r1 r2 = 
-    let sbs = solve_aux repr r1 r2 in
+  let solve r1 r2 = 
+    let sbs = solve_aux r1 r2 in
     let sbs = List.fast_sort (fun (a,_) (x,y) -> X.compare x a)sbs in
     if debug_arith then begin
       fprintf fmt "[arith] solving %a = %a yields:@." X.print r1 X.print r2;

@@ -103,7 +103,7 @@ module Make(X : ALIEN) = struct
         
   let term_of my_v = assert false
 
-  let solve repr a b = 
+  let solve a b = 
     match embed a, embed b with
       | Cons(c1,_) , Cons(c2,_) when Hs.equal c1 c2 -> []
       | Cons(c1,_) , Cons(c2,_) -> raise Exception.Unsolvable
@@ -111,11 +111,11 @@ module Make(X : ALIEN) = struct
       | Alien r1   , Cons _     -> [r1,b]
       | Alien _    , Alien _    -> assert false
     
-  let solve repr a b = 
+  let solve a b = 
     if debug_sum then fprintf fmt "[Sum] we solve %a = %a@."  
       X.print a X.print b;
     try
-      let res = solve repr a b in
+      let res = solve a b in
       if debug_sum then (match res with
           [p,v] -> fprintf fmt "\twe get: %a |-> %a@." X.print p X.print v
         | []    -> fprintf fmt "\tthe equation is trivial@."

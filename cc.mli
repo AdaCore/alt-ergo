@@ -29,7 +29,6 @@ module type S = sig
   val query : Literal.LT.t -> t -> Explanation.t option
   val class_of : t -> Term.t -> Term.t list
   val explain : Literal.LT.t -> t -> Explanation.t
-  val rewrite_system : t -> (Term.t Why_ptree.rwt_rule) list -> t
 end
 
 module Make (X:Sig.X) : S

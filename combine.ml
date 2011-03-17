@@ -258,7 +258,7 @@ struct
 	 (theory_num u = tag || unsolvable u) && 
 	   (theory_num t = tag || unsolvable t))
 
-  let rec solve_list repr solved l =
+  let rec solve_list  solved l =
     List.fold_left
       (fun solved (a,b) -> 
          if debug_combine then
@@ -268,20 +268,20 @@ struct
 	   match a , b with
 	       (* both sides are empty *)
 	     | (Term _ | Ac _) , (Term _ | Ac _) -> 
-		 add_mr solved (unsolvable_values cmp repr a b)
+		 add_mr solved (unsolvable_values cmp  a b)
 		   
 	     (* only one side is empty *)
 	     | (a, b) 
                  when unsolvable a || unsolvable b ||  compare_tag a b = 0 ->
 		 let a,b = if unsolvable a then b,a else a,b in
-		 let cp , sol = partition (theory_num a) (solvei repr b a) in
-		 solve_list repr (add_mr solved cp) sol
+		 let cp , sol = partition (theory_num a) (solvei  b a) in
+		 solve_list  (add_mr solved cp) sol
 		   
 	     (* both sides are not empty *)
-	     | a , b -> solve_theoryj repr solved a b
+	     | a , b -> solve_theoryj  solved a b
       ) solved l
 
-  and unsolvable_values cmp repr a b =
+  and unsolvable_values cmp a b =
     match a, b with
       (* Clash entre theories: On peut avoir ces pbs ? *)
       | X1 _, (X2 _ | X3 _ | X4 _ | X5 _) 
@@ -293,38 +293,38 @@ struct
       | X5 _, X4 _ -> assert false
 
       (* theorie d'un cote, vide de l'autre *)
-      | X1 _, _ | _, X1 _ -> X1.solve repr a b
-      | X2 _, _ | _, X2 _ -> X2.solve repr a b
-      | X3 _, _ | _, X3 _ -> X3.solve repr a b
-      | X4 _, _ | _, X4 _ -> X4.solve repr a b
-      | X5 _, _ | _, X5 _ -> X5.solve repr a b
+      | X1 _, _ | _, X1 _ -> X1.solve a b
+      | X2 _, _ | _, X2 _ -> X2.solve a b
+      | X3 _, _ | _, X3 _ -> X3.solve a b
+      | X4 _, _ | _, X4 _ -> X4.solve a b
+      | X5 _, _ | _, X5 _ -> X5.solve a b
       | (Ac _|Term _), (Ac _|Term _) -> [if cmp > 0 then a,b else b,a]
 
-  and solve_theoryj repr solved xi xj =
+  and solve_theoryj solved xi xj =
     if debug_combine then
       fprintf fmt "solvej %a=%a@." print xi print xj;
-    let cp , sol = partition (theory_num xj) (solvei repr xi xj) in
-    solve_list repr (add_mr solved cp) (List.rev_map (fun (x,y) -> y,x) sol)
+    let cp , sol = partition (theory_num xj) (solvei  xi xj) in
+    solve_list  (add_mr solved cp) (List.rev_map (fun (x,y) -> y,x) sol)
 
-  and solvei repr a b =
+  and solvei  a b =
     if debug_combine then
       fprintf fmt "solvei %a=%a@." print a print b;
     match b with
-      | X1 _ -> X1.solve repr a b
-      | X2 _ -> X2.solve repr a b
-      | X3 _ -> X3.solve repr a b
-      | X4 _ -> X4.solve repr a b
-      | X5 _ -> X5.solve repr a b
+      | X1 _ -> X1.solve  a b
+      | X2 _ -> X2.solve  a b
+      | X3 _ -> X3.solve  a b
+      | X4 _ -> X4.solve  a b
+      | X5 _ -> X5.solve  a b
       | Term _ | Ac _ -> 
           (* XXX pour Arrays *)
           match a with
-            | X4 _  -> X4.solve repr a b
+            | X4 _  -> X4.solve  a b
             | _ -> 
 	        fprintf fmt "solvei %a = %a @." print a print b;
 	        assert false
 
-  let rec solve_rec repr mt ab = 
-    let mr = solve_list repr mt ab in
+  let rec solve_rec  mt ab = 
+    let mr = solve_list  mt ab in
     let mr , ab = 
       MR.fold 
 	(fun p lr ((mt,ab) as acc) -> match lr with
@@ -334,19 +334,19 @@ struct
 	       MR.add p [x] mr , List.rev_map (fun y-> (x,y)) lx)	 
 	mr (mr,[])
     in 
-    if ab=[] then mr else solve_rec repr mr ab
+    if ab=[] then mr else solve_rec  mr ab
       
-  let solve repr a b =
+  let solve  a b =
     MR.fold 
       (fun p lr ret -> 
 	 match lr with [r] -> (p ,r)::ret | _ -> assert false) 
-      (solve_rec repr MR.empty [a,b]) []
+      (solve_rec  MR.empty [a,b]) []
 
 
-  let solve repr a b =
+  let solve  a b =
     if debug_combine then 
       fprintf fmt "[combine] solving %a = %a yields:@." print a print b;
-    let sbs = solve repr a b in
+    let sbs = solve  a b in
     if debug_combine then begin
       let c = ref 0 in
       List.iter 

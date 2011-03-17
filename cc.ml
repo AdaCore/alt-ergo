@@ -29,7 +29,6 @@ module type S = sig
   val query : Literal.LT.t -> t -> Explanation.t option
   val class_of : t -> Term.t -> Term.t list
   val explain : Literal.LT.t -> t -> Explanation.t
-  val rewrite_system : t -> (Term.t Why_ptree.rwt_rule) list -> t
 end
 
 module Make (X : Sig.X) = struct    
@@ -86,7 +85,8 @@ module Make (X : Sig.X) = struct
 
   let compat_leaves env lt1 lt2 = 
     List.fold_left2
-      (fun dep x y -> Ex.union (Uf.explain env.uf x y) dep) Ex.empty lt1 lt2
+      (fun dep x y -> 
+	 Ex.union (Uf.explain_equal env.uf x y) dep) Ex.empty lt1 lt2
 
   let terms_congr env u1 u2 = 
     if Term.compare u1 u2 = 0 then raise Exception.Trivial;
@@ -476,7 +476,7 @@ module Make (X : Sig.X) = struct
   let explain_env a env = 
     try
       (match Literal.LT.view a with
-	 | Literal.Eq (x, y) -> Uf.explain env.uf x y
+	 | Literal.Eq (x, y) -> Uf.explain_equal env.uf x y
 	     (* A FAIRE *)
 (*	 | Literal.Neq (x, y) -> Uf.neq_explain env.uf x y*)
 	 | _ -> Ex.everything)
@@ -523,10 +523,5 @@ module Make (X : Sig.X) = struct
 (*
     fst (assume (Literal.LT.make (Literal.Neq (T.vrai, T.faux))) Ex.empty t)
 *) (* A FAIRE *)
-      
-  let rewrite_system ({gamma=g; gamma_finite=gf} as env) rs = 
-    let g  = {g  with uf = Uf.rewrite_system g.uf  rs} in
-    let gf = {gf with uf = Uf.rewrite_system gf.uf rs} in
-    {env with gamma=g; gamma_finite=gf}
 
 end

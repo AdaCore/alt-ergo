@@ -29,6 +29,8 @@ val make_deps : Formula.Set.t -> t
 
 val union : t -> t -> t
 
+val merge : t -> t -> t
+
 val remove : Formula.t -> t -> t
 
 val print : Format.formatter -> t -> unit

@@ -702,7 +702,7 @@ module Make(X : ALIEN) = struct
 
 
   (* ne resout pas quand c'est deja resolu *)
-  let solve repr u t = 
+  let solve u t = 
     if Options.debug_bitv then 
       eprintf "[Bitv] solve %a = %a@." X.print u X.print t;
     
