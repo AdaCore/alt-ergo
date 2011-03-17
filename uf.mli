@@ -44,7 +44,7 @@ module type S = sig
   val class_of : t -> Term.t -> Term.t list
     
   val explain_equal : t -> Term.t -> Term.t -> Explanation.t
-  val explain_distinct : t -> Term.t -> Term.t -> Explanation.t
+  val explain_distinct : t -> Term.t list -> Explanation.t
   
   val print : Format.formatter -> t -> unit
 
