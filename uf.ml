@@ -46,7 +46,8 @@ module type S = sig
   val class_of : t -> Term.t -> Term.t list
 
   val explain_equal : t -> Term.t -> Term.t -> Explanation.t
-  val explain_distinct : t -> Term.t -> Term.t -> Explanation.t
+  val explain_distinct : t -> Term.t list -> Explanation.t
+
   val print : Format.formatter -> t -> unit
  
 end
@@ -577,11 +578,20 @@ module Make ( R : Sig.X ) = struct
       if not (R.equal r1 r2) then raise NotCongruent;
       Ex.union ex1 ex2 
 
-  let explain_distinct env t1 t2 = 
-    let r1, ex1 = Env.lookup_by_t t1 env in
-    let r2, ex2 = Env.lookup_by_t t2 env in
-    if R.equal r1 r2 then raise NotCongruent;
-    Ex.union ex1 ex2 
+  module H = Hashtbl.Make(Lit)
+
+  let explain_distinct env lt = assert false
+(*    let h = H.create 17 in
+    List.iter 
+      (fun t ->
+	 let r, ex = Env.lookup_by_t t env in
+	 let neqs = Env.lookup_for_neqs r env in
+	 MapL.iter 
+	   (fun l ex_l -> 
+	      let n, ex' = try H.find h l with Not_found -> 0, Ex.empty in
+	      H.add h l (n+1, Ex.union ex ex_l
+      ) lt*)
+
 
   let class_of env t = 
     try 
