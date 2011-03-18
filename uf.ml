@@ -578,20 +578,7 @@ module Make ( R : Sig.X ) = struct
       if not (R.equal r1 r2) then raise NotCongruent;
       Ex.union ex1 ex2 
 
-  module H = Hashtbl.Make(Lit)
-
   let explain_distinct env lt = assert false
-(*    let h = H.create 17 in
-    List.iter 
-      (fun t ->
-	 let r, ex = Env.lookup_by_t t env in
-	 let neqs = Env.lookup_for_neqs r env in
-	 MapL.iter 
-	   (fun l ex_l -> 
-	      let n, ex' = try H.find h l with Not_found -> 0, Ex.empty in
-	      H.add h l (n+1, Ex.union ex ex_l
-      ) lt*)
-
 
   let class_of env t = 
     try 
