@@ -40,13 +40,10 @@ module type S = sig
 
   val distinct : t -> R.r list -> Explanation.t -> t
 
-  val are_equal : t -> Term.t -> Term.t -> bool
-  val are_distinct : t -> Term.t -> Term.t -> bool
+  val are_equal : t -> Term.t -> Term.t -> Sig.answer
+  val are_distinct : t -> Term.t -> Term.t -> Sig.answer
 
   val class_of : t -> Term.t -> Term.t list
-
-  val explain_equal : t -> Term.t -> Term.t -> Explanation.t
-  val explain_distinct : t -> Term.t list -> Explanation.t
 
   val print : Format.formatter -> t -> unit
  
@@ -548,37 +545,19 @@ module Make ( R : Sig.X ) = struct
       env newds
 			  
   let are_equal env t1 t2 = 
-    let r1, _ = Env.lookup_by_t t1 env in
-    let r2, _ = Env.lookup_by_t t2 env in
-    R.equal r1 r2
-
-  let are_in_neqs env (r1, r2) =
-    try ignore (Env.update_neqs r1 r2 Ex.empty env); false
-    with Inconsistent _ -> true
+    let r1, ex_r1 = Env.lookup_by_t t1 env in
+    let r2, ex_r2 = Env.lookup_by_t t2 env in
+    if R.equal r1 r2 then Yes(Ex.union ex_r1 ex_r2) else No
 
   let are_distinct env t1 t2 = 
-    let res = 
-      let r1, _ = Env.lookup_by_t t1 env in
-      let r2, _ = Env.lookup_by_t t2 env in
-      not (R.equal r1 r2) && 
-	( are_in_neqs env (r1, r2) ||
-	    try
-	      List.exists (are_in_neqs env) (R.solve r1 r2)
-	    with Unsolvable -> true )
-    in     
     if debug_uf then
-      printf " [uf] are_distinct %a <> %a ? %b@." T.print t1 T.print t2 res; 
-    res
-
-  let explain_equal env t1 t2 = 
-    if Term.equal t1 t2 then Ex.empty
-    else
-      let r1, ex1 = Env.lookup_by_t t1 env in
-      let r2, ex2 = Env.lookup_by_t t2 env in
-      if not (R.equal r1 r2) then raise NotCongruent;
-      Ex.union ex1 ex2 
-
-  let explain_distinct env lt = assert false
+      printf " [uf] are_distinct %a %a @." T.print t1 T.print t2; 
+    let r1, ex_r1 = Env.lookup_by_t t1 env in
+    let r2, ex_r2 = Env.lookup_by_t t2 env in
+    try
+      ignore (union env r1 r2 (Ex.union ex_r1 ex_r2));
+      No
+    with Inconsistent ex -> Yes(ex)
 
   let class_of env t = 
     try 

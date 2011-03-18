@@ -249,8 +249,8 @@ module Make(X : ALIEN) = struct
 	    []
 
     let query (a,r) env expl =
-      try ignore(assume env [a,r,Explanation.empty] expl); None
-      with Exception.Inconsistent expl -> Some expl          
+      try ignore(assume env [a,r,Explanation.empty] expl); Sig.No
+      with Exception.Inconsistent expl -> Sig.Yes expl          
 
     let add env r = match embed r, values_of r with
       | Alien r, Some hss -> if MX.mem r env then env else MX.add r hss env

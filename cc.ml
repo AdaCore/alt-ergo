@@ -26,9 +26,8 @@ module type S = sig
 
   val empty : unit -> t
   val assume : Literal.LT.t -> Explanation.t -> t -> t * int
-  val query : Literal.LT.t -> t -> Explanation.t option
+  val query : Literal.LT.t -> t -> answer
   val class_of : t -> Term.t -> Term.t list
-  val explain : Literal.LT.t -> t -> Explanation.t
 end
 
 module Make (X : Sig.X) = struct    
@@ -86,7 +85,9 @@ module Make (X : Sig.X) = struct
   let compat_leaves env lt1 lt2 = 
     List.fold_left2
       (fun dep x y -> 
-	 Ex.union (Uf.explain_equal env.uf x y) dep) Ex.empty lt1 lt2
+	 match Uf.are_equal env.uf x y with
+	   | No -> raise Exception.NotCongruent
+	   | Yes ex -> Ex.union ex dep) Ex.empty lt1 lt2
 
   let terms_congr env u1 u2 = 
     if Term.compare u1 u2 = 0 then raise Exception.Trivial;
@@ -462,44 +463,28 @@ if Options.nocontracongru then env
     t, 1
 
   let class_of t term = Uf.class_of t.gamma.uf term
-    
-    
-  let explain_env a env = 
-    try
-      (match Literal.LT.view a with
-	 | Literal.Eq (x, y) -> Uf.explain_equal env.uf x y
-	 | Literal.Distinct l -> Uf.explain_distinct env.uf l
-	 | _ -> Ex.everything)
-    with Exception.NotCongruent -> assert false
-
-  let explain a t = explain_env a t.gamma
 	      
   let query a t = 
     try
-      let na = Literal.LT.neg a in
-      ignore (assume na Explanation.empty t);
-      None
-    with Exception.Inconsistent d -> Some(d)
-
-(*    try
-      if debug_use then Use.print t.gamma.use;
       let t = { t with gamma = add a Explanation.empty t.gamma } in
       let t =  try_it (add a Explanation.empty) t Explanation.empty in
       let env = t.gamma in
+      if debug_use then Use.print t.gamma.use;    
       match Literal.LT.view a with
 	| Literal.Eq (t1, t2)  -> 
-	    if Uf.equal env.uf t1 t2 then 
-	      Some (Uf.explain env.uf t1 t2) 
-	    else None
-	| Literal.Neq (t1, t2) -> 
-	    if Uf.are_distinct env.uf t1 t2 then 
-	      Some (Uf.neq_explain env.uf t1 t2)
-	    else None
+	    Uf.are_equal env.uf t1 t2
+
+	| Literal.Distinct [t1; t2] -> 
+	    Uf.are_distinct env.uf t1 t2
+
+	| Literal.Distinct _ -> 
+	    assert false (* devrait etre capture par une analyse statique *)
+
 	| _ -> 
-            let na = Literal.LT.neg a in
-            X.Rel.query (semantic_view env na,Some na) env.relation Ex.empty
-    with Exception.Inconsistent d -> Some(d)
-*)
+	      let na = Literal.LT.neg a in
+	      let rna, ex_rna = semantic_view env na Ex.empty in
+              X.Rel.query (rna, Some na) env.relation ex_rna
+    with Exception.Inconsistent d -> Yes d
 
   let empty () = 
     let env = { 

@@ -15,7 +15,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type ('a,'b) mine = Yes of 'a | No of 'b
+type answer = Yes of Explanation.t | No
 
 type 'a ac = {h: Symbols.t ; t: Ty.t ; l: ('a * int) list}
 
@@ -29,12 +29,13 @@ module type RELATION = sig
 
   val empty : unit -> t
   
-  val assume : t -> r sem_atom_ex list -> Explanation.t -> t * r sem_atom_ex list
+  val assume : 
+    t -> r sem_atom_ex list -> Explanation.t -> t * r sem_atom_ex list
 
   val instantiate :
     t -> r sem_atom list -> (Term.t -> Term.t list) -> t * Literal.LT.t list
 
-  val query : r sem_atom -> t -> Explanation.t -> Explanation.t option
+  val query : r sem_atom -> t -> Explanation.t -> answer
 
   val case_split : t -> (r sem_atom * Num.num) list
     (** case_split env returns a list of equalities *)

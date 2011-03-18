@@ -46,7 +46,7 @@ module type X = sig
   type t
 
   val class_of : t -> Term.t -> Term.t list
-  val query : Literal.LT.t -> t -> Explanation.t option
+  val query : Literal.LT.t -> t -> Sig.answer
 
 end
 
@@ -149,7 +149,7 @@ module Make (X : X) = struct
     try 
       let t' = SubstT.find f s_t in
       let a = Literal.LT.make (Literal.Eq (t, t')) in
-      if X.query a uf (*Explanation.singleton (Formula.mk_lit a)*) <> None 
+      if X.query a uf (*Explanation.singleton (Formula.mk_lit a)*) <> Sig.No
       then sg 
       else raise Echec
     with Not_found ->  {sg with sbt=(SubstT.add f t s_t,s_ty) }

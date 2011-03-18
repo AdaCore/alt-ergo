@@ -17,6 +17,7 @@
 
 open Format
 open Options
+open Sig
 
 module rec CX : sig
   include Sig.X
@@ -405,14 +406,14 @@ struct
 	
     let query a env expl = 
       match X1.Rel.query a env.r1 expl with
-	| Some expl -> Some expl
-	| None -> match X2.Rel.query a env.r2 expl with
-	    | Some expl -> Some expl
-	    | None -> match X3.Rel.query a env.r3 expl with
-		| Some expl -> Some expl
-		| None -> match X4.Rel.query a env.r4 expl with
-		    | Some expl -> Some expl
-		    | None -> X5.Rel.query a env.r5 expl
+	| Yes _ as ans -> ans
+	| No -> match X2.Rel.query a env.r2 expl with
+	    | Yes _ as ans -> ans
+	    | No -> match X3.Rel.query a env.r3 expl with
+		| Yes _ as ans -> ans
+		| No -> match X4.Rel.query a env.r4 expl with
+		    | Yes _ as ans -> ans
+		    | No -> X5.Rel.query a env.r5 expl
 		      
     let case_split env = 
       let seq1 = X1.Rel.case_split env.r1 in

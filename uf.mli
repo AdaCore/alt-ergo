@@ -37,15 +37,11 @@ module type S = sig
 
   val distinct : t -> R.r list -> Explanation.t -> t
 
-  val are_equal : t -> Term.t -> Term.t -> bool
-  val are_distinct : t -> Term.t -> Term.t -> bool
-
+  val are_equal : t -> Term.t -> Term.t -> Sig.answer
+  val are_distinct : t -> Term.t -> Term.t -> Sig.answer
 
   val class_of : t -> Term.t -> Term.t list
-    
-  val explain_equal : t -> Term.t -> Term.t -> Explanation.t
-  val explain_distinct : t -> Term.t list -> Explanation.t
-  
+
   val print : Format.formatter -> t -> unit
 
 end

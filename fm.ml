@@ -816,8 +816,8 @@ module Make
   let query (a,r) env expl =
     try 
       ignore(assume env [a,r,Explanation.empty] expl); 
-      None
-    with Exception.Inconsistent expl -> Some expl
+      No
+    with Exception.Inconsistent expl -> Yes expl
 
   let case_split_polynomes env = 
     let o = MP.fold
