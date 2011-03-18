@@ -18,6 +18,8 @@
 open Format
 open Options
 
+type ('a, 'b) mine = Yes of 'a | No of 'b
+
 type 'a abstract = 
     Pair of 'a abstract * 'a abstract * Ty.t
   | Fst of 'a abstract * Ty.t
@@ -46,8 +48,8 @@ module Make (X : ALIEN) = struct
     | Other(t,_) -> X.print fmt t
 
   let print_mine fmt = function
-      Sig.No r -> X.print fmt r
-    | Sig.Yes t -> print fmt t
+      No r -> X.print fmt r
+    | Yes t -> print fmt t
 
   let is_pair =
     let c = Hstring.make "pair" in
@@ -453,7 +455,7 @@ module Make (X : ALIEN) = struct
     exception Inconsistent    
     let empty _ = ()
     let assume _ _ _ = (), []
-    let query _ _ _ = None
+    let query _ _ _ = Sig.No
     let case_split env = []
     let add env _ = env
     let instantiate env _ _ = env, []

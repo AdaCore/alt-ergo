@@ -34,7 +34,7 @@ module type X = sig
   type t
 
   val class_of : t -> Term.t -> Term.t list
-  val query : Literal.LT.t -> t -> Explanation.t option
+  val query : Literal.LT.t -> t -> Sig.answer
 end
 
 module type S = sig

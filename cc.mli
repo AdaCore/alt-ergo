@@ -26,9 +26,8 @@ module type S = sig
 
   val empty : unit -> t
   val assume : Literal.LT.t -> Explanation.t -> t -> t * int
-  val query : Literal.LT.t -> t -> Explanation.t option
+  val query : Literal.LT.t -> t -> Sig.answer
   val class_of : t -> Term.t -> Term.t list
-  val explain : Literal.LT.t -> t -> Explanation.t
 end
 
 module Make (X:Sig.X) : S

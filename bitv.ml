@@ -828,7 +828,7 @@ module Make(X : ALIEN) = struct
       | ({bv=true } as x)::l -> {x with bv = false}::(succ l)
 
     let case_split env = []    
-    let query _ _ _ = None
+    let query _ _ _ = Sig.No
     let instantiate env _ _ = env, []
   end
 

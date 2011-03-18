@@ -17,6 +17,7 @@
 
 open Options
 open Format
+open Sig
 
 module A = Literal
 module CcX = Cc.Make(Combine.CX)
@@ -250,7 +251,7 @@ let print_model fmt s =
 let elim {f=f} env = 
   MF.mem f env.gamma ||
     match F.view f with 
-      | F.Literal a -> CcX.query a env.tbox <> None
+      | F.Literal a -> CcX.query a env.tbox <> No
       | _ -> false
 
 let size_formula = 1_000_000
@@ -258,11 +259,11 @@ let size_formula = 1_000_000
 let red {f=f} env = 
   let nf = F.mk_not f in
   try 
-    Some(MF.find nf env.gamma)
+    Yes (MF.find nf env.gamma)
   with Not_found -> 
     match F.view nf with
       |	F.Literal a -> CcX.query a env.tbox
-      | _ -> None
+      | _ -> No
 
 let pred_def env f = 
   let ff = {f=f;age=0;name=None;mf=false;gf=false} in
@@ -352,11 +353,11 @@ and bcp env =
 	 else 
            (Print.red f1 f2;
 	   match red f1 env with
-	       Some d1 -> (cl,(f2,Ex.union d d1)::u)
-	     | None -> 
+	     | Yes d1 -> (cl,(f2,Ex.union d d1)::u)
+	     | No -> 
 		 match red f2 env with
-		     Some d2 -> (cl,(f1,Ex.union d d2)::u)
-		   | None -> fd::cl , u)
+		     Yes d2 -> (cl,(f1,Ex.union d d2)::u)
+		   | No -> fd::cl , u)
       ) ([],[]) env.delta
   in
   List.fold_left assume {env with delta=cl} u

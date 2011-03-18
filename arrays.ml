@@ -370,7 +370,7 @@ module Make(X : ALIEN) = struct
       }
 
     let assume env _ _ = env, []
-    let query a _ _ = None
+    let query a _ _ = Sig.No
     let add env r = env
   end
 end
