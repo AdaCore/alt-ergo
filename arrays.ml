@@ -81,16 +81,17 @@ module Make(X : ALIEN) = struct
               let s1,s2 = if X.compare s1 s2 > 0 then s1,s2 else s2,s1 in
               let c = X.compare r1 s1 in
               if c = 0 then X.compare r2 s2 else c
-		(* A FAIRE *)
-          (*| A.Neq(r1,r2), A.Neq(s1,s2) -> 
+
+          | A.Distinct[r1;r2], A.Distinct[s1;s2] -> 
               let r1,r2 = if X.compare r1 r2 > 0 then r1,r2 else r2,r1 in
               let s1,s2 = if X.compare s1 s2 > 0 then s1,s2 else s2,s1 in
               let c = X.compare r1 s1 in
-              if c = 0 then X.compare r2 s2 else c*)
-(*          | A.Eq _      , A.Neq _      -> 1 
-          | A.Neq _     , A.Eq _       -> -1*)(* A FAIRE *)
+              if c = 0 then X.compare r2 s2 else c
+          | A.Eq _      , A.Distinct _      -> 1 
+          | A.Distinct _     , A.Eq _       -> -1
           | A.Builtin _ , _            -> assert false
           | _           , A.Builtin _  -> assert false
+          | _ -> assert false (* XXX *)
     end
       
     (* ensemble d'egalites/disegalites sur des atomes semantiques *)
@@ -170,12 +171,14 @@ module Make(X : ALIEN) = struct
 
     (* retourne l'ensemble des feuilles d'un atome *)
     let leaves_of_atom = function
-      | A.Eq (r1,r2) (*| A.Neq (r1,r2) *) (*A FAIRE *)-> 
+      | A.Eq (r1,r2) | A.Distinct [r1;r2]-> 
           (X.leaves r2) @ (X.leaves r1)
 
       | A.Builtin (_,_,l)            ->
           L.fold_left (fun acc r -> (X.leaves r) @ acc) [] l
             
+      | _ -> assert false
+
     (* met a jour gets et tbset en utilisant l'ensemble des termes donne*)
     let update_gets_sets st acc =
       List.fold_left
@@ -247,16 +250,15 @@ module Make(X : ALIEN) = struct
              let env = {env with seen = TM.update get set env.seen} in
              let {T.f=f;xs=xs;ty=sty} = T.view set in 
              match Sy.is_set f, xs with
-(* A FAIRE *)
-(*               | true , [stab;si;sv] -> 
+               | true , [stab;si;sv] -> 
                    let xi, _ = X.make gi in
                    let xj, _ = X.make si in
                    let get_stab  = T.make (Sy.Op Sy.Get) [stab;gi] gty in
                    let i_j       = A.Eq(xi,xj) in
                    let i_j_ded   = A.LT.make (A.Eq(get,sv)) in
-                   let i_n_j     = A.Neq(xi,xj) in
+                   let i_n_j     = A.Distinct[xi;xj] in
                    let i_n_j_ded = A.LT.make (A.Eq(get,get_stab)) in
-                   update_env env acc xi xj i_j i_j_ded i_n_j i_n_j_ded*)
+                   update_env env acc xi xj i_j i_j_ded i_n_j i_n_j_ded
                | _ -> (env,acc)
         ) (env,acc) (class_of gtab)
 
@@ -273,8 +275,7 @@ module Make(X : ALIEN) = struct
         (fun  {s=set; st=stab; si=si; sv=sv; sty=sty} (env,acc) -> 
            if TM.splited get set env.seen then (env,acc)
            else 
-	     assert false
-(*             begin
+             begin
                let env = {env with seen = TM.update get set env.seen} in
                let xi, _ = X.make gi in
                let xj, _ = X.make si in
@@ -282,10 +283,10 @@ module Make(X : ALIEN) = struct
                let gt_of_st  = T.make (Sy.Op Sy.Get) [set;gi] gty in
                let i_j       = A.Eq(xi,xj) in
                let i_j_ded   = A.LT.make (A.Eq(gt_of_st,sv)) in
-               let i_n_j     = A.Neq(xi,xj) in
+               let i_n_j     = A.Distinct[xi;xj] in
                let i_n_j_ded = A.LT.make (A.Eq(gt_of_st,get_stab)) in
                update_env env acc xi xj i_j i_j_ded i_n_j i_n_j_ded
-             end*) (* A FAIRE *)
+             end
         ) suff_sets (env,acc)
         
     (* Generer de nouvelles instantiations de lemmes *)
@@ -300,17 +301,16 @@ module Make(X : ALIEN) = struct
       match X.type_info r1, X.term_extract r1, X.term_extract r2 with
 
         | Ty.Tfarray (ty_key, ty_val), Some t1, Some t2  -> 
-	    assert false
-(*            L.fold_left
+            L.fold_left
               (fun acc t1 ->
                  L.fold_left 
                    (fun acc t2 -> 
                       let index = T.fresh_name ty_key in
                       let g1 = T.make (Sy.Op Sy.Get) [t1;index] ty_val in
                       let g2 = T.make (Sy.Op Sy.Get) [t2;index] ty_val in
-                      A.LT.Set.add (A.LT.make (A.Neq(g1,g2))) acc
+                      A.LT.Set.add (A.LT.make (A.Distinct[g1;g2])) acc
                    ) acc (class_of t2)
-              ) acc (class_of t1)*) (* A FAIRE *)
+              ) acc (class_of t1)
 
         | _ -> acc
 
@@ -320,7 +320,7 @@ module Make(X : ALIEN) = struct
     let extension acc la class_of = 
       List.fold_left
         (fun acc -> function 
-           (*| A.Neq(r1,r2) -> ext_1 acc r1 r2 class_of*) (* A FAIRE *)
+           | A.Distinct[r1;r2] -> ext_1 acc r1 r2 class_of
            | _ -> acc
         ) acc la
 
