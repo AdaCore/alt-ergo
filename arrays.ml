@@ -189,25 +189,22 @@ module Make(X : ALIEN) = struct
 
         
     (* mise a jour de env avec les instances 
-       1) i_j   => i_j_ded 
-       2) i_n_j => i_n_j_ded *)
-    let update_env are_eq are_dist 
-        env acc gi si i_j i_j_ded i_n_j i_n_j_ded =
-
+       1) p   => p_ded 
+       2) n => n_ded *)
+    let update_env are_eq are_dist env acc gi si p p_ded n n_ded =
       match are_eq gi si, are_dist gi si with
-            
         | Sig.Yes dep, Sig.No -> 
-            let csq = Amap.add i_n_j i_n_j_ded env.csq in
-            {env with csq = csq}, A.LT.Set.add i_j_ded acc
+            let csq = Amap.add n n_ded env.csq in
+            {env with csq = csq}, A.LT.Set.add p_ded acc
               
         | Sig.No, Sig.Yes dep -> 
-            let csq = Amap.add i_j i_j_ded env.csq in
-            {env with csq = csq}, A.LT.Set.add i_n_j_ded acc
+            let csq = Amap.add p p_ded env.csq in
+            {env with csq = csq}, A.LT.Set.add n_ded acc
               
         | Sig.No, Sig.No ->
-            let sp = Aset.add i_j env.split in
-            let csq = Amap.add i_j i_j_ded env.csq in
-            let csq = Amap.add i_n_j i_n_j_ded csq in
+            let sp = Aset.add p env.split in
+            let csq = Amap.add p p_ded env.csq in
+            let csq = Amap.add n n_ded csq in
             { env with split = sp; csq = csq }, acc
               
         | Sig.Yes _,  Sig.Yes _ -> assert false
@@ -228,12 +225,11 @@ module Make(X : ALIEN) = struct
                    let xi, _ = X.make gi in
                    let xj, _ = X.make si in
                    let get_stab  = T.make (Sy.Op Sy.Get) [stab;gi] gty in
-                   let i_j       = LitR.make (A.Eq(xi,xj)) in
-                   let i_j_ded   = A.LT.make (A.Eq(get,sv)) in
-                   let i_n_j     = LitR.make (A.Distinct[xi;xj]) in
-                   let i_n_j_ded = A.LT.make (A.Eq(get,get_stab)) in
-                   update_env are_eq are_dist 
-                     env acc gi si i_j i_j_ded i_n_j i_n_j_ded
+                   let p       = LitR.make (A.Eq(xi,xj)) in
+                   let p_ded   = A.LT.make (A.Eq(get,sv)) in
+                   let n     = LitR.make (A.Distinct[xi;xj]) in
+                   let n_ded = A.LT.make (A.Eq(get,get_stab)) in
+                   update_env are_eq are_dist env acc gi si p p_ded n n_ded
                | _ -> (env,acc)
         ) (env,acc) (class_of gtab)
 
@@ -257,12 +253,11 @@ module Make(X : ALIEN) = struct
                let xj, _ = X.make si in
                let get_stab  = T.make (Sy.Op Sy.Get) [stab;gi] gty in
                let gt_of_st  = T.make (Sy.Op Sy.Get) [set;gi] gty in
-               let i_j       = LitR.make (A.Eq(xi,xj)) in
-               let i_j_ded   = A.LT.make (A.Eq(gt_of_st,sv)) in
-               let i_n_j     = LitR.make (A.Distinct[xi;xj]) in
-               let i_n_j_ded = A.LT.make (A.Eq(gt_of_st,get_stab)) in
-               update_env  are_eq are_dist 
-                 env acc gi si i_j i_j_ded i_n_j i_n_j_ded
+               let p       = LitR.make (A.Eq(xi,xj)) in
+               let p_ded   = A.LT.make (A.Eq(gt_of_st,sv)) in
+               let n     = LitR.make (A.Distinct[xi;xj]) in
+               let n_ded = A.LT.make (A.Eq(gt_of_st,get_stab)) in
+               update_env  are_eq are_dist env acc gi si p p_ded n n_ded
              end
         ) suff_sets (env,acc)
         
@@ -274,32 +269,50 @@ module Make(X : ALIEN) = struct
            get_and_set are_eq are_dist  gt_info accu class_of
         ) env.gets (env,acc)
         
-    let ext_1 acc r1 r2 class_of =
-      match X.type_info r1, X.term_extract r1, X.term_extract r2 with
-
-        | Ty.Tfarray (ty_key, ty_val), Some t1, Some t2  -> 
-            L.fold_left
-              (fun acc t1 ->
-                 L.fold_left 
-                   (fun acc t2 -> 
-                      let index = T.fresh_name ty_key in
-                      let g1 = T.make (Sy.Op Sy.Get) [t1;index] ty_val in
-                      let g2 = T.make (Sy.Op Sy.Get) [t2;index] ty_val in
-                      A.LT.Set.add (A.LT.make (A.Distinct[g1;g2])) acc
-                   ) acc (class_of t2)
-              ) acc (class_of t1)
-
-        | _ -> acc
-
-
     (* nouvelles disegalites par instantiation du premier
        axiome d'exentionnalite *)
     let extension acc la class_of = 
       List.fold_left
         (fun acc -> function 
-           | A.Distinct[r1;r2] -> ext_1 acc r1 r2 class_of
+           | A.Distinct[r1;r2] -> 
+               begin
+                 match X.type_info r1, X.term_extract r1, X.term_extract r2 with
+                   | Ty.Tfarray (ty_k, ty_v), Some t1, Some t2  -> 
+                       let i  = T.fresh_name ty_k in
+                       let g1 = T.make (Sy.Op Sy.Get) [t1;i] ty_v in
+                       let g2 = T.make (Sy.Op Sy.Get) [t2;i] ty_v in
+                       let d  = A.Distinct[g1;g2] in
+                       A.LT.Set.add (A.LT.make d) acc
+                   | _ -> acc
+               end
            | _ -> acc
         ) acc la
+
+(*
+    let extension acc la class_of = 
+      List.fold_left
+        (fun acc -> function 
+           | A.Distinct[r1;r2] -> 
+               begin
+                 match X.type_info r1, X.term_extract r1, X.term_extract r2 with
+                   | Ty.Tfarray (ty_k, ty_v), Some t1, Some t2  -> 
+                       L.fold_left
+                         (fun acc t1 ->
+                            L.fold_left 
+                              (fun acc t2 -> 
+                                 let i  = T.fresh_name ty_k in
+                                 let g1 = T.make (Sy.Op Sy.Get) [t1;i] ty_v in
+                                 let g2 = T.make (Sy.Op Sy.Get) [t2;i] ty_v in
+                                 let d  = A.Distinct[g1;g2] in
+                                 A.LT.Set.add (A.LT.make d) acc
+                              ) acc (class_of t2)
+                         ) acc (class_of t1)
+                         
+                   | _ -> acc
+               end
+           | _ -> acc
+        ) acc la
+      *)
 
     (* deduction de nouvelles dis/egalites *)
     let new_equalities env eqs la class_of = 
