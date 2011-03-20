@@ -23,8 +23,6 @@ module type S = sig
   val empty :  t
   val add : t -> Term.t -> t * Literal.LT.t list
 
-  val add_semantic : t -> R.r -> t 
-
   val mem : t -> Term.t -> bool
 
   val find : t -> Term.t -> R.r * Explanation.t
