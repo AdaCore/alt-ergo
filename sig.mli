@@ -33,7 +33,12 @@ module type RELATION = sig
     t -> r sem_atom_ex list -> Explanation.t -> t * r sem_atom_ex list
 
   val instantiate :
-    t -> r sem_atom list -> (Term.t -> Term.t list) -> t * Literal.LT.t list
+    t -> 
+    (Term.t -> Term.t -> answer) -> 
+    (Term.t -> Term.t -> answer) -> 
+    (Term.t -> Term.t list)      ->
+    r sem_atom list ->  
+    t * Literal.LT.t list
 
   val query : r sem_atom -> t -> Explanation.t -> answer
 

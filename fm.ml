@@ -865,6 +865,6 @@ module Make
    
   let add env _ = env
 
-  let instantiate env _ _ = env, []
+  let instantiate env _ _ _ _ = env, []
 
 end

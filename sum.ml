@@ -259,7 +259,7 @@ module Make(X : ALIEN) = struct
       | Alien r, Some hss -> if MX.mem r env then env else MX.add r hss env
       | _ -> env
 
-    let instantiate env _ _ = env, []
+    let instantiate env _ _ _ _ = env, []
 
   end
 end

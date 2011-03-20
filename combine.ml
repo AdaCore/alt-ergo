@@ -385,12 +385,12 @@ struct
       let env5, seq5 = X5.Rel.assume env.r5 sa expl in
       {r1=env1; r2=env2; r3=env3; r4=env4; r5=env5}, seq1@seq2@seq3@seq4@seq5
 
-    let instantiate env sa class_of = 
-      let env1, seq1 = X1.Rel.instantiate env.r1 sa class_of in
-      let env2, seq2 = X2.Rel.instantiate env.r2 sa class_of in
-      let env3, seq3 = X3.Rel.instantiate env.r3 sa class_of in
-      let env4, seq4 = X4.Rel.instantiate env.r4 sa class_of in 
-      let env5, seq5 = X5.Rel.instantiate env.r5 sa class_of in 
+    let instantiate env are_eq are_dist class_of sa = 
+      let env1, seq1 = X1.Rel.instantiate env.r1 are_eq are_dist class_of sa in
+      let env2, seq2 = X2.Rel.instantiate env.r2 are_eq are_dist class_of sa in
+      let env3, seq3 = X3.Rel.instantiate env.r3 are_eq are_dist class_of sa in
+      let env4, seq4 = X4.Rel.instantiate env.r4 are_eq are_dist class_of sa in
+      let env5, seq5 = X5.Rel.instantiate env.r5 are_eq are_dist class_of sa in 
       {r1=env1; r2=env2; r3=env3; r4=env4; r5=env5}, seq1@seq2@seq3@seq4@seq5
 	
     let query a env expl = 
