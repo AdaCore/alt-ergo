@@ -45,8 +45,10 @@ type output = Unsat of Explanation.t | Inconsistent | Sat | Unknown
 
 let check_produced_proof dep =
   if verbose then 
-    fprintf fmt "checking the proof:@.-------------------@.%a@;" 
+    fprintf fmt "checking the proof:\n-------------------\n%a@." 
       Explanation.print_proof dep;
+
+  if dep = Explanation.everything then () else
   try
     let env =
       (Formula.Set.fold
