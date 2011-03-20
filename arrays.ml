@@ -54,7 +54,6 @@ module Make(X : ALIEN) = struct
   let solve _ _    = assert false
 
 
-  (* == La partie Relation de Arrays =====================================*)
   module Rel = struct
     type r = X.r
     module LR = Literal.Make(struct type t = X.r include X end)
@@ -70,28 +69,7 @@ module Make(X : ALIEN) = struct
 
     (* ce module fournit une fonction de comparaison pour A.Eq et A.Neq 
        encodant la symetrie *)
-    module Argu = struct
-      type t = r A.view
-
-      let compare a1 a2 = 
-        match a1, a2 with
-          | A.Eq(r1,r2) , A.Eq(s1,s2)  -> 
-              let r1,r2 = if X.compare r1 r2 > 0 then r1,r2 else r2,r1 in
-              let s1,s2 = if X.compare s1 s2 > 0 then s1,s2 else s2,s1 in
-              let c = X.compare r1 s1 in
-              if c = 0 then X.compare r2 s2 else c
-
-          | A.Distinct[r1;r2], A.Distinct[s1;s2] -> 
-              let r1,r2 = if X.compare r1 r2 > 0 then r1,r2 else r2,r1 in
-              let s1,s2 = if X.compare s1 s2 > 0 then s1,s2 else s2,s1 in
-              let c = X.compare r1 s1 in
-              if c = 0 then X.compare r2 s2 else c
-          | A.Eq _      , A.Distinct _      -> 1 
-          | A.Distinct _     , A.Eq _       -> -1
-          | A.Builtin _ , _            -> assert false
-          | _           , A.Builtin _  -> assert false
-          | _ -> assert false (* XXX *)
-    end
+    module Argu = LR 
       
     (* ensemble d'egalites/disegalites sur des atomes semantiques *)
     module Aset= Set.Make(Argu)
@@ -133,6 +111,16 @@ module Make(X : ALIEN) = struct
          seen  : T.Set.t TM.t    (* combinaisons (get,set) deja splitees *) }
           
 
+    let empty _ = 
+      {gets  = G.empty;
+       tbset = TBS.empty;
+       split = Aset.empty;
+       sps   = Aset.empty;
+       csq   = Amap.empty;
+       seen  = TM.empty
+      }
+
+
     module Debug = struct
 
       let assume fmt la = 
@@ -144,7 +132,7 @@ module Make(X : ALIEN) = struct
       let print_gets fmt = G.iter (fun t -> fprintf fmt "%a@." T.print t.g)
       let print_sets fmt = S.iter (fun t -> fprintf fmt "%a@." T.print t.s)
       let print_splits fmt = 
-        Aset.iter (fun a -> fprintf fmt "%a@." LR.print (LR.make a))
+        Aset.iter (fun a -> fprintf fmt "%a@." LR.print a)
       let print_tbs fmt = 
         TBS.iter (fun k v -> fprintf fmt "%a --> %a@." T.print k print_sets v)
 
@@ -253,9 +241,9 @@ module Make(X : ALIEN) = struct
                    let xi, _ = X.make gi in
                    let xj, _ = X.make si in
                    let get_stab  = T.make (Sy.Op Sy.Get) [stab;gi] gty in
-                   let i_j       = A.Eq(xi,xj) in
+                   let i_j       = LR.make (A.Eq(xi,xj)) in
                    let i_j_ded   = A.LT.make (A.Eq(get,sv)) in
-                   let i_n_j     = A.Distinct[xi;xj] in
+                   let i_n_j     = LR.make (A.Distinct[xi;xj]) in
                    let i_n_j_ded = A.LT.make (A.Eq(get,get_stab)) in
                    update_env env acc xi xj i_j i_j_ded i_n_j i_n_j_ded
                | _ -> (env,acc)
@@ -280,9 +268,9 @@ module Make(X : ALIEN) = struct
                let xj, _ = X.make si in
                let get_stab  = T.make (Sy.Op Sy.Get) [stab;gi] gty in
                let gt_of_st  = T.make (Sy.Op Sy.Get) [set;gi] gty in
-               let i_j       = A.Eq(xi,xj) in
+               let i_j       = LR.make (A.Eq(xi,xj)) in
                let i_j_ded   = A.LT.make (A.Eq(gt_of_st,sv)) in
-               let i_n_j     = A.Distinct[xi;xj] in
+               let i_n_j     = LR.make (A.Distinct[xi;xj]) in
                let i_n_j_ded = A.LT.make (A.Eq(gt_of_st,get_stab)) in
                update_env env acc xi xj i_j i_j_ded i_n_j i_n_j_ded
              end
@@ -329,8 +317,9 @@ module Make(X : ALIEN) = struct
       let assu, sp, eqs = 
         L.fold_left
           (fun (assu,sp,eqs) a ->
+             let a = LR.make a in
              Aset.add a assu, 
-             Aset.remove (LR.view (LR.neg (LR.make a))) (Aset.remove a sp),
+             Aset.remove (LR.neg a) (Aset.remove a sp),
              A.LT.Set.union (Amap.find a env.csq) eqs
           ) (env.sps, env.split, eqs) la
       in
@@ -352,22 +341,13 @@ module Make(X : ALIEN) = struct
       try
         let a = Aset.choose env.split in
         if debug_arrays then 
-          fprintf fmt "[Arrays.case-split] %a@." LR.print(LR.make a);
+          fprintf fmt "[Arrays.case-split] %a@." LR.print a;
 	(* Taille du case split est tjs 2 : a ou (not a) *)
-        [(a, None), (Num.Int 2)]
+        [(LR.view a, None), (Num.Int 2)]
       with Not_found ->
         if debug_arrays then fprintf fmt "[Arrays.case-split] Nothing@.";
         []
           
-    let empty _ = 
-      {gets  = G.empty;
-       tbset = TBS.empty;
-       split = Aset.empty;
-       sps   = Aset.empty;
-       csq   = Amap.empty;
-       seen  = TM.empty
-      }
-
     let assume env _ _ = env, []
     let query a _ _ = Sig.No
     let add env r = env
