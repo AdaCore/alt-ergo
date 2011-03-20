@@ -43,31 +43,6 @@ end
 
 type output = Unsat of Explanation.t | Inconsistent | Sat | Unknown
 
-let print_status d s steps =
-  let satmode = !smtfile or !smt2file or !satmode in 
-  match s with
-    | Unsat dep -> 
-	if not satmode then Loc.report d.st_loc;
-	if satmode then printf "@{<C.F_Red>unsat@}@." 
-	else printf "@{<C.F_Green>Valid@} (%2.4f) (%Ld)@." (Time.get()) steps;
-	if proof then printf "Proof:\n%a@." Explanation.print_proof dep
-	  
-    | Inconsistent ->
-	if not satmode then 
-	  (Loc.report d.st_loc; 
-	   fprintf fmt "Inconsistent assumption@.")
-	else printf "unsat@."
-	  
-    | Unknown ->
-	if not satmode then
-	  (Loc.report d.st_loc; printf "I don't know.@.")
-	else printf "unknown@."
-	  
-    | Sat  -> 
-	if not satmode then Loc.report d.st_loc;
-	if satmode then printf "unknown (sat)@." 
-	else printf "I don't know@."
-
 let check_produced_proof dep =
   if verbose then 
     fprintf fmt "checking the proof:@.-------------------@.%a@;" 
@@ -85,7 +60,7 @@ let check_produced_proof dep =
     | (Sat.Sat _ | Sat.I_dont_know) as e -> raise e
 
 
-let process_decl (env, consistent, dep) d =
+let process_decl print_status (env, consistent, dep) d =
   try
     match d.st_decl with
       | Assume(f,mf) -> 
@@ -171,13 +146,13 @@ let pruning =
        if select > 0 then Pruning.split_and_prune select d 
        else [List.map (fun f -> f,true) d])
     
-let processing declss = 
+let processing report declss = 
   Sat.start ();
   let declss = List.map (List.map fst) declss in
   List.iter
     (List.iter 
        (fun dcl ->
 	  let cnf = Cnf.make dcl in 
-	  ignore (Queue.fold process_decl
+	  ignore (Queue.fold (process_decl report)
 		    (Sat.empty, true, Explanation.empty) cnf)
        )) (pruning declss)
