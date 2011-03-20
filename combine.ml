@@ -208,17 +208,6 @@ struct
       | _ -> assert false
 
 
-  let term_of = function
-    | X1 v   -> X1.term_of v
-    | X2 v   -> X2.term_of v
-    | X3 v   -> X3.term_of v
-    | X4 v   -> X4.term_of v
-    | X5 v   -> X5.term_of v
-    | Ac v   -> AC.term_of v
-    | Term t -> t
-  
-
-
   let color ac = 
     match ac.Sig.l with
       | [] -> assert false

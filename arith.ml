@@ -203,26 +203,6 @@ module Make
     let p, ctx = mke (Int 1) (empty_polynome ty) t [] in
     is_mine (arith_to_ac p), ctx
 
-      
-
-  let term_of_aux ty cst_of l c0 = 
-    List.fold_left
-      (fun t (c,r) ->
-        let tc = cst_of (string_of_num c) in
-        let tr = X.term_of r in
-        let tc_tr = T.make (Sy.Op Sy.Mult) [tc;tr] ty in
-        T.make (Sy.Op Sy.Plus) [tc_tr;t] ty
-      )(cst_of (string_of_num c0)) l
-    
-
-  let term_of p = 
-    let l, c = P.to_list p in
-    match P.type_info p with
-      | Ty.Tint  -> term_of_aux Ty.Tint T.int l c 
-      | Ty.Treal -> term_of_aux Ty.Treal T.real l c 
-      | _     -> assert false
-        
-
   let rec expand p n acc =
     assert (n >=0);
     if n = 0 then acc else expand p (n-1) (p::acc)

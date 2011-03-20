@@ -66,8 +66,6 @@ module type THEORY = sig
   (** Give a representant of a term of the theory*)
   val make : Term.t -> r * Literal.LT.t list
 
-  val term_of : t -> Term.t
-
   val color : (r ac) -> r
   
   val type_info : t -> Ty.t
@@ -115,8 +113,6 @@ module type X = sig
 
   val make : Term.t -> r * Literal.LT.t list
   
-  val term_of : r -> Term.t
-
   val type_info : r -> Ty.t
   
   val compare : r -> r -> int

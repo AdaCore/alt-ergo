@@ -51,7 +51,6 @@ module Make(X : ALIEN) = struct
   let leaves _       = assert false
   let subst _ _ _    = assert false 
   let make _         = assert false
-  let term_of my_v   = assert false
   let solve _ _    = assert false
 
 
