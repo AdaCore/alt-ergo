@@ -210,14 +210,13 @@ module Make (X : Sig.X) = struct
 	 (* TODO ajouter les égalités dans Use avec les explications*)
          match ra with
            | Literal.Eq(r1,r2) -> 
-	       let env = { env with uf =
-                   Uf.add_semantic (Uf.add_semantic env.uf r1) r2 } in
-               let r1,_ = Uf.find_r env.uf r1 in
+	       let r1,_ = Uf.find_r env.uf r1 in
 	       let r2,_ = Uf.find_r env.uf r2 in
 	       let st_r1, sa_r1 = Use.find r1 env.use in
 	       let st_r2, sa_r2 = Use.find r2 env.use in
 	       let sa_r1', sa_r2' = match a with 
-	         | Some a -> SetA.remove (a,ex) sa_r1, SetA.remove (a,ex) sa_r2 
+	         | Some a -> 
+                     SetA.remove (a,ex) sa_r1, SetA.remove (a,ex) sa_r2 
 	         | None -> sa_r1, sa_r2
 	       in
 	       let use =  Use.add r1 (st_r1, sa_r1') env.use in
@@ -370,15 +369,7 @@ if Options.nocontracongru then env
   let assume_r env ra dep =
     match ra with
       | Literal.Eq(r1, r2) ->
-          
-          (* XXX: Hack (arrays); pour passer l'égalité à la relation meme si 
-             elle est triviale. Peut etre utilisée pour le case_split 
-             de arith ? *)
           let env = replay_atom_r env [ra, None, dep] dep in
-          (* XXX fin *)
-	  
-          let env = {env with uf =
-              Uf.add_semantic (Uf.add_semantic env.uf r1) r2} in
           close_up_r r1 r2 dep env
       | Literal.Distinct lr ->
 	  let env = {env with uf = Uf.distinct env.uf lr dep} in

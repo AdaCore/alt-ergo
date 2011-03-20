@@ -27,7 +27,6 @@ module type S = sig
 
   val empty :  t
   val add : t -> Term.t -> t * Literal.LT.t list
-  val add_semantic : t -> R.r -> t 
 
   val mem : t -> Term.t -> bool
 
@@ -342,17 +341,16 @@ module Make ( R : Sig.X ) = struct
     let find_or_canon env r =
       try MapR.find r env.repr with Not_found -> canon env r
 
-    (* A revoir *)
-    let add_sm env r rr dep = 
-      if debug_uf then 
-        fprintf fmt "add_sm:  %a --> %a@." R.print r R.print rr;
-      if MapR.mem r env.repr then env 
-      else 
+    let init_leaf env p = 
+      if MapR.mem p env.repr then env 
+      else begin
+        if debug_uf then fprintf fmt "init_leaf: %a@." R.print p;
 	{ env with
-	  repr    = MapR.add r (rr, dep) env.repr;
-	  classes = update_classes r rr env.classes;
-	  gamma   = add_to_gamma r rr env.gamma ;
-	  neqs    = update_neqs r rr dep env } 
+	    repr    = MapR.add p (p, Ex.empty) env.repr;
+	    classes = update_classes p p env.classes;
+	    gamma   = add_to_gamma p p env.gamma ;
+	    neqs    = update_neqs p p Ex.empty env } 
+      end
           
     let init_term env t = 
       let mkr, ctx = R.make t in
@@ -460,7 +458,7 @@ module Make ( R : Sig.X ) = struct
 	  ) env.repr (env, tch)
 	  
     let apply_sigma eqs env tch ((p, v, dep) as sigma) = 
-      let env = add_sm env p p Ex.empty in
+      let env = init_leaf env p in
       let env = apply_sigma_ac eqs env sigma in
       let env, touched = apply_sigma_uf env sigma in 
       up_uf_rs dep env ((p, touched, v) :: tch)
@@ -469,12 +467,6 @@ module Make ( R : Sig.X ) = struct
     
   let add env t = 
     if MapT.mem t env.make then env, [] else Env.init_term env t
-
-  let add_semantic env r =
-    if MapR.mem r env.repr then env 
-    else 
-      let rr, ex = Env.canon env r in
-      Env.add_sm (*Ex.everything*) env r rr ex
 
   let ac_solve eqs dep (env, tch) (p, v) = 
     if debug_uf then 
