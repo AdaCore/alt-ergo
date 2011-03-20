@@ -101,8 +101,6 @@ module Make(X : ALIEN) = struct
         is_mine (Cons(hs,ty)), []
     | _ -> assert false
         
-  let term_of my_v = assert false
-
   let solve a b = 
     match embed a, embed b with
       | Cons(c1,_) , Cons(c2,_) when Hs.equal c1 c2 -> []

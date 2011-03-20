@@ -32,9 +32,6 @@ module type S = sig
   (* builds an embeded semantic value from an AC term *)
   val make : Term.t -> r * Literal.LT.t list
     
-  (* builds a term from a semantic value owned by AC *)
-  val term_of : t -> Term.t
-
   (* tells whether the given term is AC*)
   val is_mine_symb : Sy.t -> bool
 
@@ -109,16 +106,6 @@ module Make (X : Sig.X) = struct
 	  X.ac_embed {h=sy; l=compact (fold_flatten sy xmake xs); t=ty}, !ctx
       | _ -> assert false  
 
-  let term_of {l=l;h=h;t=ty} = 
-    let l = expand l in
-    let rec f_aux = function 
-      | []    -> assert false
-      | [r]   -> X.term_of r
-      | r1::l -> Term.make h [ f_aux l; X.term_of r1 ] ty
-    in
-    f_aux l
-    
-    
   let is_mine_symb = Sy.is_ac
 
   let type_info {t=ty} = ty

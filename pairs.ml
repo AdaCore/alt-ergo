@@ -137,8 +137,6 @@ module Make (X : ALIEN) = struct
     let r, ctx = make_rec t [] in
     is_mine r, ctx
 
-  let term_of my_v = assert false
-
   let color _ = assert false
     
   let embed r = 
