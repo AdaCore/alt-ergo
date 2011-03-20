@@ -210,5 +210,5 @@ let goal_directed = !goal_directed
 let bouclage = ! bouclage
 let max_split = !max_split
 let rewriting = !rewriting
-let proof = !proof || true
-let debug_proof = !debug_proof || true
+let proof = !proof
+let debug_proof = !debug_proof
