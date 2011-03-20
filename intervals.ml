@@ -133,6 +133,10 @@ let point b ty e = {
   expl = Explanation.empty
 }
 
+let explain_borne = function
+  | Large (_, e) | Strict (_, e) -> e
+  | _ -> Explanation.empty
+
 let borne_of k e n = if k then Large (n, e) else Strict (n, e)
 
 let is_point { ints = l; expl = e } =
@@ -191,12 +195,21 @@ let neg_borne_strict b1 =
 let zero_borne b1 = 
   compare_bornes b1 (borne_of true Explanation.empty (Int 0)) = 0
 
-let contains_0 {ints=l} =
+exception Found of Sig.answer
+
+let doesnt_contain_0 {ints=l} =
   try
-    List.iter 
-      (fun (l, u) -> if neg_borne l && pos_borne u then raise Exit) l; 
-    false
-  with Exit -> true
+    ignore (List.fold_left
+	      (fun old_u (l, u) -> 
+		if neg_borne l && pos_borne u then raise (Found Sig.No);
+		if neg_borne_strict old_u && pos_borne_strict l then 
+		  raise (Found 
+			   (Sig.Yes 
+			      (Explanation.union 
+				 (explain_borne old_u) (explain_borne l))));
+		u) Minfty l);
+    assert false
+  with Found ans -> ans
 
 let is_strict_smaller i1 i2 =
   match i1, i2 with
@@ -365,12 +378,21 @@ let rec power_borne_sup p b =
     | 1 -> b
     | p -> mult_borne_sup b (power_borne_sup (p-1) b)
 
+let max_merge b1 b2 =
+  let ex = Explanation.union (explain_borne b1) (explain_borne b2) in
+  let max = max_borne b1 b2 in
+  match max with
+    | Minfty | Pinfty -> max
+    | Large (v, e) -> Large (v, ex)
+    | Strict (v, e) -> Strict (v, ex)
+
 let power_bornes p (b1,b2) =
   if neg_borne b1 && pos_borne b2 then
     match p with
       | 0 -> assert false
-      | p when p mod 2 = 0 -> 
-	  let m = max_borne (power_borne_sup p b1) (power_borne_sup p b2) in
+      | p when p mod 2 = 0 ->
+	  (* max_merge to have explanations !!! *)
+	  let m = max_merge (power_borne_sup p b1) (power_borne_sup p b2) in
 	  (Large (Int 0, Explanation.empty), m)
       | _ -> (power_borne_inf p b1, power_borne_sup p b2)
   else if pos_borne b1 && pos_borne b2 then
@@ -491,10 +513,6 @@ let build_relevant_bexpl be bexpl =
       SB.add b acc') bexpl SB.empty
   ) be SB.empty
 *)
-
-let explain_borne = function
-  | Large (_, e) | Strict (_, e) -> e
-  | _ -> Explanation.empty
 
 let intersect ({ints=l1; expl=e1; is_int=is_int} as uints1) {ints=l2; expl=e2} =
   let rec step (l1,l2) acc expl =
@@ -748,29 +766,30 @@ let borne_inf = function
   | _ -> invalid_arg "Intervals.borne_inf : No finite lower bound"
 
 
-let inv_borne_inf b is_int =
+
+let inv_borne_inf b is_int ~other =
   match b with
     | Pinfty -> assert false
     | Minfty ->
-      if is_int then Large (Int 0, Explanation.empty) 
-      else Strict (Int 0, Explanation.empty)
+      if is_int then Large (Int 0,  explain_borne other) 
+      else Strict (Int 0, explain_borne other)
     | Strict (Int 0, e) | Large (Int 0, e) -> Pinfty
     | Strict (v, e) -> Strict (Int 1 // v, e)
     | Large (v, e) -> Large (Int 1 // v, e)
 
-let inv_borne_sup b is_int =
+let inv_borne_sup b is_int ~other =
   match b with
     | Minfty -> assert false
     | Pinfty ->
-      if is_int then Large (Int 0, Explanation.empty)
-      else Strict (Int 0, Explanation.empty)
+      if is_int then Large (Int 0, explain_borne other)
+      else Strict (Int 0, explain_borne other)
     | Strict (Int 0, e) | Large (Int 0, e) -> Minfty
     | Strict (v, e) -> Strict (Int 1 // v, e)
     | Large (v, e) -> Large (Int 1 // v, e)
 
 let inv_bornes (l, u) is_int =
-  inv_borne_sup u is_int, inv_borne_inf l is_int
-  
+  inv_borne_sup u is_int ~other:l, inv_borne_inf l is_int ~other:u
+
 
 let inv ({ints=l; is_int=is_int} as u) =
   try

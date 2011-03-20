@@ -26,7 +26,7 @@ val undefined : Ty.t -> t
 
 val point : num -> Ty.t -> Explanation.t -> t
 
-val contains_0 : t -> bool
+val doesnt_contain_0 : t -> Sig.answer
 
 val is_strict_smaller : t -> t -> bool
 

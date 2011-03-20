@@ -240,11 +240,13 @@ module Make
 		  let (pb', cb, db) as npb = P.normal_form_pos pb in
 		  let env, ia = init_alien expl pa npa ty use_x env in
 		  let env, ib = init_alien expl pb npb ty use_x env in
-		  let ia, ib = 
-		    if not (Intervals.contains_0 ib) 
-		      && Num.compare_num ca cb = 0 && P.compare pa' pb' = 0 then
+		  let ia, ib = match Intervals.doesnt_contain_0 ib with
+		    | Yes ex when Num.compare_num ca cb = 0 
+			       && P.compare pa' pb' = 0 ->
+		      let expl = Explanation.union ex expl in
 		      Intervals.point da ty expl, Intervals.point db ty expl
-		    else ia, ib in
+		    | _ -> ia, ib
+		  in
 		  Intervals.div ia ib, env
 		| _ -> Intervals.undefined ty, env
 	    end
