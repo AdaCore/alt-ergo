@@ -208,4 +208,4 @@ let goal_directed = !goal_directed
 let bouclage = ! bouclage
 let max_split = !max_split
 let rewriting = !rewriting
-let proof = !proof
+let proof = !proof || true 

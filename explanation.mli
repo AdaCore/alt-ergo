@@ -38,3 +38,5 @@ val print : Format.formatter -> t -> unit
 val print_proof : Format.formatter -> t -> unit
 
 val ids_of : t -> int list option
+
+val formulas_of : t -> Formula.Set.t
