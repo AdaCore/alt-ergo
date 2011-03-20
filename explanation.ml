@@ -72,7 +72,6 @@ let print fmt = function
 	| BJ f -> Format.fprintf fmt "{BJ:%a}" Formula.print f) s;
       Format.fprintf fmt "]"
 
-(*
 let print_proof fmt = function
   | None -> Format.fprintf fmt "{Everything}"
   | Some s -> 
@@ -80,16 +79,6 @@ let print_proof fmt = function
 	| (Dep f | BJ f) -> Format.fprintf fmt "  %a@." Formula.print f
 	(* | BJ f  -> Format.fprintf fmt "  %a@." Formula.print f *)
       ) s
-*)
-let print_proof fmt = function
-  | None -> Format.fprintf fmt "{Everything}"
-  | Some s -> 
-      ES.iter 
-        (fun e -> match e with 
-	   | (Dep f | BJ f) -> Format.fprintf fmt "  %a and@." Formula.print f
-	       (* | BJ f  -> Format.fprintf fmt "  %a@." Formula.print f *)
-        ) s;
-      Format.fprintf fmt "  true ->@.  false@."
 
 let ids_of = function
   | None -> None
@@ -100,8 +89,9 @@ let ids_of = function
       id::acc) s [])
 
 let formulas_of = function
-  | None -> Formula.Set.empty
+  | None  -> Formula.Set.empty
   | Some s -> 
-      ES.fold
-        (fun e acc -> match e with (Dep f | BJ f) -> Formula.Set.add f acc)
-        s Formula.Set.empty
+      ES.fold (fun e acc -> 
+                 match e with 
+	             Dep f | BJ f -> Formula.Set.add f acc
+              )s Formula.Set.empty

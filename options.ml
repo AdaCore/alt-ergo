@@ -72,6 +72,7 @@ let types = ref false
 let all_models = ref false
 let goal_directed = ref false
 let proof = ref false
+let debug_proof = ref false
 let max_split = ref (Num.Int 1000000)
 
 let show_version () = Format.printf "Alt-Ergo %s@." Version.version; exit 0
@@ -131,6 +132,7 @@ let spec = [
   "-term-like-pp", Arg.Set term_like_pp, "Output semantic values as terms";
   "-all-models", Arg.Set all_models, "experimental support for model";
   "-proof", Arg.Set proof, "experimental support for succint proof";
+  "-debug-proof", Arg.Set debug_proof, "experimental support for succint proof";
   "-goal-directed", Arg.Set goal_directed,
   " instantiate lemmas only with the terms from the goal";
   "-bouclage", Arg.Set_int bouclage,
@@ -208,4 +210,5 @@ let goal_directed = !goal_directed
 let bouclage = ! bouclage
 let max_split = !max_split
 let rewriting = !rewriting
-let proof = !proof || true 
+let proof = !proof || true
+let debug_proof = !debug_proof || true

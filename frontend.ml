@@ -43,28 +43,49 @@ end
 
 type output = Unsat of Explanation.t | Inconsistent | Sat | Unknown
 
-let check_dependencies dep = 
+let print_status d s steps =
+  let satmode = !smtfile or !smt2file or !satmode in 
+  match s with
+    | Unsat dep -> 
+	if not satmode then Loc.report d.st_loc;
+	if satmode then printf "@{<C.F_Red>unsat@}@." 
+	else printf "@{<C.F_Green>Valid@} (%2.4f) (%Ld)@." (Time.get()) steps;
+	if proof then printf "Proof:\n%a@." Explanation.print_proof dep
+	  
+    | Inconsistent ->
+	if not satmode then 
+	  (Loc.report d.st_loc; 
+	   fprintf fmt "Inconsistent assumption@.")
+	else printf "unsat@."
+	  
+    | Unknown ->
+	if not satmode then
+	  (Loc.report d.st_loc; printf "I don't know.@.")
+	else printf "unknown@."
+	  
+    | Sat  -> 
+	if not satmode then Loc.report d.st_loc;
+	if satmode then printf "unknown (sat)@." 
+	else printf "I don't know@."
+
+let check_produced_proof dep =
   if verbose then 
     fprintf fmt "checking the proof:@.-------------------@.%a@;" 
       Explanation.print_proof dep;
   try
-    let _ = 
-      Formula.Set.fold
-        (fun f env -> 
-           Sat.assume env {Sat.f=f;age=0;name=None;mf=false;gf=false}
-        )(Explanation.formulas_of dep) Sat.empty
-    in 
-    if verbose then fprintf fmt "check_dependencies: PB@.";
-    assert false
+    let env =
+      (Formula.Set.fold
+         (fun f env -> 
+            Sat.assume env {Sat.f=f;age=0;name=None;mf=false;gf=false}
+         )(Explanation.formulas_of dep) Sat.empty)
+    in
+    raise (Sat.Sat env)
   with 
-    | Sat.Unsat _ -> 
-        if verbose then fprintf fmt "check_dependencies: OK@.";
-        ()
-    | _ -> 
-        if verbose then fprintf fmt "check_dependencies: PB@.";
-        assert false
-          
-let process_decl report (env, consistent, dep) d =
+    | Sat.Unsat _  -> ()
+    | (Sat.Sat _ | Sat.I_dont_know) as e -> raise e
+
+
+let process_decl (env, consistent, dep) d =
   try
     match d.st_decl with
       | Assume(f,mf) -> 
@@ -82,21 +103,22 @@ let process_decl report (env, consistent, dep) d =
 	      let dep' = Sat.unsat env 
 		{Sat.f=f;age=0;name=None;mf=true;gf=true} stopb in
 	      Explanation.union dep' dep
-	    else dep 
+	    else dep
           in
-          check_dependencies dep;
-	  report d (Unsat dep) (Sat.stop ());
+          if debug_proof then check_produced_proof dep;
+	  print_status d (Unsat dep) (Sat.stop ());
 	  env, consistent, dep
-
   with 
     | Sat.Sat _ -> 
-	report d Sat (Sat.stop ());
+	print_status d Sat (Sat.stop ());
 	env , consistent, dep
     | Sat.Unsat dep' -> 
-	report d Inconsistent (Sat.stop ());
-	env , false, Explanation.union dep' dep
+        let dep = Explanation.union dep dep' in
+        if debug_proof then check_produced_proof dep;
+	print_status d Inconsistent (Sat.stop ());
+	env , false, dep
     | Sat.I_dont_know -> 
-	report d Unknown (Sat.stop ());
+	print_status d Unknown (Sat.stop ());
 	env , consistent, dep
 
 let get_smt_prelude () =
@@ -149,13 +171,13 @@ let pruning =
        if select > 0 then Pruning.split_and_prune select d 
        else [List.map (fun f -> f,true) d])
     
-let processing report declss = 
+let processing declss = 
   Sat.start ();
   let declss = List.map (List.map fst) declss in
   List.iter
     (List.iter 
        (fun dcl ->
 	  let cnf = Cnf.make dcl in 
-	  ignore (Queue.fold (process_decl report) 
+	  ignore (Queue.fold process_decl
 		    (Sat.empty, true, Explanation.empty) cnf)
        )) (pruning declss)

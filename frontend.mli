@@ -28,9 +28,7 @@ end
 type output = Unsat of Explanation.t | Inconsistent | Sat | Unknown
 
 
-
 val process_decl:
-  (sat_tdecl -> output -> int64 -> 'a) ->
   Sat.t * bool * Explanation.t -> sat_tdecl ->
   Sat.t * bool * Explanation.t
 
@@ -39,5 +37,4 @@ val open_file:
   ((int tdecl, int) annoted * Why_typing.env) list list * Smt_ast.status
 
 val processing:
-  (sat_tdecl -> output -> int64 -> 'a) -> 
   ((int tdecl, int) annoted * Why_typing.env) list list -> unit
