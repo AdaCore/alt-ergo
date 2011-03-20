@@ -106,7 +106,6 @@ module Make(X : ALIEN) = struct
         {gets  : G.t;            (* l'ensemble des "get" croises*)
          tbset : S.t TBS.t ;     (* map t |-> set(t,-,-) *)
          split : Aset.t;         (* l'ensemble des case-split possibles *)
-         sps   : Aset.t;         (* atomes (=, <>) supposes par cc(X)*)
          csq   : A.LT.Set.t Amap.t; (* consequences des splits *)
          seen  : T.Set.t TM.t    (* combinaisons (get,set) deja splitees *) }
           
@@ -115,7 +114,6 @@ module Make(X : ALIEN) = struct
       {gets  = G.empty;
        tbset = TBS.empty;
        split = Aset.empty;
-       sps   = Aset.empty;
        csq   = Amap.empty;
        seen  = TM.empty
       }
@@ -207,6 +205,11 @@ module Make(X : ALIEN) = struct
        1) i_j   => i_j_ded 
        2) i_n_j => i_n_j_ded *)
     let update_env env acc xi xj i_j i_j_ded i_n_j i_n_j_ded =
+      let sp = Aset.add i_j env.split in
+      let csq = Amap.add i_j i_j_ded env.csq in
+      let csq = Amap.add i_n_j i_n_j_ded csq in
+      { env with split = sp; csq = csq }, acc
+        (* avec sps 
       match X.equal xi xj, Aset.mem i_j env.sps, Aset.mem i_n_j env.sps with
         | true , _, _ -> env, A.LT.Set.add i_j_ded acc
             
@@ -225,7 +228,7 @@ module Make(X : ALIEN) = struct
             { env with split = sp; csq = csq }, acc
               
         | false, true,  true  -> assert false
-
+        *)
     (*----------------------------------------------------------------------
       get(set(-,-,-),-) modulo egalite
       ---------------------------------------------------------------------*)
@@ -314,16 +317,15 @@ module Make(X : ALIEN) = struct
     (* deduction de nouvelles dis/egalites *)
     let new_equalities env eqs la class_of = 
       let la = L.filter (function A.Builtin _  -> false | _ -> true) la in
-      let assu, sp, eqs = 
+      let sp, eqs = 
         L.fold_left
-          (fun (assu,sp,eqs) a ->
+          (fun (sp,eqs) a ->
              let a = LR.make a in
-             Aset.add a assu, 
              Aset.remove (LR.neg a) (Aset.remove a sp),
              A.LT.Set.union (Amap.find a env.csq) eqs
-          ) (env.sps, env.split, eqs) la
+          ) (env.split, eqs) la
       in
-      {env with sps=assu; split=sp}, extension eqs la class_of
+      {env with split=sp}, extension eqs la class_of
 
     (* instantiation des axiomes des tableaux *)
     let instantiate env la class_of =
