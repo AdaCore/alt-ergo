@@ -367,31 +367,22 @@ module Make ( R : Sig.X ) = struct
 	  else MapR.add rp MapL.empty env.neqs}, ctx
 
 
-    let add_cp eqs env (x, y, dep) = 
-      let rx, ex_rx = find_or_canon env x in
-      let ry, ex_ry = find_or_canon env y in
-      let ex = Ex.union dep (Ex.union ex_rx ex_ry) in
-      if R.equal rx ry then env
-      else 
-	let env = add_sm env rx rx Ex.empty in
-	let env = add_sm env ry ry Ex.empty in
-        if debug_ac then
-          fprintf fmt "[uf] critical pair: %a = %a@." R.print rx R.print ry;
-        Queue.push (rx, ry, ex) eqs;
-        env
-
     let head_cp eqs env (({h=h} as ac), v, dep) = 
-      try 
-        SetRL.fold
-	  (fun (g, d, dep_rl) env ->
-	    match disjoint_union ac.l g.l with
-	      | _  , [] , _  -> env
-	      | l1 , cm , l2 -> 
-		let x = {ac with l = Ac.add h (d,1) l1} in
-		let y = {g  with l = Ac.add h (v,1) l2} in
-		add_cp eqs env (R.color x, R.color y, Ex.union dep dep_rl)
-	  )(RS.find h env.ac_rs) env
-      with Not_found -> env
+      if RS.mem h env.ac_rs then
+        SetRL.iter
+	  (fun (g, d, dep_rl) ->
+	     match disjoint_union ac.l g.l with
+	       | _  , [] , _  -> ()
+	       | l1 , cm , l2 -> 
+		   let rx = R.color {ac with l = Ac.add h (d,1) l1} in
+		   let ry = R.color {g  with l = Ac.add h (v,1) l2} in
+                   if debug_uf then
+                     fprintf fmt "[uf] critical pair: %a = %a@." 
+                       R.print rx R.print ry;
+                   if not (R.equal rx ry) then 
+                     Queue.push (rx, ry, Ex.union dep dep_rl) eqs
+	  )(RS.find h env.ac_rs)
+
 	
     let comp_collapse eqs env (p, v, dep) = 
       RS.fold
@@ -402,19 +393,17 @@ module Make ( R : Sig.X ) = struct
 	      let gx = R.color g in
 	      let g2, ex_g2 = canon env (Ac.subst p v g) in
 	      let d2, ex_d2 = canon env (R.subst p v d) in
-	      if R.equal g2 gx then 
-		(* compose *)
+	      if R.equal g2 gx then (* compose *)
                 let ex = Ex.union ex_d2 (Ex.union dep_rl dep) in
 	        {env with ac_rs = RS.add_rule (g,d2, ex) env.ac_rs}
-	      else 
-		(* collapse *)
-	        let env = add_sm env g2 g2 Ex.empty in
-	        let env = add_sm env d2 d2 Ex.empty in
-                if debug_ac then
-                  fprintf fmt "[uf] collapse: %a = %a@." R.print g2 R.print d2;
-                let ex = Ex.union (Ex.union ex_g2 ex_d2) (Ex.union dep_rl dep) in
-                Queue.push (g2, d2, ex) eqs;
-	        env
+	      else (* collapse *)
+                begin
+                  if debug_ac then
+                    fprintf fmt "[uf] collapse: %a = %a@." R.print g2 R.print d2;
+                  let ex = Ex.union (Ex.union ex_g2 ex_d2) (Ex.union dep_rl dep) in
+                  Queue.push (g2, d2, ex) eqs;
+	          env
+                end
 	    ) rls env
 	) env.ac_rs env
 	
@@ -426,7 +415,8 @@ module Make ( R : Sig.X ) = struct
 	| Some r -> 
 	    let env = {env with ac_rs = RS.add_rule (r, v, dep) env.ac_rs} in
 	    let env = comp_collapse eqs env sigma in
-	    head_cp eqs env (r, v, dep)
+	    head_cp eqs env (r, v, dep);
+            env
 	    
     let apply_sigma_uf env (p, v, dep) =
       assert (MapR.mem p env.gamma);
