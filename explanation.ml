@@ -32,7 +32,7 @@ let everything = None
 
 let empty = Some (ES.empty)
 
-let mem l = function
+let mem_as_bj l = function
   | None -> true
   | Some s -> ES.mem (BJ l) s
 

@@ -21,7 +21,7 @@ val everything : t
 
 val empty : t
 
-val mem : Formula.t -> t -> bool
+val mem_as_bj : Formula.t -> t -> bool
 
 val singleton : ?bj:bool -> Formula.t -> t
 

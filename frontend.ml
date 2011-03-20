@@ -54,7 +54,7 @@ let check_produced_proof dep =
       (Formula.Set.fold
          (fun f env -> 
             Sat.assume env {Sat.f=f;age=0;name=None;mf=false;gf=false}
-         )(Explanation.formulas_of dep) Sat.empty)
+         ) (Explanation.formulas_of dep) Sat.empty)
     in
     raise (Sat.Sat env)
   with 
