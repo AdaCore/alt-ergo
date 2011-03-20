@@ -827,7 +827,7 @@ module Make(X : ALIEN) = struct
 
     let case_split env = []    
     let query _ _ _ = Sig.No
-    let instantiate env _ _ = env, []
+    let instantiate env _ _ _ _ = env, []
   end
 
 end
