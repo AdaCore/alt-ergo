@@ -66,8 +66,6 @@ module Make ( R : Sig.X ) = struct
   module Lit = Literal.Make(struct type t = R.r include R end)
   module MapL = Lit.Map  
 
-  let equations = Queue.create ()
-
   module MapR = Map.Make(struct type t = R.r let compare = R.compare end)
     
   module SetR = Set.Make(struct type t = R.r let compare = R.compare end)
@@ -207,6 +205,21 @@ module Make ( R : Sig.X ) = struct
 	  let s = try MapR.find x gamma with Not_found -> SetR.empty in
 	  MapR.add x (SetR.add r s) gamma) gamma (R.leaves c)
 	
+    let is_bad_distinct env lit = 
+      match Lit.view lit with
+        | Literal.Eq _ | Literal.Builtin _ -> assert false
+        | Literal.Distinct rl ->
+            try
+              let _ = 
+                List.fold_left
+                  (fun st mk ->
+                     let r, _ = lookup_by_r mk env in
+                     if SetR.mem r st then raise Exit else SetR.add r st
+                  )SetR.empty rl
+              in 
+              false
+            with Exit -> true
+
     let update_neqs r1 r2 dep env = 
       let nq_r1 = lookup_for_neqs env r1 in
       let nq_r2 = lookup_for_neqs env r2 in
@@ -215,8 +228,10 @@ module Make ( R : Sig.X ) = struct
 	  (fun l1 ex1 mapl ->  
 	     try 
 	       let ex2 = MapL.find l1 mapl in
-	       let ex = Ex.union (Ex.union ex1 ex2) dep in (* VERIF *)
-	       raise (Inconsistent ex)
+               if is_bad_distinct env l1 then
+	         let ex = Ex.union (Ex.union ex1 ex2) dep in (* VERIF *)
+	         raise (Inconsistent ex)
+               else MapL.add l1 (Ex.union ex1 dep) mapl
 	     with Not_found -> 
 	       MapL.add l1 (Ex.union ex1 dep) mapl) 
 	  nq_r1 nq_r2
@@ -340,7 +355,7 @@ module Make ( R : Sig.X ) = struct
 	  else MapR.add rp MapL.empty env.neqs}, ctx
 
 
-    let add_cp env (x, y, dep) = 
+    let add_cp eqs env (x, y, dep) = 
       let rx, ex_rx = find_or_canon env x in
       let ry, ex_ry = find_or_canon env y in
       let ex = Ex.union dep (Ex.union ex_rx ex_ry) in
@@ -350,10 +365,10 @@ module Make ( R : Sig.X ) = struct
 	let env = add_sm env ry ry Ex.empty in
         if debug_ac then
           fprintf fmt "[uf] critical pair: %a = %a@." R.print rx R.print ry;
-        Queue.push (rx, ry, ex) equations;
+        Queue.push (rx, ry, ex) eqs;
         env
 
-    let head_cp env (({h=h} as ac), v, dep) = 
+    let head_cp eqs env (({h=h} as ac), v, dep) = 
       try 
         SetRL.fold
 	  (fun (g, d) env ->
@@ -362,11 +377,11 @@ module Make ( R : Sig.X ) = struct
 	      | l1 , cm , l2 -> 
 		let x = {ac with l = Ac.add h (d,1) l1} in
 		let y = {g  with l = Ac.add h (v,1) l2} in
-		add_cp env (R.color x, R.color y, dep)
+		add_cp eqs env (R.color x, R.color y, dep)
 	  )(RS.find h env.ac_rs) env
       with Not_found -> env
 	
-    let comp_collapse env (p, v, dep) = 
+    let comp_collapse eqs env (p, v, dep) = 
       RS.fold
 	(fun h rls env ->
           SetRL.fold
@@ -392,20 +407,20 @@ module Make ( R : Sig.X ) = struct
 	        let env = add_sm env d2 d2 Ex.empty in
                 if debug_ac then
                   fprintf fmt "[uf] collapse: %a = %a@." R.print g2 R.print d2;
-                Queue.push (g2, d2, ex) equations;
+                Queue.push (g2, d2, ex) eqs;
 	        env
 	    ) rls env
 	) env.ac_rs env
 	
     (* TODO explications: ajout de dep dans ac_rs *)
-    let apply_sigma_ac env ((p, v, dep) as sigma) = 
+    let apply_sigma_ac eqs env ((p, v, dep) as sigma) = 
       match R.ac_extract p with
 	| None -> 
-	    comp_collapse env sigma
+	    comp_collapse eqs env sigma
 	| Some r -> 
 	    let env = {env with ac_rs = RS.add_rule (r, v) env.ac_rs} in
-	    let env = comp_collapse env sigma in
-	    head_cp env (r, v, dep)
+	    let env = comp_collapse eqs env sigma in
+	    head_cp eqs env (r, v, dep)
 	    
     let apply_sigma_uf env (p, v, dep) =
       assert (MapR.mem p env.gamma);
@@ -418,7 +433,8 @@ module Make ( R : Sig.X ) = struct
 	     if R.equal rr nrr then env, touched
 	     else 
 	       let ex  = Ex.union ex dep in
-	       let env = { 
+               let env = {env with repr = MapR.add r (nrr, ex) env .repr} in
+               let env = { 
 		 env with
 		   repr = MapR.add r (nrr, ex) env .repr;
 		   classes = update_classes rr nrr env.classes;
@@ -447,9 +463,9 @@ module Make ( R : Sig.X ) = struct
                env, (r,[r, nrr, ex],nrr)::tch
 	  ) env.repr (env, tch)
 	  
-    let apply_sigma env tch ((p, v, dep) as sigma) = 
+    let apply_sigma eqs env tch ((p, v, dep) as sigma) = 
       let env = add_sm env p p Ex.empty in
-      let env = apply_sigma_ac env sigma in
+      let env = apply_sigma_ac eqs env sigma in
       let env, touched = apply_sigma_uf env sigma in 
       up_uf_rs dep env ((p, touched, v) :: tch)
 	
@@ -464,13 +480,13 @@ module Make ( R : Sig.X ) = struct
       let rr, ex = Env.canon env r in
       Env.add_sm (*Ex.everything*) env r rr ex
 
-  let ac_solve dep (env, tch) (p, v) = 
+  let ac_solve eqs dep (env, tch) (p, v) = 
     if debug_uf then 
       printf "[uf] ac-solve: %a |-> %a %a@." R.print p R.print v Ex.print dep;
     assert ( let rp, _ = Env.find_or_canon env p in R.equal p rp);
     let rv, ex_rv = Env.find_or_canon env v in
     let dep = Ex.union ex_rv dep in
-    Env.apply_sigma env tch (p, rv, dep)
+    Env.apply_sigma eqs env tch (p, rv, dep)
 
   let x_solve env r1 r2 dep = 
     let rr1, ex_r1 = Env.find_or_canon env r1 in
@@ -485,23 +501,23 @@ module Make ( R : Sig.X ) = struct
         R.solve rr1 rr2 
       end
         
-  let rec ac_x env tch = 
-    if Queue.is_empty equations then env, tch
+  let rec ac_x eqs env tch = 
+    if Queue.is_empty eqs then env, tch
     else 
-      let r1, r2, dep = Queue.pop equations in
+      let r1, r2, dep = Queue.pop eqs in
       if debug_uf then 
 	printf "[uf] ac(x): delta (%a) = delta (%a)@." 
 	  R.print r1 R.print r2;
       let sbs = x_solve env r1 r2 dep in
-      let env, tch = List.fold_left (ac_solve dep) (env, tch) sbs in
+      let env, tch = List.fold_left (ac_solve eqs dep) (env, tch) sbs in
       if debug_uf then Print.all fmt env;
-      ac_x env tch
+      ac_x eqs env tch
       
   let union env r1 r2 dep =
     try
-      Queue.clear equations;
+      let equations = Queue.create () in 
       Queue.push (r1,r2, dep) equations;
-      ac_x env []
+      ac_x equations env []
     with Unsolvable -> raise (Inconsistent dep)
 
   let rec distinct env rl dep =

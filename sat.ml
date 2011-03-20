@@ -205,7 +205,6 @@ let new_facts mode env =
 
 
 let mround predicate mode env max_size =
-  Format.eprintf "debut mround@.";
   let round mode =
     Print.mround max_size;
     let axioms = if predicate then env.definitions else env.lemmas in
@@ -224,12 +223,8 @@ let mround predicate mode env max_size =
     max_size, lf 
   in
   let max_size, lf = round (mode || Options.goal_directed) in 
-  let r = 
-    if Options.goal_directed && lf = [] then round false 
-    else max_size, lf
-  in
-  Format.eprintf "fin mround@.";
-  r
+  if Options.goal_directed && lf = [] then round false 
+  else max_size, lf
   
 
 let extract_model t = 
