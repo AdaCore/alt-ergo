@@ -43,6 +43,27 @@ end
 
 type output = Unsat of Explanation.t | Inconsistent | Sat | Unknown
 
+let check_dependencies dep = 
+  if verbose then 
+    fprintf fmt "checking the proof:@.-------------------@.%a@;" 
+      Explanation.print_proof dep;
+  try
+    let _ = 
+      Formula.Set.fold
+        (fun f env -> 
+           Sat.assume env {Sat.f=f;age=0;name=None;mf=false;gf=false}
+        )(Explanation.formulas_of dep) Sat.empty
+    in 
+    if verbose then fprintf fmt "check_dependencies: PB@.";
+    assert false
+  with 
+    | Sat.Unsat _ -> 
+        if verbose then fprintf fmt "check_dependencies: OK@.";
+        ()
+    | _ -> 
+        if verbose then fprintf fmt "check_dependencies: PB@.";
+        assert false
+          
 let process_decl report (env, consistent, dep) d =
   try
     match d.st_decl with
@@ -61,9 +82,12 @@ let process_decl report (env, consistent, dep) d =
 	      let dep' = Sat.unsat env 
 		{Sat.f=f;age=0;name=None;mf=true;gf=true} stopb in
 	      Explanation.union dep' dep
-	    else dep in
+	    else dep 
+          in
+          check_dependencies dep;
 	  report d (Unsat dep) (Sat.stop ());
 	  env, consistent, dep
+
   with 
     | Sat.Sat _ -> 
 	report d Sat (Sat.stop ());

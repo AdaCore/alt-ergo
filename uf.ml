@@ -74,18 +74,22 @@ module Make ( R : Sig.X ) = struct
 
   module SetRL = Set.Make
     (struct 
-      type t = Ac.t * R.r
-      let compare (ac1,_) (ac2,_)= Ac.compare ac1 ac2
+      type t = Ac.t * R.r * Ex.t
+      let compare (ac1,_,_) (ac2,_,_)= Ac.compare ac1 ac2
      end)
 
   module RS = struct
     include Map.Make(struct type t = Sy.t let compare = Sy.compare end)
       
-    let find k m = try find k m with Not_found -> SetRL.empty
+    let find k m = 
+      try find k m with Not_found -> SetRL.empty
 
-    let add_rule (ac,d) m = add ac.h (SetRL.add (ac,d) (find ac.h m)) m
+    let add_rule (({h=h},_,_) as rul) mp =
+      add h (SetRL.add rul (find h mp)) mp
 
-    let remove_rule (ac,d) m = add ac.h (SetRL.remove (ac,d) (find ac.h m)) m
+    let remove_rule (({h=h},_,_) as rul) mp =
+      add h (SetRL.remove rul (find h mp)) mp
+
   end
 
 
@@ -143,8 +147,10 @@ module Make ( R : Sig.X ) = struct
       RS.iter
 	(fun k srl -> 
 	  SetRL.iter
-	    (fun (ac,d)-> fprintf fmt "%a ~~> %a\n" 
-              R.print (R.ac_embed ac) R.print d)srl )s
+	    (fun (ac,d,dep)-> fprintf fmt "%a ~~> %a %a\n" 
+              R.print (R.ac_embed ac) R.print d Ex.print dep
+            )srl 
+        )s
 	
     let pclasses fmt m = 
       fprintf fmt "------------- UF: Class map --------------------------@.";
@@ -274,20 +280,25 @@ module Make ( R : Sig.X ) = struct
     let apply_rs r rls = 
       let fp = ref true in
       let r = ref r in
-      let rec apply_rule (p, v) =
+      let ex = ref Ex.empty in
+      let rec apply_rule ((p, v, dep) as rul) =
 	let c = Ac.compare !r p in
-	if c = 0 then r := {!r with l=[v, 1]}
+	if c = 0 then begin
+          r := {!r with l=[v, 1]};
+          ex := Ex.union !ex dep
+        end
 	else if c < 0 then raise Exit
 	else 
           try 
             r := {!r with l = Ac.add !r.h (v, 1) (list_minus !r.l p.l)};
+            ex := Ex.union !ex dep;
 	    fp := false;
-            apply_rule (p, v)
+            apply_rule rul
           with List_minus_exn -> ()
       in
       let rec fixpoint () = 
         (try SetRL.iter apply_rule rls with Exit -> ());
-	if !fp then !r else (fp := true; fixpoint ())
+	if !fp then !r, !ex else (fp := true; fixpoint ())
       in fixpoint()
 
     let filter_leaves r = 
@@ -306,19 +317,20 @@ module Make ( R : Sig.X ) = struct
 
     let canon_ac st env = 
       SetAc.fold
-	(fun ac z ->
-	  let rac = apply_rs ac (RS.find ac.h env.ac_rs) in
-	  if Ac.compare ac rac = 0 then z
-	  else (R.color ac, R.color rac) :: z )st []
+	(fun ac (z,ex) ->
+	  let rac, ex_ac = apply_rs ac (RS.find ac.h env.ac_rs) in
+	  if Ac.compare ac rac = 0 then z, ex
+	  else (R.color ac, R.color rac) :: z, Ex.union ex ex_ac)
+        st ([], Ex.empty)
 	
     let canon_aux rx = L.fold_left (fun r (p,v) -> R.subst p v r) rx
       
     let rec canon env r ex_r = 
       let se, sac = filter_leaves r in
       let subst, ex_subst = canon_empty se env in
-      let sac = canon_ac sac env in (* explications? *)
+      let sac, ex_ac = canon_ac sac env in (* explications? *)
       let r2 = canon_aux (canon_aux r sac) subst in
-      let ex_r2 = Ex.union ex_r ex_subst in
+      let ex_r2 = Ex.union (Ex.union ex_r ex_subst) ex_ac in
       if R.equal r r2 then r2, ex_r2 else canon env r2 ex_r2
 
     let canon env r =
@@ -371,13 +383,13 @@ module Make ( R : Sig.X ) = struct
     let head_cp eqs env (({h=h} as ac), v, dep) = 
       try 
         SetRL.fold
-	  (fun (g, d) env ->
+	  (fun (g, d, dep_rl) env ->
 	    match disjoint_union ac.l g.l with
 	      | _  , [] , _  -> env
 	      | l1 , cm , l2 -> 
 		let x = {ac with l = Ac.add h (d,1) l1} in
 		let y = {g  with l = Ac.add h (v,1) l2} in
-		add_cp eqs env (R.color x, R.color y, dep)
+		add_cp eqs env (R.color x, R.color y, Ex.union dep dep_rl)
 	  )(RS.find h env.ac_rs) env
       with Not_found -> env
 	
@@ -385,28 +397,22 @@ module Make ( R : Sig.X ) = struct
       RS.fold
 	(fun h rls env ->
           SetRL.fold
-	    (fun (g, d) env ->
-	      let env = {env with ac_rs = RS.remove_rule (g,d) env.ac_rs} in
+	    (fun ((g, d, dep_rl) as rul) env ->
+	      let env = {env with ac_rs = RS.remove_rule rul env.ac_rs} in
 	      let gx = R.color g in
-	      (* TODO : ajouter les explications dans ac_rs *)
-	      let ex_g = 
-                try snd (MapR.find gx env.repr) 
-	        with Not_found -> Ex.empty in
-	      let ex_d = 
-                try snd (MapR.find d env.repr)
-	        with Not_found -> Ex.empty in
 	      let g2, ex_g2 = canon env (Ac.subst p v g) in
 	      let d2, ex_d2 = canon env (R.subst p v d) in
-	      let ex = Ex.union (Ex.union ex_g ex_d) dep in
 	      if R.equal g2 gx then 
 		(* compose *)
-	        {env with ac_rs = RS.add_rule (g,d2) env.ac_rs}
+                let ex = Ex.union ex_d2 (Ex.union dep_rl dep) in
+	        {env with ac_rs = RS.add_rule (g,d2, ex) env.ac_rs}
 	      else 
 		(* collapse *)
 	        let env = add_sm env g2 g2 Ex.empty in
 	        let env = add_sm env d2 d2 Ex.empty in
                 if debug_ac then
                   fprintf fmt "[uf] collapse: %a = %a@." R.print g2 R.print d2;
+                let ex = Ex.union (Ex.union ex_g2 ex_d2) (Ex.union dep_rl dep) in
                 Queue.push (g2, d2, ex) eqs;
 	        env
 	    ) rls env
@@ -418,7 +424,7 @@ module Make ( R : Sig.X ) = struct
 	| None -> 
 	    comp_collapse eqs env sigma
 	| Some r -> 
-	    let env = {env with ac_rs = RS.add_rule (r, v) env.ac_rs} in
+	    let env = {env with ac_rs = RS.add_rule (r, v, dep) env.ac_rs} in
 	    let env = comp_collapse eqs env sigma in
 	    head_cp eqs env (r, v, dep)
 	    
