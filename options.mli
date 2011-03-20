@@ -68,3 +68,4 @@ val bouclage : int
 val max_split : Num.num
 val rewriting : bool
 val proof : bool
+val debug_proof : bool
