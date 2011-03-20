@@ -211,4 +211,4 @@ let bouclage = ! bouclage
 let max_split = !max_split
 let rewriting = !rewriting
 let proof = !proof
-let debug_proof = !debug_proof
+let debug_proof = !debug_proof && proof
