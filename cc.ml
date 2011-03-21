@@ -199,13 +199,12 @@ module Make (X : Sig.X) = struct
 	
   and replay_atom_r env sa dep = 
     let rel, leqs  = X.Rel.assume env.relation sa dep in
-    let sa = List.map (fun (a,r,_) -> (a,r)) sa in
     let are_eq = Uf.are_equal env.uf in
     let are_dist = Uf.are_distinct env.uf in
     let rel, atoms = 
       X.Rel.instantiate rel are_eq are_dist (Uf.class_of env.uf) sa in
     let env = play_eqset {env with relation = rel} leqs dep in
-    List.fold_left (fun env a -> assume a dep env) env atoms
+    List.fold_left (fun env (a,ex) -> assume a ex env) env atoms
 
   and play_eqset env leqs dep =
     List.fold_left

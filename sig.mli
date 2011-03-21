@@ -37,8 +37,8 @@ module type RELATION = sig
     (Term.t -> Term.t -> answer) -> 
     (Term.t -> Term.t -> answer) -> 
     (Term.t -> Term.t list)      ->
-    r sem_atom list ->  
-    t * Literal.LT.t list
+    r sem_atom_ex list ->
+    t * (Literal.LT.t * Explanation.t) list
 
   val query : r sem_atom -> t -> Explanation.t -> answer
 

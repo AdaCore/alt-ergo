@@ -56,9 +56,12 @@ module Make(X : ALIEN) = struct
 
   module Rel = struct
 
+    open Sig
+    module Ex = Explanation
+
     type r = X.r
     
-    module LitR = Literal.Make(struct type t = X.r include X end)
+    module LR = Literal.Make(struct type t = X.r include X end)
     
     (* map get |-> { set } des associations (get,set) deja splites *)
     module Tmap = struct
@@ -69,15 +72,19 @@ module Make(X : ALIEN) = struct
       let splited t a mp = try T.Set.mem a (find t mp) with Not_found -> false
     end
       
-    (* ensemble d'egalites/disegalites sur des atomes semantiques *)
-    module Aset= LitR.Set
+    module LRset= LR.Set
 
-
+    module Conseq = 
+      Set.Make
+        (struct
+           type t = A.LT.t * Ex.t
+           let compare (lt1,_) (lt2,_) = A.LT.compare lt1 lt2
+         end)
     (* map k |-> {sem Atom} d'egalites/disegalites sur des atomes semantiques*)
-    module Amap = struct
-      include LitR.Map
-      let find k mp = try find k mp with Not_found -> A.LT.Set.empty
-      let add k v mp = add k (A.LT.Set.add v (find k mp)) mp
+    module LRmap = struct
+      include LR.Map
+      let find k mp = try find k mp with Not_found -> Conseq.empty
+      let add k v ex mp = add k (Conseq.add (v,ex) (find k mp)) mp
     end
 
     (* ensemble de termes "get" avec leurs arguments et leurs types*)
@@ -101,18 +108,18 @@ module Make(X : ALIEN) = struct
     end
 
     type t = 
-        {gets  : G.t;            (* l'ensemble des "get" croises*)
-         tbset : S.t TBS.t ;     (* map t |-> set(t,-,-) *)
-         split : Aset.t;         (* l'ensemble des case-split possibles *)
-         csq   : A.LT.Set.t Amap.t; (* consequences des splits *)
-         seen  : T.Set.t Tmap.t    (* combinaisons (get,set) deja splitees *) }
+        {gets  : G.t;               (* l'ensemble des "get" croises*)
+         tbset : S.t TBS.t ;        (* map t |-> set(t,-,-) *)
+         split : LRset.t;            (* l'ensemble des case-split possibles *)
+         conseq   : Conseq.t LRmap.t; (* consequences des splits *)
+         seen  : T.Set.t Tmap.t     (* combinaisons (get,set) deja splitees *) }
           
 
     let empty _ = 
       {gets  = G.empty;
        tbset = TBS.empty;
-       split = Aset.empty;
-       csq   = Amap.empty;
+       split = LRset.empty;
+       conseq   = LRmap.empty;
        seen  = Tmap.empty}
 
     module Debug = struct
@@ -120,13 +127,14 @@ module Make(X : ALIEN) = struct
       let assume fmt la = 
         if debug_arrays && la <> [] then begin
           fprintf fmt "[Arrays.Rel] We assume@.";
-          L.iter (fun a -> fprintf fmt "  > %a@." LitR.print (LitR.make a)) la;
+          L.iter (fun (a,_,_) -> fprintf fmt "  > %a@." 
+                    LR.print (LR.make a)) la;
         end
 
       let print_gets fmt = G.iter (fun t -> fprintf fmt "%a@." T.print t.g)
       let print_sets fmt = S.iter (fun t -> fprintf fmt "%a@." T.print t.s)
       let print_splits fmt = 
-        Aset.iter (fun a -> fprintf fmt "%a@." LitR.print a)
+        LRset.iter (fun a -> fprintf fmt "%a@." LR.print a)
       let print_tbs fmt = 
         TBS.iter (fun k v -> fprintf fmt "%a --> %a@." T.print k print_sets v)
 
@@ -145,8 +153,8 @@ module Make(X : ALIEN) = struct
         if debug_arrays then 
           begin
             fprintf fmt "[Arrays] %d implied equalities@." 
-	      (A.LT.Set.cardinal st);
-            A.LT.Set.iter (fprintf fmt "  %a@." A.LT.print) st
+	      (Conseq.cardinal st);
+            Conseq.iter (fun (a,_) -> fprintf fmt "  %a@." A.LT.print a) st
           end
     end
 
@@ -180,9 +188,10 @@ module Make(X : ALIEN) = struct
       in 
       let gets, tbset = 
         L.fold_left
-          (fun acc -> function
-             | A.Eq (r1,r2) -> fct (fct acc r1) r2
-             | A.Builtin (_,_,l) | A.Distinct l -> L.fold_left fct acc l
+          (fun acc (a,_,_)->
+             match a with 
+               | A.Eq (r1,r2) -> fct (fct acc r1) r2
+               | A.Builtin (_,_,l) | A.Distinct l -> L.fold_left fct acc l
           )(env.gets,env.tbset) la
       in 
       {env with gets=gets; tbset=tbset}
@@ -191,29 +200,31 @@ module Make(X : ALIEN) = struct
     (* mise a jour de env avec les instances 
        1) p   => p_ded 
        2) n => n_ded *)
-    let update_env are_eq are_dist env acc gi si p p_ded n n_ded =
+    let update_env are_eq are_dist dep env acc gi si p p_ded n n_ded =
       match are_eq gi si, are_dist gi si with
-        | Sig.Yes dep, Sig.No -> 
-            let csq = Amap.add n n_ded env.csq in
-            {env with csq = csq}, A.LT.Set.add p_ded acc
+        | Sig.Yes idep, Sig.No -> 
+            let conseq = LRmap.add n n_ded dep env.conseq in
+            {env with conseq = conseq}, 
+            Conseq.add (p_ded, Ex.union dep idep) acc
               
-        | Sig.No, Sig.Yes dep -> 
-            let csq = Amap.add p p_ded env.csq in
-            {env with csq = csq}, A.LT.Set.add n_ded acc
+        | Sig.No, Sig.Yes idep -> 
+            let conseq = LRmap.add p p_ded dep env.conseq in
+            {env with conseq = conseq},
+            Conseq.add (n_ded, Ex.union dep idep) acc
               
         | Sig.No, Sig.No ->
-            let sp = Aset.add p env.split in
-            let csq = Amap.add p p_ded env.csq in
-            let csq = Amap.add n n_ded csq in
-            { env with split = sp; csq = csq }, acc
+            let sp = LRset.add p env.split in
+            let conseq = LRmap.add p p_ded dep env.conseq in
+            let conseq = LRmap.add n n_ded dep conseq in
+            { env with split = sp; conseq = conseq }, acc
               
         | Sig.Yes _,  Sig.Yes _ -> assert false
         
     (*----------------------------------------------------------------------
       get(set(-,-,-),-) modulo egalite
       ---------------------------------------------------------------------*)
-    let get_of_set 
-        are_eq are_dist {g=get; gt=gtab; gi=gi; gty=gty} (env,acc) class_of = 
+    let get_of_set are_eq are_dist gtype (env,acc) class_of = 
+      let {g=get; gt=gtab; gi=gi; gty=gty} = gtype in
       L.fold_left
         (fun (env,acc) set -> 
            if Tmap.splited get set env.seen then (env,acc)
@@ -225,19 +236,22 @@ module Make(X : ALIEN) = struct
                    let xi, _ = X.make gi in
                    let xj, _ = X.make si in
                    let get_stab  = T.make (Sy.Op Sy.Get) [stab;gi] gty in
-                   let p       = LitR.make (A.Eq(xi,xj)) in
+                   let p       = LR.make (A.Eq(xi,xj)) in
                    let p_ded   = A.LT.make (A.Eq(get,sv)) in
-                   let n     = LitR.make (A.Distinct[xi;xj]) in
+                   let n     = LR.make (A.Distinct[xi;xj]) in
                    let n_ded = A.LT.make (A.Eq(get,get_stab)) in
-                   update_env are_eq are_dist env acc gi si p p_ded n n_ded
+                   let dep = match are_eq gtab set with
+                       Yes dep -> dep | No -> assert false
+                   in 
+                   update_env are_eq are_dist dep env acc gi si p p_ded n n_ded
                | _ -> (env,acc)
         ) (env,acc) (class_of gtab)
 
     (*----------------------------------------------------------------------
       get(t,-) and set(t,-,-) modulo egalite
       ---------------------------------------------------------------------*)
-    let get_and_set 
-         are_eq are_dist {g=get; gt=gtab; gi=gi; gty=gty} (env,acc) class_of =
+    let get_and_set are_eq are_dist gtype (env,acc) class_of =
+      let {g=get; gt=gtab; gi=gi; gty=gty} = gtype in
       let suff_sets = 
         L.fold_left
           (fun acc t -> S.union acc (TBS.find t env.tbset))
@@ -253,11 +267,14 @@ module Make(X : ALIEN) = struct
                let xj, _ = X.make si in
                let get_stab  = T.make (Sy.Op Sy.Get) [stab;gi] gty in
                let gt_of_st  = T.make (Sy.Op Sy.Get) [set;gi] gty in
-               let p       = LitR.make (A.Eq(xi,xj)) in
+               let p       = LR.make (A.Eq(xi,xj)) in
                let p_ded   = A.LT.make (A.Eq(gt_of_st,sv)) in
-               let n     = LitR.make (A.Distinct[xi;xj]) in
+               let n     = LR.make (A.Distinct[xi;xj]) in
                let n_ded = A.LT.make (A.Eq(gt_of_st,get_stab)) in
-               update_env  are_eq are_dist env acc gi si p p_ded n n_ded
+               let dep = match are_eq gtab stab with
+                   Yes dep -> dep | No -> assert false
+               in 
+               update_env are_eq are_dist dep env acc gi si p p_ded n n_ded
              end
         ) suff_sets (env,acc)
         
@@ -271,80 +288,67 @@ module Make(X : ALIEN) = struct
         
     (* nouvelles disegalites par instantiation du premier
        axiome d'exentionnalite *)
-    let extension acc la class_of = 
+
+    let extensionality acc la class_of =
       List.fold_left
-        (fun acc -> function 
-           | A.Distinct[r1;r2] -> 
-               begin
-                 match X.type_info r1, X.term_extract r1, X.term_extract r2 with
-                   | Ty.Tfarray (ty_k, ty_v), Some t1, Some t2  -> 
-                       let i  = T.fresh_name ty_k in
-                       let g1 = T.make (Sy.Op Sy.Get) [t1;i] ty_v in
-                       let g2 = T.make (Sy.Op Sy.Get) [t2;i] ty_v in
-                       let d  = A.Distinct[g1;g2] in
-                       A.LT.Set.add (A.LT.make d) acc
-                   | _ -> acc
-               end
-           | _ -> acc
+        (fun acc (a, _, dep) ->
+           match a with 
+             | A.Distinct[r;s] -> 
+                 begin
+                   match X.type_info r, X.term_extract r, X.term_extract s with
+                     | Ty.Tfarray (ty_k, ty_v), Some t1, Some t2  -> 
+                         let i  = T.fresh_name ty_k in
+                         let g1 = T.make (Sy.Op Sy.Get) [t1;i] ty_v in
+                         let g2 = T.make (Sy.Op Sy.Get) [t2;i] ty_v in
+                         let d  = A.Distinct[g1;g2] in
+                         Conseq.add (A.LT.make d, dep) acc
+                     | _ -> acc
+                 end
+             | _ -> acc
         ) acc la
 
-(*
-    let extension acc la class_of = 
-      List.fold_left
-        (fun acc -> function 
-           | A.Distinct[r1;r2] -> 
-               begin
-                 match X.type_info r1, X.term_extract r1, X.term_extract r2 with
-                   | Ty.Tfarray (ty_k, ty_v), Some t1, Some t2  -> 
-                       L.fold_left
-                         (fun acc t1 ->
-                            L.fold_left 
-                              (fun acc t2 -> 
-                                 let i  = T.fresh_name ty_k in
-                                 let g1 = T.make (Sy.Op Sy.Get) [t1;i] ty_v in
-                                 let g2 = T.make (Sy.Op Sy.Get) [t2;i] ty_v in
-                                 let d  = A.Distinct[g1;g2] in
-                                 A.LT.Set.add (A.LT.make d) acc
-                              ) acc (class_of t2)
-                         ) acc (class_of t1)
-                         
-                   | _ -> acc
-               end
-           | _ -> acc
-        ) acc la
-      *)
-
+    let implied_consequences env eqs la =
+      let spl, eqs = 
+        L.fold_left
+          (fun (spl,eqs) (a,_,dep) ->
+             let a = LR.make a in
+             let spl = LRset.remove (LR.neg a) (LRset.remove a spl) in
+             let eqs = 
+               Conseq.fold
+                 (fun (fact,ex) acc -> Conseq.add (fact, Ex.union ex dep) acc)
+                 (LRmap.find a env.conseq) eqs 
+             in
+             spl, eqs
+          )(env.split, eqs) la
+      in
+      {env with split=spl}, eqs
+        
     (* deduction de nouvelles dis/egalites *)
     let new_equalities env eqs la class_of = 
-      let la = L.filter (function A.Builtin _  -> false | _ -> true) la in
-      let sp, eqs = 
-        L.fold_left
-          (fun (sp,eqs) a ->
-             let a = LitR.make a in
-             Aset.remove (LitR.neg a) (Aset.remove a sp),
-             A.LT.Set.union (Amap.find a env.csq) eqs
-          ) (env.split, eqs) la
+      let la = L.filter 
+        (fun (a,_,_) -> match a with A.Builtin _  -> false | _ -> true) la 
       in
-      {env with split=sp}, extension eqs la class_of
+      let eqs = extensionality eqs la class_of in
+      implied_consequences env eqs la
+        
 
     (* instantiation des axiomes des tableaux *)
     let instantiate env are_eq are_dist class_of la =
-      let la = List.map fst la in
       Debug.assume fmt la; 
       let env = new_terms env la in
-      let env, atoms = new_splits are_eq are_dist env A.LT.Set.empty class_of in
+      let env, atoms = new_splits are_eq are_dist env Conseq.empty class_of in
       let env, atoms = new_equalities env atoms la class_of in
       Debug.env fmt env;
       Debug.new_equalities fmt atoms;
-      env, A.LT.Set.elements atoms 
+      env, Conseq.elements atoms 
         
     (* choisir une egalite sur laquelle on fait un case-split *)
     let case_split env = 
       try
-        let a = Aset.choose env.split in
+        let a = LRset.choose env.split in
         if debug_arrays then 
-          fprintf fmt "[Arrays.case-split] %a@." LitR.print a;
-        [(LitR.view a, None), (Num.Int 2)]
+          fprintf fmt "[Arrays.case-split] %a@." LR.print a;
+        [(LR.view a, None), (Num.Int 2)]
       with Not_found ->
         if debug_arrays then fprintf fmt "[Arrays.case-split] Nothing@.";
         []
