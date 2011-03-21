@@ -38,7 +38,8 @@ module Make (X : Sig.X) = struct
   module Uf = Uf.Make(X)
   module SetF = Formula.Set
   module T = Term
-  module A = Literal.Make(struct type t = X.r include X end)
+  module A = Literal
+  module LR = A.Make(struct type t = X.r include X end)
   module SetT = Term.Set
   module S = Symbols
 
@@ -299,14 +300,18 @@ module Make (X : Sig.X) = struct
 		 use = Use.add rx (st_uset,SetA.add (a, expl) sa_uset) env.use }
 	    ) env lvs
 
-  and negate_prop t1 uf bol = 
+  and negate_prop t1 uf bol =
     match T.view t1 with
 	{T.f=f1 ; xs=[a]} ->
 	  List.fold_left 
 	    (fun acc t2 ->
 	       match T.view t2 with
-		   {T.f=f2 ; xs=[b]} when S.equal f1 f2 ->
-		     (Literal.LT.make (Literal.Distinct [a; b])) :: acc
+		 | {T.f=f2 ; xs=[b]} when S.equal f1 f2 ->
+                     let dist = Literal.LT.make (Literal.Distinct [a; b]) in
+                     begin match Uf.are_distinct uf t1 t2 with
+                       | Yes ex -> (dist,ex) :: acc
+                       | No -> assert false
+                     end
 		 | _ -> acc
 	    )[] (Uf.class_of uf bol)
       | _ -> []
@@ -328,9 +333,12 @@ module Make (X : Sig.X) = struct
               begin
                 fprintf fmt "[cc] %d equalities by contra-congruence@." 
                   (List.length facts);
-                List.iter (fprintf fmt "\t%a@." Literal.LT.print) facts;
+                List.iter 
+                  (fun (a,ex) ->
+                     fprintf fmt "\t%a : %a@." A.LT.print a Ex.print ex) facts;
               end;
-	    List.fold_left (assume_rec dep) env facts
+	    List.fold_left 
+              (fun env (a,ex) -> assume_rec (Ex.union ex dep) env a) env facts
 	  end
       | Literal.Distinct lt -> 
 	  let lr, ex = fex env dep lt in
@@ -410,24 +418,24 @@ if Options.nocontracongru then env
           (* XXX * Quelle explication pour la backtrack ?
              -> Celle de Inconsistent de try_it. C'est la qu'on appelle
           look_for_sat avec bad_last=true *)
-          let neg_c = A.neg (A.make c) in
+          let neg_c = LR.neg (LR.make c) in
           if debug_split then
             fprintf fmt "[case-split] I backtrack on %a : %a@."
-              A.print neg_c Ex.print dep;
-	  aux false dl base_env dep [A.view neg_c, Num.Int 1, true] 
+              LR.print neg_c Ex.print dep;
+	  aux false dl base_env dep [LR.view neg_c, Num.Int 1, true] 
 
       | ((c, size, false) as a)::l ->
 	  try
 	    let base_env = assume_r base_env c dep in
 	    aux bad_last (a::dl) base_env dep l
 	  with Exception.Inconsistent dep' ->
-            let neg_c = A.neg (A.make c) in
+            let neg_c = LR.neg (LR.make c) in
             (* Faut-il vraiement faire l'union ? *)
             let ex = Ex.union dep dep' in
             if debug_split then
               fprintf fmt "[case-split] I backtrack on %a : %a@." 
-                A.print neg_c Ex.print ex;
-	    aux false dl base_env ex [A.view neg_c, Num.Int 1, true] 
+                LR.print neg_c Ex.print ex;
+	    aux false dl base_env ex [LR.view neg_c, Num.Int 1, true] 
     in
     aux bad_last (List.rev t.choices) base_env dep l
 
