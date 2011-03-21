@@ -381,7 +381,7 @@ if Options.nocontracongru then env
 
 
   let rec look_for_sat ?(bad_last=false) t base_env l dep =
-    let rec aux bad_last dl base_env = function
+    let rec aux bad_last dl base_env dep = function
       | [] -> 
 	begin
           match X.Rel.case_split base_env.relation with
@@ -398,7 +398,7 @@ if Options.nocontracongru then env
 		fprintf fmt ">size case-split: %s@."
 		  (Num.string_of_num tot_size);
 	      if Num.le_num tot_size max_split then
-		aux false dl base_env l
+		aux false dl base_env dep l
 	      else
 		{ t with 
 		  gamma_finite = base_env; 
@@ -406,25 +406,27 @@ if Options.nocontracongru then env
 	end
       | ((c, size, true) as a)::l ->
 	  let base_env = assume_r base_env c dep in
-	  aux bad_last (a::dl) base_env l      
+	  aux bad_last (a::dl) base_env dep l
 
       | [(c, size, false)] when bad_last ->
           let neg_c = A.neg (A.make c) in
           if debug_cc || debug_fm then
             fprintf fmt "[case-split] I backtrack on %a@." A.print neg_c;
-	  aux false dl base_env [A.view neg_c, Num.Int 1, true] 
+	  aux false dl base_env dep [A.view neg_c, Num.Int 1, true] 
 
       | ((c, size, false) as a)::l ->
 	  try
 	    let base_env = assume_r base_env c dep in
-	    aux bad_last (a::dl) base_env l
-	  with Exception.Inconsistent _ ->
+	    aux bad_last (a::dl) base_env dep l
+	  with Exception.Inconsistent dep' ->
             let neg_c = A.neg (A.make c) in
             if debug_cc || debug_fm then
               fprintf fmt "[case-split] I backtrack on %a@." A.print neg_c;
-	    aux false dl base_env [A.view neg_c, Num.Int 1, true] 
+            (* Faut-il vraiement faire l'union ? *)
+            let ex = Ex.union dep dep' in
+	    aux false dl base_env ex [A.view neg_c, Num.Int 1, true] 
     in
-    aux bad_last (List.rev t.choices) base_env l
+    aux bad_last (List.rev t.choices) base_env dep l
 
   let try_it f t dep =
     if debug_cc || debug_fm then
