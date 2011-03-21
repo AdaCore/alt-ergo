@@ -17,7 +17,7 @@
 
 open Options
 open Format
-  
+open Exception  
 module Sy = Symbols
 module T  = Term
 module A  = Literal
@@ -104,7 +104,7 @@ module Make(X : ALIEN) = struct
   let solve a b = 
     match embed a, embed b with
       | Cons(c1,_) , Cons(c2,_) when Hs.equal c1 c2 -> []
-      | Cons(c1,_) , Cons(c2,_) -> raise Exception.Unsolvable
+      | Cons(c1,_) , Cons(c2,_) -> raise Unsolvable
       | Cons _     , Alien r2   -> [r2,a]
       | Alien r1   , Cons _     -> [r1,b]
       | Alien _    , Alien _    -> assert false
@@ -119,113 +119,117 @@ module Make(X : ALIEN) = struct
         | []    -> fprintf fmt "\tthe equation is trivial@."
         | _ -> assert false);
       res
-    with Exception.Unsolvable -> 
+    with Unsolvable -> 
       if debug_sum then fprintf fmt "\tthe equation is unsolvable@.";
-      raise Exception.Unsolvable
+      raise Unsolvable
 
-  (* == La partie Relation de Sum =====================================*)
   module Rel = struct
     type r = X.r
 
     exception Not_Cons
 
+    module Ex = Explanation
+
     module MX = Map.Make(struct type t = X.r include X end)
     module HSS = Set.Make (struct type t=Hs.t let compare = Hs.compare end)
 
-    type t = HSS.t MX.t
+    type t = (HSS.t * Ex.t) MX.t
 
     let empty () = MX.empty
 
+    module Debug = struct
 
-    let print_env env =
-      if debug_sum then begin
-        fprintf fmt "--SUM env ---------------------------------@.";
-        MX.iter
-          (fun r hss ->
-            fprintf fmt "%a ::= " X.print r;
-            match HSS.elements hss with
-                []      -> ()
-              | hs :: l ->
-                fprintf fmt " %s" (Hs.view hs);
-                L.iter (fun hs -> fprintf fmt " | %s" (Hs.view hs)) l;
-            fprintf fmt "@.";
-          ) env;
-        fprintf fmt "-------------------------------------------@.";
-      end
+      let assume bol r1 r2 =
+        if debug_sum then
+          fprintf fmt "[Sum.Rel] we assume %a %s %a@." 
+            X.print r1 (if bol then "=" else "<>") X.print r2
 
-    let inconsistent() = raise (Exception.Inconsistent Explanation.everything)
+        let print_env env =
+          if debug_sum then begin
+            fprintf fmt "--SUM env ---------------------------------@.";
+            MX.iter
+              (fun r (hss, ex) ->
+                 fprintf fmt "%a ::= " X.print r;
+                 begin
+                   match HSS.elements hss with
+                       []      -> ()
+                     | hs :: l ->
+                         fprintf fmt " %s" (Hs.view hs);
+                         L.iter (fun hs -> fprintf fmt " | %s" (Hs.view hs)) l
+                 end;
+                 fprintf fmt " : %a@." Ex.print ex;
+                       
+              ) env;
+            fprintf fmt "-------------------------------------------@.";
+          end
+    end
 
     let values_of r = match X.type_info r with
       | Ty.Tsum (_,l) -> 
         Some (List.fold_left (fun st hs -> HSS.add hs st) HSS.empty l)
       | _ -> None
 
-    let add_diseq hss sm1 sm2 expl env eqs = 
+    let add_diseq hss sm1 sm2 dep env eqs = 
       match sm1, sm2 with
         | Alien r , Cons(h,ty) 
         | Cons (h,ty), Alien r  ->
-          let enum = try MX.find r env with Not_found -> hss in
+          let enum, ex = try MX.find r env with Not_found -> hss, Ex.empty in
           let enum = HSS.remove h enum in
-          if HSS.is_empty enum then 
-            inconsistent()
+          let ex = Ex.union ex dep in
+          if HSS.is_empty enum then raise (Inconsistent ex)
           else 
-            let env = MX.add r enum env in
+            let env = MX.add r (enum, ex) env in
             if HSS.cardinal enum = 1 then
               let h' = HSS.choose enum in
-              env, (A.Eq(r, is_mine (Cons(h',ty))),None,expl)::eqs
+              env, (A.Eq(r, is_mine (Cons(h',ty))), None, ex)::eqs
             else env, eqs
               
         | Alien r1   , Alien r2   -> env, eqs
         |  _ -> env, eqs
-    
-    let add_eq hss sm1 sm2 expl env eqs = 
+
+    let add_eq hss sm1 sm2 dep env eqs = 
       match sm1, sm2 with
         | Alien r , Cons(h,ty) 
         | Cons (h,ty), Alien r  ->
-          let enum = try MX.find r env with Not_found -> hss in
-          if HSS.mem h enum then 
-            MX.add r (HSS.singleton h) env, eqs
-          else 
-            inconsistent()
+          let enum, ex = try MX.find r env with Not_found -> hss, Ex.empty in
+          let ex = Ex.union ex dep in
+          if HSS.mem h enum then MX.add r (HSS.singleton h, ex) env, eqs
+          else raise (Inconsistent ex)
             
         | Alien r1 , Alien r2   -> 
-          let enum1 = try MX.find r1 env with Not_found -> hss in
-          let enum2 = try MX.find r2 env with Not_found -> hss in
+          let enum1,ex1 = try MX.find r1 env with Not_found -> hss, Ex.empty in
+          let enum2,ex2 = try MX.find r2 env with Not_found -> hss, Ex.empty in
+          let ex = Ex.union dep (Ex.union ex1 ex2) in
           let diff = HSS.inter enum1 enum2 in 
-          if HSS.is_empty diff then 
-            inconsistent()
+          if HSS.is_empty diff then raise (Inconsistent ex)
           else 
-            let env = MX.add r1 diff env in
-            let env = MX.add r2 diff env in
+            let env = MX.add r1 (diff, ex) env in
+            let env = MX.add r2 (diff, ex) env in
             if HSS.cardinal diff = 1 then
               let h' = HSS.choose diff in
               let ty = X.type_info r1 in
-              env, (A.Eq(r1, is_mine (Cons(h',ty))),None,expl)::eqs
+              env, (A.Eq(r1, is_mine (Cons(h',ty))), None, ex)::eqs
             else env, eqs
-
         |  _ -> env, eqs
 
     let assume env la expl = 
-      let aux bol r1 r2 ex1 ex2 env eqs = function
-        | None     -> env,eqs
+      let aux bol r1 r2 dep env eqs = function
+        | None     -> env, eqs
         | Some hss -> 
-          if debug_sum then
-            fprintf fmt "[Sum.Rel] we assume %a %s %a@." 
-              X.print r1 (if bol then "=" else "<>") X.print r2;
-          
-          if bol then 
-            add_eq hss (embed r1) (embed r2) (Ex.union ex1 ex2) env eqs
-          else
-            add_diseq hss (embed r1) (embed r2) (Ex.union ex1 ex2) env eqs
+            Debug.assume bol r1 r2;
+            if bol then 
+              add_eq hss (embed r1) (embed r2) dep env eqs
+            else
+              add_diseq hss (embed r1) (embed r2) dep env eqs
       in
-      print_env env;
+      Debug.print_env env;
       List.fold_left
         (fun (env,eqs) -> function
-          | A.Eq(r1,r2) , _, e -> 
-              aux true  r1 r2 expl e env eqs (values_of r1)
+          | A.Eq(r1,r2) , _, ex -> 
+              aux true  r1 r2 (Ex.union expl ex) env eqs (values_of r1)
 
-          | A.Distinct[r1;r2], _, e -> 
-              aux false r1 r2 expl e env eqs (values_of r1)
+          | A.Distinct[r1;r2], _, ex -> 
+              aux false r1 r2 (Ex.union expl ex) env eqs (values_of r1)
 
           | _ -> env, eqs
 
@@ -233,30 +237,34 @@ module Make(X : ALIEN) = struct
 
     let case_split env = 
       let acc = MX.fold
-        (fun r range acc ->
-           let sz = HSS.cardinal range in
+        (fun r (hss, ex) acc ->
+           let sz = HSS.cardinal hss in
            if sz = 1 then acc
            else match acc with
 	     | Some (n,r,hs) when n <= sz -> acc
-	     | _ -> Some (sz, r, HSS.choose range)
+	     | _ -> Some (sz, r, HSS.choose hss)
         ) env None 
       in
       match acc with 
         | Some (n,r,hs) -> 
 	    let r' = is_mine (Cons(hs,X.type_info r)) in
-	    if debug then
+	    if debug_sum then
 	      fprintf fmt "[case-split] %a = %a@." X.print r X.print r';
 	    [(A.Eq(r, r'), None), Num.Int n]
         | None -> 
-	    if debug then fprintf fmt "[case-split] sum: nothing@.";
+	    if debug_sum then fprintf fmt "[case-split] sum: nothing@.";
 	    []
+      
 
     let query (a,r) env expl =
       try ignore(assume env [a,r,Explanation.empty] expl); Sig.No
-      with Exception.Inconsistent expl -> Sig.Yes expl          
+      with Inconsistent expl -> Sig.Yes expl          
 
     let add env r = match embed r, values_of r with
-      | Alien r, Some hss -> if MX.mem r env then env else MX.add r hss env
+      | Alien r, Some hss -> 
+          if MX.mem r env then env else 
+            MX.add r (hss, Ex.empty) env
+
       | _ -> env
 
     let instantiate env _ _ _ _ = env, []

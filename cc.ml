@@ -257,7 +257,7 @@ module Make (X : Sig.X) = struct
       let env , ct = List.fold_left add_term (env,ct) xs in
       (* we update uf and use *)
       let nuf, ctx  = Uf.add env.uf t in (* XXX *)
-      if debug_fm then Print.make_cst t ctx;
+      if debug_cc then Print.make_cst t ctx;
       let rt,_   = Uf.find nuf t in
       let lvs = concat_leaves nuf xs in
       let nuse = Use.up_add env.use t rt lvs in
@@ -391,14 +391,12 @@ if Options.nocontracongru then env
 		choices = List.rev dl }
 	    | l ->
 	      let l = List.map (fun ((c,_), size) -> (c, size, false)) l in
-	      let tot_size =
+	      let sz =
 		List.fold_left
 		  (fun acc (a,s,_) ->  Num.mult_num acc s) (Num.Int 1) (l@dl) in
-	      if debug_cc then
-		fprintf fmt ">size case-split: %s@."
-		  (Num.string_of_num tot_size);
-	      if Num.le_num tot_size max_split then
-		aux false dl base_env dep l
+	      if debug_split then
+		fprintf fmt ">size case-split: %s@." (Num.string_of_num sz);
+	      if Num.le_num sz max_split then aux false dl base_env dep l
 	      else
 		{ t with 
 		  gamma_finite = base_env; 
@@ -409,9 +407,13 @@ if Options.nocontracongru then env
 	  aux bad_last (a::dl) base_env dep l
 
       | [(c, size, false)] when bad_last ->
+          (* XXX * Quelle explication pour la backtrack ?
+             -> Celle de Inconsistent de try_it. C'est la qu'on appelle
+          look_for_sat avec bad_last=true *)
           let neg_c = A.neg (A.make c) in
-          if debug_cc || debug_fm then
-            fprintf fmt "[case-split] I backtrack on %a@." A.print neg_c;
+          if debug_split then
+            fprintf fmt "[case-split] I backtrack on %a : %a@."
+              A.print neg_c Ex.print dep;
 	  aux false dl base_env dep [A.view neg_c, Num.Int 1, true] 
 
       | ((c, size, false) as a)::l ->
@@ -420,17 +422,18 @@ if Options.nocontracongru then env
 	    aux bad_last (a::dl) base_env dep l
 	  with Exception.Inconsistent dep' ->
             let neg_c = A.neg (A.make c) in
-            if debug_cc || debug_fm then
-              fprintf fmt "[case-split] I backtrack on %a@." A.print neg_c;
             (* Faut-il vraiement faire l'union ? *)
             let ex = Ex.union dep dep' in
+            if debug_split then
+              fprintf fmt "[case-split] I backtrack on %a : %a@." 
+                A.print neg_c Ex.print ex;
 	    aux false dl base_env ex [A.view neg_c, Num.Int 1, true] 
     in
     aux bad_last (List.rev t.choices) base_env dep l
 
   let try_it f t dep =
-    if debug_cc || debug_fm then
-      fprintf fmt "============= Debut FINITE ===============@.";
+    if debug_split then
+      fprintf fmt "============= Begin CASE-SPLIT ===============@.";
     let r =
       try 
 	if t.choices = [] then 
@@ -439,16 +442,17 @@ if Options.nocontracongru then env
 	  try
 	    let env = f t.gamma_finite in
 	    look_for_sat t env [] dep
-	  with Exception.Inconsistent _ ->
-	    look_for_sat ~bad_last:true { t with choices = []}
-	      t.gamma t.choices dep
+	  with Exception.Inconsistent dep' ->
+            (* Faut-il vraiement faire l'union des dep ? *)
+            let ex = Ex.union dep dep' in
+	    look_for_sat ~bad_last:true { t with choices = []} t.gamma t.choices ex
       with Exception.Inconsistent d ->
-	if debug_cc || debug_fm then
-	  fprintf fmt "============= fin FINITE ===============@.";
+	if debug_split then
+	  fprintf fmt "============= Fin CASE-SPLIT ===============@.";
 	raise (Exception.Inconsistent d)
     in
-    if debug_cc || debug_fm then
-      fprintf fmt "============= fin FINITE ===============@.";
+    if debug_split then
+      fprintf fmt "============= Fin CASE-SPLIT ===============@.";
     r
   
   let assume a ex t = 

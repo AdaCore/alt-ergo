@@ -37,7 +37,6 @@ val debug_sat_simple : bool
 val debug_typing : bool
 val debug_constr : bool
 val debug_pairs : bool
-val debug_finite : bool
 val debug_arrays : bool
 val debug_combine : bool
 val verbose : bool
@@ -55,7 +54,6 @@ val select : int
 val cin : in_channel
 val no_rm_eq_existential : bool
 val nocontracongru : bool
-val finitetest : bool
 val omega : bool
 val arrays : bool
 val pairs : bool
@@ -69,3 +67,4 @@ val max_split : Num.num
 val rewriting : bool
 val proof : bool
 val debug_proof : bool
+val debug_split : bool

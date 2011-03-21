@@ -49,7 +49,7 @@ let dcombine = ref false
 let dbitv = ref false
 let dac = ref false
 let ddispatch = ref false
-let dfinite = ref false
+let debug_split = ref false
 let options = ref false
 let tracefile = ref ""
 let smtfile = ref false
@@ -63,7 +63,6 @@ let astuce = ref false
 let select = ref 0
 let no_rm_eq_existential = ref false
 let nocontracongru = ref false
-let finitetest = ref false
 let omega = ref false
 let arrays = ref false
 let pairs = ref false
@@ -102,7 +101,7 @@ let spec = [
   "-dpairs", Arg.Set dpairs, "  sets the debugging flag of pairs";
   "-darrays", Arg.Set darrays, "  sets the debugging flag of arrays";
   "-dcombine", Arg.Set dcombine, "  sets the debugging flag of combine";
-  "-dfinite", Arg.Set dfinite, "  sets the debugging flag of finite test";
+  "-dsplit", Arg.Set debug_split, "  sets the debugging flag of case-split analysis";
    "-v", Arg.Set verbose, "  sets the verbose mode";
   "-version", Arg.Unit show_version, "  prints the version number";
   "-ddispatch", Arg.Set ddispatch, "  sets the debugging flag of sat";
@@ -125,7 +124,6 @@ let spec = [
   Arg.Unit (fun () -> Print_color.set_margin_with_term_width fmt;
               Print_color.disable false), "Set ainsi color in output";
   "-nocontracongru", Arg.Set nocontracongru, "";
-  "-finitetest",Arg.Set finitetest, "";
   "-omega", Arg.Set omega, "Use omega for arithmetic equalities";
   "-arrays", Arg.Set arrays, "experimental support for the theory of arrays";
   "-pairs", Arg.Set pairs, "experimental support for the theory of pairs";
@@ -184,7 +182,6 @@ let debug_sat_simple = !dsats
 let debug_typing = !dtyping
 let debug_constr = !dconstr
 let debug_pairs = !dpairs
-let debug_finite = !dfinite
 let verbose = !verbose
 let debug_dispatch = !ddispatch
 let tracefile = !tracefile
@@ -196,7 +193,6 @@ let astuce = !astuce
 let select = !select
 let no_rm_eq_existential = !no_rm_eq_existential
 let nocontracongru = !nocontracongru
-let finitetest = !finitetest
 let omega = !omega
 let arrays = !arrays
 let pairs = !pairs
@@ -212,3 +208,4 @@ let max_split = !max_split
 let rewriting = !rewriting
 let proof = !proof
 let debug_proof = !debug_proof && proof
+let debug_split = !debug_split

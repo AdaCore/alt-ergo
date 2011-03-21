@@ -3401,6 +3401,18 @@ goal g35 :
   x = t5[36] ->
     P(x)
 
+goal g36:
+  forall i,j : int.
+  forall t1: (int,int) farray.
+  forall t2: (int,int) farray. 
+  forall t3: (int,int) farray. 
+  t2 = t1[ i <- 1] ->
+  t3 = t2[ j <- 2] ->
+  t3[i] <> 1 ->
+  j=2 ->
+  i=1 ->
+  false
+
 $$$ injective
 
 type a
