@@ -409,6 +409,14 @@ module Make ( R : Sig.X ) = struct
 	    head_cp eqs env (r, v, dep);
             env
 	    
+    let update_aux dep set env= 
+      SetRR.fold 
+	(fun (rr, nrr) env -> 
+	   { env with
+	       neqs = update_neqs rr nrr dep env ;
+	       classes = update_classes rr nrr env.classes})
+	set env
+
     let apply_sigma_uf env (p, v, dep) =
       assert (MapR.mem p env.gamma);
       let use_p = MapR.find p env.gamma in
@@ -428,33 +436,31 @@ module Make ( R : Sig.X ) = struct
 	       env, (r, nrr, ex)::touched, SetRR.add (rr, nrr) neqs_to_up
 	  ) use_p (env, [], SetRR.empty) in
 	(* Correction : Do not update neqs twice for the same r *)
-	let env = SetRR.fold 
-	  (fun (rr, nrr) env -> 
-	    { env with
-	      neqs = update_neqs rr nrr dep env ;
-	      classes = update_classes rr nrr env.classes})
-	  neqs_to_up env
-	in
-	env, tch
+	update_aux dep neqs_to_up env, tch 
+	
       with Not_found -> assert false
 
     let up_uf_rs dep env tch =
       if RS.is_empty env.ac_rs then env, tch
       else
-	MapR.fold
-	  (fun r (rr,ex) (env,tch) ->
+	let env, tch, neqs_to_up = MapR.fold
+	  (fun r (rr,ex) (env,tch,neqs_to_up) ->
 	     let nrr, ex_nrr = canon env rr in
-	     if R.equal nrr rr then env, tch
+	     if R.equal nrr rr then env, tch, neqs_to_up
 	     else 
 	       let ex = Ex.union ex ex_nrr in
                let env = 
 		 {env with
 	            repr = MapR.add r (nrr, ex) env.repr;
-	            classes = update_classes rr nrr env.classes;
-	            gamma = add_to_gamma r nrr env.gamma ;
-	            neqs = update_neqs rr nrr dep env } in
-               env, (r,[r, nrr, ex],nrr)::tch
-	  ) env.repr (env, tch)
+	            gamma = add_to_gamma r nrr env.gamma }
+               in
+               env, (r,[r, nrr, ex],nrr)::tch, SetRR.add (rr, nrr) neqs_to_up
+	  ) env.repr (env, tch, SetRR.empty)
+        in 
+        (* Correction : Do not update neqs twice for the same r *)
+	update_aux dep neqs_to_up env, tch 
+	
+
 	  
     let apply_sigma eqs env tch ((p, v, dep) as sigma) = 
       let env = init_leaf env p in

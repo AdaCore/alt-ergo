@@ -141,7 +141,7 @@ testbyte:$(BYTE)
 
 testopt:$(OPT)
 	make -C util/
-	sh tests/test.sh " ./$(OPT) -glouton -triggers-var -pairs -arrays"
+	sh tests/test.sh " ./$(OPT) -glouton -triggers-var -pairs -arrays -proof -debug-proof"
 
 challenge:$(OPT)
 	make -C util/
