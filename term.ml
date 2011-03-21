@@ -47,8 +47,16 @@ let view t = t.node
 
 (* fresh variables must be smaller than problem's variables.
    thus, Instead of comparinf t1.tag with t2.tag, 
-   we compare t2.tag and t1.tag *)
-let compare t1 t2 = Pervasives.compare t2.tag t1.tag
+   we compare t2.tag and t1.tag
+   But we keep true and false as repr
+ *)
+let compare t1 t2 =
+  let c = Pervasives.compare t2.tag t1.tag in
+  if c = 0 then c else
+  match (view t1).f, (view t2).f with
+    | (Sy.True | Sy.False ), _ -> -1
+    | _, (Sy.True | Sy.False ) -> 1
+    | _,_ -> c
 
 let sort = List.sort compare
 
