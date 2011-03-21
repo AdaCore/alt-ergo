@@ -764,70 +764,14 @@ module Make(X : ALIEN) = struct
   module Rel = struct
 
     type r = X.r
-        (* ces X.t sont toujours des constantes *)
-        (* Cette map associe à chaque représentant r de type bitvector
-           une constante c tel que toutes les constantes plus petite
-           que c sont différentes de r.
-           Un représentant r est associé à None si c'est une constante*)
-    type elt = t
-    type t =  (elt option) M.t
+    type t =  unit
 
-    exception Inconsistent    
-    let empty () = M.empty
-
-    let is_bitv t = 
-      match (Term.view t).T.ty with 
-        | Ty.Tbitv _ -> true
-        | _ -> false
-
-    let assume env la ex = 
-      let leqs = 
-	List.fold_left 
-          (fun acc (a, root, e) ->
-	     let ex = Explanation.union e ex in 
-             match a with (* A FAIRE *)
-               (*| Literal.Neq(rx1,rx2) ->
-                   begin
-		     match X.extract rx1, X.extract rx2 with
-                       | Some [r1], Some [r2] when r1.sz = 1 -> 
-                           begin
-			     match r1.bv, r2.bv with
-                               | Cte b, Other o -> 
-				   let v = X.embed [r1] in
-				   (Literal.Eq(rx2,v),root,ex)::acc  
-			       | Other o, Cte b -> 
-				   let v = X.embed [r2] in
-				   (Literal.Eq(rx1,v),root,ex)::acc  
-                               | _ -> acc
-			   end
-                       | _ -> acc
-                   end*)
-               | _ -> acc) [] la
-      in 
-      env, leqs
- 
-    let cst0 n = 
-      let rec aux acc = function
-        | n when n <= 0 -> acc
-        | n -> aux ({bv=Cte false;sz=1}::acc) (n-1) in
-      aux [] n
-        
-    let add env r = 
-      match X.type_info r with
-        | Ty.Tbitv i when not (M.mem r env) ->     
-            let cst0 = Some (cst0 i) in
-            M.add r cst0 env
-        | _ -> env
-
-    let rec succ = function
-	(* TODO : Find good explanations *)
-      | [] -> raise (Exception.Inconsistent Explanation.everything)
-      | ({bv=false} as x)::l -> {x with bv = true }::l
-      | ({bv=true } as x)::l -> {x with bv = false}::(succ l)
-
-    let case_split env = []    
+    let empty () = ()
+    let assume _ _ _ = (), []
+    let add _ _ = ()
+    let case_split _ = []    
     let query _ _ _ = Sig.No
-    let instantiate env _ _ _ _ = env, []
+    let instantiate _ _ _ _ _ = (), []
   end
 
 end
