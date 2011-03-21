@@ -69,6 +69,14 @@ module Make ( R : Sig.X ) = struct
     
   module SetR = Set.Make(struct type t = R.r let compare = R.compare end)
 
+  module SetRR = Set.Make(struct 
+    type t = R.r * R.r 
+    let compare (r1, r1') (r2, r2') = 
+      let c = R.compare r1 r2 in
+      if c <> 0 then c 
+      else  R.compare r1' r2'
+  end)
+
   module SetAc = Set.Make(struct type t = Ac.t let compare = Ac.compare end)
 
   module SetRL = Set.Make
@@ -210,21 +218,6 @@ module Make ( R : Sig.X ) = struct
 	  let s = try MapR.find x gamma with Not_found -> SetR.empty in
 	  MapR.add x (SetR.add r s) gamma) gamma (R.leaves c)
 	
-    let is_bad_distinct env lit = 
-      match Lit.view lit with
-        | Literal.Eq _ | Literal.Builtin _ -> assert false
-        | Literal.Distinct rl ->
-            try
-              let _ = 
-                List.fold_left
-                  (fun st mk ->
-                     let r, _ = lookup_by_r mk env in
-                     if SetR.mem r st then raise Exit else SetR.add r st
-                  )SetR.empty rl
-              in 
-              false
-            with Exit -> true
-
     let update_neqs r1 r2 dep env = 
       let nq_r1 = lookup_for_neqs env r1 in
       let nq_r2 = lookup_for_neqs env r2 in
@@ -233,10 +226,8 @@ module Make ( R : Sig.X ) = struct
 	  (fun l1 ex1 mapl ->  
 	     try 
 	       let ex2 = MapL.find l1 mapl in
-               if is_bad_distinct env l1 then
-	         let ex = Ex.union (Ex.union ex1 ex2) dep in (* VERIF *)
-	         raise (Inconsistent ex)
-               else MapL.add l1 (Ex.union ex1 dep) mapl
+	       let ex = Ex.union (Ex.union ex1 ex2) dep in (* VERIF *)
+	       raise (Inconsistent ex)
 	     with Not_found -> 
 	       MapL.add l1 (Ex.union ex1 dep) mapl) 
 	  nq_r1 nq_r2
@@ -397,8 +388,10 @@ module Make ( R : Sig.X ) = struct
 	      else (* collapse *)
                 begin
                   if debug_ac then
-                    fprintf fmt "[uf] collapse: %a = %a@." R.print g2 R.print d2;
-                  let ex = Ex.union (Ex.union ex_g2 ex_d2) (Ex.union dep_rl dep) in
+                    fprintf fmt "[uf] collapse: %a = %a@."
+		      R.print g2 R.print d2;
+                  let ex = Ex.union 
+		    (Ex.union ex_g2 ex_d2) (Ex.union dep_rl dep) in
                   Queue.push (g2, d2, ex) eqs;
 	          env
                 end
@@ -420,23 +413,29 @@ module Make ( R : Sig.X ) = struct
       assert (MapR.mem p env.gamma);
       let use_p = MapR.find p env.gamma in
       try 
-	SetR.fold 
-	  (fun r (env, touched) -> 
+	let env, tch, neqs_to_up = SetR.fold 
+	  (fun r (env, touched, neqs_to_up) -> 
 	     let rr, ex = MapR.find r env.repr in
 	     let nrr = R.subst p v rr in
-	     if R.equal rr nrr then env, touched
+	     if R.equal rr nrr then env, touched, neqs_to_up
 	     else 
 	       let ex  = Ex.union ex dep in
-               let env = {env with repr = MapR.add r (nrr, ex) env .repr} in
-               let env = { 
-		 env with
+               let env = 
+		 {env with
 		   repr = MapR.add r (nrr, ex) env .repr;
-		   classes = update_classes rr nrr env.classes;
-		   gamma = add_to_gamma r nrr env.gamma ;
-		   neqs = update_neqs rr nrr dep env } 
+		   gamma = add_to_gamma r nrr env.gamma } 
 	       in
-	       env, (r, nrr, ex)::touched
-	  ) use_p (env, [])
+	       env, (r, nrr, ex)::touched, SetRR.add (rr, nrr) neqs_to_up
+	  ) use_p (env, [], SetRR.empty) in
+	(* Correction : Do not update neqs twice for the same r *)
+	let env = SetRR.fold 
+	  (fun (rr, nrr) env -> 
+	    { env with
+	      neqs = update_neqs rr nrr dep env ;
+	      classes = update_classes rr nrr env.classes})
+	  neqs_to_up env
+	in
+	env, tch
       with Not_found -> assert false
 
     let up_uf_rs dep env tch =
