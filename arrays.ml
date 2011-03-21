@@ -21,7 +21,6 @@ open Format
 module Sy = Symbols
 module T  = Term
 module A  = Literal
-module F = Formula
 module L  = List
   
 type 'a abstract = unit
@@ -62,10 +61,8 @@ module Make(X : ALIEN) = struct
 
     type r = X.r
     
-
-    module LR = A.Make(struct type t = X.r include X end)
-    module LT = A.LT
-
+    module LR = Literal.Make(struct type t = X.r include X end)
+    
     (* map get |-> { set } des associations (get,set) deja splites *)
     module Tmap = struct
       include T.Map
@@ -80,8 +77,8 @@ module Make(X : ALIEN) = struct
     module Conseq = 
       Set.Make
         (struct
-           type t = LT.t * Ex.t
-           let compare (lt1,_) (lt2,_) = LT.compare lt1 lt2
+           type t = A.LT.t * Ex.t
+           let compare (lt1,_) (lt2,_) = A.LT.compare lt1 lt2
          end)
     (* map k |-> {sem Atom} d'egalites/disegalites sur des atomes semantiques*)
     module LRmap = struct
@@ -157,7 +154,7 @@ module Make(X : ALIEN) = struct
           begin
             fprintf fmt "[Arrays] %d implied equalities@." 
 	      (Conseq.cardinal st);
-            Conseq.iter (fun (a,_) -> fprintf fmt "  %a@." LT.print a) st
+            Conseq.iter (fun (a,_) -> fprintf fmt "  %a@." A.LT.print a) st
           end
     end
 
@@ -203,114 +200,83 @@ module Make(X : ALIEN) = struct
     (* mise a jour de env avec les instances 
        1) p   => p_ded 
        2) n => n_ded *)
-    let update_env eq dis pos pos_ded pos_ex neg neg_ded neg_ex dep (env, eqs) =
-      match eq, dis with
+    let update_env are_eq are_dist dep env acc gi si p p_ded n n_ded =
+      match are_eq gi si, are_dist gi si with
         | Sig.Yes idep, Sig.No -> 
-            let c = LRmap.add neg neg_ded (Ex.union dep neg_ex) env.conseq in
-            {env with conseq = c}, 
-            Conseq.add (pos_ded, Ex.union dep idep) eqs
+            let conseq = LRmap.add n n_ded dep env.conseq in
+            {env with conseq = conseq}, 
+            Conseq.add (p_ded, Ex.union dep idep) acc
               
         | Sig.No, Sig.Yes idep -> 
-            let c = LRmap.add pos pos_ded (Ex.union dep pos_ex) env.conseq in
-            {env with conseq = c},
-            Conseq.add (neg_ded, Ex.union dep idep) eqs
-  
+            let conseq = LRmap.add p p_ded dep env.conseq in
+            {env with conseq = conseq},
+            Conseq.add (n_ded, Ex.union dep idep) acc
+              
         | Sig.No, Sig.No ->
-            let spl = LRset.add pos env.split in
-            let c = LRmap.add pos pos_ded (Ex.union dep pos_ex) env.conseq in
-            let c = LRmap.add neg neg_ded (Ex.union dep neg_ex) c in
-            { env with split = spl; conseq = c }, eqs
-
+            let sp = LRset.add p env.split in
+            let conseq = LRmap.add p p_ded dep env.conseq in
+            let conseq = LRmap.add n n_ded dep conseq in
+            { env with split = sp; conseq = conseq }, acc
+              
         | Sig.Yes _,  Sig.Yes _ -> assert false
-
+        
     (*----------------------------------------------------------------------
-      get(set(-,-,-),-) modulo egalite. 
-      t1 == get(set(-,-,-),-) et
-      t2 == set(-,-,-)
+      get(set(-,-,-),-) modulo egalite
       ---------------------------------------------------------------------*)
-    let update_get_of_set are_eq are_dist t1 t2 acc = 
-      let dep = match are_eq t1.gt t2.s with Yes d -> d | No -> assert false in
-      let xi, _ = X.make t1.gi in
-      let xj, _ = X.make t2.si in
-      
-      let pos = LR.make (A.Eq(xi,xj)) in
-      let neg = LR.make (A.Distinct[xi;xj]) in
-      
-      let pos_fm = F.mk_lit (LT.make (A.Eq(t1.gi, t2.si))) 0 in
-      let pos_ex = Ex.singleton pos_fm in
-      
-      let neg_fm = F.mk_lit (LT.make (A.Distinct[t1.gi; t2.si])) 0 in
-      let neg_ex = Ex.singleton neg_fm in
-
-      let pos_ded   = LT.make (A.Eq(t1.g,t2.sv)) in
-      let get_stab  = T.make (Sy.Op Sy.Get) [t2.st;t1.gi] t1.gty in
-      let neg_ded = LT.make (A.Eq(t1.g,get_stab)) in
-      
-      let eq = are_eq t1.gi t2.si in
-      let dis = are_dist t1.gi t2.si in
-      update_env eq dis pos pos_ded pos_ex neg neg_ded neg_ex dep acc
-
-
-    let get_of_set are_eq are_dist gtype acc class_of =
+    let get_of_set are_eq are_dist gtype (env,acc) class_of = 
+      let {g=get; gt=gtab; gi=gi; gty=gty} = gtype in
       L.fold_left
-        (fun ((env, eqs) as acc) set -> 
-           if Tmap.splited gtype.g set env.seen then acc
+        (fun (env,acc) set -> 
+           if Tmap.splited get set env.seen then (env,acc)
            else 
-             let env = {env with seen = Tmap.update gtype.g set env.seen} in
+             let env = {env with seen = Tmap.update get set env.seen} in
              let {T.f=f;xs=xs;ty=sty} = T.view set in 
              match Sy.is_set f, xs with
                | true , [stab;si;sv] -> 
-                   let stype = {s=set; st=stab; si=si; sv=sv; sty=sty} in
-                   update_get_of_set are_eq are_dist gtype stype (env, eqs)
-               | _ -> acc
-        ) acc (class_of gtype.gt)
-
-
-
+                   let xi, _ = X.make gi in
+                   let xj, _ = X.make si in
+                   let get_stab  = T.make (Sy.Op Sy.Get) [stab;gi] gty in
+                   let p       = LR.make (A.Eq(xi,xj)) in
+                   let p_ded   = A.LT.make (A.Eq(get,sv)) in
+                   let n     = LR.make (A.Distinct[xi;xj]) in
+                   let n_ded = A.LT.make (A.Eq(get,get_stab)) in
+                   let dep = match are_eq gtab set with
+                       Yes dep -> dep | No -> assert false
+                   in 
+                   update_env are_eq are_dist dep env acc gi si p p_ded n n_ded
+               | _ -> (env,acc)
+        ) (env,acc) (class_of gtab)
 
     (*----------------------------------------------------------------------
       get(t,-) and set(t,-,-) modulo egalite
       ---------------------------------------------------------------------*)
-
-    let update_get_and_set are_eq are_dist t1 t2 acc = 
-      let dep = match are_eq t1.gt t2.st with Yes d -> d | No -> assert false in
-      let xi, _ = X.make t1.gi in
-      let xj, _ = X.make t2.si in
-      
-      let pos       = LR.make (A.Eq(xi,xj)) in
-      let neg     = LR.make (A.Distinct[xi;xj]) in
-
-      let pos_fm = F.mk_lit (LT.make (A.Eq(t1.gi, t2.si))) 0 in
-      let pos_ex = Ex.singleton pos_fm in
-      
-      let neg_fm = F.mk_lit (LT.make (A.Distinct[t1.gi; t2.si])) 0 in
-      let neg_ex = Ex.singleton neg_fm in
-
-      let get_stab  = T.make (Sy.Op Sy.Get) [t2.st;t1.gi] t1.gty in
-      let gt_of_st  = T.make (Sy.Op Sy.Get) [t2.s;t1.gi] t1.gty in
-      let pos_ded   = LT.make (A.Eq(gt_of_st,t2.sv)) in
-      let neg_ded = LT.make (A.Eq(gt_of_st,get_stab)) in
-             
-      let eq = are_eq t1.gi t2.si in
-      let dis = are_dist t1.gi t2.si in
-      update_env eq dis pos pos_ded pos_ex neg neg_ded neg_ex dep acc
-
-
-    let get_and_set are_eq are_dist gtype ((env, eqs) as acc) class_of =
+    let get_and_set are_eq are_dist gtype (env,acc) class_of =
+      let {g=get; gt=gtab; gi=gi; gty=gty} = gtype in
       let suff_sets = 
         L.fold_left
           (fun acc t -> S.union acc (TBS.find t env.tbset))
-          S.empty (class_of gtype.gt)
+          S.empty (class_of gtab)
       in
       S.fold
-        (fun  ({s=set} as stype) ((env,eqs) as acc) -> 
-           if Tmap.splited gtype.g set env.seen then acc
+        (fun  {s=set; st=stab; si=si; sv=sv; sty=sty} (env,acc) -> 
+           if Tmap.splited get set env.seen then (env,acc)
            else 
-             let env = {env with seen = Tmap.update gtype.g stype.s env.seen} in
-             update_get_and_set are_eq are_dist gtype stype (env, eqs)
-        ) suff_sets acc
-
-
+             begin
+               let env = {env with seen = Tmap.update get set env.seen} in
+               let xi, _ = X.make gi in
+               let xj, _ = X.make si in
+               let get_stab  = T.make (Sy.Op Sy.Get) [stab;gi] gty in
+               let gt_of_st  = T.make (Sy.Op Sy.Get) [set;gi] gty in
+               let p       = LR.make (A.Eq(xi,xj)) in
+               let p_ded   = A.LT.make (A.Eq(gt_of_st,sv)) in
+               let n     = LR.make (A.Distinct[xi;xj]) in
+               let n_ded = A.LT.make (A.Eq(gt_of_st,get_stab)) in
+               let dep = match are_eq gtab stab with
+                   Yes dep -> dep | No -> assert false
+               in 
+               update_env are_eq are_dist dep env acc gi si p p_ded n n_ded
+             end
+        ) suff_sets (env,acc)
         
     (* Generer de nouvelles instantiations de lemmes *)
     let new_splits are_eq are_dist env acc class_of = 
@@ -322,7 +288,6 @@ module Make(X : ALIEN) = struct
         
     (* nouvelles disegalites par instantiation du premier
        axiome d'exentionnalite *)
-
     let extensionality acc la class_of =
       List.fold_left
         (fun acc (a, _, dep) ->
@@ -335,7 +300,7 @@ module Make(X : ALIEN) = struct
                          let g1 = T.make (Sy.Op Sy.Get) [t1;i] ty_v in
                          let g2 = T.make (Sy.Op Sy.Get) [t2;i] ty_v in
                          let d  = A.Distinct[g1;g2] in
-                         Conseq.add (LT.make d, dep) acc
+                         Conseq.add (A.LT.make d, dep) acc
                      | _ -> acc
                  end
              | _ -> acc
