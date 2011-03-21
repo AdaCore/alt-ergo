@@ -154,7 +154,8 @@ module Make(X : ALIEN) = struct
           begin
             fprintf fmt "[Arrays] %d implied equalities@." 
 	      (Conseq.cardinal st);
-            Conseq.iter (fun (a,_) -> fprintf fmt "  %a@." A.LT.print a) st
+            Conseq.iter (fun (a,ex) -> fprintf fmt "  %a : %a@."
+                           A.LT.print a Ex.print ex) st
           end
     end
 
