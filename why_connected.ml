@@ -25,17 +25,17 @@ let rec unprune r t dep =
     | Some d -> d in
   List.iter (fun d -> unprune d d.tag dep) deps
 
+let prune_nodep r t =
+  r.pruned <- true;
+  t#set_property (`FOREGROUND "light gray")
+
+let unprune_nodep r t =
+  r.pruned <- false;
+  t#set_property (`FOREGROUND_SET false)
+
 let toggle_prune_nodep r t =
-  if r.pruned then
-    begin
-      r.pruned <- false;
-      t#set_property (`FOREGROUND_SET false)
-    end
-  else
-    begin
-      r.pruned <- true;
-      t#set_property (`FOREGROUND "light gray")
-    end
+  if r.pruned then unprune_nodep r t
+  else prune_nodep r t
 
 let search_using t sbuf env =
   List.iter (fun t -> t#set_property (`BACKGROUND_SET false)) env.search_tags;
@@ -86,8 +86,10 @@ let tag_callback t env sbuf ~origin:y z i =
 	    | None -> ()
 	    | Some an -> match an with
 		| AD (r,_) ->
+		  if env.ctrl then 
 		    if r.pruned then unprune r t env.dep 
 		    else prune r t env.dep
+		  else toggle_prune_nodep r t
 		| AF r -> toggle_prune_nodep r t
 		| AT r -> toggle_prune_nodep r t
 		| QF _ -> ()
@@ -692,3 +694,27 @@ let show_used_lemmas env expl =
   env.proof_tags <- tags;
   List.iter (fun t -> t#set_property (`BACKGROUND "pale green")) tags
   
+(* TODO change this *)
+let prune_unused env expl =
+  let ids = match Explanation.ids_of expl with
+    | None -> []
+    | Some ids -> List.sort Pervasives.compare ids 
+  in
+  let rec aux ast ids =
+    match ast, ids with
+      | [], _ | _, [] -> ()
+      | [d1,_], id::rids -> 
+	if d1.id > id then
+	    prune_nodep d1 d1.tag
+	else aux ast rids
+      | (d1,_)::(((d2,_)::_) as rast), id::rids ->
+	fprintf fmt "%d - %d : %d@." d1.id d2.id id;
+	if id >= d2.id then 
+	  begin 
+	    prune_nodep d1 d1.tag;
+	    aux rast ids
+	  end
+	else if id >= d1.id then aux rast rids
+	else assert false
+  in
+  aux env.ast ids

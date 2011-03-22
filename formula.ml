@@ -182,7 +182,8 @@ let iview f = f.node
 let view (t,_) = t.node.pos
 let id (_,id) = id
 
-let rec print fmt f = match view f with
+let rec print fmt f = 
+  match view f with
   | Literal a -> 
       Literal.LT.print fmt a
   | Lemma {triggers = trs; main = f; name = n} -> 
@@ -203,6 +204,10 @@ let rec print fmt f = match view f with
   | Let l -> 
       fprintf fmt 
 	"let %a =@ %a in@ %a" Sy.print l.lvar Term.print l.lterm print l.lf
+
+let print fmt f = 
+  let _,id = f in
+  fprintf fmt "%a (id:%d)" print f id
 
 let union_subst s1 ((s2,s2_ty) as subst) = 
   Sy.Map.fold 

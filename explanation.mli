@@ -17,7 +17,7 @@
 
 type t
 
-val everything : t
+(* val everything : t *)
 
 val empty : t
 

@@ -28,7 +28,7 @@ end)
 
 type t = ES.t option
 
-let everything = None
+(* let everything = None *)
 
 let empty = Some (ES.empty)
 

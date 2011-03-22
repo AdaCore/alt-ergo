@@ -55,7 +55,7 @@ let pop_error ?(error=false) ~message () =
 
 
 
-let update_status image label env d s steps =
+let update_status image label buttonclean env d s steps =
   let satmode = !smtfile or !smt2file or !satmode in 
   match s with
     | Frontend.Unsat dep ->
@@ -68,7 +68,10 @@ let update_status image label env d s steps =
 	  show_used_lemmas env dep
 	end;
 	image#set_stock `YES;
-	label#set_text (sprintf "  Valid (%2.4f)" time)
+	label#set_text (sprintf "  Valid (%2.4f)" time);
+	buttonclean#misc#show ();
+	ignore(buttonclean#connect#clicked 
+		 ~callback:(fun () -> prune_unused env dep))
 	  
     | Frontend.Inconsistent ->
 	if not satmode then 
@@ -112,7 +115,7 @@ let force_interrupt old_action_ref n =
     | _ -> fprintf fmt "Not in threaded mode@."
 
 
-let rec run buttonrun buttonstop image label thread env () =
+let rec run buttonrun buttonstop buttonclean image label thread env () =
   (* Install the signal handler: *)
   let old_action_ref = ref Sys.Signal_ignore in
   let old_action = 
@@ -123,6 +126,7 @@ let rec run buttonrun buttonstop image label thread env () =
   label#set_text "  ...";
   buttonstop#misc#show ();
   buttonrun#misc#hide ();
+  buttonclean#misc#hide ();
     
   let ast = to_ast env.ast in
   if debug then fprintf fmt "AST : \n-----\n%a@." print_typed_decl_list ast;
@@ -154,7 +158,8 @@ let rec run buttonrun buttonstop image label thread env () =
 	       (* Thread.yield (); *)
 	       let cnf = Cnf.make dcl in
 	       ignore (Queue.fold
-			 (Frontend.process_decl (update_status image label env))
+			 (Frontend.process_decl 
+			    (update_status image label buttonclean env))
 			 (Sat.empty,true, Explanation.empty) cnf)
 	    ) ast_pruned
 	with 
@@ -345,11 +350,17 @@ let _ =
 	 ~text:" " ~packing:resultbox#add () in
        
        ignore(toolbar#insert_widget resultbox#coerce);
+       
+       let buttonclean = toolbar#insert_button
+	 ~text:" Clean unused"
+	 ~icon:(GMisc.image ~stock:`CLEAR ())#coerce () in
+	buttonclean#misc#hide ();
+
 
        let thread = ref None in
        
        ignore(buttonrun#connect#clicked 
-	 ~callback:(run buttonrun buttonstop 
+	 ~callback:(run buttonrun buttonstop buttonclean
 		      result_image result_label thread env));
 
        ignore(buttonstop#connect#clicked 
