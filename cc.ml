@@ -248,18 +248,18 @@ module Make (X : Sig.X) = struct
 	   
   (* add a new term in env *)   	
 
-  and add_term (env, ct) t = 
+  and add_term expl (env, ct) t = 
     if debug_cc then Print.add_to_use t;
     (* nothing to do if the term already exists *)
     if Uf.mem env.uf t then (env,ct)
     else
       (* we add t's arguments in env *)
       let {T.f = f; xs = xs} = T.view t in
-      let env , ct = List.fold_left add_term (env,ct) xs in
+      let env , ct = List.fold_left (add_term expl) (env,ct) xs in
       (* we update uf and use *)
-      let nuf, ctx  = Uf.add env.uf t in (* XXX *)
+      let nuf, ctx  = Uf.add env.uf t in 
       if debug_cc then Print.make_cst t ctx;
-      let rt,_   = Uf.find nuf t in
+      let rt,_   = Uf.find nuf t in (* XXX : ctx only in terms *)
       let lvs = concat_leaves nuf xs in
       let nuse = Use.up_add env.use t rt lvs in
       
@@ -276,7 +276,7 @@ module Make (X : Sig.X) = struct
       (* we check the congruence of each term *)
       let env = {uf = nuf; use = nuse; relation = rel} in 
       let env = 
-        List.fold_left (fun env a -> assume a Ex.everything env) env ctx in
+        List.fold_left (fun env a -> assume a expl env) env ctx in
 
       (env,congruents env t st_uset ct)
 	
@@ -285,7 +285,7 @@ module Make (X : Sig.X) = struct
     let env = 
       SetT.fold
 	(fun t env -> 
-	   let env , ct = add_term (env,[]) t in
+	   let env , ct = add_term expl (env,[]) t in
 	   List.fold_left
 	     (fun e (x,y,dep) -> close_up x y dep e) env ct) st env
     in 

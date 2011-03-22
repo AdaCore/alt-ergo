@@ -287,7 +287,7 @@ module Make
 	   P.add p p')
         (P.create [] c ty) l
     in 
-    check_int (Exception.Inconsistent Explanation.everything) p;
+    check_int (Exception.Unsolvable) p;
     is_mine p
 
 

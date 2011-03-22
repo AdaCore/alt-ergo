@@ -1288,11 +1288,12 @@ let findproof_atyped_decl ids td acc =
   match td.c with
     | ARewriting (_,_, arwtl) -> assert false
 
-    | ALogic _ | ATypeDecl _
-    | APredicate_def (_,_,_, _) 
-    | AFunction_def (_,_,_,_, _) -> acc
-      
-    | AAxiom (_, name, af) -> findproof_aform ids af acc 
+    | ALogic _ | ATypeDecl _ -> acc
+
+    | APredicate_def (_,_,_, af) 
+    | AFunction_def (_,_,_,_, af) 
+    | AAxiom (_, _, af) -> findproof_aform ids af acc 
+
     | AGoal (_,_, aaf) -> findproof_aaform ids aaf acc
 
 let findtags_proof expl l =
