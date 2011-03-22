@@ -317,7 +317,7 @@ let _ =
 	    ~packing:fr1#add () 
        in
        let tv1 = GSourceView2.source_view ~source_buffer:buf1 ~packing:(sw1#add)
-	 ~show_line_numbers:true ~wrap_mode:`CHAR() in
+	 ~show_line_numbers:true ~wrap_mode:`NONE() in
        let _ = tv1#misc#modify_font monospace_font in
        let _ = tv1#set_editable false in
        add_to_buffer env.buffer env.ast;
@@ -328,7 +328,7 @@ let _ =
 	    ~packing:fr2#add () 
        in
        let tv2 = GSourceView2.source_view ~source_buffer:buf2 ~packing:(sw2#add)
-	 ~show_line_numbers:false ~wrap_mode:`CHAR() in
+	 ~show_line_numbers:false ~wrap_mode:`NONE() in
        let _ = tv2#misc#modify_font monospace_font in
        let _ = tv2#set_editable false in
 

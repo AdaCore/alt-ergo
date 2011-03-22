@@ -374,10 +374,18 @@ and popup_axiom t env offset () =
   
   let vars, entries, af, aname = (match find t env.buffer env.ast with
     | Some (AD (atd, tyenv)) -> 
-	begin
+      begin
 	  match atd.c with
 	    | AAxiom (_, aname, af) ->
-		pop_w#set_title ("Instanciate axiom "^aname);
+		pop_w#set_title ("Instanciate axiom "^aname)
+	    | APredicate_def (_, aname,_ , af) ->
+		pop_w#set_title ("Instanciate predicate "^aname)
+	    | _ -> assert false
+      end;
+      begin
+	  match atd.c with
+	    | AAxiom (_, aname, af)
+	    | APredicate_def (_, aname,_ , af) ->
 		let vars = remove_doublons (list_vars_in_form af) in
 		let rows = List.length vars in
 		let table = GPack.table ~rows ~columns:2 ~homogeneous:false
@@ -667,6 +675,7 @@ and connect_aaform env sbuf aaf =
 
 let connect_atyped_decl env td =
   match td.c with
+    | APredicate_def (_, _, _, af)
     | AAxiom (_, _, af) ->
 	connect_axiom_tag env td.tag;
 	connect_aform env env.buffer af
@@ -676,7 +685,6 @@ let connect_atyped_decl env td =
     | AGoal (_, _, aaf) ->
 	connect_tag env env.buffer td.tag;
 	connect_aform env env.buffer aaf.c
-    | APredicate_def (_, _, _, af)
     | AFunction_def (_, _, _, _, af) ->
 	connect_tag env env.buffer td.tag;
 	connect_aform env env.buffer af	
@@ -694,27 +702,28 @@ let show_used_lemmas env expl =
   env.proof_tags <- tags;
   List.iter (fun t -> t#set_property (`BACKGROUND "pale green")) tags
   
-(* TODO change this *)
 let prune_unused env expl =
   let ids = match Explanation.ids_of expl with
     | None -> []
     | Some ids -> List.sort Pervasives.compare ids 
   in
-  let rec aux ast ids =
+  let prune_top d = match d.c with
+    | ATypeDecl _ | AGoal _ | ALogic _ -> ()
+    | _ -> prune_nodep d d.tag
+  in
+  let rec aux dont ast ids =
     match ast, ids with
       | [], _ | _, [] -> ()
-      | [d1,_], id::rids -> 
-	if d1.id > id then
-	    prune_nodep d1 d1.tag
-	else aux ast rids
-      | (d1,_)::(((d2,_)::_) as rast), id::rids ->
-	fprintf fmt "%d - %d : %d@." d1.id d2.id id;
-	if id >= d2.id then 
-	  begin 
-	    prune_nodep d1 d1.tag;
-	    aux rast ids
-	  end
-	else if id >= d1.id then aux rast rids
-	else assert false
+	
+      | (d, _)::rast, id::rids ->
+	if id = d.id then (* is d *)
+	  aux false rast rids
+	else if id < d.id then (* in d *)
+	  aux true ast rids
+      	else (* not in d *)
+      	  begin
+	    if not dont then prune_top d;
+      	    aux false rast ids
+      	  end
   in
-  aux env.ast ids
+  aux false env.ast ids
