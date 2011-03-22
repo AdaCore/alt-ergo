@@ -486,12 +486,14 @@ module Make ( R : Sig.X ) = struct
     let rr2, ex_r2 = Env.find_or_canon env r2 in
     let dep = Ex.union dep (Ex.union ex_r1 ex_r2) in
     if debug_uf then 
-      printf "[uf] x-solve: %a = %a@." R.print rr1 R.print rr2;
+      printf "[uf] x-solve: %a = %a %a@."
+	R.print rr1 R.print rr2 Ex.print dep;
     if R.equal rr1 rr2 then [] (* Remove rule *)
     else 
       begin
 	ignore (Env.update_neqs rr1 rr2 dep env);
-        R.solve rr1 rr2 
+        try R.solve rr1 rr2 
+	with Unsolvable -> raise (Inconsistent dep)
       end
         
   let rec ac_x eqs env tch = 
@@ -507,11 +509,9 @@ module Make ( R : Sig.X ) = struct
       ac_x eqs env tch
       
   let union env r1 r2 dep =
-    try
-      let equations = Queue.create () in 
-      Queue.push (r1,r2, dep) equations;
-      ac_x equations env []
-    with Unsolvable -> raise (Inconsistent dep)
+    let equations = Queue.create () in 
+    Queue.push (r1,r2, dep) equations;
+    ac_x equations env []
 
   let rec distinct env rl dep =
     let d = Lit.make (Literal.Distinct rl) in
