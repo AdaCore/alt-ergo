@@ -203,18 +203,18 @@ let unquantify_aatom (buffer:sbuffer) = function
   | AApred a -> AApred a
   | AAbuilt (h,aatl) -> AAbuilt (h, (List.map (unquantify_aaterm buffer) aatl))
 
-let rec unquantify_aform (buffer:sbuffer) vars f ptag =
-  let pptag = (tag buffer) in
+let rec unquantify_aform (buffer:sbuffer) vars f =
+  let ptag = (tag buffer) in
   let c = match f with
     | AFatom aa -> AFatom (unquantify_aatom buffer aa)
     | AFop (op, afl) ->
       AFop (op, List.map
-	(fun af -> unquantify_aform buffer vars af.c ptag) afl)
+	(fun af -> unquantify_aform buffer vars af.c) afl)
     | AFforall aaqf | AFexists aaqf ->
       let {aqf_bvars = bv; aqf_upvars = uv; aqf_triggers = atll; aqf_form = af}=
 	aaqf.c in
       let aqf_bvars = List.filter (fun v -> not (List.mem v vars)) bv in
-      let aform = unquantify_aform buffer vars af.c ptag in
+      let aform = unquantify_aform buffer vars af.c in
       if aqf_bvars = [] then aform.c
       else 
 	let aqf_triggers = 
@@ -237,11 +237,11 @@ let rec unquantify_aform (buffer:sbuffer) vars f ptag =
 	       | _ -> assert false)
     | AFlet (uv, s, at, aaf) ->
       AFlet (List.filter (fun v -> not (List.mem v vars)) uv, s, at,
-	     unquantify_aform buffer vars aaf.c ptag)
+	     unquantify_aform buffer vars aaf.c)
     | AFnamed (n, aaf) ->
-      (unquantify_aform buffer vars aaf.c ptag).c
+      (unquantify_aform buffer vars aaf.c).c
   in
-  new_annot buffer c (Why_typing.new_id ()) pptag
+  new_annot buffer c (Why_typing.new_id ()) ptag
       
   
 
@@ -276,11 +276,10 @@ let make_instance (buffer:sbuffer) vars (entries:GEdit.entry list)
 	 at::l, (remove_doublons used_vars)::u, v::vl
        else l, u, vl
     ) ([],[],[]) entries (List.rev vars) in
-  let ptag = tag buffer in
   let aform = List.fold_left2
     (fun af (s, ty) (at, u) -> 
       new_annot buffer (AFlet (u, s, at.c, af)) af.id (tag buffer))
-    (unquantify_aform buffer vars afc ptag) vars (List.combine terms used_vars)
+    (unquantify_aform buffer vars afc) vars (List.combine terms used_vars)
   in
   let all_used_vars = remove_doublons (List.flatten used_vars) in
   (* new_annot buffer *) aform, all_used_vars
