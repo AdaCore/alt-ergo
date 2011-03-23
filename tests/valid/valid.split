@@ -953,6 +953,25 @@ logic P : int -> prop
 
 goal g5 : (exists x:int. P(x)) -> exists y:int. P(y)
 
+$
+logic f, g : int -> int
+logic h: int,int -> int
+logic a, b:int
+
+goal g6:
+  h(g(a),g(b)) = g(b) ->
+  f(h(g(a),g(b))) - f(g(b)) = 0
+
+$
+
+logic f, g : int -> int
+logic h: int,int -> int
+logic a, b:int
+
+goal g7:
+  h(g(a),g(b)) = g(b) ->
+  g(f(h(g(a),g(b))) - f(g(b))) = g(0) 
+
 
 $$$typage
 logic P : 'a -> prop
