@@ -59,19 +59,19 @@ let tag_callback t env sbuf ~origin:y z i =
         if List.mem env.last_tag env.search_tags then 
           env.last_tag#set_properties 
 	    [`BACKGROUND "gold"; `UNDERLINE_SET false]
-	else if List.mem env.last_tag env.proof_tags then 
-          env.last_tag#set_properties 
-	    [`BACKGROUND "lime green"; `UNDERLINE_SET false]
-	else if List.mem env.last_tag env.proof_toptags then 
-          env.last_tag#set_properties 
-	    [`BACKGROUND "pale green"; `UNDERLINE_SET false]
+	(* else if List.mem env.last_tag env.proof_tags then  *)
+        (*   env.last_tag#set_properties  *)
+	(*     [`BACKGROUND "lime green"; `UNDERLINE_SET false] *)
+	(* else if List.mem env.last_tag env.proof_toptags then  *)
+        (*   env.last_tag#set_properties  *)
+	(*     [`BACKGROUND "pale green"; `UNDERLINE_SET false] *)
 	else
           env.last_tag#set_properties 
 	    [`BACKGROUND_SET false; `UNDERLINE_SET false];
         if env.ctrl then
 	  begin
 	    t#set_properties 
-	      [`BACKGROUND "light green"; `UNDERLINE `SINGLE]
+	      [`BACKGROUND "turquoise1"; `UNDERLINE `SINGLE]
 	  end
 	else
 	  begin
@@ -203,18 +203,18 @@ let unquantify_aatom (buffer:sbuffer) = function
   | AApred a -> AApred a
   | AAbuilt (h,aatl) -> AAbuilt (h, (List.map (unquantify_aaterm buffer) aatl))
 
-let rec unquantify_aform (buffer:sbuffer) vars f =
-  let ptag = (tag buffer) in
+let rec unquantify_aform (buffer:sbuffer) vars f ptag =
+  let pptag = (tag buffer) in
   let c = match f with
     | AFatom aa -> AFatom (unquantify_aatom buffer aa)
     | AFop (op, afl) ->
       AFop (op, List.map
-	(fun af -> unquantify_aform buffer vars af.c) afl)
+	(fun af -> unquantify_aform buffer vars af.c ptag) afl)
     | AFforall aaqf | AFexists aaqf ->
       let {aqf_bvars = bv; aqf_upvars = uv; aqf_triggers = atll; aqf_form = af}=
 	aaqf.c in
       let aqf_bvars = List.filter (fun v -> not (List.mem v vars)) bv in
-      let aform = unquantify_aform buffer vars af.c in
+      let aform = unquantify_aform buffer vars af.c ptag in
       if aqf_bvars = [] then aform.c
       else 
 	let aqf_triggers = 
@@ -237,11 +237,11 @@ let rec unquantify_aform (buffer:sbuffer) vars f =
 	       | _ -> assert false)
     | AFlet (uv, s, at, aaf) ->
       AFlet (List.filter (fun v -> not (List.mem v vars)) uv, s, at,
-	     unquantify_aform buffer vars aaf.c)
+	     unquantify_aform buffer vars aaf.c ptag)
     | AFnamed (n, aaf) ->
-      (unquantify_aform buffer vars aaf.c).c
+      (unquantify_aform buffer vars aaf.c ptag).c
   in
-  new_annot buffer c (Why_typing.new_id ()) ptag
+  new_annot buffer c (Why_typing.new_id ()) pptag
       
   
 
@@ -276,10 +276,11 @@ let make_instance (buffer:sbuffer) vars (entries:GEdit.entry list)
 	 at::l, (remove_doublons used_vars)::u, v::vl
        else l, u, vl
     ) ([],[],[]) entries (List.rev vars) in
+  let ptag = tag buffer in
   let aform = List.fold_left2
     (fun af (s, ty) (at, u) -> 
       new_annot buffer (AFlet (u, s, at.c, af)) af.id (tag buffer))
-    (unquantify_aform buffer vars afc) vars (List.combine terms used_vars)
+    (unquantify_aform buffer vars afc ptag) vars (List.combine terms used_vars)
   in
   let all_used_vars = remove_doublons (List.flatten used_vars) in
   (* new_annot buffer *) aform, all_used_vars
@@ -710,7 +711,7 @@ let show_used_lemmas env expl =
   env.proof_tags <- ftags;
   env.proof_toptags <- atags;
   List.iter (fun t -> t#set_property (`BACKGROUND "pale green")) atags;
-  List.iter (fun t -> t#set_property (`BACKGROUND "lime green")) ftags
+  List.iter (fun t -> t#set_property (`BACKGROUND "green")) ftags
   
 let prune_unused env expl =
   let ids = match Explanation.ids_of expl with
