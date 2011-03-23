@@ -278,7 +278,7 @@ let pred_def env f =
 
 let add_dep f dep =
   match F.view f with 
-    | F.Clause _ | F.Lemma _ | F.Literal _ when proof -> 
+    | F.Literal _ when proof -> 
       if not (Ex.mem_as_bj f dep) then
 	Ex.union (Ex.singleton ~bj:false f) dep
       else dep
@@ -290,6 +290,8 @@ let rec add_dep_of_formula f dep =
   match F.view f with 
     | F.Unit l when proof -> 
       List.fold_left (fun acc f -> add_dep_of_formula f acc) dep l
+    | F.Clause _ when proof -> 
+	Ex.union (Ex.singleton ~bj:false f) dep
     | _ -> dep
 
 
@@ -297,7 +299,9 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
   try
     let dep = add_dep f dep in
     let dep_gamma = add_dep_of_formula f dep in
-    (try raise (IUnsat (Ex.union dep_gamma (MF.find (F.mk_not f) env.gamma)))
+    (try (* Print.gamma env.gamma; *)
+	 (* fprintf fmt "ass:%a %a @." F.print (F.mk_not f) Ex.print dep_gamma; *)
+       raise (IUnsat (Ex.union dep_gamma (MF.find (F.mk_not f) env.gamma)))
      with Not_found -> ());
     if MF.mem f env.gamma then env
     else 

@@ -6,6 +6,7 @@ type 'a annoted =
     { mutable c : 'a; 
       mutable pruned : bool;
       tag : GText.tag;
+      ptag : GText.tag;
       id : int;
       buf : sbuffer }
 
@@ -85,6 +86,7 @@ type env = {
   mutable last_tag : GText.tag;
   mutable search_tags : GText.tag list;
   mutable proof_tags : GText.tag list;
+  mutable proof_toptags : GText.tag list;
   dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t
 }
 
@@ -120,7 +122,9 @@ val make_dep :
   (atyped_decl annoted  * Why_typing.env) list ->
   (atyped_decl annoted list * atyped_decl annoted list) MDep.t
 
-val new_annot : sbuffer -> 'a -> int -> 'a annoted
+val tag : sbuffer -> GText.tag 
+
+val new_annot : sbuffer -> 'a -> int -> GText.tag -> 'a annoted
 
 val annot : 
   sbuffer -> ((int tdecl, int) Why_ptree.annoted * Why_typing.env) list -> 
@@ -152,5 +156,5 @@ val findtags_dep :
   aterm -> (atyped_decl annoted * Why_typing.env) list -> GText.tag list 
 
 val findtags_proof : 
-  Explanation.t -> (atyped_decl annoted * Why_typing.env) list -> GText.tag list
-
+  Explanation.t -> (atyped_decl annoted * Why_typing.env) list ->
+  GText.tag list * GText.tag list 

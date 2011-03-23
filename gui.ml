@@ -127,6 +127,7 @@ let rec run buttonrun buttonstop buttonclean image label thread env () =
   buttonstop#misc#show ();
   buttonrun#misc#hide ();
   buttonclean#misc#hide ();
+  clear_used_lemmas_tags env;
     
   let ast = to_ast env.ast in
   if debug then fprintf fmt "AST : \n-----\n%a@." print_typed_decl_list ast;

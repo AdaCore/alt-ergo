@@ -14,6 +14,7 @@ type 'a annoted =
     { mutable c : 'a; 
       mutable pruned : bool;
       tag : GText.tag;
+      ptag : GText.tag;
       id : int;
       buf : sbuffer }
 
@@ -97,6 +98,7 @@ type env = {
   mutable last_tag : GText.tag;
   mutable search_tags : GText.tag list;
   mutable proof_tags : GText.tag list;
+  mutable proof_toptags : GText.tag list;
   dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t
 }
 
@@ -113,6 +115,7 @@ let create_env buf1 (buf2:sbuffer) st_ctx ast dep  =
     last_tag = GText.tag ();
     search_tags = [];
     proof_tags = [];
+    proof_toptags = [];
   }
 
 
@@ -599,8 +602,9 @@ let make_dep annoted_ast =
 
 let tag (buffer:sbuffer) = buffer#create_tag []
 
-let new_annot (buffer:sbuffer) c id =
-  { c = c; pruned = false; tag = (tag buffer); id = id; buf = buffer }
+let new_annot (buffer:sbuffer) c id ptag =
+  { c = c; pruned = false; tag = (tag buffer); 
+    ptag = ptag;id = id; buf = buffer }
 
 let annot_of_tconstant (buffer:sbuffer)  t =
   new_annot buffer t
@@ -610,8 +614,9 @@ let rec of_tterm (buffer:sbuffer) t =
    at_ty = t.Why_ptree.c.tt_ty }
 
 and annot_of_tterm (buffer:sbuffer) t =
+  let ptag = tag buffer in
   let c = of_tterm buffer t in
-  new_annot buffer c t.Why_ptree.annot
+  new_annot buffer c t.Why_ptree.annot ptag
 
 and of_tt_desc (buffer:sbuffer) = function
   | TTconst c -> (ATconst c)
@@ -650,13 +655,15 @@ let of_oplogic (buffer:sbuffer)  = function
 
 let rec of_quant_form (buffer:sbuffer)   
     {qf_bvars = bv; qf_upvars = uv; qf_triggers = trs; qf_form = tf } =
+  let ptag = tag buffer in
   { aqf_bvars = bv;
     aqf_upvars = uv;
     aqf_triggers = List.map (List.map (annot_of_tterm buffer )) trs;
-    aqf_form = new_annot buffer (of_tform buffer tf) tf.Why_ptree.annot }
+    aqf_form = new_annot buffer (of_tform buffer tf) tf.Why_ptree.annot ptag}
 
 and annot_of_quant_form (buffer:sbuffer) qf =
-  new_annot buffer (of_quant_form buffer qf) (-1)
+  let ptag = tag buffer in
+  new_annot buffer (of_quant_form buffer qf) (-1) ptag
 
 and of_tform (buffer:sbuffer) f = match f.Why_ptree.c with
   | TFatom a -> AFatom (of_tatom buffer a)
@@ -671,10 +678,12 @@ and of_tform (buffer:sbuffer) f = match f.Why_ptree.c with
       AFnamed (n, annot_of_tform buffer tf)
 
 and annot_of_tform (buffer:sbuffer) t =
+  let ptag = tag buffer in
   let c = of_tform buffer t in
-  new_annot buffer c t.Why_ptree.annot
+  new_annot buffer c t.Why_ptree.annot ptag
 
 let annot_of_typed_decl (buffer:sbuffer) td = 
+  let ptag = tag buffer in
   let c = match td.Why_ptree.c with
     | TAxiom (loc, s, tf) -> AAxiom (loc, s, of_tform buffer tf)
     | TRewriting (loc, s, rwtl) ->
@@ -684,11 +693,11 @@ let annot_of_typed_decl (buffer:sbuffer) td =
 	    { rwt with 
 	      rwt_left = of_tterm buffer rwt.rwt_left;
 	      rwt_right = of_tterm buffer rwt.rwt_right }
-	    td.Why_ptree.annot
+	    td.Why_ptree.annot ptag
 	) rwtl in
       ARewriting (loc, s, arwtl)
     | TGoal (loc, s, tf) ->
-        let g = new_annot buffer (of_tform buffer tf) tf.Why_ptree.annot in
+        let g = new_annot buffer (of_tform buffer tf) tf.Why_ptree.annot ptag in
         AGoal (loc, s, g)
     | TLogic (loc, ls, ty) -> ALogic (loc, ls, ty)
     | TPredicate_def (loc, p, spptl, tf) ->
@@ -697,7 +706,7 @@ let annot_of_typed_decl (buffer:sbuffer) td =
         AFunction_def (loc, f,  spptl, ty, of_tform buffer  tf)
     | TTypeDecl (loc, ls, s, lc) -> ATypeDecl (loc, ls, s, lc)
   in
-  new_annot buffer c td.Why_ptree.annot
+  new_annot buffer c td.Why_ptree.annot ptag
 
 
 let annot (buffer:sbuffer) ast =
@@ -848,7 +857,7 @@ and add_aterm_list_at (buffer:sbuffer) tags iter sep =
 	add_aterm_list_at buffer tags iter sep l
 
 and add_aaterm_at (buffer:sbuffer) tags iter at =
-  add_aterm_at buffer (at.tag::tags) iter at.c
+  add_aterm_at buffer (at.tag::at.ptag::tags) iter at.c
 
 and add_aaterm (buffer:sbuffer) tags at =
   add_aaterm_at buffer tags buffer#end_iter at
@@ -954,7 +963,7 @@ let add_oplogic (buffer:sbuffer) indent tags op =
 
 let add_rwt (buffer:sbuffer) indent tags r =
   let { rwt_vars = rv; rwt_left = rl; rwt_right = rr } = r.c in
-  let tags = r.tag::tags in
+  let tags = r.tag::r.ptag::tags in
   buffer#insert (String.make (indent * indent_size) ' ');
   buffer#insert ~tags "forall ";
   fprintf str_formatter "%a. " print_var_list rv;
@@ -977,7 +986,7 @@ let rec add_quant_form (buffer:sbuffer) indent tags qf =
     qf.c in
   fprintf str_formatter "%a " print_var_list bv;
   buffer#insert ~tags (flush_str_formatter ());
-  let ntags = qf.tag::tags in
+  let ntags = qf.tag::qf.ptag::tags in
   buffer#insert ~tags:ntags "[";
   add_triggers buffer ntags trs;
   buffer#insert ~tags:ntags "].";
@@ -1046,8 +1055,8 @@ and add_aaform_list_aux (buffer:sbuffer) indent tags op =
 
 
 and add_aaform (buffer:sbuffer) indent tags
-    {c = af; tag = tag} =
-  add_aform buffer indent (tag::tags) af
+    {c = af; tag = tag; ptag = ptag} =
+  add_aform buffer indent (tag::ptag::tags) af
 
 let add_atyped_decl (buffer:sbuffer) d =
   match d.c with
@@ -1055,57 +1064,57 @@ let add_atyped_decl (buffer:sbuffer) d =
       let keyword = 
 	if String.length s > 0 && s.[0] = '_' 
 	then "hypothesis" else "axiom" in
-      buffer#insert ~tags:[d.tag] (sprintf "%s %s :" keyword s);
+      buffer#insert ~tags:[d.tag;d.ptag] (sprintf "%s %s :" keyword s);
       buffer#insert "\n";
       buffer#insert (String.make indent_size ' ');
-      add_aform buffer 1 [d.tag] af;
+      add_aform buffer 1 [d.tag;d.ptag] af;
       buffer#insert "\n\n"
 
   | ARewriting (loc, s, arwtl) ->
-      buffer#insert ~tags:[d.tag] (sprintf "rewriting %s :" s);
+      buffer#insert ~tags:[d.tag;d.ptag] (sprintf "rewriting %s :" s);
       buffer#insert "\n";
-      add_rwt_list buffer 1 [d.tag] arwtl;
+      add_rwt_list buffer 1 [d.tag;d.ptag] arwtl;
       buffer#insert "\n\n"
 
   | AGoal (loc, s, aaf) -> 
-      buffer#insert ~tags:[d.tag] (sprintf "goal %s :" s);
+      buffer#insert ~tags:[d.tag;d.ptag] (sprintf "goal %s :" s);
       buffer#insert "\n";
       buffer#insert (String.make indent_size ' ');
-      add_aform buffer 1 [d.tag] aaf.c;
+      add_aform buffer 1 [d.tag;d.ptag] aaf.c;
       buffer#insert "\n\n"
 
   | ALogic (loc, ls, ty) ->
       fprintf str_formatter 
 	"logic %a : %a" print_string_list ls print_plogic_type ty;
-      buffer#insert ~tags:[d.tag] (flush_str_formatter());
+      buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
       buffer#insert "\n\n"
 
   | APredicate_def (loc, p, spptl, af) ->
       fprintf str_formatter "predicate %s %a =" p print_pred_type_list spptl;
-      buffer#insert ~tags:[d.tag] (flush_str_formatter());
+      buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
       buffer#insert "\n";
       buffer#insert (String.make indent_size ' ');
-      add_aform buffer 1 [d.tag] af;
+      add_aform buffer 1 [d.tag;d.ptag] af;
       buffer#insert "\n\n"
 
   | AFunction_def (loc, f, spptl, ty, af) ->
       fprintf str_formatter "function %s (%a) : %a =" f
 	print_string_ppure_type_list spptl print_ppure_type ty;
-      buffer#insert ~tags:[d.tag] (flush_str_formatter());
+      buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
       buffer#insert "\n";
       buffer#insert (String.make indent_size ' ');
-      add_aform buffer 1 [d.tag] af;
+      add_aform buffer 1 [d.tag;d.ptag] af;
       buffer#insert "\n\n"
       
   | ATypeDecl (loc, ls, s, []) -> 
       fprintf str_formatter "type %a %s" print_astring_list ls s;
-      buffer#insert ~tags:[d.tag] (flush_str_formatter());
+      buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
       buffer#insert "\n\n"
       
   | ATypeDecl (loc, ls, s, lc) -> 
       fprintf str_formatter "type %a %s = %a"
 	print_astring_list ls s (print_string_sep " | ") lc;
-      buffer#insert ~tags:[d.tag] (flush_str_formatter());
+      buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
       buffer#insert "\n\n"
 
 
@@ -1266,38 +1275,47 @@ let findtags_dep at l =
   let sl = listsymbols at [] in
   List.fold_left (fun acc (td, _) -> findtags_atyped_delc_dep sl td acc) [] l
   
-let rec findproof_aform ids af acc =
+let rec findproof_aform ids af acc found =
   match af with
-    | AFatom at -> acc
+    | AFatom at -> acc, found
     | AFop (_, aafl) ->
       List.fold_left
-	(fun acc aaf -> findproof_aaform ids aaf acc)
-	acc aafl
+	(fun (acc, found) aaf -> findproof_aaform ids aaf acc found)
+	(acc,found) aafl
     | AFforall aaqf | AFexists aaqf ->
-      let acc = if List.mem aaqf.id ids then aaqf.tag::acc else acc in
-      findproof_aaform ids aaqf.c.aqf_form acc
+      let acc, found = 
+	if List.mem aaqf.id ids then aaqf.ptag::acc, true 
+	else acc, found in
+      findproof_aaform ids aaqf.c.aqf_form acc found
     | AFlet (_,_,_, aaf) | AFnamed (_, aaf) ->
-      findproof_aaform ids aaf acc
+      findproof_aaform ids aaf acc found
 
-and findproof_aaform ids aaf acc =
-  let acc = if List.mem aaf.id ids then aaf.tag::acc else acc in
-  findproof_aform ids aaf.c acc 
+and findproof_aaform ids aaf acc found =
+  let acc, found = 
+    if List.mem aaf.id ids then aaf.ptag::acc, true 
+    else acc, found in
+  findproof_aform ids aaf.c acc found
 
-let findproof_atyped_decl ids td acc =
-  let acc = if List.mem td.id ids then td.tag::acc else acc in
+let findproof_atyped_decl ids td (ax,acc) =
+  let acc = if List.mem td.id ids then td.ptag::acc else acc in
   match td.c with
     | ARewriting (_,_, arwtl) -> assert false
 
-    | ALogic _ | ATypeDecl _ -> acc
+    | ALogic _ | ATypeDecl _ -> ax,acc
 
     | APredicate_def (_,_,_, af) 
     | AFunction_def (_,_,_,_, af) 
-    | AAxiom (_, _, af) -> findproof_aform ids af acc 
+    | AAxiom (_, _, af) -> 
+      let acc, found = findproof_aform ids af acc false in
+      if found then td.ptag::ax, acc else ax,acc
 
-    | AGoal (_,_, aaf) -> findproof_aaform ids aaf acc
+    | AGoal (_,_, aaf) ->
+      let acc, found = findproof_aaform ids aaf acc false in
+      if found then td.ptag::ax, acc else ax,acc
 
 let findtags_proof expl l =
   match Explanation.ids_of expl with
-    | None -> []
+    | None -> [],[]
     | Some ids -> 
-      List.fold_left (fun acc (td, _) -> findproof_atyped_decl ids td acc) [] l
+      List.fold_left (fun acc (td, _) ->
+	findproof_atyped_decl ids td acc) ([],[]) l
