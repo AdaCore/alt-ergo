@@ -4,10 +4,6 @@ open Lexing
 open Format
 open Options
 
-
-let last_tag = ref (GText.tag ())
-let search_tags = ref []
-let proof_tags = ref []
     
 let rec prune r t dep =
   r.pruned <- true;
@@ -64,6 +60,9 @@ let tag_callback t env sbuf ~origin:y z i =
           env.last_tag#set_properties 
 	    [`BACKGROUND "gold"; `UNDERLINE_SET false]
 	else if List.mem env.last_tag env.proof_tags then 
+          env.last_tag#set_properties 
+	    [`BACKGROUND "lime green"; `UNDERLINE_SET false]
+	else if List.mem env.last_tag env.proof_toptags then 
           env.last_tag#set_properties 
 	    [`BACKGROUND "pale green"; `UNDERLINE_SET false]
 	else
@@ -191,7 +190,7 @@ let rec remove_doublons = function
 
 
 let unquantify_aaterm (buffer:sbuffer) at =
-  new_annot buffer at.c at.id
+  new_annot buffer at.c at.id (tag buffer)
 
 let unquantify_aatom (buffer:sbuffer) = function
   | AAtrue -> AAtrue
@@ -205,6 +204,7 @@ let unquantify_aatom (buffer:sbuffer) = function
   | AAbuilt (h,aatl) -> AAbuilt (h, (List.map (unquantify_aaterm buffer) aatl))
 
 let rec unquantify_aform (buffer:sbuffer) vars f =
+  let ptag = (tag buffer) in
   let c = match f with
     | AFatom aa -> AFatom (unquantify_aatom buffer aa)
     | AFop (op, afl) ->
@@ -230,8 +230,10 @@ let rec unquantify_aform (buffer:sbuffer) vars f =
 		 aqf_triggers =  aqf_triggers;
 		 aqf_form = aform} in
 	     (match f with
-	       | AFforall _ -> AFforall (new_annot buffer c aaqf.id)
-	       | AFexists _ -> AFexists (new_annot buffer c aaqf.id)
+	       | AFforall _ -> 
+		 AFforall (new_annot buffer c aaqf.id (tag buffer))
+	       | AFexists _ -> 
+		 AFexists (new_annot buffer c aaqf.id (tag buffer))
 	       | _ -> assert false)
     | AFlet (uv, s, at, aaf) ->
       AFlet (List.filter (fun v -> not (List.mem v vars)) uv, s, at,
@@ -239,7 +241,7 @@ let rec unquantify_aform (buffer:sbuffer) vars f =
     | AFnamed (n, aaf) ->
       (unquantify_aform buffer vars aaf.c).c
   in
-  new_annot buffer c (Why_typing.new_id ())
+  new_annot buffer c (Why_typing.new_id ()) ptag
       
   
 
@@ -276,7 +278,7 @@ let make_instance (buffer:sbuffer) vars (entries:GEdit.entry list)
     ) ([],[],[]) entries (List.rev vars) in
   let aform = List.fold_left2
     (fun af (s, ty) (at, u) -> 
-      new_annot buffer (AFlet (u, s, at.c, af)) af.id)
+      new_annot buffer (AFlet (u, s, at.c, af)) af.id (tag buffer))
     (unquantify_aform buffer vars afc) vars (List.combine terms used_vars)
   in
   let all_used_vars = remove_doublons (List.flatten used_vars) in
@@ -309,6 +311,7 @@ let rec least_nested_form used_vars af =
 	least_nested_form used_vars af
 
 let rec add_instance env vars entries af aname =
+  let ptag =  (tag env.inst_buffer) in
   let goal_form, tyenv, loc =
     let rec find_goal = function
       | [] -> raise Not_found
@@ -325,7 +328,7 @@ let rec add_instance env vars entries af aname =
   env.inst_buffer#place_cursor  ~where:env.inst_buffer#end_iter;
   if ln_form = goal_form then begin
     let hy = AAxiom (loc, (sprintf "%s%s" "_instance_" aname), instance.c) in
-    let ahy = new_annot env.inst_buffer hy instance.id in
+    let ahy = new_annot env.inst_buffer hy instance.id ptag in
     let rev_ast = List.rev env.ast in
     let rev_ast = match rev_ast with 
       | (g,te)::l -> (g,te)::(ahy, te)::l
@@ -337,7 +340,7 @@ let rec add_instance env vars entries af aname =
     add_to_buffer env.inst_buffer [ahy, tyenv] 
   end
   else begin
-    let instance = new_annot env.inst_buffer instance.c instance.id in
+    let instance = new_annot env.inst_buffer instance.c instance.id ptag in
     ln_form.c <- 
       AFop 
       (AOPimp, 
@@ -695,12 +698,19 @@ let connect_atyped_decl env td =
 let connect env =
   List.iter (fun (t, _) -> connect_atyped_decl env t) env.ast
 
+let clear_used_lemmas_tags env =
+  List.iter (fun t -> t#set_property (`BACKGROUND_SET false)) env.proof_tags;
+  List.iter (fun t -> t#set_property (`BACKGROUND_SET false)) env.proof_toptags;
+  env.proof_tags <- [];
+  env.proof_toptags <- []
+  
 
 let show_used_lemmas env expl =
-  List.iter (fun t -> t#set_property (`BACKGROUND_SET false)) env.proof_tags;
-  let tags = findtags_proof expl env.ast in
-  env.proof_tags <- tags;
-  List.iter (fun t -> t#set_property (`BACKGROUND "pale green")) tags
+  let atags,ftags = findtags_proof expl env.ast in
+  env.proof_tags <- ftags;
+  env.proof_toptags <- atags;
+  List.iter (fun t -> t#set_property (`BACKGROUND "pale green")) atags;
+  List.iter (fun t -> t#set_property (`BACKGROUND "lime green")) ftags
   
 let prune_unused env expl =
   let ids = match Explanation.ids_of expl with
