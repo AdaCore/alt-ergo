@@ -1,0 +1,455 @@
+(* this is a prelude for Alt-Ergo*)
+(* this is a prelude for Alt-Ergo integer arithmetic *)
+logic match_bool : bool, 'a, 'a -> 'a
+
+
+axiom match_bool_True :
+  (forall z:'a. forall z1:'a. (match_bool(true, z, z1) = z))
+
+
+axiom match_bool_False :
+  (forall z:'a. forall z1:'a. (match_bool(false, z, z1) = z1))
+
+
+logic index_bool : bool -> int
+
+
+axiom index_bool_True : (index_bool(true) = 0)
+
+
+axiom index_bool_False : (index_bool(false) = 1)
+
+
+axiom bool_inversion : (forall u:bool. ((u = true) or (u = false)))
+
+
+function andb(x: bool, y: bool) : bool = match_bool(y, match_bool(x, true,
+  false), false)
+
+
+function orb(x: bool, y: bool) : bool = match_bool(y, true, match_bool(x,
+  true, false))
+
+
+function xorb(x: bool, y: bool) : bool = match_bool(y, match_bool(x, false,
+  true), match_bool(x, true, false))
+
+
+function notb(x: bool) : bool = match_bool(x, false, true)
+
+
+axiom CompatOrderMult :
+  (forall x:int. forall y:int. forall z:int. ((x <= y) -> ((0 <= z) ->
+  ((x * z) <= (y * z)))))
+
+
+logic abs : int -> int
+
+
+axiom abs_def :
+  (forall x:int. (((0 <= x) -> (abs(x) = x)) and ((not (0 <= x)) ->
+  (abs(x) = (-x)))))
+
+
+axiom Abs_pos : (forall x:int. (0 <= abs(x)))
+
+
+logic div : int, int -> int
+
+
+logic mod : int, int -> int
+
+
+axiom Div_mod :
+  (forall x:int. forall y:int. ((not (y = 0)) -> (x = ((y * div(x,
+  y)) + mod(x, y)))))
+
+
+axiom Div_bound :
+  (forall x:int. forall y:int. (((0 <= x) and (0 <  y)) -> ((0 <= div(x,
+  y)) and (div(x, y) <= x))))
+
+
+axiom Mod_bound :
+  (forall x:int. forall y:int. ((not (y = 0)) -> (((-abs(y)) <  mod(x,
+  y)) and (mod(x, y) <  abs(y)))))
+
+
+axiom Div_sign_pos :
+  (forall x:int. forall y:int. (((0 <= x) and (0 <  y)) -> (0 <= div(x, y))))
+
+
+axiom Div_sign_neg :
+  (forall x:int. forall y:int. (((x <= 0) and (0 <  y)) -> (div(x, y) <= 0)))
+
+
+axiom Mod_sign_pos :
+  (forall x:int. forall y:int. (((0 <= x) and (not (y = 0))) -> (0 <= mod(x,
+  y))))
+
+
+axiom Mod_sign_neg :
+  (forall x:int. forall y:int. (((x <= 0) and (not (y = 0))) -> (mod(x,
+  y) <= 0)))
+
+
+axiom Rounds_toward_zero :
+  (forall x:int. forall y:int. ((not (y = 0)) -> (abs((div(x,
+  y) * y)) <= abs(x))))
+
+
+axiom Div_1 : (forall x:int. (div(x, 1) = x))
+
+
+axiom Mod_1 : (forall x:int. (mod(x, 1) = 0))
+
+
+axiom Div_inf :
+  (forall x:int. forall y:int. (((0 <= x) and (x <  y)) -> (div(x, y) = 0)))
+
+
+axiom Mod_inf :
+  (forall x:int. forall y:int. (((0 <= x) and (x <  y)) -> (mod(x, y) = x)))
+
+
+axiom Div_mult :
+  (forall x:int. forall y:int. forall z:int [div(((x * y) + z), x)].
+  (((0 <  x) and ((0 <= y) and (0 <= z))) -> (div(((x * y) + z),
+  x) = (y + div(z, x)))))
+
+
+axiom Mod_mult :
+  (forall x:int. forall y:int. forall z:int [mod(((x * y) + z), x)].
+  (((0 <  x) and ((0 <= y) and (0 <= z))) -> (mod(((x * y) + z), x) = mod(z,
+  x))))
+
+
+type 'a1 t
+
+logic single : 'a2 -> 'a2 t
+
+
+logic union : 'a3 t, 'a3 t -> 'a3 t
+
+
+logic mem : 'a4, 'a4 t -> prop
+
+
+axiom Mem_single :
+  (forall x:'a5. forall y:'a5 [mem(x, single(y))]. (mem(x, single(y)) <->
+  (x = y)))
+
+
+axiom Mem_union :
+  (forall x:'a6. forall s1:'a6 t. forall s2:'a6 t [mem(x, union(s1, s2))].
+  (mem(x, union(s1, s2)) <-> (mem(x, s1) or mem(x, s2))))
+
+
+type enum_t_S1
+
+logic E_S1_a : enum_t_S1
+
+
+logic E_S1_b : enum_t_S1
+
+
+logic match_enum_t_S1 : enum_t_S1, 'a7, 'a7 -> 'a7
+
+
+axiom match_enum_t_S1_E_S1_a :
+  (forall z:'a7. forall z1:'a7. (match_enum_t_S1(E_S1_a, z, z1) = z))
+
+
+axiom match_enum_t_S1_E_S1_b :
+  (forall z:'a7. forall z1:'a7. (match_enum_t_S1(E_S1_b, z, z1) = z1))
+
+
+logic index_enum_t_S1 : enum_t_S1 -> int
+
+
+axiom index_enum_t_S1_E_S1_a : (index_enum_t_S1(E_S1_a) = 0)
+
+
+axiom index_enum_t_S1_E_S1_b : (index_enum_t_S1(E_S1_b) = 1)
+
+
+axiom enum_t_S1_inversion :
+  (forall u:enum_t_S1. ((u = E_S1_a) or (u = E_S1_b)))
+
+
+type enum_t_S2
+
+logic E_S2_1 : enum_t_S2
+
+
+logic E_S2_2 : enum_t_S2
+
+
+logic match_enum_t_S2 : enum_t_S2, 'a8, 'a8 -> 'a8
+
+
+axiom match_enum_t_S2_E_S2_1 :
+  (forall z:'a8. forall z1:'a8. (match_enum_t_S2(E_S2_1, z, z1) = z))
+
+
+axiom match_enum_t_S2_E_S2_2 :
+  (forall z:'a8. forall z1:'a8. (match_enum_t_S2(E_S2_2, z, z1) = z1))
+
+
+logic index_enum_t_S2 : enum_t_S2 -> int
+
+
+axiom index_enum_t_S2_E_S2_1 : (index_enum_t_S2(E_S2_1) = 0)
+
+
+axiom index_enum_t_S2_E_S2_2 : (index_enum_t_S2(E_S2_2) = 1)
+
+
+axiom enum_t_S2_inversion :
+  (forall u:enum_t_S2. ((u = E_S2_1) or (u = E_S2_2)))
+
+
+type enum_t_S3
+
+logic E_S3_1 : enum_t_S3
+
+
+logic E_S3_2 : enum_t_S3
+
+
+logic match_enum_t_S3 : enum_t_S3, 'a9, 'a9 -> 'a9
+
+
+axiom match_enum_t_S3_E_S3_1 :
+  (forall z:'a9. forall z1:'a9. (match_enum_t_S3(E_S3_1, z, z1) = z))
+
+
+axiom match_enum_t_S3_E_S3_2 :
+  (forall z:'a9. forall z1:'a9. (match_enum_t_S3(E_S3_2, z, z1) = z1))
+
+
+logic index_enum_t_S3 : enum_t_S3 -> int
+
+
+axiom index_enum_t_S3_E_S3_1 : (index_enum_t_S3(E_S3_1) = 0)
+
+
+axiom index_enum_t_S3_E_S3_2 : (index_enum_t_S3(E_S3_2) = 1)
+
+
+axiom enum_t_S3_inversion :
+  (forall u:enum_t_S3. ((u = E_S3_1) or (u = E_S3_2)))
+
+
+type enum_t_S4
+
+logic E_S4_1 : enum_t_S4
+
+
+logic E_S4_2 : enum_t_S4
+
+
+logic match_enum_t_S4 : enum_t_S4, 'a10, 'a10 -> 'a10
+
+
+axiom match_enum_t_S4_E_S4_1 :
+  (forall z:'a10. forall z1:'a10. (match_enum_t_S4(E_S4_1, z, z1) = z))
+
+
+axiom match_enum_t_S4_E_S4_2 :
+  (forall z:'a10. forall z1:'a10. (match_enum_t_S4(E_S4_2, z, z1) = z1))
+
+
+logic index_enum_t_S4 : enum_t_S4 -> int
+
+
+axiom index_enum_t_S4_E_S4_1 : (index_enum_t_S4(E_S4_1) = 0)
+
+
+axiom index_enum_t_S4_E_S4_2 : (index_enum_t_S4(E_S4_2) = 1)
+
+
+axiom enum_t_S4_inversion :
+  (forall u:enum_t_S4. ((u = E_S4_1) or (u = E_S4_2)))
+
+
+type enum_t_S5
+
+logic E_S5_1 : enum_t_S5
+
+
+logic E_S5_2 : enum_t_S5
+
+
+logic match_enum_t_S5 : enum_t_S5, 'a11, 'a11 -> 'a11
+
+
+axiom match_enum_t_S5_E_S5_1 :
+  (forall z:'a11. forall z1:'a11. (match_enum_t_S5(E_S5_1, z, z1) = z))
+
+
+axiom match_enum_t_S5_E_S5_2 :
+  (forall z:'a11. forall z1:'a11. (match_enum_t_S5(E_S5_2, z, z1) = z1))
+
+
+logic index_enum_t_S5 : enum_t_S5 -> int
+
+
+axiom index_enum_t_S5_E_S5_1 : (index_enum_t_S5(E_S5_1) = 0)
+
+
+axiom index_enum_t_S5_E_S5_2 : (index_enum_t_S5(E_S5_2) = 1)
+
+
+axiom enum_t_S5_inversion :
+  (forall u:enum_t_S5. ((u = E_S5_1) or (u = E_S5_2)))
+
+
+predicate f1(a2: int, a3: int, a36: bool, a36_1: bool, a37: bool,
+  a37_1: bool, a38: bool, a38_1: bool, a39: bool, a39_1: bool, a4: int,
+  a5: int, a6: int, a7: int, a8: int, a9: int, a40: bool, a11: int,
+  a42: enum_t_S5, a12: int, a13: int, a14: int, a15: int, a16: int,
+  a41: bool, a18: int) =
+  ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((0 <= a13) and
+  (a13 <= 2147483647)) and (not (a13 = 0))) and (0 <= a15)) and
+  (a15 <= 2147483647)) and (not (a15 = 0))) and (a13 = 400)) and
+  (a15 = 50)) and (0 <= a14)) and (a14 <= 2147483647)) and
+  (not (a14 = 0))) and (a14 = 28)) and (0 <= a3)) and (a3 <= 2147483647)) and
+  (not (a3 = 0))) and (0 <= a2)) and (a2 <= 2147483647)) and
+  (not (a2 = 0))) and (0 <= a4)) and (a4 <= 2147483647)) and
+  (not (a4 = 0))) and (0 <= a6)) and (a6 <= 2147483647)) and
+  (not (a6 = 0))) and (0 <= a7)) and (a7 <= 2147483647)) and
+  (not (a7 = 0))) and (a3 = 1000)) and (a2 = 950)) and (a4 = 25)) and
+  (a6 = 15)) and (a7 = 10)) and (a15 <= (a3 - a2))) and
+  (a15 <= ((a4 + a7) + a6))) and (30 <= div(a3, a14))) and (a8 = 100)) and
+  (0 <= a5)) and (a5 <= 2147483647)) and (not (a5 = 0))) and (0 <= a18)) and
+  (a18 <= 2147483647)) and (not (a18 = 0))) and (0 <= a16)) and
+  (a16 <= 2147483647)) and (not (a16 = 0))) and (0 <= a9)) and
+  (a9 <= 2147483647)) and (not (a9 = 0))) and (0 <= a11)) and
+  (a11 <= 2147483647)) and (not (a11 = 0))) and (a5 = 8000)) and
+  (a18 = 2000)) and (a16 = 8000)) and (a9 = 10000)) and (a11 = 5000)) and
+  (0 <= a12)) and (a12 <= 2147483647)) and (not (a12 = 0))) and
+  ((div(((a3 + a7) + a6), a15) + 1) <= a12))
+
+predicate f2(a2: int, a3: int, a36: bool, a36_1: bool, a37: bool,
+  a37_1: bool, a38: bool, a38_1: bool, a39: bool, a39_1: bool, a4: int,
+  a5: int, a6: int, a7: int, a8: int, a9: int, a40: bool, a11: int,
+  a42: enum_t_S5, a12: int, a13: int, a14: int, a15: int, a16: int,
+  a41: bool, a18: int) = true
+
+predicate f3(a2: int, a3: int, a36: bool, a36_1: bool, a37: bool,
+  a37_1: bool, a38: bool, a38_1: bool, a39: bool, a39_1: bool, a4: int,
+  a5: int, a6: int, a7: int, a8: int, a9: int, a40: bool, a11: int,
+  a42: enum_t_S5, a12: int, a13: int, a14: int, a15: int, a16: int,
+  a41: bool, a18: int) = ((((a40 = a36_1) and (a40 = a38_1)) and
+  (a41 = a37_1)) and (a41 = a39_1))
+
+predicate f4(a2: int, a3: int, a36: bool, a36_1: bool, a37: bool,
+  a37_1: bool, a38: bool, a38_1: bool, a39: bool, a39_1: bool, a4: int,
+  a5: int, a6: int, a7: int, a8: int, a9: int, a40: bool, a11: int,
+  a42: enum_t_S5, a12: int, a13: int, a14: int, a15: int, a16: int,
+  a41: bool, a18: int) = true
+
+predicate f5(a2: int, a3: int, a36: bool, a36_1: bool, a37: bool,
+  a37_1: bool, a38: bool, a38_1: bool, a39: bool, a39_1: bool, a4: int,
+  a5: int, a6: int, a7: int, a8: int, a9: int, a40: bool, a11: int,
+  a42: enum_t_S5, a12: int, a13: int, a14: int, a15: int, a16: int,
+  a41: bool, a18: int) = ((E_S4_2 = E_S4_1) and (a42 = E_S5_1))
+
+predicate f10(a2: int, a3: int, a36: bool, a36_1: bool, a37: bool,
+  a37_1: bool, a38: bool, a38_1: bool, a39: bool, a39_1: bool, a4: int,
+  a5: int, a6: int, a7: int, a8: int, a9: int, a40: bool, a11: int,
+  a42: enum_t_S5, a12: int, a13: int, a14: int, a15: int, a16: int,
+  a41: bool, a18: int) = ((E_S4_2 = E_S4_1) and (not (a42 = E_S5_1)))
+
+predicate f13(a2: int, a3: int, a36: bool, a36_1: bool, a37: bool,
+  a37_1: bool, a38: bool, a38_1: bool, a39: bool, a39_1: bool, a4: int,
+  a5: int, a6: int, a7: int, a8: int, a9: int, a40: bool, a11: int,
+  a42: enum_t_S5, a12: int, a13: int, a14: int, a15: int, a16: int,
+  a41: bool, a18: int) = ((not (E_S4_2 = E_S4_1)) and (a42 = E_S5_1))
+
+predicate f14(a2: int, a3: int, a36: bool, a36_1: bool, a37: bool,
+  a37_1: bool, a38: bool, a38_1: bool, a39: bool, a39_1: bool, a4: int,
+  a5: int, a6: int, a7: int, a8: int, a9: int, a40: bool, a11: int,
+  a42: enum_t_S5, a12: int, a13: int, a14: int, a15: int, a16: int,
+  a41: bool, a18: int) = ((not (E_S4_2 = E_S4_1)) and (not (a42 = E_S5_1)))
+
+predicate f15(a2: int, a3: int, a36: bool, a36_1: bool, a37: bool,
+  a37_1: bool, a38: bool, a38_1: bool, a39: bool, a39_1: bool, a4: int,
+  a5: int, a6: int, a7: int, a8: int, a9: int, a40: bool, a11: int,
+  a42: enum_t_S5, a12: int, a13: int, a14: int, a15: int, a16: int,
+  a41: bool, a18: int) = true
+
+predicate f16(a2: int, a3: int, a36: bool, a36_1: bool, a37: bool,
+  a37_1: bool, a38: bool, a38_1: bool, a39: bool, a39_1: bool, a4: int,
+  a5: int, a6: int, a7: int, a8: int, a9: int, a40: bool, a11: int,
+  a42: enum_t_S5, a12: int, a13: int, a14: int, a15: int, a16: int,
+  a41: bool, a18: int) = ((E_S4_2 = E_S4_1) and (a42 = E_S5_1))
+
+predicate f18(a2: int, a3: int, a36: bool, a36_1: bool, a37: bool,
+  a37_1: bool, a38: bool, a38_1: bool, a39: bool, a39_1: bool, a4: int,
+  a5: int, a6: int, a7: int, a8: int, a9: int, a40: bool, a11: int,
+  a42: enum_t_S5, a12: int, a13: int, a14: int, a15: int, a16: int,
+  a41: bool, a18: int) = ((E_S4_2 = E_S4_1) and (not (a42 = E_S5_1)))
+
+predicate f20(a2: int, a3: int, a36: bool, a36_1: bool, a37: bool,
+  a37_1: bool, a38: bool, a38_1: bool, a39: bool, a39_1: bool, a4: int,
+  a5: int, a6: int, a7: int, a8: int, a9: int, a40: bool, a11: int,
+  a42: enum_t_S5, a12: int, a13: int, a14: int, a15: int, a16: int,
+  a41: bool, a18: int) = ((not (E_S4_2 = E_S4_1)) and (a42 = E_S5_1))
+
+predicate f21(a2: int, a3: int, a36: bool, a36_1: bool, a37: bool,
+  a37_1: bool, a38: bool, a38_1: bool, a39: bool, a39_1: bool, a4: int,
+  a5: int, a6: int, a7: int, a8: int, a9: int, a40: bool, a11: int,
+  a42: enum_t_S5, a12: int, a13: int, a14: int, a15: int, a16: int,
+  a41: bool, a18: int) = ((not (E_S4_2 = E_S4_1)) and (not (a42 = E_S5_1)))
+
+predicate f22(a2: int, a3: int, a36: bool, a36_1: bool, a37: bool,
+  a37_1: bool, a38: bool, a38_1: bool, a39: bool, a39_1: bool, a4: int,
+  a5: int, a6: int, a7: int, a8: int, a9: int, a40: bool, a11: int,
+  a42: enum_t_S5, a12: int, a13: int, a14: int, a15: int, a16: int,
+  a41: bool, a18: int) = ((((a36 = a36_1) and (a38 = a38_1)) and
+  (a37 = a37_1)) and (a39 = a39_1))
+
+predicate f23(a2: int, a3: int, a36: bool, a36_1: bool, a37: bool,
+  a37_1: bool, a38: bool, a38_1: bool, a39: bool, a39_1: bool, a4: int,
+  a5: int, a6: int, a7: int, a8: int, a9: int, a40: bool, a11: int,
+  a42: enum_t_S5, a12: int, a13: int, a14: int, a15: int, a16: int,
+  a41: bool, a18: int) = true
+
+goal g10_1 :
+  (forall a2:int.
+  (forall a3:int.
+  (forall a36:bool.
+  (forall a36_1:bool.
+  (forall a37:bool.
+  (forall a37_1:bool.
+  (forall a38:bool.
+  (forall a38_1:bool.
+  (forall a39:bool.
+  (forall a39_1:bool.
+  (forall a4:int.
+  (forall a5:int.
+  (forall a6:int.
+  (forall a7:int.
+  (forall a8:int.
+  (forall a9:int.
+  (forall a40:bool.
+  (forall a11:int.
+  (forall a42:enum_t_S5.
+  (forall a12:int.
+  (forall a13:int.
+  (forall a14:int.
+  (forall a15:int.
+  (forall a16:int.
+  (forall a41:bool.
+  (forall a18:int. ((f1(a2, a3, a36, a36_1, a37, a37_1, a38, a38_1, a39,
+  a39_1, a4, a5, a6, a7, a8, a9, a40, a11, a42, a12, a13, a14, a15, a16, a41,
+  a18) and (f2(a2, a3, a36, a36_1, a37, a37_1, a38, a38_1, a39, a39_1, a4,
+  a5, a6, a7, a8, a9, a40, a11, a42, a12, a13, a14, a15, a16, a41, a18) and
+  (f3(a2, a3, a36, a36_1, a37, a37_1, a38, a38_1, a39, a39_1, a4, a5, a6, a7,
+  a8, a9, a40, a11, a42, a12, a13, a14, a15, a16, a41, a18) and (f4(a2, a3,
+  a36, a36_1, a37, a37_1, a38, a38_1, a39, a39_1, a4, a5, a6, a7, a8, a9,
+  a40, a11, a42, a12, a13, a14, a15, a16, a41, a18) and f5(a2, a3, a36,
+  a36_1, a37, a37_1, a38, a38_1, a39, a39_1, a4, a5, a6, a7, a8, a9, a40,
+  a11, a42, a12, a13, a14, a15, a16, a41, a18))))) -> (a38_1 = true))))))))))))))))))))))))))))

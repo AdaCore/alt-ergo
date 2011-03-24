@@ -1,0 +1,290 @@
+(* this is a prelude for Alt-Ergo*)
+(* this is a prelude for Alt-Ergo integer arithmetic *)
+logic match_bool : bool, 'a, 'a -> 'a
+
+
+axiom match_bool_True :
+  (forall z:'a. forall z1:'a. (match_bool(true, z, z1) = z))
+
+
+axiom match_bool_False :
+  (forall z:'a. forall z1:'a. (match_bool(false, z, z1) = z1))
+
+
+logic index_bool : bool -> int
+
+
+axiom index_bool_True : (index_bool(true) = 0)
+
+
+axiom index_bool_False : (index_bool(false) = 1)
+
+
+axiom bool_inversion : (forall u:bool. ((u = true) or (u = false)))
+
+
+function andb(x: bool, y: bool) : bool = match_bool(y, match_bool(x, true,
+  false), false)
+
+
+function orb(x: bool, y: bool) : bool = match_bool(y, true, match_bool(x,
+  true, false))
+
+
+function xorb(x: bool, y: bool) : bool = match_bool(y, match_bool(x, false,
+  true), match_bool(x, true, false))
+
+
+function notb(x: bool) : bool = match_bool(x, false, true)
+
+
+axiom CompatOrderMult :
+  (forall x:int. forall y:int. forall z:int. ((x <= y) -> ((0 <= z) ->
+  ((x * z) <= (y * z)))))
+
+
+logic abs : int -> int
+
+
+axiom abs_def :
+  (forall x:int. (((0 <= x) -> (abs(x) = x)) and ((not (0 <= x)) ->
+  (abs(x) = (-x)))))
+
+
+axiom Abs_pos : (forall x:int. (0 <= abs(x)))
+
+
+logic div : int, int -> int
+
+
+logic mod : int, int -> int
+
+
+axiom Div_mod :
+  (forall x:int. forall y:int. ((not (y = 0)) -> (x = ((y * div(x,
+  y)) + mod(x, y)))))
+
+
+axiom Div_bound :
+  (forall x:int. forall y:int. (((0 <= x) and (0 <  y)) -> ((0 <= div(x,
+  y)) and (div(x, y) <= x))))
+
+
+axiom Mod_bound :
+  (forall x:int. forall y:int. ((not (y = 0)) -> (((-abs(y)) <  mod(x,
+  y)) and (mod(x, y) <  abs(y)))))
+
+
+axiom Div_sign_pos :
+  (forall x:int. forall y:int. (((0 <= x) and (0 <  y)) -> (0 <= div(x, y))))
+
+
+axiom Div_sign_neg :
+  (forall x:int. forall y:int. (((x <= 0) and (0 <  y)) -> (div(x, y) <= 0)))
+
+
+axiom Mod_sign_pos :
+  (forall x:int. forall y:int. (((0 <= x) and (not (y = 0))) -> (0 <= mod(x,
+  y))))
+
+
+axiom Mod_sign_neg :
+  (forall x:int. forall y:int. (((x <= 0) and (not (y = 0))) -> (mod(x,
+  y) <= 0)))
+
+
+axiom Rounds_toward_zero :
+  (forall x:int. forall y:int. ((not (y = 0)) -> (abs((div(x,
+  y) * y)) <= abs(x))))
+
+
+axiom Div_1 : (forall x:int. (div(x, 1) = x))
+
+
+axiom Mod_1 : (forall x:int. (mod(x, 1) = 0))
+
+
+axiom Div_inf :
+  (forall x:int. forall y:int. (((0 <= x) and (x <  y)) -> (div(x, y) = 0)))
+
+
+axiom Mod_inf :
+  (forall x:int. forall y:int. (((0 <= x) and (x <  y)) -> (mod(x, y) = x)))
+
+
+axiom Div_mult :
+  (forall x:int. forall y:int. forall z:int [div(((x * y) + z), x)].
+  (((0 <  x) and ((0 <= y) and (0 <= z))) -> (div(((x * y) + z),
+  x) = (y + div(z, x)))))
+
+
+axiom Mod_mult :
+  (forall x:int. forall y:int. forall z:int [mod(((x * y) + z), x)].
+  (((0 <  x) and ((0 <= y) and (0 <= z))) -> (mod(((x * y) + z), x) = mod(z,
+  x))))
+
+
+type 'a1 t
+
+logic single : 'a2 -> 'a2 t
+
+
+logic union : 'a3 t, 'a3 t -> 'a3 t
+
+
+logic mem : 'a4, 'a4 t -> prop
+
+
+axiom Mem_single :
+  (forall x:'a5. forall y:'a5 [mem(x, single(y))]. (mem(x, single(y)) <->
+  (x = y)))
+
+
+axiom Mem_union :
+  (forall x:'a6. forall s1:'a6 t. forall s2:'a6 t [mem(x, union(s1, s2))].
+  (mem(x, union(s1, s2)) <-> (mem(x, s1) or mem(x, s2))))
+
+
+type enum_POSITION
+
+logic E_normal : enum_POSITION
+
+
+logic E_reverse : enum_POSITION
+
+
+logic E_void : enum_POSITION
+
+
+logic match_enum_POSITION : enum_POSITION, 'a7, 'a7, 'a7 -> 'a7
+
+
+axiom match_enum_POSITION_E_normal :
+  (forall z:'a7. forall z1:'a7. forall z2:'a7. (match_enum_POSITION(E_normal,
+  z, z1, z2) = z))
+
+
+axiom match_enum_POSITION_E_reverse :
+  (forall z:'a7. forall z1:'a7. forall z2:'a7.
+  (match_enum_POSITION(E_reverse, z, z1, z2) = z1))
+
+
+axiom match_enum_POSITION_E_void :
+  (forall z:'a7. forall z1:'a7. forall z2:'a7. (match_enum_POSITION(E_void,
+  z, z1, z2) = z2))
+
+
+logic index_enum_POSITION : enum_POSITION -> int
+
+
+axiom index_enum_POSITION_E_normal : (index_enum_POSITION(E_normal) = 0)
+
+
+axiom index_enum_POSITION_E_reverse : (index_enum_POSITION(E_reverse) = 1)
+
+
+axiom index_enum_POSITION_E_void : (index_enum_POSITION(E_void) = 2)
+
+
+axiom enum_POSITION_inversion :
+  (forall u:enum_POSITION. (((u = E_normal) or (u = E_reverse)) or
+  (u = E_void)))
+
+
+predicate f1(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) = true
+
+predicate f2(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) = true
+
+predicate f3(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) =
+  (((not (m1 = E_reverse)) and (m1 = E_normal)) and (m2 = E_reverse))
+
+predicate f5(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) =
+  ((((mem(E_normal, union(union(single(m1), single(m2)), single(m3))) and
+  (((not (E_reverse = m1)) and (not (E_reverse = m2))) and
+  (not (E_reverse = m3)))) and (E_void = E_normal)) or ((mem(E_reverse,
+  union(union(single(m1), single(m2)), single(m3))) and
+  (((not (E_normal = m1)) and (not (E_normal = m2))) and
+  (not (E_normal = m3)))) and (E_void = E_reverse))) or ((mem(E_normal,
+  union(union(single(m1), single(m2)), single(m3))) -> mem(E_reverse,
+  union(union(single(m1), single(m2)), single(m3)))) and (mem(E_reverse,
+  union(union(single(m1), single(m2)), single(m3))) -> mem(E_normal,
+  union(union(single(m1), single(m2)), single(m3))))))
+
+predicate f6(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) =
+  (((not (m1 = E_reverse)) and (m1 = E_normal)) and (m3 = E_reverse))
+
+predicate f7(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) =
+  ((((not (m1 = E_reverse)) and (m1 = E_normal)) and
+  (not (m2 = E_reverse))) and (not (m3 = E_reverse)))
+
+predicate f8(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) =
+  (((mem(E_normal, union(union(single(m1), single(m2)), single(m3))) and
+  (((not (E_reverse = m1)) and (not (E_reverse = m2))) and
+  (not (E_reverse = m3)))) or ((mem(E_reverse, union(union(single(m1),
+  single(m2)), single(m3))) and (((not (E_normal = m1)) and
+  (not (E_normal = m2))) and (not (E_normal = m3)))) and
+  (E_normal = E_reverse))) or (((mem(E_normal, union(union(single(m1),
+  single(m2)), single(m3))) -> mem(E_reverse, union(union(single(m1),
+  single(m2)), single(m3)))) and (mem(E_reverse, union(union(single(m1),
+  single(m2)), single(m3))) -> mem(E_normal, union(union(single(m1),
+  single(m2)), single(m3))))) and (E_normal = E_void)))
+
+predicate f9(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) =
+  (((not (m1 = E_normal)) and (m1 = E_reverse)) and (m2 = E_normal))
+
+predicate f10(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) =
+  (((not (m1 = E_normal)) and (m1 = E_reverse)) and (m3 = E_normal))
+
+predicate f11(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) =
+  ((((not (m1 = E_normal)) and (m1 = E_reverse)) and
+  (not (m2 = E_normal))) and (not (m3 = E_normal)))
+
+predicate f12(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) =
+  ((((mem(E_normal, union(union(single(m1), single(m2)), single(m3))) and
+  (((not (E_reverse = m1)) and (not (E_reverse = m2))) and
+  (not (E_reverse = m3)))) and (E_reverse = E_normal)) or (mem(E_reverse,
+  union(union(single(m1), single(m2)), single(m3))) and
+  (((not (E_normal = m1)) and (not (E_normal = m2))) and
+  (not (E_normal = m3))))) or (((mem(E_normal, union(union(single(m1),
+  single(m2)), single(m3))) -> mem(E_reverse, union(union(single(m1),
+  single(m2)), single(m3)))) and (mem(E_reverse, union(union(single(m1),
+  single(m2)), single(m3))) -> mem(E_normal, union(union(single(m1),
+  single(m2)), single(m3))))) and (E_reverse = E_void)))
+
+predicate f13(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) =
+  (((((not (m1 = E_normal)) and (not (m1 = E_reverse))) and
+  (not (m2 = E_reverse))) and (m2 = E_normal)) and (m3 = E_reverse))
+
+predicate f14(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) =
+  (((((not (m1 = E_normal)) and (not (m1 = E_reverse))) and
+  (not (m2 = E_reverse))) and (m2 = E_normal)) and (not (m3 = E_reverse)))
+
+predicate f15(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) =
+  (((((not (m1 = E_normal)) and (not (m1 = E_reverse))) and
+  (not (m2 = E_normal))) and (m2 = E_reverse)) and (m3 = E_normal))
+
+predicate f16(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) =
+  (((((not (m1 = E_normal)) and (not (m1 = E_reverse))) and
+  (not (m2 = E_normal))) and (m2 = E_reverse)) and (not (m3 = E_normal)))
+
+predicate f17(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) =
+  ((((not (m1 = E_normal)) and (not (m1 = E_reverse))) and
+  (not (m2 = E_normal))) and (not (m2 = E_reverse)))
+
+predicate f19(m1: enum_POSITION, m2: enum_POSITION, m3: enum_POSITION) =
+  ((((mem(E_normal, union(union(single(m1), single(m2)), single(m3))) and
+  (((not (E_reverse = m1)) and (not (E_reverse = m2))) and
+  (not (E_reverse = m3)))) and (m3 = E_normal)) or ((mem(E_reverse,
+  union(union(single(m1), single(m2)), single(m3))) and
+  (((not (E_normal = m1)) and (not (E_normal = m2))) and
+  (not (E_normal = m3)))) and (m3 = E_reverse))) or (((mem(E_normal,
+  union(union(single(m1), single(m2)), single(m3))) -> mem(E_reverse,
+  union(union(single(m1), single(m2)), single(m3)))) and (mem(E_reverse,
+  union(union(single(m1), single(m2)), single(m3))) -> mem(E_normal,
+  union(union(single(m1), single(m2)), single(m3))))) and (m3 = E_void)))
+
+goal estimate_11 :
+  (forall m1:enum_POSITION.
+  (forall m2:enum_POSITION.
+  (forall m3:enum_POSITION. ((f1(m1, m2, m3) and (f2(m1, m2, m3) and f17(m1,
+  m2, m3))) -> f19(m1, m2, m3)))))
