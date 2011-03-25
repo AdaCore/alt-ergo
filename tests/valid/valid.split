@@ -972,6 +972,15 @@ goal g7:
   h(g(a),g(b)) = g(b) ->
   g(f(h(g(a),g(b))) - f(g(b))) = g(0) 
 
+$
+logic h,g,f: int,int -> int
+logic a, b:int
+
+goal g8:
+  h(g(a,a),g(b,b)) = g(b,b) ->
+  a = b ->
+  g(f(h(g(a,a),g(b,b)),b) - f(g(b,b),a),
+    f(h(g(a,a),g(b,b)),a) - f(g(b,b),b)) = g(0,0) 
 
 $$$typage
 logic P : 'a -> prop
