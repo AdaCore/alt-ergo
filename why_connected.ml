@@ -190,7 +190,7 @@ let rec remove_doublons = function
 
 
 let unquantify_aaterm (buffer:sbuffer) at =
-  new_annot buffer at.c at.id (tag buffer)
+  new_annot buffer at.c (Why_typing.new_id ()) (tag buffer)
 
 let unquantify_aatom (buffer:sbuffer) = function
   | AAtrue -> AAtrue
@@ -231,9 +231,9 @@ let rec unquantify_aform (buffer:sbuffer) vars f =
 		 aqf_form = aform} in
 	     (match f with
 	       | AFforall _ -> 
-		 AFforall (new_annot buffer c aaqf.id (tag buffer))
+		 AFforall (new_annot buffer c (Why_typing.new_id ()) (tag buffer))
 	       | AFexists _ -> 
-		 AFexists (new_annot buffer c aaqf.id (tag buffer))
+		 AFexists (new_annot buffer c (Why_typing.new_id ()) (tag buffer))
 	       | _ -> assert false)
     | AFlet (uv, s, at, aaf) ->
       AFlet (List.filter (fun v -> not (List.mem v vars)) uv, s, at,
@@ -278,7 +278,7 @@ let make_instance (buffer:sbuffer) vars (entries:GEdit.entry list)
     ) ([],[],[]) entries (List.rev vars) in
   let aform = List.fold_left2
     (fun af (s, ty) (at, u) -> 
-      new_annot buffer (AFlet (u, s, at.c, af)) af.id (tag buffer))
+      new_annot buffer (AFlet (u, s, at.c, af)) (Why_typing.new_id ()) (tag buffer))
     (unquantify_aform buffer vars afc) vars (List.combine terms used_vars)
   in
   let all_used_vars = remove_doublons (List.flatten used_vars) in
@@ -707,10 +707,11 @@ let clear_used_lemmas_tags env =
 
 let show_used_lemmas env expl =
   let atags,ftags = findtags_proof expl env.ast in
-  env.proof_tags <- ftags;
-  env.proof_toptags <- atags;
+  clear_used_lemmas_tags env;
   List.iter (fun t -> t#set_property (`BACKGROUND "pale green")) atags;
-  List.iter (fun t -> t#set_property (`BACKGROUND "green")) ftags
+  List.iter (fun t -> t#set_property (`BACKGROUND "green")) ftags;
+  env.proof_tags <- ftags;
+  env.proof_toptags <- atags
   
 let prune_unused env expl =
   let ids = match Explanation.ids_of expl with

@@ -288,8 +288,8 @@ let add_dep f dep =
 let rec add_dep_of_formula f dep =
   let dep = add_dep f dep in
   match F.view f with 
-    | F.Unit l when proof -> 
-      List.fold_left (fun acc f -> add_dep_of_formula f acc) dep l
+    | F.Unit (f1, f2) when proof ->
+      add_dep_of_formula f2 (add_dep_of_formula f1 dep)
     | F.Clause _ when proof -> 
 	Ex.union (Ex.singleton ~bj:false f) dep
     | _ -> dep
@@ -315,12 +315,11 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 	  let env = { env with gamma = MF.add f dep_gamma env.gamma } in
 	  Print.assume ff dep;
 	  match F.view f with
-	    | F.Unit l -> 
-		List.fold_left assume env 
-		  (List.map (fun x->
-		    { f = x; age = age; name = lem; mf = mf; gf = gf }, dep
-		   ) l)
-
+	    | F.Unit (f1, f2) ->
+	      let env = assume env 
+		({ f = f1; age = age; name = lem; mf = mf; gf = gf }, dep) in
+	      assume env 
+		({ f = f2; age = age; name = lem; mf = mf; gf = gf }, dep) 
 	    | F.Clause(f1,f2) -> 
 	        (* let dep = Ex.union (Ex.singleton ~bj:false f) dep in *)
 		let p1 = {f=f1;age=age;name=lem;mf=mf;gf=gf} in

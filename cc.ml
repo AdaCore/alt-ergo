@@ -128,9 +128,9 @@ module Make (X : Sig.X) = struct
 
   let semantic_view env a ex_a = 
     match Literal.LT.view a with
-      | Literal.Distinct lt -> 
+      | Literal.Distinct (b, lt) -> 
 	  let lr, ex = fex env ex_a lt in 
-	  Literal.Distinct lr, ex
+	  Literal.Distinct (b, lr), ex
       | Literal.Builtin(b, s, l) -> 
 	  let lr, ex  = fex env ex_a l in
 	  Literal.Builtin(b, s, List.rev lr), ex
@@ -228,7 +228,7 @@ module Make (X : Sig.X) = struct
 	       close_up_r r1 r2 (Ex.union ex dep) { env with use = use}
            (* XXX: les tableaux peuvent retourner des diseq aussi ! 
               Il faut factoriser un peu le code par la suite *)
-           | Literal.Distinct lr -> 
+           | Literal.Distinct (false, lr) -> 
 	       let env = {env with uf = Uf.distinct env.uf lr dep} in
                replay_atom_r env [ra, None, ex] dep
            | _ -> assert false
@@ -307,7 +307,8 @@ module Make (X : Sig.X) = struct
 	    (fun acc t2 ->
 	       match T.view t2 with
 		 | {T.f=f2 ; xs=[b]} when S.equal f1 f2 ->
-                     let dist = Literal.LT.make (Literal.Distinct [a; b]) in
+                     let dist = 
+		       Literal.LT.make (Literal.Distinct (false, [a; b])) in
                      begin match Uf.are_distinct uf t1 t2 with
                        | Yes ex -> (dist,ex) :: acc
                        | No -> assert false
@@ -340,11 +341,14 @@ module Make (X : Sig.X) = struct
 	    List.fold_left 
               (fun env (a,ex) -> assume_rec (Ex.union ex dep) env a) env facts
 	  end
-      | Literal.Distinct lt -> 
+      | Literal.Distinct (false, lt) -> 
 	  let lr, ex = fex env dep lt in
 	  let env = {env with uf = Uf.distinct env.uf lr ex} in
 	  let env = replay_atom env (SetA.singleton (a, dep)) [] dep in
 	  contra_congruence env lr ex
+
+      | Literal.Distinct (true, _) -> assert false
+
       | _ -> replay_atom env (SetA.singleton (a, dep)) [] dep
     end with Inconsistent dep' -> raise (Inconsistent (Ex.union dep dep'))
 
@@ -381,9 +385,10 @@ if Options.nocontracongru then env
       | Literal.Eq(r1, r2) ->
           let env = replay_atom_r env [ra, None, dep] dep in
           close_up_r r1 r2 dep env
-      | Literal.Distinct lr ->
+      | Literal.Distinct (false, lr) ->
 	  let env = {env with uf = Uf.distinct env.uf lr dep} in
           replay_atom_r env [ra, None, dep] dep
+      | Literal.Distinct (true, _) -> assert false
       | _ ->
           replay_atom_r env [ra, None, dep] dep
 
@@ -481,7 +486,7 @@ if Options.nocontracongru then env
 	| Literal.Eq (t1, t2)  -> 
 	    Uf.are_equal env.uf t1 t2
 
-	| Literal.Distinct [t1; t2] -> 
+	| Literal.Distinct (false, [t1; t2]) -> 
 	    Uf.are_distinct env.uf t1 t2
 
 	| Literal.Distinct _ -> 
@@ -502,6 +507,8 @@ if Options.nocontracongru then env
     in
     let t = { gamma = env; gamma_finite = env; choices = [] } in
     fst 
-      (assume (Literal.LT.make (Literal.Distinct [T.vrai; T.faux])) Ex.empty t)
+      (assume 
+	 (Literal.LT.make (Literal.Distinct (false, [T.vrai; T.faux])))
+	 Ex.empty t)
 
 end

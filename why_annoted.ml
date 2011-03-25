@@ -423,7 +423,7 @@ and print_triggers fmt = function
   | [ts] -> print_tterm_list "," fmt ts
   | ts::l -> fprintf fmt "%a | %a" (print_tterm_list ",") ts print_triggers l
 
-and print_tform fmt f = match f.Why_ptree.c with
+and print_tform2 fmt f = match f.Why_ptree.c with
   | TFatom a -> print_tatom fmt a
   | TFop (op, tfl) -> print_tform_list op fmt tfl
   | TFforall qf -> fprintf fmt "forall %a" print_quant_form qf
@@ -432,6 +432,8 @@ and print_tform fmt f = match f.Why_ptree.c with
       fprintf fmt "let %a = %a in\n %a" 
 	Symbols.print s print_tterm t print_tform tf
   | TFnamed (_, tf) -> print_tform fmt tf
+
+and print_tform fmt f = fprintf fmt "%a (id:%d)"  print_tform2 f f.Why_ptree.annot
 
 and print_tform_list op fmt = function
   | [] -> ()

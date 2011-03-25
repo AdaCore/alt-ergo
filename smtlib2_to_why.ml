@@ -114,7 +114,6 @@ let infix_of_string = function
   | "and" -> Some PPand
   | "or" -> Some PPor
   | "=>" -> Some PPimplies
-  | "distinct" -> Some PPneq
   | _ -> None
 
 
@@ -210,6 +209,8 @@ and ppdesc_of_sexpr = function
 		PPif ((lexpr_of_sexpr (List.nth sel 0)),
 		      (lexpr_of_sexpr (List.nth sel 1)),
 		      (lexpr_of_sexpr (List.nth sel 2)))
+	      | "distinct" ->
+		PPdistinct (List.map lexpr_of_sexpr sel)
 	      | _ ->
 		PPapp (s, List.map lexpr_of_sexpr sel)
 	    )
@@ -233,7 +234,7 @@ and triggers_of_attributelist = function
 
 
 and ppinfix_alist predicates pos ppi tl tfunc =
-  let tl = if ppi = PPneq && List.length tl >= 3 then tl@[List.hd tl] else tl in
+  (* let tl = if ppi = PPneq && List.length tl >= 3 then tl@[List.hd tl] else tl in *)
   let rec aux predicates pos ppi = function
     | [] -> Loc.report pos; raise Not_Implemented
     | [a] -> 
@@ -274,7 +275,7 @@ and ppinfix_termlist pre pos ppi tl =
 
 and ppinfix_blist predicates pos ppi tl tfunc = 
   (* FIXME = ppinfix_alist predicates pos ppi tl tfunc *)
-  let tl = if ppi = PPneq && List.length tl >= 3 then tl@[List.hd tl] else tl in
+  (* let tl = if ppi = PPneq && List.length tl >= 3 then tl@[List.hd tl] else tl in *)
   let rec aux predicates pos ppi = function
     | [] -> Loc.report pos; raise Not_Implemented
     | [a] -> 
@@ -319,7 +320,7 @@ and let_of_varbindinglist predicates pos t = function
     let (s, le) = stringlexpr_of_varbinding predicates vb in
     let are_prop = is_prop predicates [] le in
     let predicates = if are_prop then (S.add s predicates) else predicates in
-    if true || are_prop then 
+    if (* true ||  *)are_prop then 
       let { pp_desc = ppd } = 
 	inline_lexpr s le [] (lexpr_of_term predicates t) in
       ppd
@@ -330,7 +331,7 @@ and let_of_varbindinglist predicates pos t = function
     let predicates = if are_prop then (S.add s predicates) else predicates in
     let le2 = 
       { pp_loc = pos; pp_desc = let_of_varbindinglist predicates pos t l } in
-    if true || are_prop then
+    if (* true ||  *)are_prop then
       let { pp_desc = ppd } = inline_lexpr s le [] le2 in
       ppd
     else PPlet (s, le, le2)
@@ -375,7 +376,11 @@ and ppapp_of_string pos s tl predicates =
 	      PPset ((lexpr_of_term predicates (List.nth tl 0)),
 		     (lexpr_of_term predicates (List.nth tl 1)),
 		     (lexpr_of_term predicates (List.nth tl 2)))
-	    | "ditinct" ->
+	    | "ite" -> 
+	      PPif ((lexpr_of_term predicates (List.nth tl 0)),
+		    (lexpr_of_term predicates (List.nth tl 1)),
+		    (lexpr_of_term predicates (List.nth tl 2)))
+	    | "distinct" ->
 	      PPdistinct (List.map (lexpr_of_term predicates) tl)
 	    | _ ->
 	      PPapp (s, List.map (lexpr_of_term predicates) tl)
@@ -419,10 +424,10 @@ and ppdesc_of_term predicates = function
   | TermLetTerm (pos, (_, vbl), t) -> 
     let_of_varbindinglist predicates pos t vbl
   
-(* FIXME : out of scope bounded variables inside triggers ! *)
+(* FIXME : out of scope bounded variables inside triggers ! 
   | TermForAllTerm (pos, (_, svl),  TermExclimationPt (_, t, (_, atl))) ->
     forall_of_sortedvarlist pos t (triggers_of_attributelist atl) svl
-
+*)
   | TermForAllTerm (pos, (_, svl), t) ->
     forall_of_sortedvarlist pos t [] svl
   | TermExistsTerm (pos, (_, svl), t) ->
