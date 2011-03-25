@@ -754,7 +754,7 @@ module Make
 		   let env = replace_inequation env root ineq in
 		   env, eqs, true, expl
 
-	       | L.Distinct [r1; r2] when is_num r1 && is_num r2 -> 
+	       | L.Distinct (false, [r1; r2]) when is_num r1 && is_num r2 -> 
 		   let p = P.sub (P.poly_of r1) (P.poly_of r2) in
 		   let env = init_monomes env p SX.empty expl in
 		   let env, eqs = add_disequality env eqs p expl in

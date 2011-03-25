@@ -514,7 +514,7 @@ module Make ( R : Sig.X ) = struct
     ac_x equations env []
 
   let rec distinct env rl dep =
-    let d = Lit.make (Literal.Distinct rl) in
+    let d = Lit.make (Literal.Distinct (false,rl)) in
     if debug_uf then fprintf fmt "[uf] distinct %a@." Lit.print d;
     let neqs, _, newds = 
       List.fold_left

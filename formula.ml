@@ -44,7 +44,7 @@ and skolem = {
 }
 
 and view = 
-    Unit of t list
+    Unit of t*t
   | Clause of t*t  
   | Literal of Literal.LT.t
   | Lemma of lemma
@@ -67,7 +67,8 @@ module View = struct
 	if c<>0 then c else compare_list compare l1 l2
 	
   let rec compare_pclause v1 v2 = match v1 , v2 with
-      Unit l1 , Unit l2 -> compare_list compare_t l1 l2
+    | Unit(x1,y1) , Unit(x2,y2) -> 
+	  let c = compare_t x1 x2 in if c<>0 then c else compare_t y1 y2
     | Unit _ , _ -> -1
     | _, Unit _ -> 1
     | Clause(x1,y1) , Clause(x2,y2) -> 
@@ -120,9 +121,8 @@ module View = struct
 	   | _ -> x::acc) [] l
       
   let eqc c1 c2 = match c1,c2 with
-      Unit l1 , Unit l2 -> 
-	(try List.for_all2 (fun (f1,_) (f2,_) -> f1 == f2) (sort l1) (sort l2)
-	 with Invalid_argument _ -> false)
+    | Unit((f1, _), (f2, _)) , Unit((g1,_), (g2,_)) ->
+      f1==g1 && f2==g2 || f1==g2 && f2==g1
 
     | Clause((f1, _), (f2, _)) , Clause((g1,_), (g2,_)) ->
       f1==g1 && f2==g2 || f1==g2 && f2==g1
@@ -153,8 +153,10 @@ module View = struct
   let hashllt = List.fold_left (fun acc x->acc*19 + hashlt 0 x)
     
   let hashc acc = function 
-    | Unit l -> 
-	List.fold_left (fun acc (f,_) -> acc * 19 + f.tag) 1 (sort l)
+    | Unit((f1,_),(f2,_)) -> (* XXX : Same as Clause ? *)
+	let min = min f1.tag f2.tag in
+	let max = max f1.tag f2.tag in
+	(acc*19 + min)*19 + max
     | Clause((f1,_),(f2,_)) -> 
 	let min = min f1.tag f2.tag in
 	let max = max f1.tag f2.tag in
@@ -195,7 +197,7 @@ let rec print fmt f =
       else 
 	fprintf fmt "lem %s" n
 
-  | Unit l -> Print_color.print_list "& " print fmt l
+  | Unit(f1, f2) -> fprintf fmt "%a & %a " print f1 print f2
 
   | Clause(f1, f2) -> fprintf fmt "(%a v %a) " print f1 print f2
 
@@ -205,44 +207,14 @@ let rec print fmt f =
       fprintf fmt 
 	"let %a =@ %a in@ %a" Sy.print l.lvar Term.print l.lterm print l.lf
 
+let print fmt ((_,id) as f) =
+  fprintf fmt "%a (%d)" print f id
+
 let union_subst s1 ((s2,s2_ty) as subst) = 
   Sy.Map.fold 
     (fun k x s2 -> Sy.Map.add k x s2) (Sy.Map.map (T.apply_subst subst)  s1) s2
 
-(* this function should only be applied with ground substitutions *)
-let rec apply_subst subst (f, id) = 
-  let {pos=p;neg=n;size=s} = iview f in
-  (H.hashcons tbl 
-     {pos=iapply_subst subst p; neg=iapply_subst subst n; size=s}, id)
 
-and iapply_subst ((s_t,s_ty) as subst) = function
-  | Literal a -> 
-      Literal(Literal.LT.apply_subst subst a)
-
-  | Lemma({qvars = vars; triggers = trs; main = f} as e)->
-      let s_t = Sy.Set.fold Sy.Map.remove vars s_t in
-      let subst = s_t , s_ty in
-      let f =  apply_subst subst f in
-      let trs = List.map (List.map (T.apply_subst subst)) trs in
-      Lemma({e with triggers = trs; main = f})
-
-  | Unit l -> 
-      Unit(List.map (apply_subst subst) l)
-
-  | Clause(f1, f2) -> 
-      Clause(apply_subst subst f1, apply_subst subst f2)
-
-  | Skolem e -> 
-      Skolem{e with 
-	    ssubst = union_subst e.ssubst subst;
-            ssubst_ty = Ty.union_subst e.ssubst_ty s_ty}
-
-  | Let ({lsubst=lsubst;lsubst_ty=lsubst_ty;lterm=lterm} as e) ->
-     let lterm = T.apply_subst subst lterm in
-     let lsubst = union_subst lsubst subst in
-     Let {e with 
-	    lsubst=lsubst;lsubst_ty=Ty.union_subst lsubst_ty s_ty; lterm=lterm;}
-   
 let size (t,_) = t.node.size
 
 let compare ((v1,_) as f1) ((v2,_) as f2)= 
@@ -307,18 +279,18 @@ let mk_and f1 f2 id =
   if equal f1 f2 then f1 else
     let size = size f1 + size f2 in
     (H.hashcons tbl 
-       {pos=Unit([f1;f2]); neg=Clause(mk_not f1,mk_not f2); size=size}, id)
+       {pos=Unit(f1,f2); neg=Clause(mk_not f1,mk_not f2); size=size}, id)
 	
 let mk_or f1 f2 id = 
   if equal f1 f2 then f1 else
     let size = size f1 + size f2 in
     (H.hashcons tbl 
-       {pos=Clause(f1,f2); neg=Unit([mk_not f1;mk_not f2]); size=size}, id)
+       {pos=Clause(f1,f2); neg=Unit(mk_not f1,mk_not f2); size=size}, id)
       
 let mk_imp f1 f2 id = 
   let size = size f1 + size f2 in
   (H.hashcons tbl 
-     {pos=Clause(mk_not f1,f2); neg=Unit([f1;mk_not f2]); size=size}, id)
+     {pos=Clause(mk_not f1,f2); neg=Unit(f1,mk_not f2); size=size}, id)
 
 let mk_if t f2 f3 id = 
   let lit = mk_lit (Literal.LT.mk_pred t) id in
@@ -330,9 +302,57 @@ let mk_iff f1 f2 id =
   let c = mk_or (mk_not f1) f2 id in
   let d = mk_or f1 (mk_not f2) id in
   (H.hashcons tbl 
-     {pos=Unit([c;d]); neg=Unit([a;b]) ; size=2*(size f1+size f2)}, id)
+     {pos=Unit(c,d); neg=Unit(a,b) ; size=2*(size f1+size f2)}, id)
 
-let add_label lbl f = 
+
+(* this function should only be applied with ground substitutions *)
+let rec apply_subst subst (f, id) =
+  let {pos=p;neg=n;size=s} = iview f in
+  let sp, sn = iapply_subst subst p n in 
+  (H.hashcons tbl { pos = sp; neg = sn; size = s }, id)
+
+and iapply_subst ((s_t,s_ty) as subst) p n = match p, n with
+  | Literal a, Literal _ ->
+      let sa = Literal.LT.apply_subst subst a in
+      let nsa = Literal.LT.neg sa in
+      Literal(sa), Literal(nsa)
+
+  | Lemma({qvars = vars; triggers = trs; main = f} as lem), Skolem sko
+  | Skolem sko, Lemma({qvars = vars; triggers = trs; main = f} as lem)->
+      let s_t = Sy.Set.fold Sy.Map.remove vars s_t in
+      let subst = s_t , s_ty in
+      let f = apply_subst subst f in
+      let trs = List.map (List.map (T.apply_subst subst)) trs in
+      let slem = Lemma({lem with triggers = trs; main = f}) in
+      let ssko = Skolem {sko with 
+	    ssubst = union_subst sko.ssubst subst;
+            ssubst_ty = Ty.union_subst sko.ssubst_ty s_ty} in
+      (match p,n with
+	| Lemma _, Skolem _ -> slem, ssko
+	| Skolem _, Lemma _ -> ssko, slem
+	| _ -> assert false)
+
+  | Unit(f1, f2), _ ->
+      let sf1 = apply_subst subst f1 in
+      let sf2 = apply_subst subst f2 in
+      Unit(sf1, sf2), Clause(mk_not sf1, mk_not sf2)
+
+  | Clause(f1, f2), _ -> 
+      let sf1 = apply_subst subst f1 in
+      let sf2 = apply_subst subst f2 in
+      Clause(sf1, sf2), Unit(mk_not sf1, mk_not sf2)
+
+  | Let ({lsubst=lsubst;lsubst_ty=lsubst_ty;lterm=lterm;lf=lf} as e), Let _ ->
+     let lterm = T.apply_subst subst lterm in
+     let lsubst = union_subst lsubst subst in
+     let se = { e with 
+       lsubst = lsubst; lsubst_ty = Ty.union_subst lsubst_ty s_ty;
+       lterm=lterm} in
+     let sne = { se with lf = mk_not lf } in
+     Let se, Let sne
+  | _ -> assert false
+
+let add_label lbl f =
   match view f with
     | Literal a -> 
 	Literal.LT.add_label lbl a;
@@ -350,7 +370,7 @@ let free_vars =
 	Literal a -> Sy.Set.union (Literal.LT.vars_of a) acc
       | Lemma {qvars = v; main = f} -> 
 	  let s = free_rec acc f in Sy.Set.diff s v
-      | Unit l -> List.fold_left free_rec acc l
+      | Unit(f1,f2) -> free_rec (free_rec acc f1) f2
       | Clause(f1,f2) -> free_rec (free_rec acc f1) f2
       | Skolem{ssubst=subst;sf=f} -> 
 	  let sy = free_rec acc f in
@@ -384,7 +404,7 @@ let terms =
 	in
 	T.Set.union s acc
     | Lemma {triggers = trs; main = f} -> terms acc f
-    | Unit l -> List.fold_left terms acc l
+    | Unit(f1,f2) -> terms (terms acc f1) f2
     | Clause(f1,f2) -> terms (terms acc f1) f2
     | Skolem{ssubst=s;sf=f} -> terms acc f
     | Let {lterm=t;lf=lf} -> 

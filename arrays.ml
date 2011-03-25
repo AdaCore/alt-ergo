@@ -192,7 +192,7 @@ module Make(X : ALIEN) = struct
           (fun acc (a,_,_)->
              match a with 
                | A.Eq (r1,r2) -> fct (fct acc r1) r2
-               | A.Builtin (_,_,l) | A.Distinct l -> L.fold_left fct acc l
+               | A.Builtin (_,_,l) | A.Distinct (_, l) -> L.fold_left fct acc l
           )(env.gets,env.tbset) la
       in 
       {env with gets=gets; tbset=tbset}
@@ -239,7 +239,7 @@ module Make(X : ALIEN) = struct
                    let get_stab  = T.make (Sy.Op Sy.Get) [stab;gi] gty in
                    let p       = LR.make (A.Eq(xi,xj)) in
                    let p_ded   = A.LT.make (A.Eq(get,sv)) in
-                   let n     = LR.make (A.Distinct[xi;xj]) in
+                   let n     = LR.make (A.Distinct(false, [xi;xj])) in
                    let n_ded = A.LT.make (A.Eq(get,get_stab)) in
                    let dep = match are_eq gtab set with
                        Yes dep -> dep | No -> assert false
@@ -270,7 +270,7 @@ module Make(X : ALIEN) = struct
                let gt_of_st  = T.make (Sy.Op Sy.Get) [set;gi] gty in
                let p       = LR.make (A.Eq(xi,xj)) in
                let p_ded   = A.LT.make (A.Eq(gt_of_st,sv)) in
-               let n     = LR.make (A.Distinct[xi;xj]) in
+               let n     = LR.make (A.Distinct(false, [xi;xj])) in
                let n_ded = A.LT.make (A.Eq(gt_of_st,get_stab)) in
                let dep = match are_eq gtab stab with
                    Yes dep -> dep | No -> assert false
@@ -293,14 +293,14 @@ module Make(X : ALIEN) = struct
       List.fold_left
         (fun acc (a, _, dep) ->
            match a with 
-             | A.Distinct[r;s] -> 
+             | A.Distinct(false, [r;s]) -> 
                  begin
                    match X.type_info r, X.term_extract r, X.term_extract s with
                      | Ty.Tfarray (ty_k, ty_v), Some t1, Some t2  -> 
                          let i  = T.fresh_name ty_k in
                          let g1 = T.make (Sy.Op Sy.Get) [t1;i] ty_v in
                          let g2 = T.make (Sy.Op Sy.Get) [t2;i] ty_v in
-                         let d  = A.Distinct[g1;g2] in
+                         let d  = A.Distinct(false, [g1;g2]) in
                          Conseq.add (A.LT.make d, dep) acc
                      | _ -> acc
                  end

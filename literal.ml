@@ -19,7 +19,7 @@ open Hashcons
 
 type 'a view = 
   | Eq of 'a * 'a 
-  | Distinct of 'a list
+  | Distinct of bool * 'a list
   | Builtin of bool * Hstring.t * 'a list
 
 module type OrderedType = sig
@@ -64,9 +64,10 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
       match a1, a2 with
 	| Eq(t1, t2), Eq(u1, u2) -> 
 	    X.compare t1 u1 = 0 && X.compare t2 u2 = 0
-	| Distinct lt1, Distinct lt2 ->
+	| Distinct (b1,lt1), Distinct (b2,lt2) ->
 	    (try 
-	       List.for_all2 (fun x y -> X.compare x y = 0) lt1 lt2
+	       b1 = b2 && 
+		List.for_all2 (fun x y -> X.compare x y = 0) lt1 lt2
 	     with Invalid_argument _ -> false)
 	| Builtin(b1, n1, l1), Builtin(b2, n2, l2) -> 
 	    (try 
@@ -78,8 +79,9 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
 	    
     let hash a = match a with
       | Eq(t1, t2) -> abs (19 * (X.hash t1 + X.hash t2))
-      | Distinct lt ->
-	  abs (17 * List.fold_left (fun acc t -> (X.hash t) + acc ) 0 lt)
+      | Distinct (b,lt) ->
+	  let x = if b then 7 else 23 in
+	  abs (17 * List.fold_left (fun acc t -> (X.hash t) + acc ) x lt)
       | Builtin(b, n, l) -> 
 	  let x = if b then 7 else 23 in
 	  abs 
@@ -107,8 +109,10 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
   let view a = a.node
 
   let neg a = match view a with
-    | Eq(x, y) -> make (Distinct [x; y])
-    | Distinct [x; y] -> make (Eq (x, y))
+    | Eq(x, y) -> make (Distinct (false,[x; y]))
+    | Distinct (false, [x; y]) -> make (Eq (x, y))
+    | Distinct (true, [x; y]) -> make (Distinct (false,[x; y]))
+    | Distinct (false, l) -> make (Distinct (true,l))
     | Distinct _ -> assert false
     | Builtin(b, n, l) -> make (Builtin (not b, n, l))
 
@@ -133,8 +137,9 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
     match view a with
       | Eq (z1, z2) -> 
 	  Format.fprintf fmt "%s%a=%a" lbl X.print z1 X.print z2
-      | Distinct (z::l) -> 
-	  Format.fprintf fmt "%s%a" lbl X.print z;
+      | Distinct (b,(z::l)) -> 
+	  let b = if b then "" else "~" in
+	  Format.fprintf fmt "%s%s%a" lbl b X.print z;
 	  List.iter (fun x -> Format.fprintf fmt "<>%a" X.print x) l
       | Builtin (b, n, l) ->
 	  let b = if b then "" else "~" in
@@ -184,7 +189,7 @@ module LT : S_Term = struct
    let f = Term.apply_subst subst in
    let v = match view a with
      | Eq (t1, t2) -> Eq(f t1, f t2)
-     | Distinct lt -> Distinct (List.map f lt)
+     | Distinct (b, lt) -> Distinct (b, List.map f lt)
      | Builtin (b, n, l) -> Builtin(b, n, List.map f l)
    in
    make v
@@ -192,7 +197,7 @@ module LT : S_Term = struct
  let terms_of a = 
    let l = match view a with 
      | Eq (t1, t2) -> [t1; t2] 
-     | Distinct l | Builtin (_, _, l) -> l 
+     | Distinct (_, l) | Builtin (_, _, l) -> l 
    in
    List.fold_left Term.subterms Term.Set.empty l
 

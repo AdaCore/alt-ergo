@@ -255,6 +255,8 @@ let rec vars_of_term bv acc t = match t.c.tt_desc with
   | TTinfix (t1,_,t2) -> List.fold_left (vars_of_term bv) acc [t1;t2]
   | TTset (t1, t2, t3) -> List.fold_left (vars_of_term bv) acc [t1;t2;t3]
   | TTget (t1, t2) -> List.fold_left (vars_of_term bv) acc [t1;t2]
+  | TTlet (_, t1, t2) -> List.fold_left (vars_of_term bv) acc [t1;t2]
+  (* XXX TTlet ? *)
   | _ -> acc
 
 let underscoring_term mvars underscores t = 
@@ -269,6 +271,7 @@ let underscoring_term mvars underscores t =
     | TTvar _ -> t
     | TTapp (s,lt) -> TTapp(s,List.map under_rec lt)
     | TTinfix (t1,op,t2) -> TTinfix(under_rec t1,op,under_rec t2)
+       (* XXX TTlet ? *)
     | _ -> t
   in 
   under_rec t
@@ -314,6 +317,7 @@ let rec vty_term acc t =
     | TTinfix (t1,_,t2) -> vty_term (vty_term acc t1) t2
     | TTset (t1, t2, t3) -> List.fold_left vty_term acc [t1;t2;t3]
     | TTget (t1, t2) -> List.fold_left vty_term acc [t1;t2]
+    | TTlet (_, t1, t2) -> List.fold_left vty_term acc [t1;t2] (* XXX TTlet ? *)
     | _ -> acc
 
 let rec vty_form acc f = match f.c with
@@ -352,7 +356,7 @@ let potential_triggers =
 	    List.fold_left (potential_rec vars) 
 	      (STRS.add (t,bv_lf,vty_lf) acc) lf
 	  else acc
-      | TTinfix(t1,_,t2) -> 
+      | TTinfix(t1,_,t2) | TTlet (_, t1, t2) -> (* XXX TTlet ? *)
 	  let vty_lf = List.fold_left vty_term vty_t [t1;t2] in
 	  let bv_lf = List.fold_left (vars_of_term bv) Vterm.empty [t1;t2] in
 	  if as_bv bv bv_lf or as_tyv vty vty_lf then
@@ -490,8 +494,10 @@ let rec make_rec gopt vterm vtype f =
 	| TFforall _ -> TFforall r , trs 
 	| _ -> TFexists r , trs)
 
-  | TFlet (up, v, t, f) -> 
+  | TFlet (up, v, t, f) ->
       let f, trs = make_rec gopt vterm vtype f in 
+      let trs = STRS.union trs (potential_triggers (vterm, vtype) [t]) in
+       (* XXX correct for terms *)
       TFlet (up, v, t, f), trs
 
   | TFnamed(lbl, f) -> 

@@ -228,7 +228,7 @@ module Make(X : ALIEN) = struct
           | A.Eq(r1,r2) , _, ex -> 
               aux true  r1 r2 (Ex.union expl ex) env eqs (values_of r1)
 
-          | A.Distinct[r1;r2], _, ex -> 
+          | A.Distinct(false, [r1;r2]), _, ex -> 
               aux false r1 r2 (Ex.union expl ex) env eqs (values_of r1)
 
           | _ -> env, eqs

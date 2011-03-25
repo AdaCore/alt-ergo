@@ -157,6 +157,7 @@ let rec run buttonrun buttonstop buttonclean image label thread env () =
 	  List.iter 
 	    (fun dcl ->
 	       (* Thread.yield (); *)
+	      (* if debug then fprintf fmt "AST2 : \n-----\n%a@." print_typed_decl_list (let a::_ =  ast_pruned in (List.map (fun (f,_) -> f) a)); *)
 	       let cnf = Cnf.make dcl in
 	       ignore (Queue.fold
 			 (Frontend.process_decl 

@@ -95,7 +95,7 @@ let make_form name f =
 	      lit , lit::acc
 	  | TAneq lt | TAdistinct lt -> 
 	      let lt = List.map make_term lt in
-	      let lit = A.LT.make (A.Distinct lt) in
+	      let lit = A.LT.make (A.Distinct (false, lt)) in
 	      lit , lit::acc
 	  | TAle [t1;t2] -> 
 	      (try 

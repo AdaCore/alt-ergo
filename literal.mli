@@ -25,7 +25,7 @@ end
 
 type 'a view = 
   | Eq of 'a * 'a 
-  | Distinct of 'a list
+  | Distinct of bool * 'a list
   | Builtin of bool * Hstring.t * 'a list
 
 module type S = sig

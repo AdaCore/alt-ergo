@@ -38,7 +38,7 @@ and skolem = {
 }
 
 and view = 
-    Unit of t list   (* unit clauses *)
+    Unit of t*t  (* unit clauses *)
   | Clause of t*t      (* a clause (t1 or t2) *)
   | Literal of Literal.LT.t   (* an atom *)
   | Lemma of lemma   (* a lemma *)
