@@ -129,7 +129,7 @@ type 'a1 t
 logic single : 'a2 -> 'a2 t
 
 
-logic union : 'a3 t, 'a3 t -> 'a3 t
+logic ac union : 'a3 t, 'a3 t -> 'a3 t
 
 
 logic mem : 'a4, 'a4 t -> prop
