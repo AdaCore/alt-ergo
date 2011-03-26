@@ -1,9 +1,21 @@
-#!/bin/sh
+#!/bin/bash
 
 #shopt -s nullglob
-
+COLS=$(tput cols)
 ccx="$1 $ALTERGO_OPTIONS "
+KO='\E[1;31m'"*KO\033[1m\033[0m"
+OK='\E[1;32m'"OK\033[1m\033[0m"
 
+
+function print_ok {
+    tput hpa $(($COLS - 2))
+    echo -e $OK
+}
+
+function print_ko {
+    tput hpa $(($COLS - 3)) 
+    echo -e $KO
+}
 
 score=0
 nb=0
@@ -21,35 +33,35 @@ echo
 # tests valides
 for f in tests/valid/testfile-*.mlw; do 
     nb=`expr $nb + 1`
-    echo -n $f;
+    echo -n "$f "
     if timeout 4 $ccx $f |grep -q -w Valid; then
-	echo ": ok";
+	print_ok
 	score=`expr $score + 1`
     else 
-	echo ": erreur";
+        print_ko
     fi
 done
 
 # tests invalides
 for f in tests/invalid/testfile-*.mlw; do 
     nb=`expr $nb + 1`
-    echo -n $f;
+    echo -n "$f "
     if timeout 4 $ccx $f |grep -q -w "I don't"; then
-	echo ": ok";
+	print_ok
 	score=`expr $score + 1`
     else 
-	echo ": erreur";
+	print_ko
     fi
 done
 
 # tests incorrects
 for f in tests/incorrects/testfile-*.mlw; do 
     nb=`expr $nb + 1`
-    echo -n $f;
+    echo -n "$f "
     if $ccx $f >/dev/null; then
-	echo ": erreur";
+	print_ko
     else 
-	echo ": ok";
+	print_ok
 	score=`expr $score + 1`
     fi
 done
