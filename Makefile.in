@@ -137,23 +137,23 @@ test: $(OPT)
 	./$(OPT) test.mlw
 
 testbyte:$(BYTE)
-	sh tests/test.sh $(BYTE) -glouton
+	tests/test.sh $(BYTE) -glouton
 
 testopt:$(OPT)
 	make -C util/
-	sh tests/test.sh " ./$(OPT) -glouton -triggers-var -pairs -arrays"
+	tests/test.sh " ./$(OPT) -glouton -triggers-var -pairs -arrays"
 
 testproof:$(OPT)
 	make -C util/
-	sh tests/test.sh " ./$(OPT) -glouton -triggers-var -pairs -arrays -proof -debug-proof"
+	tests/test.sh " ./$(OPT) -glouton -triggers-var -pairs -arrays -proof -debug-proof"
 
 challenge:$(OPT)
 	make -C util/
-	sh tests/challenge.sh " ./$(OPT) "
+	tests/challenge.sh " ./$(OPT) "
 
 
 testoptsel:$(OPT)
-	sh tests/test.sh "./$(OPT) -select 2 -glouton -triggers-var "
+	tests/test.sh "./$(OPT) -select 2 -glouton -triggers-var "
 
 VERSION=0.92.3
 
