@@ -982,6 +982,35 @@ goal g8:
   g(f(h(g(a,a),g(b,b)),b) - f(g(b,b),a),
     f(h(g(a,a),g(b,b)),a) - f(g(b,b),b)) = g(0,0) 
 
+$
+
+logic h,g,f: int,int -> int
+logic a, b:int
+
+goal g9:
+  a = b ->
+  g(f(b,b) - f(b,a),
+    f(a,b) - f(a,a)) = g(0,0) 
+
+$
+
+logic f: int -> int
+logic a, b:int
+
+goal g10:
+  a = b ->
+  f(f(a) - f(b)) = f(0) 
+
+$
+
+logic f: int -> int
+logic a, b:int
+
+goal g11:
+  a = b ->
+  f(f(a) - f(b)) = f(f(b)-f(a)) 
+
+
 $$$typage
 logic P : 'a -> prop
 
