@@ -199,16 +199,17 @@ exception Found of Sig.answer
 
 let doesnt_contain_0 {ints=l} =
   try
-    ignore (List.fold_left
-	      (fun old_u (l, u) -> 
-		if neg_borne l && pos_borne u then raise (Found Sig.No);
-		if neg_borne_strict old_u && pos_borne_strict l then 
-		  raise (Found 
-			   (Sig.Yes 
-			      (Explanation.union 
-				 (explain_borne old_u) (explain_borne l))));
-		u) Minfty l);
-    assert false
+    let max = List.fold_left
+      (fun old_u (l, u) -> 
+	if neg_borne l && pos_borne u then raise (Found Sig.No);
+	if neg_borne_strict old_u && pos_borne_strict l then 
+	  raise (Found 
+		   (Sig.Yes 
+		      (Explanation.union 
+			 (explain_borne old_u) (explain_borne l))));
+	u) Minfty l in
+    if neg_borne_strict max then Sig.Yes (explain_borne max)
+    else Sig.No
   with Found ans -> ans
 
 let is_strict_smaller i1 i2 =
@@ -804,11 +805,14 @@ let inv ({ints=l; is_int=is_int} as u) =
   with Exit -> { u with ints = [Minfty, Pinfty]  }
 
 let div i1 i2 =
-  let ({ints=l; is_int=is_int} as i) = mult i1 (inv i2) in
-  let l = 
-    if is_int then 
-      List.map (fun (l,u) -> int_div_bornes l u) l
-    else l in
-  { i with ints = l }
+  let inv_i2 = inv i2 in
+  if inv_i2.ints = [Minfty, Pinfty] then inv_i2
+  else
+    let ({ints=l; is_int=is_int} as i) = mult i1 inv_i2 in
+    let l = 
+      if is_int then 
+	List.map (fun (l,u) -> int_div_bornes l u) l
+      else l in
+    { i with ints = l }
 
 	

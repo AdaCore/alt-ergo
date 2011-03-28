@@ -19,6 +19,61 @@ goal g3 :
   x * y = f(t) + 2 ->
   false
 
+$
+logic x:int
+goal g4 : 0 <= x*x <= 4 -> 0 <= x <= 2
+
+$
+logic x:int
+goal g5 : x*x = 25 -> x = 5
+
+
+$$$arith_div
+
+logic x,y:int
+goal g1: 2 <= x / y <= 4 -> y = 2 -> 4 <= x <= 8
+
+$
+logic x,y:int
+goal g2: 4 <= x <= 8 -> -2 <= y <= 2 -> -8 <= x / y <= 8
+
+$
+logic x,y:int
+goal g3: 0 / 0 = 0
+
+$
+logic x,y:int
+goal g4: -1 <= x <= 1 -> 0 / x = 0
+
+$
+logic x:int
+goal g5 : x/x = 1 
+
+
+$
+logic x:int
+goal g6 : 0/0 = 1 
+
+$
+logic x:int
+goal g7 : 0/0 = 0/0 -> false
+
+$
+logic x:int
+goal g8 : 0/0 <> 0/0
+
+$
+logic x:int
+logic P,Q: int -> prop
+goal g9 : P(0/x) -> P(0)
+
+$
+logic x:int
+logic P,Q: int -> prop
+goal g10 : P(0) -> P(x)
+
+
+
 
 $$$arith
 goal g1: 1=2
@@ -467,3 +522,12 @@ goal g1 : forall a : ('a,t) farray.
      forall j : 'a. forall v : t.
      a[j] <> A and a[j] <> B
      and a[j] <> C and a[j] <> D
+
+
+$$$explanations
+
+logic A,B,C,D:prop
+logic x,y,z:int
+
+goal g1:
+     A or B -> C or D -> (A -> C or A -> D)
