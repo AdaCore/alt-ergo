@@ -72,6 +72,10 @@ logic x:int
 logic P,Q: int -> prop
 goal g10 : P(0) -> P(x)
 
+$
+logic x,y:int
+goal g11 : y >= 1 -> (x/y)*y = x
+
 
 
 
@@ -164,6 +168,32 @@ goal g18:
  2*b + c - 2  <= 0
  -> false
 
+$
+goal g19 : forall x,y,z,t:int.  30*x = 15*y + 10*z + t ->
+     t = 5 -> false 
+
+$
+goal g20:
+  forall a,min, max,k : int.
+  min = a ->
+  min <= k <= max ->
+  max - min <= 10 ->
+  max - min = 0 ->
+  false 
+
+$
+goal g8 : forall x:real. x < 3.0 -> x <= 2.0
+
+$
+logic p:int
+
+goal g5: 
+(* 1 *) p <> 0 and p <> 1 and p <= 9 and
+(*      p ∈ ]-∞; -1] U [2; 3] U [5; 9]          *)
+(* 2 *) p >= 4 and p <= 10 and p <> 5 and
+(*      p ∈ [4; 4] U [6; 10]          *)
+(* 3 *) p >= 1 and p <= 4 -> false
+
 
 $$$bool
 logic A,B : prop
@@ -201,6 +231,105 @@ $
 logic f : bool -> bool
 axiom a: ((f(true) = true) <-> (true <> true)) 
 goal g10: false
+
+$
+logic A,B,C,D : prop
+goal g11: (A or B or C) -> A
+
+$
+logic A,B,C,D : prop
+goal g12: (A or B or C) -> B
+
+$
+logic A,B,C,D : prop
+goal g13: (A or B or C) -> C
+
+$
+logic A,B,C,D : prop
+goal g14: ((A -> D) or (B -> A) or (C -> B)) -> A -> D
+
+$
+logic A,B,C,D : prop
+goal g15: ((A -> D) or (B -> A) or (C -> B)) -> (C -> D)
+
+$
+logic A,B,C,D : prop
+goal g16: not ((A or B) -> (B or A))
+
+$
+logic p,q,r : prop
+goal g17: (not ((p -> q) and (p and q -> r) -> (p -> r)))
+$
+logic A,B,C,P,Q,R,S: prop
+goal g18: not (((A -> B) and A) -> B)
+$
+logic A,B,C,P,Q,R,S: prop
+goal g19: not (((A -> B) and not B) -> not A)
+$
+logic A,B,C,P,Q,R,S: prop
+goal g20: not (((A -> B) and (B -> C)) -> (A -> C))
+$
+logic A,B,C,P,Q,R,S: prop
+goal g21: not ((A and (B or C)) -> ((A and B) or (A and C)))
+$
+logic A,B,C,P,Q,R,S: prop
+goal g22: not (((A and B) or (A and C)) -> (A and (B or C)))
+$
+logic A,B,C,P,Q,R,S: prop
+goal g23: not ((A or (B and C)) -> ((A or B) and (A or C)))
+$
+logic A,B,C,P,Q,R,S: prop
+goal g24: not (((A or B) and (A or C)) -> (A or (B and C)))
+$
+logic A,B,C,P,Q,R,S: prop
+goal g25: not ((not A -> A) -> A)
+$
+logic A,B,C,P,Q,R,S: prop
+goal g26: not (((P -> (Q and R and S)) and not S) -> not P)
+
+$
+type bag
+
+type btree
+
+logic empty_tree :  -> btree
+
+logic is_heap : btree -> prop
+
+type 'a marray
+
+logic access : 'a1 marray, int -> 'a1
+
+logic update : 'a1 marray, int, 'a1 -> 'a1 marray
+
+logic array_length : 'a1 marray -> int
+
+logic tree_of_array : int marray, int, int -> btree
+
+axiom tree_of_array_empty:
+  (forall a:int marray.
+    (forall root:int.
+      (forall bound:int.
+        (((bound <= root) or (root < 0)) -> (tree_of_array(a, root,
+         bound) = empty_tree)))))
+
+
+axiom div2: (forall i:int. ((0 < i) -> (((i - 1) / 2) < i)))
+
+axiom div2gen:
+  (forall i:int.
+    (forall j:int. (((0 < i) and (i <= j)) -> (((i - 1) / 2) < j))))
+
+
+goal correctness_HeapImpl_pop_po_27:
+  forall size:int.
+  forall t:int marray.
+  ( 0 < array_length(t) and is_heap(tree_of_array(t, 0, size))) ->
+  false
+
+
+
+
 
 $$$list
 type 'a list
@@ -460,7 +589,101 @@ goal g4 :
   f(a,c) = f(x,beta) ->
   f(x,f(gamma,c)) = f(y,f(beta,b))
 
-$$$ let
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g5 : 
+  f(a+1,a) = f(a,b+1)
+
+$
+logic a,b,c,x,beta,gamma,d:int
+
+logic ac f : int,int -> int
+
+goal g6 : 
+     f((f(a,b) + x),c) = gamma -> 
+     f(a,c) = a -> 
+     f(a,d) = beta -> 
+     f(b,beta) = f(d,gamma)
+
+$
+
+logic ac f : int,int -> int
+goal g7 : forall a,b,c,x:int. c = a + x  -> a = f(c,b) -> a=0 ->  f(c,b)=c
+
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g8 : 
+  f(a+1,a) = f(a+1,b)
+
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g9 : 
+  a  = b -> 
+  f(a+1,a) = f(a,b)
+
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g10 : 
+  a + 1 = b + x -> 
+  x = b -> 
+  f(a,a) = f(a,b)
+
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g11 : 
+  f(a,a) = a ->
+  f(a,b) + a =a + b->
+  a = b 
+
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g12 : 
+  a + 1 = b + 1 -> 
+  f(a,a-1) = f(a,b)
+
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+goal g13 : 
+  2 * a = 3 * b -> 
+  f(x,(2/3) * a) = f(b,x)
+
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g15 : 
+  f(b,a) = a ->
+  f(a,b) + a = a + b
+
+$
+
+logic ac f : int,int -> int
+
+goal g16 : (forall v,w:int[v,w]. f(v,w) = w) -> (exists v,w:int. v <> w)
+
+
+$$$let
 
 logic P : 'a, int -> prop
 
@@ -511,8 +734,22 @@ goal g2 :
 
 $$$exists
 
-goal g : 
+goal g1 : 
      (exists x:int. x=2) -> (exists x:int. x=3) -> false
+
+$
+goal g2 : 
+     (exists x:int. x=2 and x=3)
+
+$
+logic P: int -> prop
+goal g3 : 
+     (exists x:int. P(x)) -> forall x:int. P(x)
+
+$
+logic P: int -> prop
+goal g4 : 
+     (exists x:int. P(x)) -> forall x:int. (exists y:int. x=y and P(y))
 
 
 $$$sum_poly_arrays
@@ -531,3 +768,63 @@ logic x,y,z:int
 
 goal g1:
      A or B -> C or D -> (A -> C or A -> D)
+
+
+$$$quant
+
+type 'a t
+logic P,Q: 'a t -> prop
+
+goal g1: forall y:int t. P(y) -> ((forall x:'a t. P(x) -> Q(x)) -> Q(y))
+
+$
+logic f : int -> int
+logic g : int,int -> int
+axiom a2 : forall x,y:int. let z = f(x) in  g(y,z) = 1
+goal g2 : g(f(1), 2) = 1
+
+$
+type t
+
+logic c : t
+logic f : t -> t
+logic p,q : t -> prop
+
+goal g3 : (forall x:t. p(x) -> q(x)) -> q(c) -> p(c)
+
+
+
+$$$cc
+type t
+logic a,b,c,d,e: t
+logic f,h : 'a -> 'a
+logic g: 'a , 'a -> 'a
+
+goal g1: 
+  forall x:t. h(x)=x and g(a,x)=a ->  g(g(x,g(a,h(x))),x)=a
+$
+type t
+logic a,b,c,d,e,f: t
+	
+goal g2: 
+  a=c and c=e and a<>b and b=f and d <> b -> c<>d
+$
+type t
+logic a,b,c,d,e: t
+logic f : 'a -> 'a
+logic g,h: 'a , 'a -> 'a
+
+goal g3: 
+  forall x,y:t. f(f(f(a)))=a and f(f(f(f(f(f(a))))))=a and g(x,y)=x -> 
+  h(g(g(x,y),y),a)=h(x,f(a))
+
+$
+logic P,Q: int -> prop
+logic f: int -> int
+axiom a : 
+  forall x:int[P(f(x))]. 
+    P(f(x)) -> Q(x)
+goal g4:
+      forall a,b,c:int.
+    P(a) -> a= f(b) -> a = f(f(c)) ->
+    Q(b) and Q(c)
