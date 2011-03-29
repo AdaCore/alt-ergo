@@ -458,6 +458,16 @@ goal g41:
   z = ((x / y) + y) / 2 -> 
   z > 1 and y > 2
 
+$$$distinct
+logic P,Q: int -> prop
+logic f: int -> int
+
+axiom a : forall x:int[P(f(x))].  P(f(x)) -> Q(x)
+
+goal g4:
+    forall a,b,c:int.
+    P(a) -> a= f(b) -> Q(b)
+
 
 $$$bool
 logic A,B,C,P,Q,R,S: prop
@@ -525,6 +535,17 @@ goal g20: (A or (B and C)) <-> ((A or B) and (A or C))
 $
 logic A,B,C,P,Q,R,S: prop
 goal g21: (A and (B or C)) <-> ((A and B) or (A and C))
+
+$
+logic A,B,C,D : prop
+goal g22: (A or B) -> (B or A)
+
+$
+logic p,q,r : prop
+goal g23: (p -> q) and (p and q -> r) -> (p -> r)
+
+
+
 $$$list
 type 'a list
 
@@ -913,6 +934,24 @@ axiom a :
      (forall y : int.forall x1 : ilist.(not (INil = ICons (y, x1)))))
   
 goal g10 : (not (INil = ICons (1, INil)))
+
+$
+logic f:int -> int
+logic g:int,int -> int
+
+axiom a11 : forall x:int. let y = f(x) in  y = 1
+
+goal g11 : f(2) = 1
+
+$
+logic f:int -> int
+logic g:int,int -> int
+
+axiom a12 : forall x,y:int. let z = f(x) in  g(z,y) = 1
+
+goal g12 : g(f(1),2) = 1
+
+
 $$$cc
 type t
 logic a,b,c,d,e: t
@@ -2014,7 +2053,12 @@ goal g58 :
   aa = 0 ->
   h(d+z,h(delta,h(delta,beta))) = h(f(f(a+x+y, b+z),f(a+x+1, c+y)),g(h(x,z),y))  (*deduct *)
 
+$
 
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g59 : (forall v,w:int[v,w]. f(v,w) = w) -> a = b
 
 $$$ac_empty
 
