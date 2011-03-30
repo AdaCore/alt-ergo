@@ -683,21 +683,6 @@ logic ac f : int,int -> int
 goal g16 : (forall v,w:int[v,w]. f(v,w) = w) -> (exists v,w:int. v <> w)
 
 
-$$$let
-
-logic P : 'a, int -> prop
-
-goal g : forall x:int. (let x=3 in P(x,x)) ->P(x,3)
-
-$ 
-
-type t
-logic P : int -> prop
-logic Q: t->prop
-
-goal g6 : forall x:t. P(let x=3 in x+x) -> Q(x)
-
-
 $$$arrays
 logic t1,t2,t3,t4,t5 : int farray
 logic P: 'a -> prop
@@ -730,6 +715,187 @@ goal g2 :
   t3 = t2[2 <- y, b <- x] ->
     P(t3, z)
 
+$
+goal g3:
+  forall t1: int farray.
+  t1[1<-1,2<-2,3<-3,4<-4,5<-5,6<-6,1<-2,7<-7,8<-8,9<-9,10<-10][1] = 1
+
+$
+goal g4:
+  forall t1: int farray.
+  forall x1, x2: int.
+  t1[x1<-1,x2<-2][x1] = 1
+
+$
+goal g5:
+  forall i,j:int.
+  forall v : 'a.
+  forall a,b : 'a farray.
+  a[i] = a[j<-v][i]
+
+$
+
+goal g6 :
+  forall i,j:int.
+  forall v : 'a.
+  forall a,b : 'a farray.
+  i = 1 -> 
+  b = a[j<-v] ->
+  a[i] = b[i]
+
+$
+
+goal g7 :
+  forall i,j:int.
+  forall v : 'a.
+  forall a,b : 'a farray.
+  v = a[j<-v][i]
+
+$
+
+goal g8 :
+  forall i,j:int.
+  forall v : 'a.
+  forall a,b : 'a farray.
+  b = a[j<-v] ->
+  v = b[i]
+
+$
+goal g9 :
+  forall i,j:int.
+  forall v : 'a.
+  forall a,b : 'a farray.
+  a = b ->
+  b = b[j <- a[i]]
+
+$
+goal g10 :
+  forall i,j,k:int.
+  forall v,w : 'a.
+  forall b : 'a farray.
+  i = 1 ->
+  j = 2 -> 
+  b = b[j<-b[i],k<-w] ->
+  b[i] = b[j]
+
+
+$
+goal g11 :
+  forall i,j:int.
+  forall v1,v2 : 'a.
+  forall a : 'a farray.
+  i = 1 ->
+  a[i<-v1, j<-v2] = a[j<-v2, i<-v1]
+
+
+$
+goal g12:
+  forall i,j:int.
+  forall v,w : 'a.
+  forall a,b : 'a farray.
+  a = b -> 
+  b = b[j<-v, i<-w]->
+  a[j]= v
+
+$
+goal g13:
+  forall i,j:int.
+  forall a,b : int farray.
+  a=b ->
+  a[i] = b[i<-a[j]][i]
+
+$
+goal g14 :
+  forall i,j:int.
+  forall v1,v2 : 'a.
+  forall a : 'a farray.
+  a[i<-v1, j<-v2] = a[j<-v2, i<-v1]
+
+$
+goal g15 :
+  forall a1,a2,a3,a4,b1,b2 : int farray.
+  forall i1,i2,i3,e1,e2,e3,e4,e5,e6,k:int.
+  a1=b1[i1<-e1] ->
+  a2=b2[i1<-e2] ->
+  a3=a1[i2<-e3] ->
+  a4=a2[i2<-e4] ->
+  e1=b2[i1] ->
+  e2=b1[i1] ->
+  e3=a2[i2] ->
+  e4=a1[i2] ->
+  b2[i3] = b1[i3]
+
+
+$
+logic t1,t2 : int farray
+
+axiom a : forall t1,t2 : 'a farray.
+  forall a,b:int.
+   t1[a+b] = t2[a-b]
+
+goal g16 : forall x,y:int. t1[3+x] = t2[x]
+
+
+$$$poly_arrays
+
+type a
+logic fi : int -> a
+logic ti : a -> int
+
+goal g1:
+  forall t1: (a,int) farray.
+  t1[fi(1)<-1,
+     fi(2)<-2,fi(3)<-3,fi(4)<-4,fi(5)<-5,
+     fi(6)<-6,fi(7)<-7,fi(8)<-8,fi(9)<-9,
+     fi(10)<-10][fi(1)] = 1
+
+$
+type a
+logic fi : int -> a
+logic ti : a -> int
+
+goal g2:
+  forall t1: (a,int) farray.
+  t1[fi(1)<-1,
+     fi(2)<-2,fi(3)<-3,fi(4)<-4,fi(5)<-5,
+     fi(6)<-6,fi(7)<-7,fi(8)<-8,fi(9)<-9,
+     fi(10)<-10][fi(5)] = 5
+
+$
+goal g3 :
+  forall i,j:'a.
+  forall v : 'b.
+  forall a,b : ('a,'b) farray.
+  v = a[j<-v][i]
+
+$
+goal g4 :
+  forall i,j:'a.
+  forall v : 'b.
+  forall b : ('a,'b) farray.
+  b = b[j <- b[i]]
+
+$
+goal g5:
+  forall a,b : ('a,'b) farray.
+  forall i,j : 'a.
+  forall v,w : 'b.
+  v = a[j] ->
+  w = b[i] ->
+  a[j<-w] = b[i<-v] ->
+  a[j] = b[j]
+
+
+
+$$$injective
+
+type a
+logic fi : 'b -> a
+logic ti : a -> 'b
+
+axiom Inj : forall x :a. ti(fi(x))=x
+
+goal inj : exists x,y:a. fi(x)=fi(y) -> x <> y
 
 
 $$$exists
@@ -828,3 +994,170 @@ goal g4:
       forall a,b,c:int.
     P(a) -> a= f(b) -> a = f(f(c)) ->
     Q(b) and Q(c)
+
+
+
+$$$bitv
+
+goal g1: [|10|]=[|01|]
+$
+goal g2: [|10|]@[|01|]=[|1010|]
+$
+goal g3: [|10|]@[|01|]=[|0|]@[|1|]@[|01|]
+$
+goal g4: [|01|]=[|1001|]^{2,3}
+$
+goal g5: [|010|]^{1,2}=[|1100|]^{1,2}
+$
+goal g6: forall x:bitv[3].  x^{0,1} = [|01|]
+$
+goal g7: forall x,y:bitv[2]. x=[|10|] -> y=[|01|] -> y@x=[|1001|]
+$
+goal g8: forall x:bitv[4]. forall y:bitv[2]. 
+         x=y@[|11|] -> x^{2,3}=[|10|] -> x=[|1110|]
+$
+goal g9: forall x,y:bitv[2]. x^{0,0} = y^{0,0}
+$
+goal g10: forall x,y:bitv[2].  x = y
+$
+logic f : 'a -> bitv[2]
+
+goal g11: forall x:bitv[3]. forall y:bitv[2]. forall z:'a.
+          x=y@[|1|] -> f(z)=y -> f(z)^{0,0} = x^{0,0}
+
+
+$$$let
+
+goal g1: 
+     let x = 3 in let y = 1 in x = y
+
+$
+
+goal g2: 
+     let x = 3 in x+x = 5
+
+$ 
+
+goal g3: 
+     let x = 3 in x=2
+
+$
+
+type t
+logic P : t, int -> prop
+
+goal g4 : forall x:t. forall y:int. (let y=3 in P(x,y)) -> P(x,y)
+
+$
+logic P : int -> prop
+
+goal g5 : forall y:int. P(let y=4 in y+y) -> P(y)
+
+$
+goal g6 : let x = 1 in let x = 2 in x = 1
+
+$
+goal g7 : forall x:int. x = (let x = 2 in x)
+
+$
+goal g8 : let x = 1 in x = (let x = 2 in x)
+
+$
+logic P : 'a, int -> prop
+
+goal g9 : forall x:int. (let x=3 in P(x,x)) ->P(x,3)
+
+$ 
+
+type t
+logic P : int -> prop
+logic Q: t->prop
+
+goal g10 : forall x:t. P(let x=3 in x+x) -> Q(x)
+
+
+$$$predicate
+logic f : int -> prop
+logic r : int -> prop
+
+predicate p (x : int) = f(x)
+
+axiom a : forall x : int [p(x)]. p(x) -> r (x)
+
+goal g1 : forall a : int. f(a) -> r(a+1)
+
+
+
+$$$sum
+
+type t = A | B | C
+
+goal g1: 
+  A = B or B = C or A = C 
+    
+$
+type t = A | B | C
+
+goal g2:
+forall x:t. x <> A -> x = B
+
+$
+type t = A | B | C
+
+goal g3:
+  forall x:t. x = A -> x = B
+
+$
+type t = A | B | C
+
+goal g4:
+  forall x:t.
+  x <> A -> x <> B -> x <> C
+
+$
+type t = A | B | C
+
+goal g5:
+  exists x:t. x <> A and x <> B and x <> C
+
+$
+type t = A | B | C
+
+goal g6:
+  forall x:t. (x = A or x = B)
+$
+
+type t = A | B | C
+
+goal g7:
+  forall x:t. x <> A
+
+$
+
+type t = A | B
+
+logic f: t , int -> int
+
+goal g8:
+  exists x:t.
+  exists y:int.
+  f(x,y) = f(A,y) and f(x,y) = f(B,y)
+
+    
+$$$sum_poly_arrays
+type t = A | B | C | D
+
+goal g1 :
+     forall a : (t,int) farray.
+     a[A <- 1, B <- 2][C] = 1
+
+$
+type t = A | B | C | D
+type t2 = E | F | G | H
+
+goal g2 :
+     forall a : (t,t2) farray.
+     a[B <- E][A] <> E ->
+     a[C <- F][A] <> F ->
+     a[D <- G][A] <> F ->
+     a[A] = H
