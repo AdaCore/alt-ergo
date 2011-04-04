@@ -235,7 +235,7 @@ module Make (X : Sig.X) = struct
 
       ) env leqs
 
-  and congruents env t s acc = 
+  and congruents env t s = 
     SetT.fold 
       (fun t2 acc ->
 	 if T.equal t t2 then acc
@@ -244,18 +244,18 @@ module Make (X : Sig.X) = struct
 	   with
                Exception.NotCongruent
              | Exception.Interpreted_Symbol -> acc
-      ) s acc
+      ) s []
 	   
   (* add a new term in env *)   	
 
-  and add_term expl (env, ct) t = 
+  and add_term expl env t = 
     if debug_cc then Print.add_to_use t;
     (* nothing to do if the term already exists *)
-    if Uf.mem env.uf t then (env,ct)
+    if Uf.mem env.uf t then env
     else
       (* we add t's arguments in env *)
       let {T.f = f; xs = xs} = T.view t in
-      let env , ct = List.fold_left (add_term expl) (env,ct) xs in
+      let env = List.fold_left (add_term expl) env xs in
       (* we update uf and use *)
       let nuf, ctx  = Uf.add env.uf t in 
       if debug_cc then Print.make_cst t ctx;
@@ -278,21 +278,16 @@ module Make (X : Sig.X) = struct
       let env = 
         List.fold_left (fun env a -> assume a expl env) env ctx in
 
-      (env,congruents env t st_uset ct)
+      let ct = congruents env t st_uset in
+      List.fold_left (fun e (x, y, dep) -> close_up x y dep e) env ct
 	
   and add a expl env =
-    let st = A.LT.terms_of a in
-    let env = 
-      SetT.fold
-	(fun t env -> 
-	   let env , ct = add_term expl (env,[]) t in
-	   List.fold_left
-	     (fun e (x,y,dep) -> close_up x y dep e) env ct) st env
-    in 
     match A.LT.view a with
-      | A.Eq _ | A.Distinct _ -> env
-      | _ ->
-	  let lvs = concat_leaves env.uf (Term.Set.elements st) in
+      | A.Eq (t1, t2) -> add_term expl (add_term expl env t1) t2
+      | A.Distinct (_, lt) -> List.fold_left (add_term expl) env lt
+      | A.Builtin (_, _, lt) ->
+	  let env = List.fold_left (add_term expl) env lt in
+	  let lvs = concat_leaves env.uf lt in (* A verifier *)
 	  List.fold_left
 	    (fun env rx ->
 	       let st_uset, sa_uset = Use.find rx env.use in
