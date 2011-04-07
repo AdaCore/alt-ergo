@@ -1,6 +1,8 @@
 
-  o rewriting systems
-  o explanations
+  o -stopb stop Alt-Ergo after a given number of steps
+  o -max-split option to limit the number of case-splits
+  o new polymorphic theory of arrays: ('a, 'b) farray
+  o explanations (-proof option)
   o Built-in support for enumeration types
 
 version 0.92.2, October 22nd, 2010
