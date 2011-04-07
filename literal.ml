@@ -116,7 +116,6 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
     | Distinct _ -> assert false
     | Builtin(b, n, l) -> make (Builtin (not b, n, l))
 
-
   module Labels = Hashtbl.Make(T)
     
   let labels = Labels.create 100007

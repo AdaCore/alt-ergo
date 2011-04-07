@@ -479,7 +479,7 @@ let rec type_form env f =
 	  | _ -> error (NotAPropVar p) f.pp_loc
       end in r, freevars_form r
 	
-    | PPapp(p,args) ->
+    | PPapp(p,args )->
       let r = 
 	begin
 	  let te_args = List.map (type_term env) args in

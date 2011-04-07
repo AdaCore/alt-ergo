@@ -24,17 +24,15 @@ type lemma =
       name : string; }
       
 and llet = {
-  lvar: Symbols.t;
-  lsubst : Term.t Subst.t;
-  lsubst_ty : Ty.subst;
-  lterm : Term.t;
-  lf : t;
+  let_var: Symbols.t;
+  let_subst : Term.subst;
+  let_term : Term.t;
+  let_f : t;
 }
 
 and skolem = {
-  ssubst : Term.t Subst.t;
-  ssubst_ty : Ty.subst;
-  sf : t;
+  sko_subst : Term.subst;
+  sko_f : t;
 }
 
 and view = 

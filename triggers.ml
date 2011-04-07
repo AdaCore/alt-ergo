@@ -326,7 +326,13 @@ let rec vty_form acc f = match f.c with
       List.fold_left vty_term acc l
   | TFatom {c=TApred t} -> vty_term acc t
   | TFop(_,l) -> List.fold_left vty_form acc l
-  | _ -> acc (* we don't go through quantifiers *)
+  | TFforall qf | TFexists qf ->
+      let acc = 
+	List.fold_left (fun acc (_, ty) -> vty_ty acc ty) acc qf.qf_bvars in
+      vty_form acc qf.qf_form
+  | TFnamed (_, f) -> vty_form acc f
+  | TFlet (ls, s, e, f') -> acc (* a finir *)
+  | _ -> acc
 
 let csort = Symbols.name "c_sort"
 
@@ -469,7 +475,6 @@ let rec make_rec gopt vterm vtype f =
 	  | TFforall _ -> TFforall r, trs 
 	  | _ -> TFexists r , trs
       end
-
 
   | TFforall qf | TFexists qf -> 
       let vtype' = vty_form Vtype.empty qf.qf_form in
