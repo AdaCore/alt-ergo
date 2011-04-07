@@ -317,7 +317,7 @@ let rec vty_term acc t =
     | TTinfix (t1,_,t2) -> vty_term (vty_term acc t1) t2
     | TTset (t1, t2, t3) -> List.fold_left vty_term acc [t1;t2;t3]
     | TTget (t1, t2) -> List.fold_left vty_term acc [t1;t2]
-    | TTlet (_, t1, t2) -> List.fold_left vty_term acc [t1;t2] (* XXX TTlet ? *)
+    | TTlet (_, t1, t2) -> List.fold_left vty_term acc [t1;t2]
     | _ -> acc
 
 let rec vty_form acc f = match f.c with
@@ -331,7 +331,8 @@ let rec vty_form acc f = match f.c with
 	List.fold_left (fun acc (_, ty) -> vty_ty acc ty) acc qf.qf_bvars in
       vty_form acc qf.qf_form
   | TFnamed (_, f) -> vty_form acc f
-  | TFlet (ls, s, e, f') -> acc (* a finir *)
+  | TFlet (ls, s, e, f') -> 
+      vty_form (vty_term acc e) f'
   | _ -> acc
 
 let csort = Symbols.name "c_sort"
