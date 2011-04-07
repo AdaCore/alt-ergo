@@ -345,6 +345,7 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		in
 		let tbox, cpt = CcX.assume a dep env.tbox in
 		steps := Int64.add (Int64.of_int cpt) !steps;
+		(*if !steps > then raise I_dont_know;*)
 		let env = { env with tbox = tbox } in
 		bcp env
 
