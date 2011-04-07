@@ -29,6 +29,7 @@ let rewriting = ref false
 let type_only = ref false
 let parse_only = ref false
 let stopb = ref 8
+let stepsb = ref (-1)
 let age_limite = ref 10
 let debug = ref false
 let notriggers = ref false
@@ -106,6 +107,7 @@ let spec = [
   "-version", Arg.Unit show_version, "  prints the version number";
   "-ddispatch", Arg.Set ddispatch, "  sets the debugging flag of sat";
   "-stop", Arg.Set_int stopb, " <n> set the stop bound";
+  "-steps", Arg.Set_int stepsb, " <n> set the maximum number of steps";
   "-age-limite", Arg.Set_int age_limite, " <n> set the age limite bound";
   "-sat" , Arg.Set satmode , " mode sat/unsat";
   "-bj" , Arg.Set bjmode , " mode sat/unsat";
@@ -166,6 +168,7 @@ let cin =
 let type_only = ! type_only
 let parse_only = ! parse_only
 let stopb = !stopb
+let stepsb = !stepsb
 let age_limite = !age_limite
 let notriggers = !notriggers
 let debug = !debug

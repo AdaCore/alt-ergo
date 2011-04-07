@@ -345,7 +345,12 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		in
 		let tbox, cpt = CcX.assume a dep env.tbox in
 		steps := Int64.add (Int64.of_int cpt) !steps;
-		(*if !steps > then raise I_dont_know;*)
+		if stepsb <> -1 
+		  && Int64.compare !steps (Int64.of_int stepsb) > 0 then 
+		  begin 
+		    printf "Steps limit reached: %Ld@." !steps;
+		    exit 1
+		  end;
 		let env = { env with tbox = tbox } in
 		bcp env
 

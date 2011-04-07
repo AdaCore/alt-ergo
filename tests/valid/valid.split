@@ -814,27 +814,6 @@ goal g7 : flatten(cons(cons(1,nil),
 
 $$$quant
 type t
-logic Q:prop
-logic R: 'a -> prop
-logic a:t
-
-axiom a1: Q -> forall x:'a. R(x)
-
-goal g1: Q -> R(a)
-$
-type t
-logic P:prop
-logic T: 'a -> prop
-logic a:t
-logic f: 'a -> 'a
-
-axiom a2: P -> forall x:'a. T(f(f(f(x))))
-
-axiom a3: f(a)=a
-
-goal g2: P -> T(a)
-$
-type t
 logic P,R,T,H,Q: 'a -> prop
 logic G,toto: 'a , 'a -> prop
 logic a,b:t
@@ -4001,3 +3980,106 @@ goal g1 :
      forall k : 'a.
      is_true(inter(s1,s2)[k]) ->
      is_true(s1[k]) and is_true(s2[k])
+
+
+$$$polymorphism
+type 'a t
+logic P,P': int -> prop
+logic Q,S: 'a t -> prop
+logic Q': int, int -> prop
+logic R: prop
+logic a: bool t
+
+
+axiom a1: forall x:int. P(x) -> (forall y:'a t. Q(y))
+goal g1: P(1) -> Q(a)
+
+$
+
+type 'a t
+logic P,P': int -> prop
+logic Q,S: 'a t -> prop
+logic Q': int, int -> prop
+logic R: prop
+logic a: bool t
+
+axiom a2: forall x:int. P(x) -> (exists y:'a t. Q(y)) and R
+
+goal g2: P(1) -> R
+
+$
+
+type 'a t
+logic P,P': int -> prop
+logic Q,S: 'a t -> prop
+logic Q': int, int -> prop
+logic R: prop
+logic a: bool t
+
+logic c: 'a t
+
+axiom a3: forall x:int. P(x) -> let y = c in  P'(x)
+
+goal g3: P(1) -> P'(1)
+
+$
+type 'a t
+logic P,P': int -> prop
+logic Q,S: 'a t -> prop
+logic Q': int, int -> prop
+logic R: prop
+logic a: bool t
+logic c: 'a t
+
+axiom a4: forall x:int. P(x) -> let y = c in  Q(y)
+
+goal g4: P(1) -> Q(c)
+
+$
+
+type 'a t
+logic P,P': int -> prop
+logic Q,S: 'a t -> prop
+logic Q': int, int -> prop
+logic R: prop
+logic a: bool t
+
+axiom a5: forall x:int. R -> (forall y:int. P'(x) -> P(y))
+
+goal g5: R -> P'(1) -> P(2)
+
+$
+
+type 'a t
+logic P,P': int -> prop
+logic Q,S: 'a t -> prop
+logic Q': int, int -> prop
+logic R: prop
+logic a: bool t
+
+axiom a6: forall x:int. R -> (forall y:int. Q'(x,y) -> P(y))
+
+goal g6: R -> Q'(1,2) -> P(2)
+
+$
+type t
+logic Q:prop
+logic R: 'a -> prop
+logic a:t
+
+axiom a7: Q -> forall x:'a. R(x)
+
+goal g7: Q -> R(a)
+
+$
+type t
+logic P:prop
+logic T: 'a -> prop
+logic a:t
+logic f: 'a -> 'a
+
+axiom a2: P -> forall x:'a. T(f(f(f(x))))
+
+axiom a3: f(a)=a
+
+goal g8: P -> T(a)
