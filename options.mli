@@ -21,6 +21,7 @@ val file : string ref
 val parse_only : bool
 val type_only : bool
 val stopb : int
+val stepsb : int
 val age_limite : int
 val notriggers : bool
 val debug : bool
