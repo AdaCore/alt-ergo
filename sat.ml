@@ -82,10 +82,10 @@ module Print = struct
 	      printf "(%s) %a@]@." s Literal.LT.print a;
 	      printf "================================================@.@."
 		
-	  | F.Skolem{F.ssubst=s;ssubst_ty=s_ty;sf=f} ->
+	  | F.Skolem{F.sko_subst=(s,s_ty); sko_f=f} ->
 	      printf "@[@{<C.Bold>[sat]@} I assume a skolem %a @]@." F.print f 
 		
-	  | F.Let {F.lvar=lvar;lterm=lterm;lsubst=lsubst;lf=lf} ->
+	  | F.Let {F.let_var=lvar; let_term=lterm; let_f=lf} ->
 	      printf "@[@{<C.Bold>[sat]@} I assume a let %a =@ %a in@ %a@ @]@." 
 		Symbols.print lvar Term.print lterm F.print lf);
 	printf " with explanations : %a@." Explanation.print dep
@@ -348,14 +348,14 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		let env = { env with tbox = tbox } in
 		bcp env
 
-	    | F.Skolem{F.ssubst=s;ssubst_ty=s_ty;sf=f} -> 
-		let f' = F.apply_subst (s,s_ty) f in
+	    | F.Skolem{F.sko_subst=sigma; sko_f=f} -> 
+		let f' = F.apply_subst sigma f in
 		assume env ({f=f';age=age;name=lem;mf=mf;gf=gf},dep)
 
-            | F.Let {F.lvar=lvar;lterm=lterm;lsubst=lsubst;lf=lf} ->
-                let f' = F.apply_subst (lsubst,Ty.esubst) lf in
+            | F.Let {F.let_var=lvar; let_term=lterm; let_subst=s; let_f=lf} ->
+                let f' = F.apply_subst s lf in
 		let id = F.id f' in
-                let v = Symbols.Map.find lvar lsubst in
+                let v = Symbols.Map.find lvar (fst s) in
                 let env = assume env 
 		  ({f=F.mk_lit (A.LT.make (A.Eq(v,lterm))) id;
 		    age=age;name=lem;mf=mf;gf=gf},dep) 

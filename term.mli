@@ -48,6 +48,11 @@ val vty_of : t -> Ty.Svty.t
 val pred : t -> t
 
 val apply_subst : subst -> t -> t
+val compare_subst : subst -> subst -> int
+val fold_subst_term : (Symbols.t -> t -> 'b -> 'b) -> subst -> 'b -> 'b
+
+val union_subst : subst -> subst -> subst
+
 val print : Format.formatter -> t -> unit
 val print_list : Format.formatter -> t list -> unit
 

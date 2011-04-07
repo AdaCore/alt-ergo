@@ -144,6 +144,21 @@ let rec apply_subst ((s_t,s_ty) as s) t =
   with Not_found -> 
     make f (List.map (apply_subst s) xs) (Ty.apply_subst s_ty ty)
 
+let compare_subst (s_t1, s_ty1) (s_t2, s_ty2) = 
+  let c = Ty.compare_subst s_ty1 s_ty2 in
+  if c<>0 then c else Sy.Map.compare compare s_t1 s_t2
+
+let fold_subst_term f (s,_) acc = Sy.Map.fold f s acc
+
+let union_subst (s_t1, s_ty1) ((s_t2, s_ty2) as subst) = 
+  let s_t = 
+    Sy.Map.fold 
+      (fun k x s2 -> Sy.Map.add k x s2)
+      (Sy.Map.map (apply_subst subst) s_t1) s_t2
+  in
+  let s_ty = Ty.union_subst s_ty1 s_ty2 in
+  s_t, s_ty
+
 module Set = 
   Set.Make(struct type t' = t type t=t' let compare=compare end)
     
