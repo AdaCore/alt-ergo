@@ -279,12 +279,12 @@ source:
 
 BINARY = $(EXPORTDIR)-$$OSTYPE
 BINARYTAR=$(BINARY).tar
-
+ARCH = $(shell uname -m)
 BINARYFILES = README INSTALL COPYING CeCILL-C doc/$(NAME).1
 
 binary: $(OPT)
 	strip $(OPT)
-	cp $(OPT) $(HTTP)/alt-ergo-$(VERSION)
+	cp $(OPT) $(HTTP)/alt-ergo-$(VERSION)-$(ARCH)
 
 # literate programming
 ######################
