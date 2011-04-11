@@ -27,17 +27,16 @@ syntax.
 Help. Will give you the full list of command line options.
 
 .TP
-.B \-arrays
 A theory of functional arrays with integer indexes . This theory
-provides a built-in type 'a farray and a built-in syntax for
+provides a built-in type ('a,'b) farray and a built-in syntax for
 manipulating arrays.
 
-Given an abstract datatype tau and a functional array t of type tau
-farray declared as follows:
+For instance, given an abstract datatype tau and a functional array t
+of type (int, tau) farray declared as follows:
 
 type tau
 
-logic t : tau farray
+logic t : (int, tau) farray
 
 The expressions:
 
@@ -55,6 +54,18 @@ t[0<-v][1<-w]
 t[0<-v, 1<-w]
 
 t[0<-v, 1<-w][1]
+
+
+.TP
+A theory of enumeration types.
+
+For instance an enumeration type t with constructors A, B, C is
+defined as follows :
+
+type t = A | B | C
+
+Which means that all values of type t are equal to either A, B or
+C. And that all these constructors are distinct.
 
 
 .TP

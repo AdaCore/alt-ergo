@@ -263,13 +263,16 @@ FILES = version.sh.in version.ml exception.mli exception.ml \
 
 export: source binary
 	cp README COPYING CeCILL-C CHANGES doc/*.1 $(HTTP)
-	cp index.html $(ERGOWEB)
+#	cp index.html $(ERGOWEB)
 
 source: 
 	mkdir -p export/$(EXPORTDIR)
 	mkdir -p export/$(EXPORTDIR)/doc
+	mkdir -p export/$(EXPORTDIR)/util
+	mkdir -p export/$(EXPORTDIR)/util/gtk-lang
 	cp $(FILES) export/$(EXPORTDIR)
 	cp doc/$(NAME).1 export/$(EXPORTDIR)/doc
+	cp util/gtk-lang/alt-ergo.lang export/$(EXPORTDIR)/util/gtk-lang/
 	cd export ; tar cf $(TAR) $(EXPORTDIR) ; gzip -f --best $(TAR)
 	cp export/$(TAR).gz $(HTTP)
 

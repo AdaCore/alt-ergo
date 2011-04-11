@@ -168,7 +168,8 @@ let rec print fmt = function
   | Tunit -> fprintf fmt "unit"
   | Tbitv n -> fprintf fmt "bitv[%d]" n
   | Tvar{v=v ; value = None} -> fprintf fmt "'a_%d" v
-  | Tvar{v=v ; value = Some t} -> fprintf fmt "('a_%d->%a)" v print t
+  | Tvar{v=v ; value = Some t} -> print fmt t
+    (* fprintf fmt "('a_%d->%a)" v print t *)
   | Text(l,s) -> fprintf fmt "%a%s" printl l (Hstring.view s)
   | Tfarray (t1,t2) -> fprintf fmt "(%a,%a) farray" print t1 print t2
   | Tsum(s, _) -> fprintf fmt "%s" (Hstring.view s)
