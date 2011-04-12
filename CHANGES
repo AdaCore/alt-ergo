@@ -1,4 +1,4 @@
-version 0.92.3, April 11th, 2011
+version 0.93, April 12th, 2011
 =================================
 
   o -steps <i> stops Alt-Ergo after a given number of steps
@@ -8,6 +8,11 @@ version 0.92.3, April 11th, 2011
   o Built-in support for enumeration types
   o graphical frontend (algr-ergo), needs to be compiled with make
     gui && make install-gui
+  o new predicate distinct (a,b,c, ...) to express that constants
+    a,b,c,... are pairwise distinct
+  o new constructs: let x = <term> in <term>
+                    let x = <term> in <formula>
+  o partial support for / (division) operator
   o bug fixes
 
 version 0.92.2, October 22nd, 2010
