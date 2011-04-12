@@ -6,7 +6,7 @@ version 0.93, April 12th, 2011
   o new polymorphic theory of arrays: ('a, 'b) farray
   o explanations (-proof option)
   o Built-in support for enumeration types
-  o graphical frontend (algr-ergo), needs to be compiled with make
+  o graphical frontend (altgr-ergo), needs to be compiled with make
     gui && make install-gui
   o new predicate distinct (a,b,c, ...) to express that constants
     a,b,c,... are pairwise distinct
