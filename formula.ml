@@ -229,9 +229,6 @@ let rec print fmt f =
 	"let %a =@ %a in@ %a" Sy.print l.let_var 
 	Term.print l.let_term print l.let_f
 
-let print fmt ((_,id) as f) =
-  fprintf fmt "%a (%d)" print f id
-
 let union_subst s1 ((s2,s2_ty) as subst) = 
   Sy.Map.fold 
     (fun k x s2 -> Sy.Map.add k x s2) (Sy.Map.map (T.apply_subst subst)  s1) s2
