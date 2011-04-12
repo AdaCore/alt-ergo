@@ -178,12 +178,15 @@ headers:
 install-indep: install-man install-prelude
 
 install: install-indep 
+	mkdir -p $(BINDIR)
 	cp -f $(NAME).$(OCAMLBEST) $(BINDIR)/$(NAME)$(EXE)
 
 install-byte: install-indep
+	mkdir -p $(BINDIR)
 	cp -f $(NAME).byte $(BINDIR)/$(NAME)$(EXE)
 
 install-opt: install-indep
+	mkdir -p $(BINDIR)
 	cp -f $(NAME).opt $(BINDIR)/$(NAME)$(EXE)
 
 install-man:
@@ -195,6 +198,7 @@ install-prelude: smt_prelude.mlw
 	cp -f $^ $(LIBDIR)
 
 install-gui: install-indep
+	mkdir -p $(BINDIR)
 	cp -f altgr-ergo.opt $(BINDIR)/altgr-ergo$(EXE)
 	cp -f util/gtk-lang/alt-ergo.lang /usr/share/gtksourceview-2.0/language-specs/alt-ergo.lang
 
