@@ -369,28 +369,11 @@ module Make (X : Sig.X) = struct
       in 
       S.Map.fold
         (fun sy l env ->
-           assume_rec dep env (A.LT.make (A.Distinct (false, l)))) mp env
-
-(*
-
-if Options.nocontracongru then env
-	  else begin
-	    let r1, ex1 = Uf.find env.uf t1 in
-	    let r2, ex2 = Uf.find env.uf t2 in
-	    let dep = Explanation.union (Explanation.union ex1 ex2) dep in
-	    begin
-	      match T.view t1,T.view t2 with
-		| {T.f = f1; xs = [a]},{T.f = f2; xs = [b]}
-		    when (S.equal f1 f2 
-			  && X.equal (X.term_embed t1) r1 
-			  && X.equal (X.term_embed t2) r2) 
-		      -> 
-		    assume_rec dep env (A.LT.make (A.Neq(a,b)))
-		| _,_ -> env
-	    end
-	  end
-	    
-*)
+           match l with
+             | [] | [_] -> 
+                 env
+             | _ -> 
+                 assume_rec dep env (A.LT.make (A.Distinct (false, l)))) mp env
     
 
   let assume_r env ra dep =
