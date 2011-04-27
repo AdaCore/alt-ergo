@@ -433,7 +433,7 @@ and print_tform2 fmt f = match f.Why_ptree.c with
 	Symbols.print s print_tterm t print_tform tf
   | TFnamed (_, tf) -> print_tform fmt tf
 
-and print_tform fmt f = fprintf fmt "%a (id:%d)"  print_tform2 f f.Why_ptree.annot
+and print_tform fmt f = fprintf fmt " (id:%d)%a" f.Why_ptree.annot print_tform2 f
 
 and print_tform_list op fmt = function
   | [] -> ()

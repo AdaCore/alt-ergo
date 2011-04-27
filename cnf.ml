@@ -183,6 +183,7 @@ let make l =
       Logics.clear();
       Types.clear();*)
   clear();
+  Formula.clear_htbl ();
   List.iter
     (fun (d,b) -> match d.c with
        | TAxiom(loc, name, f) -> push_assume f name loc b
