@@ -229,6 +229,10 @@ let rec print fmt f =
 	"let %a =@ %a in@ %a" Sy.print l.let_var 
 	Term.print l.let_term print l.let_f
 
+(* let print fmt ((_,id) as f) = *)
+(*   fprintf fmt "(%d)%a" id print f *)
+
+
 let union_subst s1 ((s2,s2_ty) as subst) = 
   Sy.Map.fold 
     (fun k x s2 -> Sy.Map.add k x s2) (Sy.Map.map (T.apply_subst subst)  s1) s2
@@ -458,6 +462,8 @@ let terms =
 	in
         terms (T.Set.union st acc) lf
   in terms T.Set.empty
+
+let clear_htbl () = H.clear tbl
 
 module Set = Set.Make(struct type t'=t type t=t' let compare=compare end)
 module Map = Map.Make(struct type t'=t type t=t' let compare=compare end)
