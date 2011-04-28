@@ -763,7 +763,7 @@ let finite_size {ints = l; is_int = is_int} =
     with Exit -> None
 		 
 let borne_inf = function
-  | {ints = (Large (v, _), _)::_} -> v
+  | {ints = (Large (v, ex), _)::_} -> v, ex
   | _ -> invalid_arg "Intervals.borne_inf : No finite lower bound"
 
 

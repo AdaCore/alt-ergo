@@ -4083,3 +4083,30 @@ axiom a2: P -> forall x:'a. T(f(f(f(x))))
 axiom a3: f(a)=a
 
 goal g8: P -> T(a)
+
+$$$explanation
+
+logic a,b : prop
+
+goal g1 : a -> b -> (a and b)
+
+$
+
+logic P : int -> prop
+
+goal g2 : forall x:int. P(0) -> P(1) -> P(2) -> 0 <= x <= 2 -> P(x)
+
+$
+
+logic P,Q : int -> prop
+
+goal g3 : 
+     forall x:int. 
+     P(0) -> P(1) -> Q(0) -> Q(1) -> 0 <= x <= 1 -> (P(x) and Q(x))
+
+$
+
+goal g4: 
+  forall x,y:int. 
+    0 <= x <= 1 -> y<>0 -> -1 <= x/y <= 1
+    

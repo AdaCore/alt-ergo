@@ -235,6 +235,9 @@ module Make(X : ALIEN) = struct
 
         ) (env,[]) la
 
+    (* XXXXXX : TODO -> ajouter les explications dans les choix du
+       case split *)
+
     let case_split env = 
       let acc = MX.fold
         (fun r (hss, ex) acc ->
@@ -250,7 +253,7 @@ module Make(X : ALIEN) = struct
 	    let r' = is_mine (Cons(hs,X.type_info r)) in
 	    if debug_sum then
 	      fprintf fmt "[case-split] %a = %a@." X.print r X.print r';
-	    [(A.Eq(r, r'), None), Num.Int n]
+	    [(A.Eq(r, r'), None, Ex.empty), Num.Int n]
         | None -> 
 	    if debug_sum then fprintf fmt "[case-split] sum: nothing@.";
 	    []
