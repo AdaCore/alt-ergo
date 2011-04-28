@@ -342,13 +342,16 @@ module Make(X : ALIEN) = struct
       Debug.new_equalities fmt atoms;
       env, Conseq.elements atoms 
         
+    (* XXXXXX : TODO -> ajouter les explications dans les choix du
+       case split *)
+
     (* choisir une egalite sur laquelle on fait un case-split *)
     let case_split env = 
       try
         let a = LRset.choose env.split in
         if debug_arrays then 
           fprintf fmt "[Arrays.case-split] %a@." LR.print a;
-        [(LR.view a, None), (Num.Int 2)]
+        [(LR.view a, None, Ex.empty), (Num.Int 2)] 
       with Not_found ->
         if debug_arrays then fprintf fmt "[Arrays.case-split] Nothing@.";
         []

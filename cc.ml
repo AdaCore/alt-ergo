@@ -54,7 +54,7 @@ module Make (X : Sig.X) = struct
   type t = { 
     gamma : env;
     gamma_finite : env ;
-    choices : (X.r A.view * Num.num * bool) list; 
+    choices : (X.r A.view * Num.num * bool * Ex.t) list; 
   }
 
   module Print = struct
@@ -389,8 +389,8 @@ module Make (X : Sig.X) = struct
           replay_atom_r env [ra, None, dep] dep
 
 
-  let rec look_for_sat ?(bad_last=false) t base_env l dep =
-    let rec aux bad_last dl base_env dep = function
+  let look_for_sat ?(bad_last=false) t base_env l =
+    let rec aux bad_last dl base_env = function
       | [] -> 
 	begin
           match X.Rel.case_split base_env.relation with
@@ -399,62 +399,61 @@ module Make (X : Sig.X) = struct
 		gamma_finite = base_env; 
 		choices = List.rev dl }
 	    | l ->
-	      let l = List.map (fun ((c,_), size) -> (c, size, false)) l in
+	      let l = List.map 
+		(fun ((c,_,ex_c), size) -> (c, size, false, ex_c)) l in
 	      let sz =
 		List.fold_left
-		  (fun acc (a,s,_) ->  Num.mult_num acc s) (Num.Int 1) (l@dl) in
+		  (fun acc (a,s,_,_) -> 
+		     Num.mult_num acc s) (Num.Int 1) (l@dl) in
 	      if debug_split then
 		fprintf fmt ">size case-split: %s@." (Num.string_of_num sz);
-	      if Num.le_num sz max_split then aux false dl base_env dep l
+	      if Num.le_num sz max_split then aux false dl base_env l
 	      else
 		{ t with 
 		  gamma_finite = base_env; 
 		  choices = List.rev dl }
 	end
-      | ((c, size, true) as a)::l ->
-	  let base_env = assume_r base_env c dep in
-	  aux bad_last (a::dl) base_env dep l
+      | ((c, size, true, ex_c) as a)::l ->
+	  let base_env = assume_r base_env c ex_c in
+	  aux bad_last (a::dl) base_env l
 
-      | [(c, size, false)] when bad_last ->
-          (* XXX * Quelle explication pour la backtrack ?
-             -> Celle de Inconsistent de try_it. C'est la qu'on appelle
-          look_for_sat avec bad_last=true *)
+      | [(c, size, false, ex_c)] when bad_last ->
           let neg_c = LR.neg (LR.make c) in
           if debug_split then
             fprintf fmt "[case-split] I backtrack on %a : %a@."
-              LR.print neg_c Ex.print dep;
-	  aux false dl base_env dep [LR.view neg_c, Num.Int 1, true] 
+              LR.print neg_c Ex.print ex_c;
+	  aux false dl base_env [LR.view neg_c, Num.Int 1, true, ex_c] 
 
-      | ((c, size, false) as a)::l ->
+      | ((c, size, false, ex_c) as a)::l ->
 	  try
-	    let base_env = assume_r base_env c dep in
-	    aux bad_last (a::dl) base_env dep l
-	  with Exception.Inconsistent dep' ->
+	    let base_env = assume_r base_env c ex_c in
+	    aux bad_last (a::dl) base_env l
+	  with Exception.Inconsistent dep ->
             let neg_c = LR.neg (LR.make c) in
-            (* Faut-il vraiement faire l'union ? *)
-            let ex = Ex.union dep dep' in
             if debug_split then
               fprintf fmt "[case-split] I backtrack on %a : %a@." 
-                LR.print neg_c Ex.print ex;
-	    aux false dl base_env ex [LR.view neg_c, Num.Int 1, true] 
+                LR.print neg_c Ex.print dep;
+	    aux false dl base_env [LR.view neg_c, Num.Int 1, true, dep] 
     in
-    aux bad_last (List.rev t.choices) base_env dep l
+    aux bad_last (List.rev t.choices) base_env l
 
-  let try_it f t dep =
+  let try_it f t =
     if debug_split then
       fprintf fmt "============= Begin CASE-SPLIT ===============@.";
     let r =
       try 
 	if t.choices = [] then 
-	  look_for_sat t t.gamma [] dep
+	  look_for_sat t t.gamma []
 	else
 	  try
+	    Format.eprintf "gamma_finite !!!!!!!!@.";
 	    let env = f t.gamma_finite in
-	    look_for_sat t env [] dep
-	  with Exception.Inconsistent dep' ->
-            (* Faut-il vraiement faire l'union des dep ? *)
-            let ex = Ex.union dep dep' in
-	    look_for_sat ~bad_last:true { t with choices = []} t.gamma t.choices ex
+	    look_for_sat t env []
+	  with Exception.Inconsistent _ -> 
+	    (* we replay the conflict in look_for_sat, so we can
+	       safely ignore the explanation which is not useful *)
+	    look_for_sat ~bad_last:true 
+	      { t with choices = []} t.gamma t.choices
       with Exception.Inconsistent d ->
 	if debug_split then
 	  fprintf fmt "============= Fin CASE-SPLIT ===============@.";
@@ -463,11 +462,10 @@ module Make (X : Sig.X) = struct
     if debug_split then
       fprintf fmt "============= Fin CASE-SPLIT ===============@.";
     r
-  
+      
   let assume a ex t = 
-    (*let ex = Ex.union ex (Explanation.singleton (Formula.mk_lit a)) in*)
     let t = { t with gamma = assume a ex t.gamma } in
-    let t = try_it (assume a ex) t  ex (* XXX: voir les explications *) in 
+    let t = try_it (assume a ex) t  in 
     t, 1
 
   let class_of t term = Uf.class_of t.gamma.uf term
@@ -475,7 +473,7 @@ module Make (X : Sig.X) = struct
   let query a t = 
     try
       let t = { t with gamma = add a Explanation.empty t.gamma } in
-      let t =  try_it (add a Explanation.empty) t Explanation.empty in
+      let t =  try_it (add a Explanation.empty) t in
       let env = t.gamma in
       if debug_use then Use.print t.gamma.use;    
       match A.LT.view a with

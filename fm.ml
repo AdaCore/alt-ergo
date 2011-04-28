@@ -818,18 +818,20 @@ module Make
 	   | Some s when s >/ (Int 1) ->
 	       begin
 		 match o with
-		   | Some (s',p',n') when s' <=/ s -> o
-		   | _ -> Some (s, p, Intervals.borne_inf i)
+		   | Some (s', _, _, _) when s' <=/ s -> o
+		   | _ -> 
+		       let n, ex = Intervals.borne_inf i in
+		       Some (s, p, n, ex)
 	       end
 	   | _ -> o
       ) env.polynomes None in
     match o with 
-      | Some (s,p,n) -> 
+      | Some (s, p, n, ex) -> 
           let r1 = P.alien_of p in
 	  let r2 = P.alien_of (P.create [] n  (P.type_info p)) in
 	  if debug_fm then
 	    fprintf fmt "[case-split] %a = %a@." X.print r1 X.print r2;
-	  [(L.Eq(r1, r2), None), s]
+	  [(L.Eq(r1, r2), None, ex), s]
       | None -> 
 	  if debug_fm then fprintf fmt "[case-split] polynomes: nothing@.";
 	  []
@@ -841,19 +843,21 @@ module Make
 	   | Some s when s >/ (Int 1) ->
 	       begin
 		 match o with
-		   | Some (s',p',n') when s' <=/ s -> o
-		   | _ -> Some (s, x, Intervals.borne_inf i)
+		   | Some (s', _, _, _) when s' <=/ s -> o
+		   | _ -> 
+		       let n, ex = Intervals.borne_inf i in
+		       Some (s, x, n, ex)
 	       end
 	   | _ -> o
       ) env.monomes None in
     match o with 
-      | Some (s,x,n) -> 
+      | Some (s,x,n,ex) -> 
           let ty = X.type_info x in
           let r1 = x in
 	  let r2 = P.alien_of (P.create [] n  ty) in
 	  if debug_fm then
 	    fprintf fmt "[case-split] %a = %a@." X.print r1 X.print r2;
-	  [(L.Eq(r1, r2), None), s]
+	  [(L.Eq(r1, r2), None, ex), s]
       | None -> 
 	  if debug_fm then fprintf fmt "[case-split] monomes: nothing@.";
 	  []

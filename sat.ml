@@ -282,6 +282,8 @@ let add_dep f dep =
       if not (Ex.mem_as_bj f dep) then
 	Ex.union (Ex.singleton ~bj:false f) dep
       else dep
+    | F.Clause _ when proof -> 
+	Ex.union (Ex.singleton ~bj:false f) dep
     | _ -> dep
   
 
@@ -290,8 +292,6 @@ let rec add_dep_of_formula f dep =
   match F.view f with 
     | F.Unit (f1, f2) when proof ->
       add_dep_of_formula f2 (add_dep_of_formula f1 dep)
-    | F.Clause _ when proof -> 
-	Ex.union (Ex.singleton ~bj:false f) dep
     | _ -> dep
 
 
@@ -300,7 +300,8 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
     let dep = add_dep f dep in
     let dep_gamma = add_dep_of_formula f dep in
     (try (* Print.gamma env.gamma; *)
-	 (* fprintf fmt "ass:%a %a @." F.print (F.mk_not f) Ex.print dep_gamma; *)
+	 (* fprintf fmt "ass:%a %a @." 
+	    F.print (F.mk_not f) Ex.print dep_gamma; *)
        raise (IUnsat (Ex.union dep_gamma (MF.find (F.mk_not f) env.gamma)))
      with Not_found -> ());
     if MF.mem f env.gamma then env
@@ -381,7 +382,13 @@ and bcp env =
 	 else 
            (Print.red f1 f2;
 	   match red f1 env with
-	     | Yes d1 -> (cl,(f2,Ex.union d d1)::u)
+	     | Yes d1 -> begin
+		 match red f2 env with
+		   | Yes d2 -> 
+		       let expl = Ex.union (Ex.union d d1) d2 in
+		       raise (Exception.Inconsistent expl)
+		   | No -> (cl,(f2,Ex.union d d1)::u)
+	       end
 	     | No -> 
 		 match red f2 env with
 		     Yes d2 -> (cl,(f1,Ex.union d d2)::u)

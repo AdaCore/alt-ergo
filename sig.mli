@@ -42,7 +42,7 @@ module type RELATION = sig
 
   val query : r sem_atom -> t -> Explanation.t -> answer
 
-  val case_split : t -> (r sem_atom * Num.num) list
+  val case_split : t -> (r sem_atom_ex * Num.num) list
     (** case_split env returns a list of equalities *)
     
   val add : t -> r -> t

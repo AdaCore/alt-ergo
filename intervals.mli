@@ -56,6 +56,6 @@ val print : Format.formatter -> t -> unit
 
 val finite_size : t -> num option
 
-val borne_inf : t -> num
+val borne_inf : t -> num * Explanation.t
 
 val div : t -> t -> t
