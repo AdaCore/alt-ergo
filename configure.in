@@ -206,5 +206,3 @@ AC_SUBST(OCAMLWIZARD)
 # Finally create the Makefile from Makefile.in
 AC_OUTPUT(Makefile)
 chmod a-w Makefile
-AC_OUTPUT(version.sh)
-chmod a-w version.sh
