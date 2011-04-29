@@ -529,7 +529,7 @@ let build_relevant_bexpl be bexpl =
 *)
 
 let intersect ({ints=l1; expl=e1; is_int=is_int} as uints1) {ints=l2; expl=e2} =
-  let rec step (l1,l2) acc expl =
+  let rec step (l1,l2) acc acc_expl expl =
     match l1, l2 with
       | (lo1,up1)::r1, (lo2,up2)::r2 ->
 	let (lo1,up1), (lo2,up2) = 
@@ -540,41 +540,43 @@ let intersect ({ints=l1; expl=e1; is_int=is_int} as uints1) {ints=l2; expl=e2} =
 	let clu = compare_bl_bu lo1 up2 in
 	let cul = compare_bu_bl up1 lo2 in
 	if cul < 0 then
-	  let expl = 
+	  let acc_expl = 
 	    (*if r1 <> [] && compare_bu_bl (snd (List.hd r1)) lo2 < 0 then expl
 	      else Explanation.union (explain_borne up1) 
 	      (Explanation.union (explain_borne lo2) expl) *)
-	    if r1 = [] || (r1 <> [] && acc = [] &&
+	    if r1 = [] || (r1 <> [] &&
 		not (compare_bl_bu lo2 (snd (List.hd r1)) > 0)) then
-	      Explanation.union (explain_borne up1) 
-		(Explanation.union (explain_borne lo2) expl) 
-	    else expl
+	      Explanation.union (explain_borne up1) (explain_borne lo2)
+	    else acc_expl
 	  in
-	  step (r1, l2) acc expl
+	  step (r1, l2) acc acc_expl expl
 	else if clu > 0 then 
-	  let expl = 
+	  let acc_expl = 
 	    (*if r2 <> [] && compare_bu_bl (snd (List.hd r2)) lo1 < 0 then expl
 	      else Explanation.union (explain_borne up2) 
 	      (Explanation.union (explain_borne lo1) expl) *)
-	    if r2 = [] || (r2 <> [] && acc = [] &&
+	    if r2 = [] || (r2 <> [] &&
 		not (compare_bl_bu lo1 (snd (List.hd r2)) > 0)) then 
-	      Explanation.union (explain_borne up2) 
-		(Explanation.union (explain_borne lo1) expl)
-	    else expl 
+	      Explanation.union (explain_borne up2) (explain_borne lo1)
+	    else acc_expl
 	  in
-	  step (l1, r2) acc expl
+	  step (l1, r2) acc acc_expl expl
 	else if cll <= 0 && cuu >= 0 then 
-	  step (l1, r2) ((lo2,up2)::acc) expl
+	  step (l1, r2) ((lo2,up2)::acc) 
+	    Explanation.empty (Explanation.union expl acc_expl)
 	else if cll >= 0 && cuu <= 0 then 
-	  step (r1, l2) ((lo1,up1)::acc) expl
+	  step (r1, l2) ((lo1,up1)::acc)
+	    Explanation.empty (Explanation.union expl acc_expl)
 	else if cll <= 0 && cuu <= 0 && cul >= 0 then 
-	  step (r1, l2) ((lo2,up1)::acc) expl
+	  step (r1, l2) ((lo2,up1)::acc)
+	    Explanation.empty (Explanation.union expl acc_expl)
 	else if cll >= 0 && cuu >= 0 && clu <= 0 then 
-	  step (l1, r2) ((lo1,up2)::acc) expl
+	  step (l1, r2) ((lo1,up2)::acc)
+	    Explanation.empty (Explanation.union expl acc_expl)
 	else assert false
-      | [], _ | _, [] ->  List.rev acc, expl 
+      | [], _ | _, [] ->  List.rev acc, (Explanation.union expl acc_expl)
     in
-  let l, expl = step (l1,l2) [] (Explanation.union e1 e2) in
+  let l, expl = step (l1,l2) [] Explanation.empty (Explanation.union e1 e2) in
   if l = [] then raise (NotConsistent expl)
   else { uints1 with ints = l; expl = expl }
 
