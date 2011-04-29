@@ -561,6 +561,9 @@ let intersect ({ints=l1; expl=e1; is_int=is_int} as uints1) {ints=l2; expl=e2} =
 	    else acc_expl
 	  in
 	  step (l1, r2) acc acc_expl expl
+	else if cll = 0 && cuu = 0 then 
+	  step (r1, r2) ((lo1,up1)::acc) 
+	    Explanation.empty (Explanation.union expl acc_expl)
 	else if cll <= 0 && cuu >= 0 then 
 	  step (l1, r2) ((lo2,up2)::acc) 
 	    Explanation.empty (Explanation.union expl acc_expl)
