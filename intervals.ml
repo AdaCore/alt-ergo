@@ -344,30 +344,43 @@ let mult_borne_sup b1 b2 =
     | Minfty, Pinfty | Pinfty, Minfty -> Pinfty
     | _, _ -> mult_borne b1 b2
 
-type interval_class = P | M | N | Z
+type interval_class = 
+  | P of Explanation.t 
+  | M of Explanation.t 
+  | N of Explanation.t 
+  | Z
 
 let class_of (l,u) =
   if zero_borne l && zero_borne u then Z
-  else if pos_borne l && pos_borne u then P
-  else if neg_borne l && neg_borne u then N
-  else M
+  else if pos_borne l && pos_borne u then P (explain_borne l)
+  else if neg_borne l && neg_borne u then N (explain_borne u)
+  else M (Explanation.union (explain_borne l) (explain_borne u))
 
 let mult_bornes (a,b) (c,d) =
   (* see util/intervals_mult.png *)
   match class_of (a,b), class_of (c,d) with
-    | P, P -> mult_borne_inf a c, mult_borne_sup b d
-    | P, M -> mult_borne_inf b c, mult_borne_sup b d
-    | P, N -> mult_borne_inf b c, mult_borne_sup a d
-    | M, P -> mult_borne_inf a d, mult_borne_sup b d
-    | M, M -> 
+    | P e1, P e2 -> 
+      mult_borne_inf a c, mult_borne_sup b d, Explanation.union e1 e2
+    | P e1, M e2 -> 
+      mult_borne_inf b c, mult_borne_sup b d, Explanation.union e1 e2
+    | P e1, N e2 -> 
+      mult_borne_inf b c, mult_borne_sup a d, Explanation.union e1 e2
+    | M e1, P e2 -> 
+      mult_borne_inf a d, mult_borne_sup b d, Explanation.union e1 e2
+    | M e1, M e2 -> 
       min_borne (mult_borne_inf a d) (mult_borne_inf b c),
-      max_borne (mult_borne_sup a c) (mult_borne_sup b d)
-    | M, N -> mult_borne_inf b c, mult_borne_sup a c
-    | N, P -> mult_borne_inf a d, mult_borne_sup b c
-    | N, M -> mult_borne_inf a d, mult_borne_sup a c
-    | N, N -> mult_borne_inf b d, mult_borne_sup a c
-    | Z, (P | M | N | Z) -> (a, b)
-    | (P | M | N ), Z -> (c, d)
+      max_borne (mult_borne_sup a c) (mult_borne_sup b d), 
+      Explanation.union e1 e2
+    | M e1, N e2 ->
+      mult_borne_inf b c, mult_borne_sup a c, Explanation.union e1 e2
+    | N e1, P e2 ->
+      mult_borne_inf a d, mult_borne_sup b c, Explanation.union e1 e2
+    | N e1, M e2 ->
+      mult_borne_inf a d, mult_borne_sup a c, Explanation.union e1 e2
+    | N e1, N e2 ->
+      mult_borne_inf b d, mult_borne_sup a c, Explanation.union e1 e2
+    | Z, (P _ | M _ | N _ | Z) -> (a, b, Explanation.empty)
+    | (P _ | M _ | N _ ), Z -> (c, d, Explanation.empty)
       
 let rec power_borne_inf p b =
   match p with
@@ -642,13 +655,18 @@ let exclude uints1 uints2 =
   intersect (complement uints1) uints2 
 
 let mult u1 u2 =
-  let resl = 
+  let resl, expl = 
     List.fold_left
-      (fun l' (u,l) -> (List.map (mult_bornes (u,l)) u2.ints)@l') 
-      [] u1.ints 
+      (fun (l', expl) b1 ->
+	List.fold_left 
+	  (fun (l, ex) b2 ->
+	    let bl, bu, ex' = mult_bornes b1 b2 in
+	    (bl, bu)::l, Explanation.union ex ex') (l', expl) u2.ints)
+      ([], Explanation.empty) u1.ints
   in
   union { ints=resl; is_int = u1.is_int;
-	  expl = Explanation.union u1.expl u2.expl }
+	  expl = Explanation.union expl 
+                 (Explanation.union u1.expl u2.expl) }
 
 let power n u =
   let l = List.map (power_bornes n) u.ints in

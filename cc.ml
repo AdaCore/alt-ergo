@@ -446,7 +446,6 @@ module Make (X : Sig.X) = struct
 	  look_for_sat t t.gamma []
 	else
 	  try
-	    Format.eprintf "gamma_finite !!!!!!!!@.";
 	    let env = f t.gamma_finite in
 	    look_for_sat t env []
 	  with Exception.Inconsistent _ -> 
