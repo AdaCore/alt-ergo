@@ -65,7 +65,7 @@ module Make (X : Sig.X) = struct
   let up_close_up g p v = 
     let lvs = leaves v in
     let g_p = find p g in
-    L.fold_left (fun gg q -> add q (union_tpl g_p (find q g)) gg) g lvs
+    L.fold_left (fun gg l -> add l (union_tpl g_p (find l g)) gg) g lvs
       
   let congr_close_up g p touched =
     let inter = function 
