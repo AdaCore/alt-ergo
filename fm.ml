@@ -774,7 +774,7 @@ module Make
 		 Explanation.print expl; 
 	     raise (Exception.Inconsistent expl)
 	)
-	(env, [], false, expl) la 
+	(env, [], false, Explanation.empty (*expl*)) la 
 	
     in
     (* explanations for new inequations *)
