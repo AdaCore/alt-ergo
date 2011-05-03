@@ -713,6 +713,8 @@ let show_used_lemmas env expl =
   env.proof_tags <- ftags;
   env.proof_toptags <- atags
   
+
+(* More efficient but invariant broken when using user instanciated axioms
 let prune_unused env expl =
   let ids = match Explanation.ids_of expl with
     | None -> []
@@ -738,3 +740,15 @@ let prune_unused env expl =
       	  end
   in
   aux false env.ast ids
+*)
+
+let prune_unused env =
+  let prune_top d = match d.c with
+    | ATypeDecl _ | AGoal _ | ALogic _ -> ()
+    | _ -> prune_nodep d d.tag
+  in
+  List.iter (fun (d, _) -> 
+    if not (List.mem d.ptag env.proof_toptags) 
+      && not (List.mem d.ptag env.proof_tags) 
+    then prune_top d
+  ) env.ast
