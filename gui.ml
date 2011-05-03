@@ -71,7 +71,7 @@ let update_status image label buttonclean env d s steps =
 	label#set_text (sprintf "  Valid (%2.4f)" time);
 	buttonclean#misc#show ();
 	ignore(buttonclean#connect#clicked 
-		 ~callback:(fun () -> prune_unused env dep))
+		 ~callback:(fun () -> prune_unused env))
 	  
     | Frontend.Inconsistent ->
 	if not satmode then 
