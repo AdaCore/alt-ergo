@@ -1,0 +1,22 @@
+Hi,
+    some simple goals on conversion between ints and reals
+     which take time to be proved :
+
+intreal-IntReal-G1.why proved by Altergo 0.05s (40) CVC3 and Z3
+intreal-IntReal-G2.why proved by Altergo 1.4s (113)
+intreal-IntReal-G3.why proved by Altergo 1.8s (115)
+intreal-IntReal-G4.why proved by Altergo 8.3s (291)
+intreal-IntReal-G5.why proved by Altergo 10.4s (291)
+
+The challenge is to reduce the time taken by alt-ergo.
+Notice that some commits ago it takes 2.7s for alt-ergo to prove
+each goal except the first.
+
+Questions:
+- from_int must be easily built-in, but floor?, ceil?,...
+- Is it linked with Gappa in Alt-ergo?
+
+Cheers,
+
+-- 
+François
