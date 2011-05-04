@@ -1,0 +1,104 @@
+(* this is a prelude for Alt-Ergo*)
+(* this is a prelude for Alt-Ergo integer arithmetic *)
+(* this is a prelude for Alt-Ergo real arithmetic *)
+axiom CompatOrderMult :
+  (forall x:int. forall y:int. forall z:int. ((x <= y) -> ((0 <= z) ->
+  ((x * z) <= (y * z)))))
+
+
+axiom CompatOrderMult1 :
+  (forall x:real. forall y:real. forall z:real. ((x <= y) -> ((0.0 <= z) ->
+  ((x * z) <= (y * z)))))
+
+
+logic from_int : int -> real
+
+
+axiom Zero : (from_int(0) = 0.0)
+
+
+axiom One : (from_int(1) = 1.0)
+
+
+axiom Add :
+  (forall x:int. forall y:int.
+  (from_int((x + y)) = (from_int(x) + from_int(y))))
+
+
+axiom Sub :
+  (forall x:int. forall y:int.
+  (from_int((x - y)) = (from_int(x) - from_int(y))))
+
+
+axiom Mul :
+  (forall x:int. forall y:int.
+  (from_int((x * y)) = (from_int(x) * from_int(y))))
+
+
+axiom Neg : (forall x:int. (from_int((-x)) = (-from_int(x))))
+
+
+logic truncate : real -> int
+
+
+axiom Truncate_int : (forall i:int. (truncate(from_int(i)) = i))
+
+
+axiom Truncate_down_pos :
+  (forall x:real. ((0.0 <= x) -> ((from_int(truncate(x)) <= x) and
+  (x <  from_int((truncate(x) + 1))))))
+
+
+axiom Truncate_up_neg :
+  (forall x:real. ((x <= 0.0) -> ((from_int((truncate(x) - 1)) <  x) and
+  (x <= from_int(truncate(x))))))
+
+
+axiom Real_of_truncate :
+  (forall x:real. (((x - 1.0) <= from_int(truncate(x))) and
+  (from_int(truncate(x)) <= (x + 1.0))))
+
+
+axiom Truncate_monotonic :
+  (forall x:real. forall y:real. ((x <= y) -> (truncate(x) <= truncate(y))))
+
+
+axiom Truncate_monotonic_int1 :
+  (forall x:real. forall i:int. ((x <= from_int(i)) -> (truncate(x) <= i)))
+
+
+axiom Truncate_monotonic_int2 :
+  (forall x:real. forall i:int. ((from_int(i) <= x) -> (i <= truncate(x))))
+
+
+logic floor : real -> int
+
+
+logic ceil : real -> int
+
+
+axiom Floor_int : (forall i:int. (floor(from_int(i)) = i))
+
+
+axiom Ceil_int : (forall i:int. (floor(from_int(i)) = i))
+
+
+axiom Floor_down :
+  (forall x:real. ((from_int(floor(x)) <= x) and
+  (x <  from_int((floor(x) + 1)))))
+
+
+axiom Ceil_up :
+  (forall x:real. ((from_int((ceil(x) - 1)) <  x) and
+  (x <= from_int(ceil(x)))))
+
+
+axiom Floor_monotonic :
+  (forall x:real. forall y:real. ((x <= y) -> (floor(x) <= floor(y))))
+
+
+axiom Ceil_monotonic :
+  (forall x:real. forall y:real. ((x <= y) -> (ceil(x) <= ceil(y))))
+
+
+goal G3 : (ceil(1.5) = 2)
