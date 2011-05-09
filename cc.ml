@@ -229,6 +229,8 @@ module Make (X : Sig.X) = struct
            (* XXX: les tableaux peuvent retourner des diseq aussi ! 
               Il faut factoriser un peu le code par la suite *)
            | A.Distinct (false, lr) -> 
+	     if Uf.already_distinct env.uf lr then env
+	     else
 	       let env = {env with uf = Uf.distinct env.uf lr dep} in
                replay_atom_r env [ra, None, ex] dep
            | _ -> assert false
@@ -338,9 +340,11 @@ module Make (X : Sig.X) = struct
 	  end
       | A.Distinct (false, lt) -> 
 	  let lr, ex = fex env dep lt in
-	  let env = {env with uf = Uf.distinct env.uf lr ex} in
-	  let env = replay_atom env (SetA.singleton (a, dep)) [] dep in
-	  contra_congruence env lr (Ex.union ex dep)
+	  if Uf.already_distinct env.uf lr then env
+	  else 
+	    let env = {env with uf = Uf.distinct env.uf lr ex} in
+	    let env = replay_atom env (SetA.singleton (a, dep)) [] dep in
+	    contra_congruence env lr (Ex.union ex dep)
 
       | A.Distinct (true, _) -> assert false
 
@@ -382,8 +386,10 @@ module Make (X : Sig.X) = struct
           let env = replay_atom_r env [ra, None, dep] dep in
           close_up_r r1 r2 dep env
       | A.Distinct (false, lr) ->
-	  let env = {env with uf = Uf.distinct env.uf lr dep} in
-          replay_atom_r env [ra, None, dep] dep
+	  if Uf.already_distinct env.uf lr then env
+	  else 
+	    let env = {env with uf = Uf.distinct env.uf lr dep} in
+            replay_atom_r env [ra, None, dep] dep
       | A.Distinct (true, _) -> assert false
       | _ ->
           replay_atom_r env [ra, None, dep] dep
