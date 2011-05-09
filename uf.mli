@@ -37,6 +37,7 @@ module type S = sig
 
   val are_equal : t -> Term.t -> Term.t -> Sig.answer
   val are_distinct : t -> Term.t -> Term.t -> Sig.answer
+  val already_distinct : t -> R.r list -> bool
 
   val class_of : t -> Term.t -> Term.t list
 

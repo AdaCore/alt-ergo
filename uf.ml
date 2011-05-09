@@ -41,6 +41,7 @@ module type S = sig
 
   val are_equal : t -> Term.t -> Term.t -> Sig.answer
   val are_distinct : t -> Term.t -> Term.t -> Sig.answer
+  val already_distinct : t -> R.r list -> bool
 
   val class_of : t -> Term.t -> Term.t list
 
@@ -567,6 +568,16 @@ module Make ( R : Sig.X ) = struct
       ignore (union env r1 r2 (Ex.union ex_r1 ex_r2));
       No
     with Inconsistent ex -> Yes(ex)
+
+  let already_distinct env lr = 
+    let d = Lit.make (Literal.Distinct (false,lr)) in
+    try 
+      List.iter (fun r -> 
+	let mdis = MapR.find r env.neqs in
+	ignore (MapL.find d mdis)
+      ) lr;
+      true
+    with Not_found -> false
 
   let class_of env t = 
     try 
