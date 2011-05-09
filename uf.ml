@@ -475,10 +475,12 @@ module Make ( R : Sig.X ) = struct
     if MapT.mem t env.make then env, [] else Env.init_term env t
 
   let ac_solve eqs dep (env, tch) (p, v) = 
+    (* pourquoi recuperer le representant de rv? r = rv d'apres testopt *)
     if debug_uf then 
       printf "[uf] ac-solve: %a |-> %a %a@." R.print p R.print v Ex.print dep;
     assert ( let rp, _ = Env.find_or_canon env p in R.equal p rp);
     let rv, ex_rv = Env.find_or_canon env v in
+    assert ( let rv, _ = Env.find_or_canon env v in R.equal v rv);
     let dep = Ex.union ex_rv dep in
     Env.apply_sigma eqs env tch (p, rv, dep)
 
