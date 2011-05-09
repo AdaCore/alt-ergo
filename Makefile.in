@@ -155,7 +155,7 @@ challenge:$(OPT)
 testoptsel:$(OPT)
 	tests/test.sh "./$(OPT) -select 2 -glouton -triggers-var "
 
-VERSION=0.93
+VERSION=0.93.1
 
 version.ml: config.status
 	@echo "let version = \""$(VERSION)"\"" > version.ml
