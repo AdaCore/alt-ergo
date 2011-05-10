@@ -1,0 +1,13 @@
+
+Source : examples/programs/list_rev.mlw in why3 repository WP_list_rev
+
+Challenge : prove this goal
+
+Provable : cvc3 and z3 prove the goal in less than 1 s
+(0.14s) cvc3 list_rev-M-WP_list_rev.cvc
+(8s) z3 -smt2 list_rev-M-WP_list_rev.smt
+(0.5s) z3 -smt2 PHASE_SELECTION=0 RESTART_STRATEGY=0 RESTART_FACTOR=1.5 QI_EAGER_THRESHOLD=100 ARITH_RANDOM_INITIAL_VALUE=true SORT_AND_OR=false CASE_SPLIT=3 DELAY_UNITS=true DELAY_UNITS_THRESHOLD=16 list_rev-M-WP_list_rev.smt
+
+Remark : It can be splitted multiple times. z3 (cvc3 not tested) can't
+prove it if distinction is not used. In this case distinction is
+quite efficient, since it remove all need of encoding.
