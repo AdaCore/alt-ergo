@@ -1,0 +1,243 @@
+(* this is a prelude for Alt-Ergo*)
+(* this is a prelude for Alt-Ergo integer arithmetic *)
+logic match_bool : bool, 'a, 'a -> 'a
+
+
+axiom match_bool_True :
+  (forall z:'a. forall z1:'a. (match_bool(true, z, z1) = z))
+
+
+axiom match_bool_False :
+  (forall z:'a. forall z1:'a. (match_bool(false, z, z1) = z1))
+
+
+logic index_bool : bool -> int
+
+
+axiom index_bool_True : (index_bool(true) = 0)
+
+
+axiom index_bool_False : (index_bool(false) = 1)
+
+
+axiom bool_inversion : (forall u:bool. ((u = true) or (u = false)))
+
+
+function andb(x: bool, y: bool) : bool = match_bool(y, match_bool(x, true,
+  false), false)
+
+
+function orb(x: bool, y: bool) : bool = match_bool(y, true, match_bool(x,
+  true, false))
+
+
+function xorb(x: bool, y: bool) : bool = match_bool(y, match_bool(x, false,
+  true), match_bool(x, true, false))
+
+
+function notb(x: bool) : bool = match_bool(x, false, true)
+
+
+axiom tuple0_inversion : (forall u:unit. (u = void))
+
+
+type unit1
+
+logic ignore : 'a1 -> unit
+
+
+type label_
+
+logic at : 'a2, label_ -> 'a2
+
+
+logic old : 'a3 -> 'a3
+
+
+axiom CompatOrderMult :
+  (forall x:int. forall y:int. forall z:int. ((x <= y) -> ((0 <= z) ->
+  ((x * z) <= (y * z)))))
+
+
+type 'a4 ref
+
+axiom Select_eq :
+  (forall m:('a5,'b) farray.
+  (forall a1:'a5. forall a2:'a5.
+  (forall b:'b [((m[a1 <- b])[a2])]. ((a1 = a2) -> (((m[a1 <- b])[a2]) = b)))))
+
+
+axiom Select_neq :
+  (forall m:('a6,'b1) farray.
+  (forall a1:'a6. forall a2:'a6.
+  (forall b:'b1 [((m[a1 <- b])[a2])]. ((not (a1 = a2)) ->
+  (((m[a1 <- b])[a2]) = (m[a2]))))))
+
+
+logic create_const : 'b2 -> ('a7,'b2) farray
+
+
+axiom Const : (forall b:'b3. forall a:'a8. ((create_const(b)[a]) = b))
+
+
+type pointer
+
+type next
+
+logic null : pointer
+
+
+logic value : (pointer,int) farray
+
+
+logic next1 : (pointer,pointer) farray
+
+
+logic is_list : (pointer,pointer) farray, pointer -> prop
+
+
+axiom is_list_null :
+  (forall next2:(pointer,pointer) farray. forall p:pointer. ((p = null) ->
+  is_list(next2, p)))
+
+
+axiom is_list_next :
+  (forall next3:(pointer,pointer) farray. forall p:pointer.
+  ((not (p = null)) -> (is_list(next3, (next3[p])) -> is_list(next3, p))))
+
+
+axiom is_list_inversion :
+  (forall z:(pointer,pointer) farray. forall z1:pointer. (is_list(z, z1) ->
+  ((exists next4:(pointer,pointer) farray. ((z = next4) and (z1 = null))) or
+  (exists next5:(pointer,pointer) farray. exists p:pointer.
+  ((not (p = null)) and (is_list(next5, (next5[p])) and ((z = next5) and
+  (z1 = p))))))))
+
+
+type 'a9 ft
+
+logic in_ft : pointer, pointer ft -> prop
+
+
+logic list_ft : (pointer,pointer) farray, pointer -> pointer ft
+
+
+axiom frame_list :
+  (forall next6:(pointer,pointer) farray. forall p:pointer. forall q:pointer.
+  forall v:pointer. ((not in_ft(q, list_ft(next6, p))) -> (is_list(next6,
+  p) -> is_list((next6[q <- v]), p))))
+
+
+predicate sep_node_list(next7: (pointer,pointer) farray, p1: pointer,
+  p2: pointer) = (not in_ft(p1, list_ft(next7, p2)))
+
+axiom list_ft_node_null :
+  (forall next8:(pointer,pointer) farray. forall q:pointer. forall p:pointer.
+  ((q = null) -> (not in_ft(p, list_ft(next8, q)))))
+
+
+axiom list_ft_node_next :
+  (forall next9:(pointer,pointer) farray. forall q:pointer. forall p:pointer.
+  ((not (q = null)) -> (is_list(next9, (next9[q])) -> (in_ft(p,
+  list_ft(next9, (next9[q]))) -> in_ft(p, list_ft(next9, q))))))
+
+
+axiom list_ft_node_next_inv :
+  (forall next10:(pointer,pointer) farray. forall q:pointer.
+  forall p:pointer. ((not (q = null)) -> (is_list(next10, (next10[q])) ->
+  ((not (q = p)) -> (in_ft(p, list_ft(next10, q)) -> in_ft(p, list_ft(next10,
+  (next10[q]))))))))
+
+
+axiom frame_list_ft :
+  (forall next11:(pointer,pointer) farray. forall p:pointer.
+  forall q:pointer. forall v:pointer. ((not in_ft(q, list_ft(next11, p))) ->
+  (list_ft(next11, p) = list_ft((next11[q <- v]), p))))
+
+
+logic list_disj : pointer ft, (pointer,pointer) farray, pointer -> prop
+
+
+axiom list_disj_null :
+  (forall ft1:pointer ft. forall next12:(pointer,pointer) farray.
+  forall p:pointer. ((p = null) -> list_disj(ft1, next12, p)))
+
+
+axiom list_disj_next :
+  (forall ft2:pointer ft. forall next13:(pointer,pointer) farray.
+  forall p:pointer. ((not (p = null)) -> (is_list(next13, (next13[p])) ->
+  ((not in_ft(p, ft2)) -> (list_disj(ft2, next13, (next13[p])) ->
+  list_disj(ft2, next13, p))))))
+
+
+axiom list_disj_inversion :
+  (forall z:pointer ft. forall z1:(pointer,pointer) farray.
+  forall z2:pointer. (list_disj(z, z1, z2) ->
+  ((exists ft3:pointer ft. exists next14:(pointer,pointer) farray.
+   (((z = ft3) and (z1 = next14)) and (z2 = null))) or
+  (exists ft4:pointer ft. exists next15:(pointer,pointer) farray.
+  exists p:pointer. ((not (p = null)) and (is_list(next15, (next15[p])) and
+  ((not in_ft(p, ft4)) and (list_disj(ft4, next15, (next15[p])) and
+  (((z = ft4) and (z1 = next15)) and (z2 = p))))))))))
+
+
+predicate sep_list_list(next16: (pointer,pointer) farray, p1: pointer,
+  p2: pointer) = (list_disj(list_ft(next16, p1), next16, p2) and
+  list_disj(list_ft(next16, p2), next16, p1))
+
+axiom list_ft_disj_null :
+  (forall next17:(pointer,pointer) farray. forall q:pointer.
+  forall p:pointer. ((q = null) -> list_disj(list_ft(next17, q), next17, p)))
+
+
+axiom list_ft_disj_next :
+  (forall next18:(pointer,pointer) farray. forall p:pointer.
+  forall q:pointer. ((not (q = null)) -> (is_list(next18, (next18[q])) ->
+  ((not in_ft(q, list_ft(next18, p))) -> ((not (q = p)) ->
+  (list_disj(list_ft(next18, (next18[q])), next18, p) ->
+  list_disj(list_ft(next18, q), next18, p)))))))
+
+
+axiom list_ft_disj_next_inv :
+  (forall next19:(pointer,pointer) farray. forall p:pointer.
+  forall q:pointer. ((not (q = null)) -> (is_list(next19, (next19[q])) ->
+  (list_disj(list_ft(next19, q), next19, p) -> list_disj(list_ft(next19,
+  (next19[q])), next19, p)))))
+
+
+axiom frame_list_disj :
+  (forall next20:(pointer,pointer) farray. forall p1:pointer.
+  forall p2:pointer. forall q:pointer. forall v:pointer. ((not in_ft(q,
+  list_ft(next20, p1))) -> ((not in_ft(q, list_ft(next20, p2))) ->
+  (list_disj(list_ft(next20, p1), next20, p2) ->
+  list_disj(list_ft((next20[q <- v]), p1), (next20[q <- v]), p2)))))
+
+
+axiom acyclic_list :
+  (forall next21:(pointer,pointer) farray. forall p:pointer.
+  ((not (p = null)) -> (is_list(next21, p) -> sep_node_list(next21, p,
+  (next21[p])))))
+
+
+goal WP_list_rev :
+  (forall next22:(pointer,pointer) farray.
+  (forall p:pointer. (is_list(next22, p) ->
+  (forall result:pointer. ((result = null) -> ((is_list(next22, p) and
+  (is_list(next22, result) and sep_list_list(next22, p, result))) and
+  (forall next23:(pointer,pointer) farray.
+  (forall q:pointer.
+  (forall p1:pointer. ((is_list(next23, p1) and (is_list(next23, q) and
+  sep_list_list(next23, p1, q))) ->
+  (forall result1:pointer. ((result1 = p1) -> (((not (result1 = null)) ->
+  (forall result2:(pointer,pointer) farray. ((result2 = next23) ->
+  (forall result3:pointer. ((result3 = p1) ->
+  (forall result4:(pointer,pointer) farray. ((result4 = next23) ->
+  (forall result5:pointer. ((result5 = p1) ->
+  (forall result6:pointer. ((result6 = q) ->
+  (forall next24:(pointer,pointer) farray.
+  ((next24 = (result4[result5 <- result6])) ->
+  (forall result7:pointer. ((result7 = p1) ->
+  (forall q1:pointer. ((q1 = result7) ->
+  (forall p2:pointer. ((p2 = (result2[result3])) -> (is_list(next24, p2) and
+  (is_list(next24, q1) and sep_list_list(next24, p2, q1)))))))))))))))))))))) and
+  ((result1 = null) -> is_list(next23, q)))))))))))))))
