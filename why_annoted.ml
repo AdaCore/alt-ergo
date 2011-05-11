@@ -104,7 +104,7 @@ type env = {
 
 let create_env buf1 (buf2:sbuffer) st_ctx ast dep  =
   let titag = buf2#create_tag [`WEIGHT `BOLD; `UNDERLINE `SINGLE] in
-  buf2#insert ~tags:[titag] "Instanciated axioms:\n\n";
+  buf2#insert ~tags:[titag] "User instantiated axioms:\n\n";
   {
     buffer = buf1;
     inst_buffer = buf2;
