@@ -104,7 +104,8 @@ let print_borne fmt = function
   | Minfty -> fprintf fmt "-inf" 
   | Pinfty -> fprintf fmt "+inf"
   | Strict (v, e) | Large (v, e) ->
-    if verbose then fprintf fmt "%s %a" (string_of_num v) Explanation.print e
+    if verbose || proof then 
+      fprintf fmt "%s %a" (string_of_num v) Explanation.print e
     else fprintf fmt "%s" (string_of_num v)
       
 let print_interval fmt (b1,b2) =
@@ -118,7 +119,7 @@ let print_interval fmt (b1,b2) =
     
 let print fmt {ints = ints; is_int = b; expl = e } = 
   List.iter (fun i -> fprintf fmt "%a" print_interval i) ints;
-  if verbose then fprintf fmt " %a" Explanation.print e
+  if verbose || proof then fprintf fmt " %a" Explanation.print e
   
 
 let undefined ty = {
