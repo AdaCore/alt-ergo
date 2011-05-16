@@ -251,6 +251,8 @@ module Make ( R : Sig.X ) = struct
 	      else di_un (l1,c,(b,n)::l2) ((a,m)::r,s)
       in di_un ([],[],[]) (l_1,l_2)
 
+
+    (* mise en forme normale modulo env *)
     exception List_minus_exn
     let list_minus l_1 l_2 = 
       let rec di_un l1 l_1 l_2 = 
@@ -324,14 +326,14 @@ module Make ( R : Sig.X ) = struct
       let ex_r2 = Ex.union (Ex.union ex_r ex_subst) ex_ac in
       if R.equal r r2 then r2, ex_r2 else canon env r2 ex_r2
 
-    let canon env r =
+    let normal_form env r =
       let rr, ex = canon env r Ex.empty in
       if rewriting && verbose then 
         fprintf fmt "canon %a = %a@." R.print r R.print rr;
       rr,ex
 
-    let find_or_canon env r =
-      try MapR.find r env.repr with Not_found -> canon env r
+    let find_or_normal_form env r =
+      try MapR.find r env.repr with Not_found -> normal_form env r
 
     let init_leaf env p = 
       if MapR.mem p env.repr then env 
@@ -346,7 +348,7 @@ module Make ( R : Sig.X ) = struct
           
     let init_term env t = 
       let mkr, ctx = R.make t in
-      let rp, ex = canon env mkr in
+      let rp, ex = normal_form env mkr in
       {env with
 	make    = MapT.add t mkr env.make; 
 	repr    = MapR.add mkr (rp,ex) env.repr;
@@ -381,8 +383,8 @@ module Make ( R : Sig.X ) = struct
 	    (fun ((g, d, dep_rl) as rul) env ->
 	      let env = {env with ac_rs = RS.remove_rule rul env.ac_rs} in
 	      let gx = R.color g in
-	      let g2, ex_g2 = canon env (Ac.subst p v g) in
-	      let d2, ex_d2 = canon env (R.subst p v d) in
+	      let g2, ex_g2 = normal_form env (Ac.subst p v g) in
+	      let d2, ex_d2 = normal_form env (R.subst p v d) in
 	      if R.equal g2 gx then (* compose *)
                 let ex = Ex.union ex_d2 (Ex.union dep_rl dep) in
 	        {env with ac_rs = RS.add_rule (g,d2, ex) env.ac_rs}
@@ -446,7 +448,7 @@ module Make ( R : Sig.X ) = struct
       else
 	let env, tch, neqs_to_up = MapR.fold
 	  (fun r (rr,ex) (env,tch,neqs_to_up) ->
-	     let nrr, ex_nrr = canon env rr in
+	     let nrr, ex_nrr = normal_form env rr in
 	     if R.equal nrr rr then env, tch, neqs_to_up
 	     else 
 	       let ex = Ex.union ex ex_nrr in
@@ -478,15 +480,15 @@ module Make ( R : Sig.X ) = struct
     (* pourquoi recuperer le representant de rv? r = rv d'apres testopt *)
     if debug_uf then 
       printf "[uf] ac-solve: %a |-> %a %a@." R.print p R.print v Ex.print dep;
-    assert ( let rp, _ = Env.find_or_canon env p in R.equal p rp);
-    let rv, ex_rv = Env.find_or_canon env v in
-    assert ( let rv, _ = Env.find_or_canon env v in R.equal v rv);
+    assert ( let rp, _ = Env.find_or_normal_form env p in R.equal p rp);
+    let rv, ex_rv = Env.find_or_normal_form env v in
+    assert ( let rv, _ = Env.find_or_normal_form env v in R.equal v rv);
     let dep = Ex.union ex_rv dep in
     Env.apply_sigma eqs env tch (p, rv, dep)
 
   let x_solve env r1 r2 dep = 
-    let rr1, ex_r1 = Env.find_or_canon env r1 in
-    let rr2, ex_r2 = Env.find_or_canon env r2 in
+    let rr1, ex_r1 = Env.find_or_normal_form env r1 in
+    let rr2, ex_r2 = Env.find_or_normal_form env r2 in
     let dep = Ex.union dep (Ex.union ex_r1 ex_r2) in
     if debug_uf then 
       printf "[uf] x-solve: %a = %a %a@."
@@ -522,7 +524,7 @@ module Make ( R : Sig.X ) = struct
     let neqs, _, newds = 
       List.fold_left
 	(fun (neqs, mapr, newds) r -> 
-	   let rr, ex = Env.find_or_canon env r in 
+	   let rr, ex = Env.find_or_normal_form env r in 
 	   try 
 	     raise (Inconsistent (Ex.union ex (MapR.find rr mapr)))
 	   with Not_found ->
@@ -589,7 +591,7 @@ module Make ( R : Sig.X ) = struct
       
   let find env t = Env.lookup_by_t t env
 
-  let find_r = Env.find_or_canon
+  let find_r = Env.find_or_normal_form
 
   let print = Print.all 
 
