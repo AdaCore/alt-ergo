@@ -3122,6 +3122,11 @@ $
 logic x:int
 goal g8 : 0/0 = 0/0
 
+$
+
+logic x,y : int
+
+goal g9 : x<>0 -> x = y -> y/y = 1
 
 $$$arith_modulo_div
 

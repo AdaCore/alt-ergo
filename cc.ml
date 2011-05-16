@@ -173,7 +173,6 @@ module Make (X : Sig.X) = struct
          replay_atom env (SetA.union gm_p_a sa_others) eqs_nonlin dep
 	   
       ) {env with uf=uf}  res
-      
 
   and replay_terms gm_p_t st_others env = 
     SetT.fold 
@@ -286,7 +285,7 @@ module Make (X : Sig.X) = struct
   and add a expl env =
     match A.LT.view a with
       | A.Eq (t1, t2) -> add_term expl (add_term expl env t1) t2
-      | A.Distinct (_, lt) -> List.fold_left (add_term expl) env lt
+      | A.Distinct (_, lt) 
       | A.Builtin (_, _, lt) ->
 	  let env = List.fold_left (add_term expl) env lt in
 	  let lvs = concat_leaves env.uf lt in (* A verifier *)
