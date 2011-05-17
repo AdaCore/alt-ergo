@@ -425,6 +425,7 @@ and print_triggers fmt = function
 
 and print_tform2 fmt f = match f.Why_ptree.c with
   | TFatom a -> print_tatom fmt a
+  | TFop (OPnot, [tf]) -> fprintf fmt "not %a" print_tform tf 
   | TFop (op, tfl) -> print_tform_list op fmt tfl
   | TFforall qf -> fprintf fmt "forall %a" print_quant_form qf
   | TFexists qf -> fprintf fmt "exists %a" print_quant_form qf
