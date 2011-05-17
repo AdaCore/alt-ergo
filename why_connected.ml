@@ -303,7 +303,7 @@ let rec least_nested_form used_vars af =
 	  (fun l v ->
 	     if List.mem v aqf.c.aqf_bvars then l else v::l (*XXX*)
 	  ) [] used_vars in
-	if not_covered = [] then af
+	if not_covered = [] then aqf.c.aqf_form
 	else least_nested_form not_covered aqf.c.aqf_form
     | _, AFlet (upvars, s, at, af) ->
 	least_nested_form used_vars af
