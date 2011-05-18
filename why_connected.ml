@@ -42,7 +42,7 @@ let search_using t sbuf env =
 	  let tags = findtags_using r.c env.ast in
 	  env.search_tags <- tags;
 	  List.iter (fun t -> t#set_property (`BACKGROUND "gold")) tags
-	| AT {c = at} | AF {c = AFatom (AApred at)} ->
+	| AT {c = at} | AF ({c = AFatom (AApred at)}, _) ->
 	  let tags = findtags_dep at env.ast in
 	  env.search_tags <- tags;
 	  List.iter (fun t -> t#set_property (`BACKGROUND "orange")) tags
@@ -84,13 +84,21 @@ let tag_callback t env sbuf ~origin:y z i =
 	  match find t sbuf env.ast with
 	    | None -> ()
 	    | Some an -> match an with
-		| AD (r,_) ->
+		| AD (r,_) -> eprintf "AD@.";
 		  if env.ctrl then 
 		    if r.pruned then unprune r t env.dep 
 		    else prune r t env.dep
 		  else toggle_prune_nodep r t
-		| AF r -> toggle_prune_nodep r t
-		| AT r -> toggle_prune_nodep r t
+		| AF (r, Some parent) -> eprintf "AF@.";
+		  begin match parent.c, parent.polarity with
+		    | AFop (AOPand, _), false | AFop (AOPor, _), true
+		    | AFop (AOPimp, _), true | AFop (AOPiff, _), _ ->
+		      eprintf 
+			"You can't prune this. Not logically equivalent@.";
+		    | _ -> toggle_prune_nodep r t
+		  end
+		| AF (r, None) -> eprintf "AF2@.";toggle_prune_nodep r t
+		| AT r -> eprintf "AT@.";toggle_prune_nodep r t
 		| QF _ -> ()
 	end;
 	true
@@ -143,6 +151,25 @@ let term_callback t env sbuf ~origin:y z i =
 	  else false
       | _ -> false
 	  
+
+let rec list_uquant_vars_in_form = function
+  | AFatom _ -> []
+  | AFop (op, aafl) ->
+      List.fold_left (fun l aaf -> l@(list_uquant_vars_in_form aaf.c)) [] aafl
+  | AFforall aqf ->
+      let l = list_uquant_vars_in_form aqf.c.aqf_form.c in
+      if aqf.polarity then
+	aqf.c.aqf_bvars@l
+      else l
+  | AFexists aqf ->
+      let l = list_uquant_vars_in_form aqf.c.aqf_form.c in
+      if not aqf.polarity then
+	aqf.c.aqf_bvars@l
+      else l
+  | AFlet (upvars, s, at, aaf) ->
+      list_uquant_vars_in_form aaf.c
+  | AFnamed (_, aaf) ->
+      list_uquant_vars_in_form aaf.c
 
 let rec list_vars_in_form = function
   | AFatom _ -> []
@@ -287,9 +314,11 @@ let make_instance (buffer:sbuffer) vars (entries:GEdit.entry list)
 
 exception UncoveredVar of (Symbols.t * Ty.t)
 
+type nestedq = Forall of aform annoted | Exists of aform annoted
+
 let rec least_nested_form used_vars af =
   match used_vars, af.c with
-    | [], _ -> af
+    | [], _ -> Exists af
     | v::r, AFatom _ -> raise(UncoveredVar v)
     | v::r, AFop (op, aafl) ->
 	let rec least_list = function
@@ -298,12 +327,19 @@ let rec least_nested_form used_vars af =
 	       try least_nested_form used_vars af
 	       with UncoveredVar _ -> least_list l
 	in least_list aafl
-    | _, AFforall aqf | _, AFexists aqf ->
+    | _, AFforall aqf ->
 	let not_covered = List.fold_left
 	  (fun l v ->
 	     if List.mem v aqf.c.aqf_bvars then l else v::l (*XXX*)
 	  ) [] used_vars in
-	if not_covered = [] then aqf.c.aqf_form
+	if not_covered = [] then Forall aqf.c.aqf_form
+	else least_nested_form not_covered aqf.c.aqf_form
+    | _, AFexists aqf ->
+	let not_covered = List.fold_left
+	  (fun l v ->
+	     if List.mem v aqf.c.aqf_bvars then l else v::l (*XXX*)
+	  ) [] used_vars in
+	if not_covered = [] then Exists aqf.c.aqf_form
 	else least_nested_form not_covered aqf.c.aqf_form
     | _, AFlet (upvars, s, at, af) ->
 	least_nested_form used_vars af
@@ -326,7 +362,7 @@ let rec add_instance env vars entries af aname =
     make_instance env.inst_buffer vars entries af goal_form tyenv in
   let ln_form = least_nested_form used_vars goal_form in
   env.inst_buffer#place_cursor  ~where:env.inst_buffer#end_iter;
-  if ln_form = goal_form then begin
+  if ln_form = Exists goal_form then begin
     let hy = AAxiom (loc, (sprintf "%s%s" "_instance_" aname), instance.c) in
     let ahy = new_annot env.inst_buffer hy instance.id ptag in
     let rev_ast = List.rev env.ast in
@@ -341,10 +377,18 @@ let rec add_instance env vars entries af aname =
   end
   else begin
     let instance = new_annot env.inst_buffer instance.c instance.id ptag in
-    ln_form.c <- 
-      AFop 
-      (AOPimp, 
-       [instance; {ln_form with c = ln_form.c}]);
+    begin match ln_form with 
+      | Exists lnf ->
+	lnf.c <- 
+	  AFop 
+	  (AOPand, 
+	   [instance; {lnf with c = lnf.c}])
+      | Forall lnf ->
+	lnf.c <- 
+	  AFop 
+	  (AOPimp, 
+	   [instance; {lnf with c = lnf.c}])
+    end;
     env.inst_buffer#insert ~tags:[instance.tag] ("instance "^aname^": \n");
     connect_aaform env env.inst_buffer instance;
     env.inst_buffer#insert (String.make indent_size ' ');
@@ -356,7 +400,7 @@ let rec add_instance env vars entries af aname =
 
 and popup_axiom t env offset () =
     let pop_w = GWindow.dialog
-    ~title:"Instanciate axiom"
+    ~title:"Instantiate axiom"
     ~allow_grow:true
     ~width:400 ()
     (* ~icon:(GdkPixbuf.from_xpm_data Logo.xpm_logo) ()  *)
@@ -380,16 +424,16 @@ and popup_axiom t env offset () =
       begin
 	  match atd.c with
 	    | AAxiom (_, aname, af) ->
-		pop_w#set_title ("Instanciate axiom "^aname)
+		pop_w#set_title ("Instantiate axiom "^aname)
 	    | APredicate_def (_, aname,_ , af) ->
-		pop_w#set_title ("Instanciate predicate "^aname)
+		pop_w#set_title ("Instantiate predicate "^aname)
 	    | _ -> assert false
       end;
       begin
 	  match atd.c with
 	    | AAxiom (_, aname, af)
 	    | APredicate_def (_, aname,_ , af) ->
-		let vars = remove_doublons (list_vars_in_form af) in
+		let vars = remove_doublons (list_uquant_vars_in_form af) in
 		let rows = List.length vars in
 		let table = GPack.table ~rows ~columns:2 ~homogeneous:false
 		  ~border_width:5 ~packing:pop_w#vbox#add () in

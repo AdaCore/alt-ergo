@@ -13,6 +13,7 @@ type sbuffer = GSourceView2.source_buffer
 type 'a annoted =
     { mutable c : 'a; 
       mutable pruned : bool;
+      mutable polarity : bool;
       tag : GText.tag;
       ptag : GText.tag;
       id : int;
@@ -76,7 +77,7 @@ type atyped_decl =
 
 type annoted_node =
   | AD of (atyped_decl annoted * Why_typing.env)
-  | AF of aform annoted
+  | AF of aform annoted * aform annoted option
   | AT of aterm annoted
   | QF of aquant_form annoted
 
@@ -117,6 +118,13 @@ let create_env buf1 (buf2:sbuffer) st_ctx ast dep  =
     proof_tags = [];
     proof_toptags = [];
   }
+
+
+let tag (buffer:sbuffer) = buffer#create_tag []
+
+let new_annot (buffer:sbuffer) c id ptag =
+  { c = c; pruned = false; tag = (tag buffer); 
+    ptag = ptag;id = id; polarity = true; buf = buffer }
 
 
 let rec findin_aterm tag buffer { at_desc = at_desc } =
@@ -175,14 +183,14 @@ let findin_aatom tag buffer aa =
 
     | AApred at -> findin_aterm tag buffer at
 
-let rec findin_quant_form tag buffer {aqf_triggers = trs; aqf_form = aaf } =
+let rec findin_quant_form tag buffer parent {aqf_triggers = trs; aqf_form = aaf } =
   let r = findin_triggers tag buffer trs in
   if r = None then 
     let goodbuf =  aaf.buf#get_oid = buffer#get_oid in
     let c = compare tag#priority aaf.tag#priority in
-    if goodbuf && c = 0 then Some (AF aaf)
+    if goodbuf && c = 0 then Some (AF (aaf, parent))
     else if goodbuf && c > 0 then None
-    else findin_aform tag buffer aaf.c
+    else findin_aform tag buffer (Some aaf) aaf.c
   else r
 
 and findin_triggers tag buffer trs =
@@ -192,37 +200,37 @@ and findin_triggers tag buffer trs =
        | Some _ -> r
     ) None trs
       
-and findin_aform tag buffer aform =
+and findin_aform tag buffer parent aform =
   match aform with
     | AFatom a -> findin_aatom tag buffer a
-    | AFop (op, afl) -> findin_aaform_list tag buffer afl
+    | AFop (op, afl) -> findin_aaform_list tag buffer parent afl
     | AFforall qf
     | AFexists qf -> 
 	let goodbuf =  qf.buf#get_oid = buffer#get_oid in
 	let c = compare tag#priority qf.tag#priority in
 	if goodbuf && c = 0 then Some (QF qf)
 	else if goodbuf && c > 0 then None
-	else findin_quant_form tag buffer qf.c
+	else findin_quant_form tag buffer parent qf.c
     | AFlet (vs, s, t, aaf) ->
 	let r = findin_aterm tag buffer t in
-	if r = None then findin_aaform tag buffer aaf
+	if r = None then findin_aaform tag buffer parent aaf
 	else r
     | AFnamed (_, aaf) ->
-	findin_aform tag buffer aaf.c
+	findin_aform tag buffer parent aaf.c
 
-and findin_aaform_list tag buffer aafl =
+and findin_aaform_list tag buffer parent aafl =
   List.fold_left
     (fun r aaf -> match r with
-       | None -> findin_aaform tag buffer aaf
+       | None -> findin_aaform tag buffer parent aaf
        | Some _ -> r
     ) None aafl
 
-and findin_aaform tag buffer aaf =
+and findin_aaform tag buffer parent aaf =
   let goodbuf =  aaf.buf#get_oid = buffer#get_oid in
   let c = compare tag#priority aaf.tag#priority in
-  if goodbuf && c = 0 then Some (AF aaf)
+  if goodbuf && c = 0 then Some (AF (aaf, parent))
   else if goodbuf && c > 0 then None
-  else findin_aform tag buffer aaf.c
+  else findin_aform tag buffer (Some aaf) aaf.c
 
 let findin_atyped_delc tag buffer (td, env) stop_decl =
   let goodbuf =  td.buf#get_oid = buffer#get_oid in
@@ -234,7 +242,9 @@ let findin_atyped_delc tag buffer (td, env) stop_decl =
     | AAxiom (_, _, af)
     | APredicate_def (_, _, _, af)
     | AFunction_def (_, _, _, _, af) ->
-	findin_aform tag buffer af
+        let aaf = new_annot buffer af (-1) tag in
+	(* TODO: Change this so af is already annoted *)
+	findin_aform tag buffer (Some aaf) af
     | ARewriting (_, _, rwtl) -> None
         (*List.fold_left 
 	  (fun {rwt_left = rl; rwt_right = rr} acc -> match acc with
@@ -244,9 +254,9 @@ let findin_atyped_delc tag buffer (td, env) stop_decl =
     | AGoal (_, _, aaf) ->
 	let goodbuf =  aaf.buf#get_oid = buffer#get_oid in
 	let c = compare tag#priority aaf.tag#priority in
-	if goodbuf && c = 0 then Some (AF aaf)
+	if goodbuf && c = 0 then Some (AF (aaf, None))
 	else if goodbuf && c > 0 then None
-	else findin_aform tag buffer aaf.c
+	else findin_aform tag buffer (Some aaf) aaf.c
     | ALogic _
     | ATypeDecl _ ->
 	None
@@ -603,11 +613,6 @@ let make_dep annoted_ast =
 
 (* Translation from AST to annoted/pruned AST *)
 
-let tag (buffer:sbuffer) = buffer#create_tag []
-
-let new_annot (buffer:sbuffer) c id ptag =
-  { c = c; pruned = false; tag = (tag buffer); 
-    ptag = ptag;id = id; buf = buffer }
 
 let annot_of_tconstant (buffer:sbuffer)  t =
   new_annot buffer t
@@ -656,6 +661,17 @@ let of_oplogic (buffer:sbuffer)  = function
   | OPif t -> AOPif (of_tterm buffer  t)
   | OPiff -> AOPiff 
 
+let rec change_polarity_aform f = 
+  f.polarity <- not f.polarity;
+  match f.c with
+    | AFatom _ -> ()
+    | AFop (_, afl) -> List.iter change_polarity_aform afl
+    | AFforall aaqf | AFexists aaqf ->
+      aaqf.polarity <- not aaqf.polarity;
+      change_polarity_aform aaqf.c.aqf_form
+    | AFlet (_,_,_,af) | AFnamed (_, af) -> change_polarity_aform af
+	
+
 let rec of_quant_form (buffer:sbuffer)   
     {qf_bvars = bv; qf_upvars = uv; qf_triggers = trs; qf_form = tf } =
   let ptag = tag buffer in
@@ -671,8 +687,11 @@ and annot_of_quant_form (buffer:sbuffer) qf =
 and of_tform (buffer:sbuffer) f = match f.Why_ptree.c with
   | TFatom a -> AFatom (of_tatom buffer a)
   | TFop (op, tfl) ->
-      AFop (of_oplogic buffer  op,
-	    List.map (annot_of_tform buffer ) tfl)
+    let afl = List.map (annot_of_tform buffer ) tfl in
+    assert (let l = List.length afl in l >= 1 && l <= 2);
+    if op = OPnot || op = OPimp then 
+      change_polarity_aform (List.hd afl);
+    AFop (of_oplogic buffer  op, afl)
   | TFforall qf -> AFforall (annot_of_quant_form buffer qf)
   | TFexists qf -> AFexists (annot_of_quant_form buffer qf)
   | TFlet (vs, s, t, tf) ->

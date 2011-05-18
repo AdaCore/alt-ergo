@@ -5,6 +5,7 @@ type sbuffer = GSourceView2.source_buffer
 type 'a annoted =
     { mutable c : 'a; 
       mutable pruned : bool;
+      mutable polarity : bool;
       tag : GText.tag;
       ptag : GText.tag;
       id : int;
@@ -68,7 +69,7 @@ type atyped_decl =
 
 type annoted_node =
   | AD of (atyped_decl annoted * Why_typing.env)
-  | AF of aform annoted
+  | AF of aform annoted * aform annoted option
   | AT of aterm annoted
   | QF of aquant_form annoted
 
