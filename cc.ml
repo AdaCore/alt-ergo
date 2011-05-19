@@ -196,13 +196,17 @@ module Make (X : Sig.X) = struct
 
   let semantic_view env a ex_a = 
     match A.LT.view a with
+      | A.Eq (t1, t2) ->
+          let r1, ex1 = Uf.find env.uf t1 in
+	  let r2, ex2 = Uf.find env.uf t2 in
+	  let ex = Ex.union (Ex.union ex1 ex2) ex_a in
+	  A.Eq(r1, r2), ex
       | A.Distinct (b, lt) -> 
 	  let lr, ex = fold_find_with_explanation env ex_a lt in 
 	  A.Distinct (b, lr), ex
       | A.Builtin(b, s, l) -> 
 	  let lr, ex  = fold_find_with_explanation env ex_a l in
 	  A.Builtin(b, s, List.rev lr), ex
-      | _ -> assert false
 
   let new_facts_by_contra_congruence env r bol ex = 
     match X.term_extract r with
@@ -290,7 +294,8 @@ module Make (X : Sig.X) = struct
     let class_of = Uf.class_of env.uf in
     let relation, result  = 
       X.Rel.assume env.relation sa are_eq are_neq class_of in
-    let env = clean_use { env with relation = relation} result.remove in
+    let env = { env with relation = relation } in
+    let env = clean_use env result.remove in
     env, result.assume
 
   let rec assume_literal env (a, ex) =
@@ -301,11 +306,13 @@ module Make (X : Sig.X) = struct
 	    let env = List.fold_left assume_literal env l in
 	    env, semantic_view env ta ex, Some ta
 	| LSem sa -> env, (sa, ex), None
-    in 
+    in
     match sa with
       | A.Eq(r1, r2) ->
 	  let env, l = congruence_closure env r1 r2 ex in
 	  let env = List.fold_left assume_literal env l in
+	  let env , l = replay_atom env [sa, tao, ex] in
+	  let env = List.fold_left assume_literal env l	in
 	  if Options.nocontracongru then env
 	  else 
 	    let env = 
@@ -411,10 +418,13 @@ module Make (X : Sig.X) = struct
 	    assert false (* devrait etre capture par une analyse statique *)
 
 	| _ -> 
-	    assert false
-  (* let na = A.LT.neg a in
-	      let rna, ex_rna = semantic_view env na Ex.empty in
-              X.Rel.query (rna, Some na) env.relation ex_rna*)
+	    let are_eq = Uf.are_equal env.uf in
+	    let are_neq = Uf.are_distinct env.uf in
+	    let class_of = Uf.class_of env.uf in
+	    let na = A.LT.neg a in
+	    let rna, ex_rna = semantic_view env na Ex.empty in
+            X.Rel.query env.relation (rna, Some na, ex_rna) 
+	      are_eq are_neq class_of 
     with Exception.Inconsistent d -> Yes d
 
   let empty () = 
