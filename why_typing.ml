@@ -726,6 +726,7 @@ and alpha_rec ((up, m) as s) f =
 	let trs = List.map (List.map (alpha_renaming s)) trs in
 	PPforall(xs, ty, trs, ff1)
     | PPlet(x, f1, f2) ->
+	let ff1 = alpha_renaming s f1 in
 	let s, x = 
 	  if S.mem x up then
 	    let nx = fresh_var x in
@@ -735,7 +736,6 @@ and alpha_rec ((up, m) as s) f =
 	  else
 	    (S.add x up, m), x
 	in
-	let ff1 = alpha_renaming s f1 in
 	let ff2 = alpha_renaming s f2 in
 	PPlet(x, ff1, ff2)
 	

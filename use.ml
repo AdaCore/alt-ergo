@@ -16,6 +16,7 @@
 (**************************************************************************)
 
 open Options
+
 module F = Format
 module L = List
 module T = Term
@@ -78,15 +79,20 @@ module Make (X : Sig.X) = struct
       (find p g) touched 
       
   let print g = 
-    let sterms fmt = ST.iter (F.fprintf fmt "%a " T.print) in
-    let satoms fmt = SA.iter (fun (a,e) -> 
-      F.fprintf fmt "%a %a" Literal.LT.print a Explanation.print e) in
-    F.fprintf fmt "@{<C.Bold>[use]@} gamma :\n";
-    iter 
-      (fun t (st,sa) -> 
-	 F.fprintf fmt "%a is used by {%a} and {%a}\n"  
-	   X.print t sterms st satoms sa
-      ) g
+    if debug_use then 
+      begin
+	let sterms fmt = ST.iter (F.fprintf fmt "%a " T.print) in
+	let satoms fmt =
+	  SA.iter 
+	    (fun (a,e) -> 
+	       F.fprintf fmt "%a %a" Literal.LT.print a Explanation.print e) in
+	F.fprintf fmt "@{<C.Bold>[use]@} gamma :\n";
+	iter 
+	  (fun t (st,sa) -> 
+	     F.fprintf fmt "%a is used by {%a} and {%a}\n"  
+	       X.print t sterms st satoms sa
+	  ) g
+      end
 
   let mem = G.mem
   let add = G.add

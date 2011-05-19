@@ -22,7 +22,7 @@ open Sig
 module A = Literal
 module CcX = Cc.Make(Combine.CX)
 module F = Formula
-module M = Matching.Make(CcX) 
+module MM = Matching.Make(CcX) 
 module SF = F.Set
 module MF = F.Map
 module Ex = Explanation
@@ -43,7 +43,7 @@ type t = {
     tbox : CcX.t;
     lemmas : (int * Ex.t) MF.t;
     definitions : (int * Ex.t) MF.t;
-    matching : M.t
+    matching : MM.t
 }
       
 exception Sat of t
@@ -145,7 +145,7 @@ let add_terms env s goal age lem =
     term_orig = lem ;
   }
   in
-  { env with matching = Term.Set.fold (M.add_term infos) s env.matching }
+  { env with matching = Term.Set.fold (MM.add_term infos) s env.matching }
 
 (*exception EnoughLemmasAlready of int * (gformula * Ex.t) list*)
 
@@ -177,14 +177,14 @@ let mtriggers env formulas max_size =
 		 List.fold_left 
 		   (fun env tg ->
 		      let info = 
-			{ Matching.pat_age = age ; 
-			  pat_orig = lem ;
-			  pat_formula = f ;
-			  pat_dep = dep }
+			{ Matching.trigger_age = age ; 
+			  trigger_orig = lem ;
+			  trigger_formula = f ;
+			  trigger_dep = dep }
 		      in
 		      { env with 
 			  matching = 
-			  M.add_pat (info, tg) env.matching env.tbox })
+			  MM.add_trigger info tg env.matching })
 		   env tgs
 	     | _ -> assert false		 
 	 in 
@@ -195,8 +195,8 @@ let mtriggers env formulas max_size =
 
 let new_facts mode env = 
   List.fold_left
-    (fun acc ({Matching.pat_formula=f; 
-	       pat_age=age; pat_dep=dep }, subst_list) ->
+    (fun acc ({Matching.trigger_formula=f; 
+	       trigger_age=age; trigger_dep=dep }, subst_list) ->
        List.fold_left
 	 (fun acc {Matching.sbt=s;gen=g;goal=b} ->
 	    if mode && not b then acc
@@ -210,7 +210,7 @@ let new_facts mode env =
 	 ) 
 	 acc subst_list
     )
-    [] (M.query env.matching env.tbox)
+    [] (MM.query env.matching env.tbox)
 
 
 let mround predicate mode env max_size =
@@ -466,7 +466,7 @@ let empty = {
   delta = [] ;
   tbox = CcX.empty (); 
   lemmas = MF.empty ; 
-  matching = M.empty;
+  matching = MM.empty;
   definitions = MF.empty
 } 
 

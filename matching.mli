@@ -17,11 +17,11 @@
 
 type gsubst = { sbt : Term.subst ; gen : int ; goal : bool}
 
-type pat_info = {
-  pat_age : int ; 
-  pat_orig : Formula.t ; 
-  pat_formula : Formula.t ; 
-  pat_dep : Explanation.t ;
+type trigger_info = {
+  trigger_age : int ; 
+  trigger_orig : Formula.t ; 
+  trigger_formula : Formula.t ; 
+  trigger_dep : Explanation.t ;
 }
 
 type term_info = {
@@ -43,8 +43,8 @@ module type S = sig
 
   val empty : t
   val add_term : term_info -> Term.t -> t -> t 
-  val add_pat : pat_info * Term.t list -> t -> uf -> t
-  val query : t -> uf -> (pat_info * gsubst list) list
+  val add_trigger : trigger_info -> Term.t list -> t -> t
+  val query : t -> uf -> (trigger_info * gsubst list) list
 
 end
 

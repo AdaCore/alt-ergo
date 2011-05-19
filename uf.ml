@@ -315,7 +315,7 @@ module Make ( R : Sig.X ) = struct
 	  else (R.color ac, R.color rac) :: z, Ex.union ex ex_ac)
         st ([], Ex.empty)
 	
-    let canon_aux rx = L.fold_left (fun r (p,v) -> R.subst p v r) rx
+    let canon_aux rx = List.fold_left (fun r (p,v) -> R.subst p v r) rx
       
     let rec canon env r ex_r = 
       let se, sac = filter_leaves r in
@@ -354,7 +354,7 @@ module Make ( R : Sig.X ) = struct
 	classes = add_to_classes t rp env.classes;
 	gamma   = add_to_gamma mkr rp env.gamma;
 	neqs    = 
-	  if MapR.mem rp env.neqs then env.neqs 
+	  if MapR.mem rp env.neqs then env.neqs (* pourquoi ce test *)
 	  else MapR.add rp MapL.empty env.neqs}, ctx
 
 
@@ -461,8 +461,6 @@ module Make ( R : Sig.X ) = struct
         in 
         (* Correction : Do not update neqs twice for the same r *)
 	update_aux dep neqs_to_up env, tch 
-	
-
 	  
     let apply_sigma eqs env tch ((p, v, dep) as sigma) = 
       let env = init_leaf env p in
