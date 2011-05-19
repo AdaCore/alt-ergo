@@ -243,7 +243,7 @@ let findin_atyped_delc tag buffer (td, env) stop_decl =
     | APredicate_def (_, _, _, af)
     | AFunction_def (_, _, _, _, af) ->
         let aaf = new_annot buffer af (-1) tag in
-	(* TODO: Change this so af is already annoted *)
+	(* TODO: Change this so af is annoted *)
 	findin_aform tag buffer (Some aaf) af
     | ARewriting (_, _, rwtl) -> None
         (*List.fold_left 
