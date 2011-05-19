@@ -17,6 +17,7 @@
 
 open Format
 open Options
+open Sig
 
 type ('a, 'b) mine = Yes of 'a | No of 'b
 
@@ -452,10 +453,9 @@ module Make (X : ALIEN) = struct
     type t = unit
     exception Inconsistent    
     let empty _ = ()
-    let assume _ _ _ = (), []
-    let query _ _ _ = Sig.No
+    let assume _ _ ~are_eq ~are_neq ~class_of = (), { assume = []; remove = []}
+    let query _ _ ~are_eq ~are_neq ~class_of = Sig.No
     let case_split env = []
     let add env _ = env
-    let instantiate env _ _ _ _ = env, []
   end
 end

@@ -136,6 +136,36 @@ module Make (X : Sig.X) = struct
 	  A.Builtin(b, s, List.rev lr), ex
       | _ -> assert false
 
+  let is_bool = 
+    let vrai,_ = X.make T.vrai in
+    let faux, _ = X.make T.faux in
+    fun r -> X.equal r vrai || X.equal r faux
+
+  let contra_congruence env r1 r2 ex = 
+    if is_bool r1 then
+      
+
+  let clean_use = 
+    List.fold_left 
+      (fun env (a, ex) -> 
+	 match a with 
+	   | LSem _ -> assert false
+	   | LTerm t -> 
+	       begin
+		 match A.LT.view t with
+		   | A.Distinct (_, lt) 
+		   | A.Builtin (_, _, lt) ->
+		       let lvs = concat_leaves env.uf lt in
+		       List.fold_left
+			 (fun env rx ->
+			    let st, sa = Use.find rx env.use in
+			    let sa = SetA.remove (t, ex) sa in
+			    { env with use = Use.add rx (st,sa) env.use }
+			 ) env lvs
+		   | _ -> assert false
+	       end) 
+      
+
   let rec close_up t1 t2 dep env =
     if debug_cc then 
       printf "@{<C.Bold>[cc]@} close_up: %a = %a@." T.print t1 T.print t2;
@@ -198,14 +228,16 @@ module Make (X : Sig.X) = struct
     replay_atom_r env sa dep
 	
   and replay_atom_r env sa dep = 
-    let rel, leqs  = X.Rel.assume env.relation sa dep in
     let are_eq = Uf.are_equal env.uf in
-    let are_dist = Uf.are_distinct env.uf in
-    let rel, atoms = 
-      X.Rel.instantiate rel are_eq are_dist (Uf.class_of env.uf) sa in
-    let env = play_eqset {env with relation = rel} leqs dep in
-    List.fold_left (fun env (a,ex) -> assume a ex env) env atoms
+    let are_neq = Uf.are_distinct env.uf in
+    let class_of = Uf.class_of env.uf in
+    let relation, result  = 
+      X.Rel.assume env.relation sa are_eq are_neq class_of in
+    let env = clean_use { env with relation = relation} result.remove in
+    List.fold_left assume env result.assume
 
+
+(*
   and play_eqset env leqs dep =
     List.fold_left
       (fun env (ra, a, ex) -> 
@@ -235,7 +267,7 @@ module Make (X : Sig.X) = struct
            | _ -> assert false
 
       ) env leqs
-
+*)
   and congruents env t s = 
     SetT.fold 
       (fun t2 acc ->
@@ -314,7 +346,6 @@ module Make (X : Sig.X) = struct
       | _ -> []
 	  
   and assume_rec dep env a =
-	(* explications a revoir *)
     try begin
     match A.LT.view a with
       | A.Eq(t1,t2) ->
@@ -350,11 +381,32 @@ module Make (X : Sig.X) = struct
       | _ -> replay_atom env (SetA.singleton (a, dep)) [] dep
     end with Inconsistent dep' -> raise (Inconsistent (Ex.union dep dep'))
 
-  and assume a dep env =
-    let env = assume_rec dep (add a dep env) a in
+  and assume env (a,ex) =
+    let env, (sa, ex) = 
+      match a with 
+	| LTerm ta -> 
+	    let env = add at ex env in
+	    env, semantic_view env ta ex
+	| LSem sa -> env, (sa, ex)
+    in 
+    match sa with
+      | A.Eq(r1, r2) ->
+	  let env = close_up_r r1 r2 ex env in
+	  if Options.nocontracongru then env
+	  else List.fold_left assume env (contra_congruence env r1 r2 ex)
+	    
+
+      | A.Distinct (false, lr) ->
+      | A.Distinct (true, _) -> assert false
+      | A.Builtin _ -> 
+
+
+
+    let env = assume_rec dep a in
     if debug_uf then Uf.print fmt env.uf;
     env
 
+(*
   and contra_congruence env lr dep =
     if Options.nocontracongru then env
     else
@@ -377,7 +429,7 @@ module Make (X : Sig.X) = struct
                  env
              | _ -> 
                  assume_rec dep env (A.LT.make (A.Distinct (false, l)))) mp env
-    
+*)  
 
   let assume_r env ra dep =
     match ra with

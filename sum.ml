@@ -17,6 +17,7 @@
 
 open Options
 open Format
+open Sig
 open Exception  
 module Sy = Symbols
 module T  = Term
@@ -181,7 +182,7 @@ module Make(X : ALIEN) = struct
             let env = MX.add r (enum, ex) env in
             if HSS.cardinal enum = 1 then
               let h' = HSS.choose enum in
-              env, (A.Eq(r, is_mine (Cons(h',ty))), None, ex)::eqs
+              env, (LSem (A.Eq(r, is_mine (Cons(h',ty)))), ex)::eqs
             else env, eqs
               
         | Alien r1   , Alien r2   -> env, eqs
@@ -189,30 +190,31 @@ module Make(X : ALIEN) = struct
 
     let add_eq hss sm1 sm2 dep env eqs = 
       match sm1, sm2 with
-        | Alien r , Cons(h,ty) 
-        | Cons (h,ty), Alien r  ->
+        | Alien r, Cons(h,ty) | Cons (h,ty), Alien r  ->
+
           let enum, ex = try MX.find r env with Not_found -> hss, Ex.empty in
           let ex = Ex.union ex dep in
-          if HSS.mem h enum then MX.add r (HSS.singleton h, ex) env, eqs
-          else raise (Inconsistent ex)
+          if not (HSS.mem h enum) then raise (Inconsistent ex);
+	  MX.add r (HSS.singleton h, ex) env, eqs
             
-        | Alien r1 , Alien r2   -> 
+        | Alien r1, Alien r2   -> 
+
           let enum1,ex1 = try MX.find r1 env with Not_found -> hss, Ex.empty in
           let enum2,ex2 = try MX.find r2 env with Not_found -> hss, Ex.empty in
           let ex = Ex.union dep (Ex.union ex1 ex2) in
           let diff = HSS.inter enum1 enum2 in 
-          if HSS.is_empty diff then raise (Inconsistent ex)
-          else 
-            let env = MX.add r1 (diff, ex) env in
-            let env = MX.add r2 (diff, ex) env in
-            if HSS.cardinal diff = 1 then
-              let h' = HSS.choose diff in
-              let ty = X.type_info r1 in
-              env, (A.Eq(r1, is_mine (Cons(h',ty))), None, ex)::eqs
-            else env, eqs
+          if HSS.is_empty diff then raise (Inconsistent ex);
+          let env = MX.add r1 (diff, ex) env in
+          let env = MX.add r2 (diff, ex) env in
+          if HSS.cardinal diff = 1 then
+            let h' = HSS.choose diff in
+            let ty = X.type_info r1 in
+            env, (LSem (A.Eq(r1, is_mine (Cons(h',ty)))), ex)::eqs
+          else env, eqs
+
         |  _ -> env, eqs
 
-    let assume env la expl = 
+    let assume env la ~are_eq ~are_neq ~class_of = 
       let aux bol r1 r2 dep env eqs = function
         | None     -> env, eqs
         | Some hss -> 
@@ -223,17 +225,20 @@ module Make(X : ALIEN) = struct
               add_diseq hss (embed r1) (embed r2) dep env eqs
       in
       Debug.print_env env;
-      List.fold_left
-        (fun (env,eqs) -> function
-          | A.Eq(r1,r2) , _, ex -> 
-              aux true  r1 r2 (Ex.union expl ex) env eqs (values_of r1)
-
-          | A.Distinct(false, [r1;r2]), _, ex -> 
-              aux false r1 r2 (Ex.union expl ex) env eqs (values_of r1)
-
-          | _ -> env, eqs
-
-        ) (env,[]) la
+      let env, eqs = 
+	List.fold_left
+          (fun (env,eqs) -> function
+             | A.Eq(r1,r2), _, ex -> 
+		 aux true  r1 r2 ex env eqs (values_of r1)
+		   
+             | A.Distinct(false, [r1;r2]), _, ex -> 
+		 aux false r1 r2 ex env eqs (values_of r1)
+		   
+             | _ -> env, eqs
+		 
+          ) (env,[]) la
+      in
+      env, { assume = eqs; remove = [] }
 
     (* XXXXXX : TODO -> ajouter les explications dans les choix du
        case split *)
@@ -253,14 +258,14 @@ module Make(X : ALIEN) = struct
 	    let r' = is_mine (Cons(hs,X.type_info r)) in
 	    if debug_sum then
 	      fprintf fmt "[case-split] %a = %a@." X.print r X.print r';
-	    [(A.Eq(r, r'), None, Ex.empty), Num.Int n]
+	    [A.Eq(r, r'), Ex.empty, Num.Int n]
         | None -> 
 	    if debug_sum then fprintf fmt "[case-split] sum: nothing@.";
 	    []
       
 
-    let query (a,r) env expl =
-      try ignore(assume env [a,r,Explanation.empty] expl); Sig.No
+    let query env a_ex ~are_eq ~are_neq ~class_of =
+      try ignore(assume env [a_ex] ~are_eq ~are_neq ~class_of); Sig.No
       with Inconsistent expl -> Sig.Yes expl          
 
     let add env r = match embed r, values_of r with

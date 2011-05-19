@@ -716,24 +716,13 @@ module Make
     let env, eqs = equalities_from_polynomes env eqs in
     equalities_from_monomes env eqs
 
-  let assume env la expl = 
+  let assume env la ~are_eq ~are_neq ~class_of = 
     Debug.env env;
-    (*let expl = 
-      List.fold_left 
-      (fun expl (a,_) ->
-      Explanation.union 
-      (Explanation.singleton (Formula.mk_lit a)) expl
-      ) Explanation.empty env.inequations
-      in*)
     let env, eqs, new_ineqs, expl =
       List.fold_left
 	(fun (env, eqs, new_ineqs, expl) (a, root, e) ->
 	   let a = normal_form a in
 	   let expl = Explanation.union e expl in
-	   (*let expl = match root with | Some a ->
-	   (*Explanation.everything*) Explanation.union expl
-	     (Explanation.singleton (Formula.mk_lit a)) | None -> expl
-	     in*)
            if debug_fm then 
 	     begin 
 	       Debug.assume a;
@@ -774,17 +763,9 @@ module Make
 		 Explanation.print expl; 
 	     raise (Exception.Inconsistent expl)
 	)
-	(env, [], false, Explanation.empty (*expl*)) la 
+	(env, [], false, Explanation.empty) la 
 	
     in
-    (* explanations for new inequations *)
-    (*let expl = if new_ineqs then 
-      List.fold_left 
-      (fun expl (a,_) ->
-      Explanation.union 
-      (Explanation.singleton (Formula.mk_lit a)) expl
-      ) expl env.inequations
-      else expl in*)
     if new_ineqs then 
       if debug_fm then 
 	fprintf fmt "new explanations %a@." Explanation.print expl; 
@@ -797,7 +778,17 @@ module Make
       Debug.env env;
       let eqs = remove_trivial_eqs eqs la in
       Debug.implied_equalities eqs;
-      env, eqs
+      let result = 
+	List.fold_left 
+	  (fun r (a_sem, a_term, ex) -> 
+	     { assume = (LSem(a_sem), ex) :: r.assume; 
+	       remove = 
+		 match a_term with 
+		   | None -> r.remove 
+		   | Some t -> (LTerm(t), ex)::r.remove
+	     } ) { assume = []; remove = [] } eqs
+      in
+      env, result
 
     with Intervals.NotConsistent expl -> 
       if debug_fm then 
@@ -805,9 +796,9 @@ module Make
 	  Explanation.print expl; 
       raise (Exception.Inconsistent expl)
       
-  let query (a,r) env expl =
+  let query env a_ex ~are_eq ~are_neq ~class_of =
     try 
-      ignore(assume env [a,r,Explanation.empty] expl); 
+      ignore(assume env [a_ex] ~are_eq ~are_neq ~class_of ); 
       No
     with Exception.Inconsistent expl -> Yes expl
 
@@ -831,7 +822,7 @@ module Make
 	  let r2 = P.alien_of (P.create [] n  (P.type_info p)) in
 	  if debug_fm then
 	    fprintf fmt "[case-split] %a = %a@." X.print r1 X.print r2;
-	  [(L.Eq(r1, r2), None, ex), s]
+	  [L.Eq(r1, r2), ex, s]
       | None -> 
 	  if debug_fm then fprintf fmt "[case-split] polynomes: nothing@.";
 	  []
@@ -857,7 +848,7 @@ module Make
 	  let r2 = P.alien_of (P.create [] n  ty) in
 	  if debug_fm then
 	    fprintf fmt "[case-split] %a = %a@." X.print r1 X.print r2;
-	  [(L.Eq(r1, r2), None, ex), s]
+	  [L.Eq(r1, r2), ex, s]
       | None -> 
 	  if debug_fm then fprintf fmt "[case-split] monomes: nothing@.";
 	  []
@@ -868,7 +859,5 @@ module Make
       | choices -> choices
    
   let add env _ = env
-
-  let instantiate env _ _ _ _ = env, []
 
 end
