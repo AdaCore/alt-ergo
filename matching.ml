@@ -29,11 +29,11 @@ type gsubst = {
 		     avec le but de la PO *)
 }
 
-type pat_info = {
-  pat_age : int ; (* age d'un trigger *)
-  pat_orig : Formula.t ; (* lemme d'origine *)
-  pat_formula : Formula.t ; (* formule associee au trigger *)
-  pat_dep : Explanation.t ;
+type trigger_info = {
+  trigger_age : int ; (* age d'un trigger *)
+  trigger_orig : Formula.t ; (* lemme d'origine *)
+  trigger_formula : Formula.t ; (* formule associee au trigger *)
+  trigger_dep : Explanation.t ;
 }
 
 type term_info = {
@@ -56,8 +56,8 @@ module type S = sig
 
   val empty : t
   val add_term : term_info -> Term.t -> t -> t 
-  val add_pat : pat_info * Term.t list -> t -> uf -> t
-  val query : t -> uf -> (pat_info * gsubst list) list  
+  val add_trigger : trigger_info -> Term.t list -> t -> t
+  val query : t -> uf -> (trigger_info * gsubst list) list  
 end
 
 module Make (X : X) = struct
@@ -75,7 +75,7 @@ module Make (X : X) = struct
   type t = { 
     fils : T.t list MT.t Subst.t ; 
     info : info MT.t ; 
-    pats : (pat_info * Term.t list) list 
+    pats : (trigger_info * Term.t list) list 
   }
 
   exception Echec
@@ -119,7 +119,7 @@ module Make (X : X) = struct
     in
     if age>age_limite then env else add_rec env t
       
-  let add_pat p env _ = { env with pats = p::env.pats }
+  let add_trigger p trs env = { env with pats = (p, trs) ::env.pats }
 
   exception Deja_vu
   let deja_vu lem1 = 
@@ -135,7 +135,7 @@ module Make (X : X) = struct
 		let ng , but = 
 		  try 
 		    let {age=ng;lem_orig=lem'; but=bt} = MT.find t env.info in
-		    if deja_vu pinfo.pat_orig lem' then raise Deja_vu;
+		    if deja_vu pinfo.trigger_orig lem' then raise Deja_vu;
 		    max ng g , bt or b
 		  with Not_found -> g , b
 		in

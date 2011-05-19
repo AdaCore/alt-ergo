@@ -3809,6 +3809,9 @@ logic P : int -> prop
 
 goal g5 : P(let y=4 in y+y) -> P(8)
 
+$
+goal g6: forall x:int. let x=x+x in x=x 
+
 $$$case_split
 
 goal g1 : forall x,y,z:int.
