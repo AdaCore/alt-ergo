@@ -19,9 +19,15 @@ type answer = Yes of Explanation.t | No
 
 type 'a ac = {h: Symbols.t ; t: Ty.t ; l: ('a * int) list}
 
-type 'a sem_atom =  'a Literal.view * Literal.LT.t option
+type 'a literal = LSem of 'a Literal.view | LTerm of Literal.LT.t
 
-type 'a sem_atom_ex =  'a Literal.view * Literal.LT.t option * Explanation.t
+type 'a input =  
+    'a Literal.view * Literal.LT.t option * Explanation.t
+
+type 'a result = { 
+  assume : ('a literal * Explanation.t) list;  
+  remove: ('a literal * Explanation.t) list;
+}
 
 module type RELATION = sig
   type t
@@ -30,19 +36,22 @@ module type RELATION = sig
   val empty : unit -> t
   
   val assume : 
-    t -> r sem_atom_ex list -> Explanation.t -> t * r sem_atom_ex list
-
-  val instantiate :
     t -> 
-    (Term.t -> Term.t -> answer) -> 
-    (Term.t -> Term.t -> answer) -> 
-    (Term.t -> Term.t list)      ->
-    r sem_atom_ex list ->
-    t * (Literal.LT.t * Explanation.t) list
+    (r input) list -> 
+    are_eq : (Term.t -> Term.t -> answer) -> 
+    are_neq : (Term.t -> Term.t -> answer) -> 
+    class_of : (Term.t -> Term.t list) ->
+    t * r result
 
-  val query : r sem_atom -> t -> Explanation.t -> answer
+  val query : 
+    t -> 
+    r input -> 
+    are_eq : (Term.t -> Term.t -> answer) -> 
+    are_neq : (Term.t -> Term.t -> answer) -> 
+    class_of : (Term.t -> Term.t list) ->
+    answer
 
-  val case_split : t -> (r sem_atom_ex * Num.num) list
+  val case_split : t -> (r Literal.view * Explanation.t * Num.num) list
     (** case_split env returns a list of equalities *)
     
   val add : t -> r -> t

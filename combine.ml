@@ -377,32 +377,32 @@ struct
       r5=X5.Rel.empty ();
     }
 	
-    let assume env sa expl = 
-      let env1, seq1 = X1.Rel.assume env.r1 sa expl in
-      let env2, seq2 = X2.Rel.assume env.r2 sa expl in
-      let env3, seq3 = X3.Rel.assume env.r3 sa expl in
-      let env4, seq4 = X4.Rel.assume env.r4 sa expl in
-      let env5, seq5 = X5.Rel.assume env.r5 sa expl in
-      {r1=env1; r2=env2; r3=env3; r4=env4; r5=env5}, seq1@seq2@seq3@seq4@seq5
-
-    let instantiate env are_eq are_dist class_of sa = 
-      let env1, seq1 = X1.Rel.instantiate env.r1 are_eq are_dist class_of sa in
-      let env2, seq2 = X2.Rel.instantiate env.r2 are_eq are_dist class_of sa in
-      let env3, seq3 = X3.Rel.instantiate env.r3 are_eq are_dist class_of sa in
-      let env4, seq4 = X4.Rel.instantiate env.r4 are_eq are_dist class_of sa in
-      let env5, seq5 = X5.Rel.instantiate env.r5 are_eq are_dist class_of sa in 
-      {r1=env1; r2=env2; r3=env3; r4=env4; r5=env5}, seq1@seq2@seq3@seq4@seq5
+    let assume env sa ~are_eq ~are_neq ~class_of = 
+      let env1, { assume = a1; remove = rm1} = 
+	X1.Rel.assume env.r1 sa ~are_eq ~are_neq ~class_of in
+      let env2, { assume = a2; remove = rm2} = 
+	X2.Rel.assume env.r2 sa ~are_eq ~are_neq ~class_of in
+      let env3, { assume = a3; remove = rm3} = 
+	X3.Rel.assume env.r3 sa ~are_eq ~are_neq ~class_of in
+      let env4, { assume = a4; remove = rm4} = 
+	X4.Rel.assume env.r4 sa ~are_eq ~are_neq ~class_of in
+      let env5, { assume = a5; remove = rm5} = 
+	X5.Rel.assume env.r5 sa ~are_eq ~are_neq ~class_of in
+      {r1=env1; r2=env2; r3=env3; r4=env4; r5=env5}, 
+      { assume = a1@a2@a3@a4@a5;
+	remove = rm1@rm2@rm3@rm4@rm5;}
 	
-    let query a env expl = 
-      match X1.Rel.query a env.r1 expl with
+    let query env a ~are_eq ~are_neq ~class_of = 
+      match X1.Rel.query env.r1 a ~are_eq ~are_neq ~class_of with
 	| Yes _ as ans -> ans
-	| No -> match X2.Rel.query a env.r2 expl with
+	| No -> match X2.Rel.query env.r2 a ~are_eq ~are_neq ~class_of with
 	    | Yes _ as ans -> ans
-	    | No -> match X3.Rel.query a env.r3 expl with
+	    | No -> match X3.Rel.query env.r3 a ~are_eq ~are_neq ~class_of with
 		| Yes _ as ans -> ans
-		| No -> match X4.Rel.query a env.r4 expl with
-		    | Yes _ as ans -> ans
-		    | No -> X5.Rel.query a env.r5 expl
+		| No -> 
+		    match X4.Rel.query env.r4 a ~are_eq ~are_neq ~class_of with
+		      | Yes _ as ans -> ans
+		      | No -> X5.Rel.query env.r5 a ~are_eq ~are_neq ~class_of
 		      
     let case_split env = 
       let seq1 = X1.Rel.case_split env.r1 in

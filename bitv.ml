@@ -17,6 +17,7 @@
 
 open Format
 open Hashcons
+open Sig
 
 module Sy = Symbols
 module T = Term
@@ -767,11 +768,10 @@ module Make(X : ALIEN) = struct
     type t =  unit
 
     let empty () = ()
-    let assume _ _ _ = (), []
+    let assume _ _ ~are_eq ~are_neq ~class_of = (), { assume = []; remove = [] }
     let add _ _ = ()
     let case_split _ = []    
-    let query _ _ _ = Sig.No
-    let instantiate _ _ _ _ _ = (), []
+    let query _ _ ~are_eq ~are_neq ~class_of = Sig.No
   end
 
 end

@@ -17,6 +17,7 @@
 
 open Options
 open Format
+open Sig
   
 module Sy = Symbols
 module T  = Term
@@ -330,34 +331,32 @@ module Make(X : ALIEN) = struct
       in
       let eqs = extensionality eqs la class_of in
       implied_consequences env eqs la
-        
-
-    (* instantiation des axiomes des tableaux *)
-    let instantiate env are_eq are_dist class_of la =
-      Debug.assume fmt la; 
-      let env = new_terms env la in
-      let env, atoms = new_splits are_eq are_dist env Conseq.empty class_of in
-      let env, atoms = new_equalities env atoms la class_of in
-      Debug.env fmt env;
-      Debug.new_equalities fmt atoms;
-      env, Conseq.elements atoms 
-        
+       
     (* XXXXXX : TODO -> ajouter les explications dans les choix du
        case split *)
-
     (* choisir une egalite sur laquelle on fait un case-split *)
     let case_split env = 
       try
         let a = LRset.choose env.split in
         if debug_arrays then 
           fprintf fmt "[Arrays.case-split] %a@." LR.print a;
-        [(LR.view a, None, Ex.empty), (Num.Int 2)] 
+        [LR.view a, Ex.empty, Num.Int 2] 
       with Not_found ->
         if debug_arrays then fprintf fmt "[Arrays.case-split] Nothing@.";
         []
           
-    let assume env _ _ = env, []
-    let query a _ _ = Sig.No
+    let assume env la ~are_eq ~are_neq ~class_of = 
+      (* instantiation des axiomes des tableaux *)
+      Debug.assume fmt la; 
+      let env = new_terms env la in
+      let env, atoms = new_splits are_eq are_neq env Conseq.empty class_of in
+      let env, atoms = new_equalities env atoms la class_of in
+      Debug.env fmt env;
+      Debug.new_equalities fmt atoms;
+      let l = Conseq.fold (fun (a,ex) l -> ((LTerm a, ex)::l)) atoms [] in
+      env, { assume = l; remove = [] }
+	  
+    let query _ _ ~are_eq ~are_neq ~class_of = Sig.No
     let add env r = env
   end
 end
