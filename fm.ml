@@ -757,7 +757,7 @@ module Make
 
 	       | _ -> (env, eqs, new_ineqs, expl) 
 		   
-	   with Intervals.NotConsistent expl -> 	       
+	   with Intervals.NotConsistent expl ->
 	     if debug_fm then 
 	       fprintf fmt "interval inconsistent %a@." 
 		 Explanation.print expl; 
@@ -790,7 +790,7 @@ module Make
       in
       env, result
 
-    with Intervals.NotConsistent expl -> 
+    with Intervals.NotConsistent expl ->
       if debug_fm then 
 	fprintf fmt "interval inconsistent %a@." 
 	  Explanation.print expl; 

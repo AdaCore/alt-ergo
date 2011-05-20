@@ -106,6 +106,13 @@ module Make (X : Sig.X) = struct
         fprintf fmt "[case-split] I backtrack on %a : %a@."
           LR.print neg_c Ex.print ex_c
 
+    let assume_literal sa =
+      if debug_cc then
+	fprintf fmt "[cc] assume literal : %a@." LR.print (LR.make sa)
+
+    let query a =
+      if debug_cc then fprintf fmt "[cc] query : %a@." A.LT.print a
+
   end
     
   let concat_leaves uf l = 
@@ -167,7 +174,7 @@ module Make (X : Sig.X) = struct
       let ct = congruents env t st_uset l ex in
       env, (List.map (fun lt -> LTerm lt, ex) ctx) @ ct
 	
-  let add a ex env =
+  let add ?(query = false) a ex env =
     match A.LT.view a with
       | A.Eq (t1, t2) -> 
 	  let env, l1 = add_term ex (env, []) t1 in
@@ -177,13 +184,15 @@ module Make (X : Sig.X) = struct
       | A.Builtin (_, _, lt) ->
 	  let env, l = List.fold_left (add_term ex) (env,[]) lt in
 	  let lvs = concat_leaves env.uf lt in (* A verifier *)
-	  let env = 
-	    List.fold_left
-	      (fun env rx ->
-		 let st, sa = Use.find rx env.use in
-		 { env with 
-		     use = Use.add rx (st,SetA.add (a, ex) sa) env.use }
-	      ) env lvs
+	  let env =
+	    if query then env
+	    else
+	      List.fold_left
+		(fun env rx ->
+		  let st, sa = Use.find rx env.use in
+		  { env with 
+		    use = Use.add rx (st,SetA.add (a, ex) sa) env.use }
+		) env lvs
 	  in
 	  env, l
 
@@ -267,7 +276,6 @@ module Make (X : Sig.X) = struct
   let rec congruence_closure env r1 r2 ex = 
     Print.cc r1 r2;
     let uf, res = Uf.union env.uf r1 r2 ex in
-    if res=[] then fprintf fmt "no@.";
     List.fold_left 
       (fun (env, l) (p, touched, v) ->
 	 (* we look for use(p) *)
@@ -285,11 +293,14 @@ module Make (X : Sig.X) = struct
 	 let env =  {env with use=nuse} in
 	 let new_eqs = 
 	   SetT.fold (fun t l -> congruents env t st_others l ex) p_t l in
-       	 let touched_as_eqs = 
+       	 let touched_atoms = 
 	   List.map (fun (x,y,e)-> (LSem(A.Eq(x, y)), e)) touched 
 	 in
-	 let atoms = SetA.union p_a sa_others in
-	 env, new_eqs @ touched_as_eqs 
+	 let touched_atoms = SetA.fold (fun (a, ex) acc ->
+	   (LTerm a, ex)::acc) p_a touched_atoms in
+	 let touched_atoms = SetA.fold (fun (a, ex) acc ->
+	   (LTerm a, ex)::acc) sa_others touched_atoms in
+	 env, new_eqs @ touched_atoms 
 	   
       ) ({env with uf=uf}, [])  res
 
@@ -313,7 +324,7 @@ module Make (X : Sig.X) = struct
 	| LSem sa -> 
 	    env, (sa,ex), None
     in
-    fprintf fmt "AL : %a@." LR.print (LR.make sa);
+    Print.assume_literal sa;
     match sa with
       | A.Eq(r1, r2) ->
 	  let env, l = congruence_closure env r1 r2 ex in
@@ -405,34 +416,35 @@ module Make (X : Sig.X) = struct
 
   let class_of t term = Uf.class_of t.gamma.uf term
 
-  let add_and_process a ex env = 
-    let gamma, l = add a ex env in
+  let add_query_and_process a ex env = 
+    let gamma, l = add a ex env ~query:true in
     List.fold_left assume_literal gamma l 
 
-  let query a t = 
+  let query a t =
+    Print.query a;
     try
-      let t = { t with gamma = add_and_process a Ex.empty t.gamma } in
-      let t =  try_it (add_and_process a Ex.empty) t in
+      let t = { t with gamma = add_query_and_process a Ex.empty t.gamma } in
+      let t =  try_it (add_query_and_process a Ex.empty) t in
       let env = t.gamma in
       Use.print t.gamma.use;    
       match A.LT.view a with
 	| A.Eq (t1, t2)  -> 
-	    Uf.are_equal env.uf t1 t2
+	  Uf.are_equal env.uf t1 t2
 
 	| A.Distinct (false, [t1; t2]) -> 
-	    Uf.are_distinct env.uf t1 t2
+	  Uf.are_distinct env.uf t1 t2
 
 	| A.Distinct _ -> 
-	    assert false (* devrait etre capture par une analyse statique *)
+	  assert false (* devrait etre capture par une analyse statique *)
 
 	| _ -> 
-	    let are_eq = Uf.are_equal env.uf in
-	    let are_neq = Uf.are_distinct env.uf in
-	    let class_of = Uf.class_of env.uf in
-	    let na = A.LT.neg a in
-	    let rna, ex_rna = semantic_view env na Ex.empty in
-            X.Rel.query env.relation (rna, Some na, ex_rna) 
-	      are_eq are_neq class_of 
+	  let are_eq = Uf.are_equal env.uf in
+	  let are_neq = Uf.are_distinct env.uf in
+	  let class_of = Uf.class_of env.uf in
+	  let na = A.LT.neg a in
+	  let rna, ex_rna = semantic_view env na Ex.empty in
+          X.Rel.query env.relation (rna, Some na, ex_rna) 
+	    are_eq are_neq class_of 
     with Exception.Inconsistent d -> Yes d
 
   let empty () = 
