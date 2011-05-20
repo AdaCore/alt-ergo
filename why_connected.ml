@@ -25,9 +25,17 @@ let prune_nodep r t =
   r.pruned <- true;
   t#set_property (`FOREGROUND "light gray")
 
+let incorrect_prune_nodep r t =
+  r.pruned <- true;
+  t#set_property (`FOREGROUND "tomato")
+
 let unprune_nodep r t =
   r.pruned <- false;
   t#set_property (`FOREGROUND_SET false)
+
+let toggle_incorrect_prune r t =
+  if r.pruned then unprune_nodep r t
+  else incorrect_prune_nodep r t
 
 let toggle_prune_nodep r t =
   if r.pruned then unprune_nodep r t
@@ -84,21 +92,20 @@ let tag_callback t env sbuf ~origin:y z i =
 	  match find t sbuf env.ast with
 	    | None -> ()
 	    | Some an -> match an with
-		| AD (r,_) -> eprintf "AD@.";
+		| AD (r,_) ->
 		  if env.ctrl then 
 		    if r.pruned then unprune r t env.dep 
 		    else prune r t env.dep
 		  else toggle_prune_nodep r t
-		| AF (r, Some parent) -> eprintf "AF@.";
+		| AF (r, Some parent) ->
 		  begin match parent.c, parent.polarity with
 		    | AFop (AOPand, _), false | AFop (AOPor, _), true
 		    | AFop (AOPimp, _), true | AFop (AOPiff, _), _ ->
-		      eprintf 
-			"You can't prune this. Not logically equivalent@.";
+		        toggle_incorrect_prune r t
 		    | _ -> toggle_prune_nodep r t
 		  end
-		| AF (r, None) -> eprintf "AF2@.";toggle_prune_nodep r t
-		| AT r -> eprintf "AT@.";toggle_prune_nodep r t
+		| AF (r, None) -> toggle_prune_nodep r t
+		| AT r -> toggle_prune_nodep r t
 		| QF _ -> ()
 	end;
 	true
