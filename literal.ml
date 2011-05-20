@@ -130,6 +130,9 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
 	Format.fprintf fmt "%a" X.print z;
 	List.iter (Format.fprintf fmt ", %a" X.print) l
     
+  let ale = Hstring.make "<=" 
+  let alt = Hstring.make "<"
+
   let print fmt a = 
     let lbl = Hstring.view (label a) in
     let lbl = if lbl = "" then lbl else lbl^":" in
@@ -140,6 +143,19 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
 	  let b = if b then "~" else "" in
 	  Format.fprintf fmt "%s%s%a" lbl b X.print z;
 	  List.iter (fun x -> Format.fprintf fmt "<>%a" X.print x) l
+
+      | Builtin (true, n, [v1;v2]) when Hstring.equal n ale ->
+	  Format.fprintf fmt "%s %a <= %a" lbl X.print v1 X.print v2
+
+      | Builtin (true, n, [v1;v2]) when Hstring.equal n alt ->
+	  Format.fprintf fmt "%s %a < %a" lbl X.print v1 X.print v2
+
+      | Builtin (false, n, [v1;v2]) when Hstring.equal n ale ->
+	  Format.fprintf fmt "%s %a > %a" lbl X.print v1 X.print v2
+
+      | Builtin (false, n, [v1;v2]) when Hstring.equal n alt ->
+	  Format.fprintf fmt "%s %a >= %a" lbl X.print v1 X.print v2
+
       | Builtin (b, n, l) ->
 	  let b = if b then "" else "~" in
 	  Format.fprintf fmt "%s%s%s(%a)" lbl b (Hstring.view n) print_list l

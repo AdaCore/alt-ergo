@@ -187,26 +187,29 @@ module Make (X : Sig.X) = struct
 	  in
 	  env, l
 
-  let fold_find_with_explanation env ex l = 
+  let fold_find_with_explanation find ex l = 
     List.fold_left 
-      (fun (lr, ex) t -> 
-	 let r, ex_r = Uf.find env.uf t in 
-	 r::lr, Ex.union ex_r ex)
+      (fun (lr, ex) t -> let r, ex_r = find t in r::lr, Ex.union ex_r ex)
       ([], ex) l
 
-  let semantic_view env a ex_a = 
-    match A.LT.view a with
+  let view find va ex_a = 
+    match va with
       | A.Eq (t1, t2) ->
-          let r1, ex1 = Uf.find env.uf t1 in
-	  let r2, ex2 = Uf.find env.uf t2 in
+          let r1, ex1 = find t1 in
+	  let r2, ex2 = find t2 in
 	  let ex = Ex.union (Ex.union ex1 ex2) ex_a in
 	  A.Eq(r1, r2), ex
       | A.Distinct (b, lt) -> 
-	  let lr, ex = fold_find_with_explanation env ex_a lt in 
+	  let lr, ex = fold_find_with_explanation find ex_a lt in 
 	  A.Distinct (b, lr), ex
       | A.Builtin(b, s, l) -> 
-	  let lr, ex  = fold_find_with_explanation env ex_a l in
+	  let lr, ex  = fold_find_with_explanation find ex_a l in
 	  A.Builtin(b, s, List.rev lr), ex
+
+  let semantic_view env a ex_a =  view (Uf.find env.uf) (A.LT.view a) ex_a
+
+  let canonical_view env a ex_a = view (Uf.find_r env.uf) a ex_a
+
 
   let new_facts_by_contra_congruence env r bol ex = 
     match X.term_extract r with
@@ -264,6 +267,7 @@ module Make (X : Sig.X) = struct
   let rec congruence_closure env r1 r2 ex = 
     Print.cc r1 r2;
     let uf, res = Uf.union env.uf r1 r2 ex in
+    if res=[] then fprintf fmt "no@.";
     List.fold_left 
       (fun (env, l) (p, touched, v) ->
 	 (* we look for use(p) *)
@@ -284,7 +288,8 @@ module Make (X : Sig.X) = struct
        	 let touched_as_eqs = 
 	   List.map (fun (x,y,e)-> (LSem(A.Eq(x, y)), e)) touched 
 	 in
-	 env, new_eqs @ touched_as_eqs
+	 let atoms = SetA.union p_a sa_others in
+	 env, new_eqs @ touched_as_eqs 
 	   
       ) ({env with uf=uf}, [])  res
 
@@ -305,8 +310,10 @@ module Make (X : Sig.X) = struct
 	    let env, l = add ta ex env in
 	    let env = List.fold_left assume_literal env l in
 	    env, semantic_view env ta ex, Some ta
-	| LSem sa -> env, (sa, ex), None
+	| LSem sa -> 
+	    env, (sa,ex), None
     in
+    fprintf fmt "AL : %a@." LR.print (LR.make sa);
     match sa with
       | A.Eq(r1, r2) ->
 	  let env, l = congruence_closure env r1 r2 ex in
@@ -327,6 +334,7 @@ module Make (X : Sig.X) = struct
 	    List.fold_left assume_literal env l
       | A.Distinct (true, _) -> assert false
       | A.Builtin _ -> 
+	  let sa, ex = canonical_view env sa ex in
 	  let env, l = replay_atom env [sa, tao, ex] in
 	  List.fold_left assume_literal env l
 
