@@ -89,6 +89,7 @@ module Make (X : Sig.X) = struct
 	fprintf fmt "@{<C.Bold>[cc]@} add_to_use: %a@." T.print t
 	
     let lrepr fmt = List.iter (fprintf fmt "%a " X.print)
+
     let leaves t lvs = 
       fprintf fmt "@{<C.Bold>[cc]@} leaves of %a@.@." T.print t; lrepr fmt lvs
 	
@@ -110,6 +111,11 @@ module Make (X : Sig.X) = struct
       if debug_cc then
 	fprintf fmt "[cc] assume literal : %a@." LR.print (LR.make sa)
 
+    let congruent a ex =
+      if debug_cc then
+	fprintf fmt "[cc] new fact by conrgruence : %a ex[%a]@." 
+          A.LT.print a Ex.print ex
+
     let query a =
       if debug_cc then fprintf fmt "[cc] query : %a@." A.LT.print a
 
@@ -127,24 +133,29 @@ module Make (X : Sig.X) = struct
 	[] -> [one]
       | res -> res
 
-  let are_equal env t1 t2 = Uf.are_equal env.uf t1 t2 <> No 
+  let are_equal env ex t1 t2 = 
+    match Uf.are_equal env.uf t1 t2 with
+      | Yes dep -> Ex.union ex dep
+      | No -> raise Exit
 
-  let equal_only_by_congruence env t1 t2 = 
-    if are_equal env t1 t2 then false
+  let equal_only_by_congruence env ex t1 t2 acc = 
+    if T.equal t1 t2 then acc
     else
       let {T.f=f1; xs=xs1; ty=ty1} = T.view t1 in
-      if X.fully_interpreted f1 then false
+      if X.fully_interpreted f1 then acc
       else 
 	let {T.f=f2; xs=xs2; ty=ty2} = T.view t2 in
-	Symbols.equal f1 f2 && Ty.equal ty1 ty2 && 
-	  List.for_all2 (are_equal env) xs1 xs2
+        if Symbols.equal f1 f2 && Ty.equal ty1 ty2 then
+	  try
+            let ex = List.fold_left2 (are_equal env) ex xs1 xs2 in
+            let t = A.LT.make (A.Eq(t1, t2)) in
+            Print.congruent t ex;
+            (LTerm t, ex) :: acc
+          with Exit -> acc
+        else acc
 
   let congruents env t1 s acc ex = 
-    SetT.fold 
-      (fun t2 acc -> 
-	 if not (equal_only_by_congruence env t1 t2) then acc
-	 else (LTerm (A.LT.make (A.Eq(t1, t2))), ex) :: acc) 
-      s acc
+    SetT.fold (equal_only_by_congruence env ex t1) s acc
 
   let rec add_term ex (env, l) t = 
     Print.add_to_use t;

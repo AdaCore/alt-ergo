@@ -111,17 +111,7 @@ struct
   module MR = Map.Make(struct type t = r let compare = compare end)
     
   let print fmt r = 
-    if verbose then 
-      match r with
-        | X1 t    -> fprintf fmt "X1(%s):[%a]" X1.name X1.print t
-        | X2 t    -> fprintf fmt "X2(%s):[%a]" X2.name X2.print t
-        | X3 t    -> fprintf fmt "X3(%s):[%a]" X3.name X3.print t
-        | X4 t    -> fprintf fmt "X3(%s):[%a]" X4.name X4.print t
-        | X5 t    -> fprintf fmt "X3(%s):[%a]" X5.name X5.print t
-        | Term t  -> fprintf fmt "FT:[%a]" Term.print t
-        | Ac t    -> fprintf fmt "Ac:[%a]" AC.print t
-          
-    else 
+    if term_like_pp then 
       match r with
         | X1 t    -> fprintf fmt "%a" X1.print t
         | X2 t    -> fprintf fmt "%a" X2.print t
@@ -130,6 +120,15 @@ struct
         | X5 t    -> fprintf fmt "%a" X5.print t
         | Term t  -> fprintf fmt "%a" Term.print t
         | Ac t    -> fprintf fmt "%a" AC.print t
+    else 
+      match r with
+        | X1 t    -> fprintf fmt "X1(%s):[%a]" X1.name X1.print t
+        | X2 t    -> fprintf fmt "X2(%s):[%a]" X2.name X2.print t
+        | X3 t    -> fprintf fmt "X3(%s):[%a]" X3.name X3.print t
+        | X4 t    -> fprintf fmt "X3(%s):[%a]" X4.name X4.print t
+        | X5 t    -> fprintf fmt "X3(%s):[%a]" X5.name X5.print t
+        | Term t  -> fprintf fmt "FT:[%a]" Term.print t
+        | Ac t    -> fprintf fmt "Ac:[%a]" AC.print t
 
             
   let leaves r = 
