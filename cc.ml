@@ -426,41 +426,40 @@ module Make (X : Sig.X) = struct
 
   let class_of t term = Uf.class_of t.gamma.uf term
 
-  let add_query_and_run a ex env = 
-    let gamma, l = add a ex env in
-    List.fold_left assume_literal gamma l 
+  let add_and_process a t =
+    let aux a ex env = 
+      let gamma, l = add a ex env in
+      List.fold_left assume_literal gamma l
+    in
+    let t = { t with gamma = aux a Ex.empty t.gamma } in
+    let t =  try_it (aux a Ex.empty) t in
+    Use.print t.gamma.use; t    
 
   let query a t =
     Print.query a;
     try
         match A.LT.view a with
-	| A.Eq (t1, t2)  -> 
-	    let t = { t with gamma = add_query_and_run a Ex.empty t.gamma } in
-	    let t =  try_it (add_query_and_run a Ex.empty) t in
-	    Use.print t.gamma.use;    
-	    Uf.are_equal t.gamma.uf t1 t2
+	| A.Eq (t1, t2)  ->
+	  let t = add_and_process a t in
+	  Uf.are_equal t.gamma.uf t1 t2
 
 	| A.Distinct (false, [t1; t2]) -> 
-	    let t = { t with gamma = add_query_and_run a Ex.empty t.gamma } in
-	    let t =  try_it (add_query_and_run a Ex.empty) t in
-	    Use.print t.gamma.use;    
-	    Uf.are_distinct t.gamma.uf t1 t2
+	  let t = add_and_process a t in (* na ? *)
+	  Uf.are_distinct t.gamma.uf t1 t2
 
 	| A.Distinct _ -> 
-	    assert false (* devrait etre capture par une analyse statique *)
+	  assert false (* devrait etre capture par une analyse statique *)
 
 	| _ -> 
-	    let na = A.LT.neg a in
-	    let t = { t with gamma = add_query_and_run na Ex.empty t.gamma } in
-	    let t =  try_it (add_query_and_run na Ex.empty) t in
-	    let env = t.gamma in
-	    let are_eq = Uf.are_equal env.uf in
-	    let are_neq = Uf.are_distinct env.uf in
-	    let class_of = Uf.class_of env.uf in
-	    let rna, ex_rna = semantic_view env na Ex.empty in
-	    Use.print t.gamma.use;    
-            X.Rel.query env.relation (rna, Some na, ex_rna) 
-	      are_eq are_neq class_of 
+	  let na = A.LT.neg a in
+	  let t = add_and_process na t in
+	  let env = t.gamma in
+	  let are_eq = Uf.are_equal env.uf in
+	  let are_neq = Uf.are_distinct env.uf in
+	  let class_of = Uf.class_of env.uf in
+	  let rna, ex_rna = semantic_view env na Ex.empty in
+          X.Rel.query env.relation (rna, Some na, ex_rna) 
+	    are_eq are_neq class_of 
     with Exception.Inconsistent d -> Yes d
 
   let empty () = 
