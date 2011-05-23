@@ -134,7 +134,8 @@ module Make (X : Sig.X) = struct
       | res -> res
 
   let are_equal env ex t1 t2 = 
-    match Uf.are_equal env.uf t1 t2 with
+    if T.equal t1 t2 then ex
+    else match Uf.are_equal env.uf t1 t2 with
       | Yes dep -> Ex.union ex dep
       | No -> raise Exit
 
@@ -148,9 +149,9 @@ module Make (X : Sig.X) = struct
         if Symbols.equal f1 f2 && Ty.equal ty1 ty2 then
 	  try
             let ex = List.fold_left2 (are_equal env) ex xs1 xs2 in
-            let t = A.LT.make (A.Eq(t1, t2)) in
-            Print.congruent t ex;
-            (LTerm t, ex) :: acc
+            let a = A.LT.make (A.Eq(t1, t2)) in
+            Print.congruent a ex;
+            (LTerm a, ex) :: acc
           with Exit -> acc
         else acc
 
