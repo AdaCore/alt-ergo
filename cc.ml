@@ -186,7 +186,7 @@ module Make (X : Sig.X) = struct
       let ct = congruents env t st_uset l ex in
       env, (List.map (fun lt -> LTerm lt, ex) ctx) @ ct
 	
-  let add ?(query = false) a ex env =
+  let add a ex env =
     match A.LT.view a with
       | A.Eq (t1, t2) -> 
 	  let env, l1 = add_term ex (env, []) t1 in
@@ -197,14 +197,12 @@ module Make (X : Sig.X) = struct
 	  let env, l = List.fold_left (add_term ex) (env,[]) lt in
 	  let lvs = concat_leaves env.uf lt in (* A verifier *)
 	  let env =
-	    if query then env
-	    else
-	      List.fold_left
-		(fun env rx ->
-		  let st, sa = Use.find rx env.use in
-		  { env with 
+	    List.fold_left
+	      (fun env rx ->
+		 let st, sa = Use.find rx env.use in
+		 { env with 
 		    use = Use.add rx (st,SetA.add (a, ex) sa) env.use }
-		) env lvs
+	      ) env lvs
 	  in
 	  env, l
 
@@ -428,35 +426,41 @@ module Make (X : Sig.X) = struct
 
   let class_of t term = Uf.class_of t.gamma.uf term
 
-  let add_query_and_process a ex env = 
-    let gamma, l = add a ex env ~query:true in
+  let add_query_and_run a ex env = 
+    let gamma, l = add a ex env in
     List.fold_left assume_literal gamma l 
 
   let query a t =
     Print.query a;
     try
-      let t = { t with gamma = add_query_and_process a Ex.empty t.gamma } in
-      let t =  try_it (add_query_and_process a Ex.empty) t in
-      let env = t.gamma in
-      Use.print t.gamma.use;    
-      match A.LT.view a with
+        match A.LT.view a with
 	| A.Eq (t1, t2)  -> 
-	  Uf.are_equal env.uf t1 t2
+	    let t = { t with gamma = add_query_and_run a Ex.empty t.gamma } in
+	    let t =  try_it (add_query_and_run a Ex.empty) t in
+	    Use.print t.gamma.use;    
+	    Uf.are_equal t.gamma.uf t1 t2
 
 	| A.Distinct (false, [t1; t2]) -> 
-	  Uf.are_distinct env.uf t1 t2
+	    let t = { t with gamma = add_query_and_run a Ex.empty t.gamma } in
+	    let t =  try_it (add_query_and_run a Ex.empty) t in
+	    Use.print t.gamma.use;    
+	    Uf.are_distinct t.gamma.uf t1 t2
 
 	| A.Distinct _ -> 
-	  assert false (* devrait etre capture par une analyse statique *)
+	    assert false (* devrait etre capture par une analyse statique *)
 
 	| _ -> 
-	  let are_eq = Uf.are_equal env.uf in
-	  let are_neq = Uf.are_distinct env.uf in
-	  let class_of = Uf.class_of env.uf in
-	  let na = A.LT.neg a in
-	  let rna, ex_rna = semantic_view env na Ex.empty in
-          X.Rel.query env.relation (rna, Some na, ex_rna) 
-	    are_eq are_neq class_of 
+	    let na = A.LT.neg a in
+	    let t = { t with gamma = add_query_and_run na Ex.empty t.gamma } in
+	    let t =  try_it (add_query_and_run na Ex.empty) t in
+	    let env = t.gamma in
+	    let are_eq = Uf.are_equal env.uf in
+	    let are_neq = Uf.are_distinct env.uf in
+	    let class_of = Uf.class_of env.uf in
+	    let rna, ex_rna = semantic_view env na Ex.empty in
+	    Use.print t.gamma.use;    
+            X.Rel.query env.relation (rna, Some na, ex_rna) 
+	      are_eq are_neq class_of 
     with Exception.Inconsistent d -> Yes d
 
   let empty () = 
