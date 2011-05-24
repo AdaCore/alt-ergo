@@ -72,8 +72,6 @@ val apply_subst : Term.subst -> t -> t
 
 val compare : t -> t -> int
 
-val clear_htbl : unit -> unit 
-    
 module Set : Set.S with type elt = t
 module Map : Map.S with type key = t
 

@@ -39,9 +39,7 @@ module H = struct
 	   t.xs)
 end
 
-module T = Make(H)
-  
-let tbl = T.create 100007
+module T = Make_consed(H)
   
 let view t = t.node
 
@@ -60,13 +58,13 @@ let compare t1 t2 =
 
 let sort = List.sort compare
 
-let make s l ty = T.hashcons tbl {f=s;xs=l;ty=ty}
+let make s l ty = T.hashcons {f=s;xs=l;ty=ty}
 
 let fresh_name ty = make (Sy.name (Common.fresh_string())) [] ty
 
 let shorten t = 
   let {f=f;xs=xs;ty=ty} = view t in
-  T.hashcons tbl {f=f;xs=xs;ty=Ty.shorten ty}
+  T.hashcons {f=f;xs=xs;ty=Ty.shorten ty}
 
 let vrai = make (Sy.True) [] Ty.Tbool
 let faux = make (Sy.False) [] Ty.Tbool

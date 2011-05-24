@@ -89,7 +89,7 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
 	       (fun acc t-> acc*13 + X.hash t) (Hstring.hash n+x) l)
   end
 
-  module H = Make(V)
+  module H = Make_consed(V)
 
   let compare a1 a2 = Pervasives.compare a1.tag a2.tag
   let equal a1 a2 = a1.tag = a2.tag
@@ -103,9 +103,7 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
     let hash = hash
   end
 
-  let tbl = H.create 100007
-    
-  let make t = H.hashcons tbl t
+  let make t = H.hashcons t
   let view a = a.node
 
   let neg a = match view a with
