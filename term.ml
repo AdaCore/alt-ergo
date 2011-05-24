@@ -113,7 +113,7 @@ and print_list fmt = function
 let is_int t = (view t).ty= Ty.Tint
 let is_real t = (view t).ty= Ty.Treal
       
-let equal t1 t2 =  t1.tag == t2.tag
+let equal t1 t2 =  t1 == t2
   
 let hash t = t.tag
   
