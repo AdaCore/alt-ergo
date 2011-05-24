@@ -28,7 +28,7 @@ let make s = S.hashcons s
 
 let view s = s.node
 
-let equal s1 s2 = s1.tag = s2.tag
+let equal s1 s2 = s1 == s2
 
 let compare s1 s2 = compare s1.tag s2.tag
 

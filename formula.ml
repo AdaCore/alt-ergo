@@ -244,7 +244,7 @@ let compare ((v1,_) as f1) ((v2,_) as f2)=
   let c = Pervasives.compare (size f1) (size f2) in 
   if c=0 then compare v1.tag v2.tag else c
 	  
-let equal (f1,_) (f2,_) = f1.tag == f2.tag
+let equal (f1,_) (f2,_) = f1 == f2
 
 
 (* smart constructors *)
