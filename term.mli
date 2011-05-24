@@ -16,7 +16,7 @@
 (**************************************************************************)
 
 type t
-type view = private {f: Symbols.t ; xs: t list; ty: Ty.t}
+type view = private {f: Symbols.t ; xs: t list; ty: Ty.t; tag : int}
 
 type subst = t Subst.t * Ty.subst
 

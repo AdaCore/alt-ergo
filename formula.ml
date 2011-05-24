@@ -49,9 +49,9 @@ and view =
   | Skolem of skolem
   | Let of llet
 
-and iview = { pos : view ; neg : view ; size : int}
+and iview = { pos : view ; neg : view ; size : int; tag : int}
 
-and t = iview hash_consed * int
+and t = iview * int
     
 module View = struct
   type t = iview
@@ -194,14 +194,15 @@ module View = struct
 	  
   let equal f1 f2 = eqc f1.pos f2.pos && eqc f1.neg f2.neg
   let hash f = abs (hashc (hashc 1 f.pos) f.neg)
+  let tag tag x = {x with tag = tag}
 end
   
   
-module H = Make_consed(View)
+module H = Make(View)
   
-let iview f = f.node
+let iview f = f
 
-let view (t,_) = t.node.pos
+let view (t,_) = t.pos
 let id (_,id) = id
 
 let rec print fmt f = 
@@ -237,7 +238,7 @@ let union_subst s1 ((s2,s2_ty) as subst) =
     (fun k x s2 -> Sy.Map.add k x s2) (Sy.Map.map (T.apply_subst subst)  s1) s2
 
 
-let size (t,_) = t.node.size
+let size (t,_) = t.size
 
 let compare ((v1,_) as f1) ((v2,_) as f2)= 
   let c = Pervasives.compare (size f1) (size f2) in 
@@ -247,13 +248,15 @@ let equal (f1,_) (f2,_) = f1.tag == f2.tag
 
 
 (* smart constructors *)
+let make pos neg size id =
+  (H.hashcons {pos = pos; neg = neg; size = size; tag = -1 (* dumb *)}, id)
 
-let mk_lit a id = 
-  (H.hashcons
-     {pos = Literal a; neg = Literal (Literal.LT.neg a); size = 1}, id)
-  
-let mk_not (f,id) = 
-  let f = iview f in (H.hashcons ({pos=f.neg;neg=f.pos;size=f.size}), id)
+let mk_lit a id =
+  make (Literal a) (Literal (Literal.LT.neg a)) 1 id
+
+let mk_not (f,id) =
+  let f = iview f in
+  make f.neg f.pos f.size id
 
 let mk_skolem_subst bv v = 
   T.Set.fold 
@@ -279,7 +282,7 @@ let mk_forall up bv trs f name id =
   let sko = 
     {sko_subst = (mk_skolem_subst up bv, Ty.esubst); sko_f = mk_not f} 
   in
-  (H.hashcons {pos=Lemma(lem) ; neg=Skolem(sko); size=size f }, id)
+  make (Lemma(lem)) (Skolem(sko)) (size f) id
     
 (* forall upbv.  name: (exists bv [trs]. f) *)
 let mk_exists up bv trs f name id= 
@@ -289,35 +292,31 @@ let mk_exists up bv trs f name id=
              ssubst_ty = Ty.esubst;
              sf = f} in*)
   let sko = {sko_subst = (mk_skolem_subst up bv, Ty.esubst); sko_f = f} in
-  (H.hashcons {pos=Skolem(sko)  ; neg=Lemma(lem) ; size = size f}, id)
+  make (Skolem(sko)) (Lemma(lem)) (size f) id
 
 (* forall up. let bv = t in f *)
 let mk_let up bv t f id =
   let {Term.ty=ty} = Term.view t in
   let up = T.Set.fold (fun y acc-> y::acc) up [] in
   let subst = Sy.Map.add bv (T.make (Sy.fresh "let") up ty) Sy.Map.empty in
-   (H.hashcons 
-     {pos=Let{let_var=bv; let_subst=(subst, Ty.esubst); let_term=t; let_f=f};
-      neg=Let{let_var=bv; let_subst=(subst, Ty.esubst); 
-	      let_term=t; let_f=mk_not f};
-      size=size f }, id)
+  make
+    (Let{let_var=bv; let_subst=(subst, Ty.esubst); let_term=t; let_f=f})
+    (Let{let_var=bv; let_subst=(subst, Ty.esubst); let_term=t; let_f=mk_not f})
+    (size f) id
     
 let mk_and f1 f2 id =
   if equal f1 f2 then f1 else
     let size = size f1 + size f2 in
-    (H.hashcons 
-       {pos=Unit(f1,f2); neg=Clause(mk_not f1,mk_not f2); size=size}, id)
+    make (Unit(f1,f2)) (Clause(mk_not f1,mk_not f2)) size id
 	
 let mk_or f1 f2 id = 
   if equal f1 f2 then f1 else
     let size = size f1 + size f2 in
-    (H.hashcons 
-       {pos=Clause(f1,f2); neg=Unit(mk_not f1,mk_not f2); size=size}, id)
+    make (Clause(f1,f2)) (Unit(mk_not f1,mk_not f2)) size id
       
 let mk_imp f1 f2 id = 
   let size = size f1 + size f2 in
-  (H.hashcons 
-     {pos=Clause(mk_not f1,f2); neg=Unit(f1,mk_not f2); size=size}, id)
+  make (Clause(mk_not f1,f2)) (Unit(f1,mk_not f2)) size id
 
 let mk_if t f2 f3 id = 
   let lit = mk_lit (Literal.LT.mk_pred t) id in
@@ -328,15 +327,14 @@ let mk_iff f1 f2 id =
   let b = mk_or (mk_not f1) (mk_not f2) id in
   let c = mk_or (mk_not f1) f2 id in
   let d = mk_or f1 (mk_not f2) id in
-  (H.hashcons 
-     {pos=Unit(c,d); neg=Unit(a,b) ; size=2*(size f1+size f2)}, id)
+  make (Unit(c,d)) (Unit(a,b)) (2*(size f1+size f2)) id
 
 
 (* this function should only be applied with ground substitutions *)
 let rec apply_subst subst (f, id) =
   let {pos=p;neg=n;size=s} = iview f in
   let sp, sn = iapply_subst subst p n in 
-  (H.hashcons { pos = sp; neg = sn; size = s }, id)
+  make sp sn s id
 
 and iapply_subst ((s_t,s_ty) as subst) p n = match p, n with
   | Literal a, Literal _ ->
