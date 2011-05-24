@@ -20,8 +20,8 @@ open Hashcons
 
 module Sy = Symbols
 
-type view = {f: Sy.t ; xs: t list; ty: Ty.t}
-and t = view hash_consed
+type view = {f: Sy.t ; xs: t list; ty: Ty.t; tag: int}
+and t = view
 
 type subst = t Subst.t * Ty.subst
     
@@ -37,11 +37,12 @@ module H = struct
     abs (List.fold_left 
 	   (fun acc x-> acc*19 +x.tag) (Sy.hash t.f + Ty.hash t.ty) 
 	   t.xs)
+  let tag tag x = {x with tag = tag}
 end
 
-module T = Make_consed(H)
+module T = Make(H)
   
-let view t = t.node
+let view t = t
 
 (* fresh variables must be smaller than problem's variables.
    thus, Instead of comparinf t1.tag with t2.tag, 
@@ -58,13 +59,13 @@ let compare t1 t2 =
 
 let sort = List.sort compare
 
-let make s l ty = T.hashcons {f=s;xs=l;ty=ty}
+let make s l ty = T.hashcons {f=s;xs=l;ty=ty;tag=0 (* dumb_value *) }
 
 let fresh_name ty = make (Sy.name (Common.fresh_string())) [] ty
 
 let shorten t = 
   let {f=f;xs=xs;ty=ty} = view t in
-  T.hashcons {f=f;xs=xs;ty=Ty.shorten ty}
+  make f xs (Ty.shorten ty)
 
 let vrai = make (Sy.True) [] Ty.Tbool
 let faux = make (Sy.False) [] Ty.Tbool
