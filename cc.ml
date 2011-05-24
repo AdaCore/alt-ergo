@@ -444,7 +444,8 @@ module Make (X : Sig.X) = struct
 	  Uf.are_equal t.gamma.uf t1 t2
 
 	| A.Distinct (false, [t1; t2]) -> 
-	  let t = add_and_process a t in (* na ? *)
+	  let na = A.LT.neg a in
+	  let t = add_and_process na t in (* na ? *)
 	  Uf.are_distinct t.gamma.uf t1 t2
 
 	| A.Distinct _ -> 
