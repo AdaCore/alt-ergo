@@ -197,9 +197,8 @@ module View = struct
 end
   
   
-module H = Make(View)
+module H = Make_consed(View)
   
-let tbl = H.create 100007
 let iview f = f.node
 
 let view (t,_) = t.node.pos
@@ -250,11 +249,11 @@ let equal (f1,_) (f2,_) = f1.tag == f2.tag
 (* smart constructors *)
 
 let mk_lit a id = 
-  (H.hashcons tbl 
+  (H.hashcons
      {pos = Literal a; neg = Literal (Literal.LT.neg a); size = 1}, id)
   
 let mk_not (f,id) = 
-  let f = iview f in (H.hashcons tbl ({pos=f.neg;neg=f.pos;size=f.size}), id)
+  let f = iview f in (H.hashcons ({pos=f.neg;neg=f.pos;size=f.size}), id)
 
 let mk_skolem_subst bv v = 
   T.Set.fold 
@@ -280,7 +279,7 @@ let mk_forall up bv trs f name id =
   let sko = 
     {sko_subst = (mk_skolem_subst up bv, Ty.esubst); sko_f = mk_not f} 
   in
-  (H.hashcons tbl {pos=Lemma(lem) ; neg=Skolem(sko); size=size f }, id)
+  (H.hashcons {pos=Lemma(lem) ; neg=Skolem(sko); size=size f }, id)
     
 (* forall upbv.  name: (exists bv [trs]. f) *)
 let mk_exists up bv trs f name id= 
@@ -290,14 +289,14 @@ let mk_exists up bv trs f name id=
              ssubst_ty = Ty.esubst;
              sf = f} in*)
   let sko = {sko_subst = (mk_skolem_subst up bv, Ty.esubst); sko_f = f} in
-  (H.hashcons tbl {pos=Skolem(sko)  ; neg=Lemma(lem) ; size = size f}, id)
+  (H.hashcons {pos=Skolem(sko)  ; neg=Lemma(lem) ; size = size f}, id)
 
 (* forall up. let bv = t in f *)
 let mk_let up bv t f id =
   let {Term.ty=ty} = Term.view t in
   let up = T.Set.fold (fun y acc-> y::acc) up [] in
   let subst = Sy.Map.add bv (T.make (Sy.fresh "let") up ty) Sy.Map.empty in
-   (H.hashcons tbl 
+   (H.hashcons 
      {pos=Let{let_var=bv; let_subst=(subst, Ty.esubst); let_term=t; let_f=f};
       neg=Let{let_var=bv; let_subst=(subst, Ty.esubst); 
 	      let_term=t; let_f=mk_not f};
@@ -306,18 +305,18 @@ let mk_let up bv t f id =
 let mk_and f1 f2 id =
   if equal f1 f2 then f1 else
     let size = size f1 + size f2 in
-    (H.hashcons tbl 
+    (H.hashcons 
        {pos=Unit(f1,f2); neg=Clause(mk_not f1,mk_not f2); size=size}, id)
 	
 let mk_or f1 f2 id = 
   if equal f1 f2 then f1 else
     let size = size f1 + size f2 in
-    (H.hashcons tbl 
+    (H.hashcons 
        {pos=Clause(f1,f2); neg=Unit(mk_not f1,mk_not f2); size=size}, id)
       
 let mk_imp f1 f2 id = 
   let size = size f1 + size f2 in
-  (H.hashcons tbl 
+  (H.hashcons 
      {pos=Clause(mk_not f1,f2); neg=Unit(f1,mk_not f2); size=size}, id)
 
 let mk_if t f2 f3 id = 
@@ -329,7 +328,7 @@ let mk_iff f1 f2 id =
   let b = mk_or (mk_not f1) (mk_not f2) id in
   let c = mk_or (mk_not f1) f2 id in
   let d = mk_or f1 (mk_not f2) id in
-  (H.hashcons tbl 
+  (H.hashcons 
      {pos=Unit(c,d); neg=Unit(a,b) ; size=2*(size f1+size f2)}, id)
 
 
@@ -337,7 +336,7 @@ let mk_iff f1 f2 id =
 let rec apply_subst subst (f, id) =
   let {pos=p;neg=n;size=s} = iview f in
   let sp, sn = iapply_subst subst p n in 
-  (H.hashcons tbl { pos = sp; neg = sn; size = s }, id)
+  (H.hashcons { pos = sp; neg = sn; size = s }, id)
 
 and iapply_subst ((s_t,s_ty) as subst) p n = match p, n with
   | Literal a, Literal _ ->
@@ -462,8 +461,6 @@ let terms =
 	in
         terms (T.Set.union st acc) lf
   in terms T.Set.empty
-
-let clear_htbl () = H.clear tbl
 
 module Set = Set.Make(struct type t'=t type t=t' let compare=compare end)
 module Map = Map.Make(struct type t'=t type t=t' let compare=compare end)

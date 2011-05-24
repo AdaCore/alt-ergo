@@ -18,15 +18,13 @@
 open Hashcons
 
 module S = 
-  Hashcons.Make(struct include String 
+  Hashcons.Make_consed(struct include String 
 		       let hash = Hashtbl.hash 
 		       let equal = (=)     end)
 
 type t = string Hashcons.hash_consed
 
-let htable = S.create 17
-
-let make s = S.hashcons htable s
+let make s = S.hashcons s
 
 let view s = s.node
 
