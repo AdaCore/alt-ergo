@@ -194,7 +194,7 @@ let rec is_quantified_term vars at =
   | ATconst _ -> false
   | ATvar s ->
       List.fold_left 
-	(fun b (s',_) -> b && (not (Symbols.equal s s'))) true vars
+	(fun b (s',_) -> b || (Symbols.equal s s')) false vars
   | ATapp (_, atl) ->
       List.fold_left
 	(fun b at -> b || is_quantified_term vars at) false atl
@@ -216,13 +216,6 @@ let rec is_quantified_term vars at =
       is_quantified_term vars at1
       || is_quantified_term nvars at2
 
-let rec remove_doublons = function
-  | [] -> []
-  | a::r ->
-      if List.mem a r then remove_doublons r
-      else a::(remove_doublons r)
-
-
 let unquantify_aaterm (buffer:sbuffer) at =
   new_annot buffer at.c (Why_typing.new_id ()) (tag buffer)
 
@@ -236,48 +229,7 @@ let unquantify_aatom (buffer:sbuffer) = function
   | AAlt aatl -> AAlt (List.map (unquantify_aaterm buffer) aatl)
   | AApred a -> AApred a
   | AAbuilt (h,aatl) -> AAbuilt (h, (List.map (unquantify_aaterm buffer) aatl))
-
-let rec unquantify_aform (buffer:sbuffer) vars f =
-  let ptag = (tag buffer) in
-  let c = match f with
-    | AFatom aa -> AFatom (unquantify_aatom buffer aa)
-    | AFop (op, afl) ->
-      AFop (op, List.map
-	(fun af -> unquantify_aform buffer vars af.c) afl)
-    | AFforall aaqf | AFexists aaqf ->
-      let {aqf_bvars = bv; aqf_upvars = uv; aqf_triggers = atll; aqf_form = af}=
-	aaqf.c in
-      let aqf_bvars = List.filter (fun v -> not (List.mem v vars)) bv in
-      let aform = unquantify_aform buffer vars af.c in
-      if aqf_bvars = [] then aform.c
-      else 
-	let aqf_triggers = 
-	  List.map (List.map (unquantify_aaterm buffer)) atll in
-	let aqf_triggers = List.filter
-	  (fun aatl ->	   
-	    List.filter (fun aat -> is_quantified_term vars aat.c) aatl <> []
-	  ) aqf_triggers in
-	if aqf_triggers = [] then aform.c
-	else let c =
-	       { aqf_bvars = List.filter (fun v -> not (List.mem v vars)) bv;
-		 aqf_upvars = List.filter (fun v -> not (List.mem v vars)) uv;
-		 aqf_triggers =  aqf_triggers;
-		 aqf_form = aform} in
-	     (match f with
-	       | AFforall _ -> 
-		 AFforall (new_annot buffer c (Why_typing.new_id ()) (tag buffer))
-	       | AFexists _ -> 
-		 AFexists (new_annot buffer c (Why_typing.new_id ()) (tag buffer))
-	       | _ -> assert false)
-    | AFlet (uv, s, at, aaf) ->
-      AFlet (List.filter (fun v -> not (List.mem v vars)) uv, s, at,
-	     unquantify_aform buffer vars aaf.c)
-    | AFnamed (n, aaf) ->
-      (unquantify_aform buffer vars aaf.c).c
-  in
-  new_annot buffer c (Why_typing.new_id ()) ptag
-      
-  
+         
 
 let rec aterm_used_vars goal_vars at =
   match at.at_desc with
@@ -296,28 +248,134 @@ let rec aterm_used_vars goal_vars at =
 	  (aterm_used_vars goal_vars at3)
 
 
+let rec unquantify_aform (buffer:sbuffer) tyenv vars_entries 
+    used_vars goal_vars f pol =
+  let ptag = (tag buffer) in
+  let c, ve, goal_used = match f, pol with
+
+    | AFatom aa, _ -> 
+      AFatom (unquantify_aatom buffer aa), vars_entries, []
+
+    | AFop (op, afl), _ ->
+      let nafl, ve, goal_used = 
+	List.fold_left (fun (nafl, ve, gu) af ->
+	  let res, ve, gu' = unquantify_aform buffer tyenv ve used_vars 
+	    goal_vars af.c af.polarity 
+	in
+	(res::nafl, ve, gu'@gu))
+	([], vars_entries, []) afl in
+      AFop (op, List.rev nafl), ve, goal_used
+
+    | AFforall aaqf, true | AFexists aaqf, false ->
+      let {aqf_bvars = bv; aqf_upvars = uv; aqf_triggers = atll; aqf_form = af}=
+	aaqf.c in
+      let nbv, used, goal_used, ve, _, lets =
+	List.fold_left (fun (nbv, used, goal_used, ve, uplet, lets) v ->
+	  let ((s, _) as v'), e = List.hd ve in
+	  let cdr_ve = List.tl ve in
+	  assert (v = v');
+	  if e#text = "" then 
+	    (v'::nbv, used, goal_used, cdr_ve, v'::uplet, lets)
+	  else
+	    let lb = Lexing.from_string e#text in
+	    let lexpr = Why_parser.lexpr Why_lexer.token lb in
+	    let at, gu =
+	      try 
+		let tt = Why_typing.term tyenv uplet lexpr in
+		annot_of_tterm buffer tt, []
+	      with Common.Error _ ->
+		let gv = List.fold_left (fun acc v ->
+		  if List.mem v uplet then acc
+		  else v::acc) [] goal_vars
+		in
+		let tt = Why_typing.term tyenv (uplet@gv) lexpr in
+		let at = annot_of_tterm buffer tt in
+		at, aterm_used_vars gv at.c
+	    in
+	    (nbv, v'::used, gu@goal_used, cdr_ve, 
+	     v'::uplet, (uplet, s, at)::lets))
+	  ([], [], [], vars_entries, uv, []) bv in
+      let aform, ve, gu =
+	unquantify_aform buffer tyenv ve used goal_vars af.c af.polarity
+      in
+      let goal_used = gu@goal_used in
+      let add_lets afc lets =
+	List.fold_left
+	  (fun af (u, s, at) -> 
+	    new_annot buffer (AFlet (u, s, at.c, af))
+	      (Why_typing.new_id ()) (tag buffer))
+	  afc lets in
+      if nbv = [] then (add_lets aform lets).c, ve, goal_used
+      else 
+	let aqf_triggers = 
+	  List.map (List.map (unquantify_aaterm buffer)) atll in
+	let aqf_triggers = List.filter
+	  (fun aatl ->
+	    (* TODO : change nbv with something else *)
+	    List.filter (fun aat -> is_quantified_term nbv aat.c) aatl <> []
+	  ) aqf_triggers in
+	if aqf_triggers = [] then (add_lets aform lets).c, ve, goal_used
+	else 
+	  let c =
+	    { aqf_bvars = nbv;
+	      aqf_upvars = List.filter (fun v -> not (List.mem v used_vars)) uv;
+	      aqf_triggers =  aqf_triggers;
+	      aqf_form =  add_lets aform lets} in
+	  (match f with
+	    | AFforall _ -> 
+	      AFforall (new_annot buffer c (Why_typing.new_id ()) (tag buffer)),
+	      ve, goal_used
+	    | AFexists _ -> 
+	      AFexists (new_annot buffer c (Why_typing.new_id ()) (tag buffer)),
+	      ve, goal_used
+	    | _ -> assert false)
+
+    | AFforall aaqf, false | AFexists aaqf, true ->
+      let naqf_form, ve, goal_used =
+	unquantify_aform buffer tyenv vars_entries used_vars goal_vars
+	aaqf.c.aqf_form.c aaqf.c.aqf_form.polarity in
+      let c = { aaqf.c with aqf_form = naqf_form } in
+      (match f with
+	| AFforall _ -> 
+	  AFforall (new_annot buffer c (Why_typing.new_id ()) (tag buffer)),
+	  ve, goal_used
+	| AFexists _ -> 
+	  AFexists (new_annot buffer c (Why_typing.new_id ()) (tag buffer)),
+	  ve, goal_used
+	| _ -> assert false)
+
+    | AFlet (uv, s, at, aaf), _ ->
+      let naaf, ve, goal_used = 
+	unquantify_aform buffer tyenv vars_entries used_vars goal_vars
+	  aaf.c aaf.polarity
+      in
+      AFlet (List.filter (fun v -> not (List.mem v used_vars)) uv, s, at, naaf),
+      ve, goal_used
+
+    | AFnamed (n, aaf), _ ->
+      let naaf, ve, goal_used =
+	unquantify_aform buffer tyenv vars_entries used_vars goal_vars
+	  aaf.c aaf.polarity 
+      in
+      AFnamed (n, naaf), ve, goal_used
+  in
+  new_annot buffer c (Why_typing.new_id ()) ptag, ve, goal_used
+
+
 let make_instance (buffer:sbuffer) vars (entries:GEdit.entry list)
     afc goal_form tyenv =
   let goal_vars = list_vars_in_form goal_form.c in
-  let terms, used_vars, vars = List.fold_left2
-    (fun (l,u,vl) e v ->
-       if e#text <> "" then
-	 let lb = Lexing.from_string e#text in
-	 let lexpr = Why_parser.lexpr Why_lexer.token lb in
-	 let tt = Why_typing.term tyenv goal_vars lexpr in
-	 let at = annot_of_tterm buffer tt in
-	 let used_vars = aterm_used_vars goal_vars at.c in
-	 at::l, (remove_doublons used_vars)::u, v::vl
-       else l, u, vl
-    ) ([],[],[]) entries (List.rev vars) in
-  let aform = List.fold_left2
-    (fun af (s, ty) (at, u) -> 
-      new_annot buffer (AFlet (u, s, at.c, af)) (Why_typing.new_id ()) (tag buffer))
-    (unquantify_aform buffer vars afc) vars (List.combine terms used_vars)
+  if debug then List.iter (fun (v,e) ->
+    eprintf "%a -> %s@." Symbols.print (fst v) e#text)
+    (List.combine vars (List.rev entries));
+  let aform, _, goal_used = 
+    unquantify_aform buffer tyenv (List.combine vars (List.rev entries)) [] 
+      goal_vars afc true
   in
-  let all_used_vars = remove_doublons (List.flatten used_vars) in
-  (* new_annot buffer *) aform, all_used_vars
+  aform, goal_used
   
+
+
 
 exception UncoveredVar of (Symbols.t * Ty.t)
 
@@ -440,7 +498,7 @@ and popup_axiom t env offset () =
 	  match atd.c with
 	    | AAxiom (_, aname, af)
 	    | APredicate_def (_, aname,_ , af) ->
-		let vars = remove_doublons (list_uquant_vars_in_form af) in
+		let vars = list_uquant_vars_in_form af in
 		let rows = List.length vars in
 		let table = GPack.table ~rows ~columns:2 ~homogeneous:false
 		  ~border_width:5 ~packing:pop_w#vbox#add () in
