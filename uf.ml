@@ -518,28 +518,29 @@ module Make ( R : Sig.X ) = struct
   let rec distinct env rl dep =
     let d = Lit.make (Literal.Distinct (false,rl)) in
     if debug_uf then fprintf fmt "[uf] distinct %a@." Lit.print d;
-    let neqs, _, newds = 
+    let env, _, newds = 
       List.fold_left
-	(fun (neqs, mapr, newds) r -> 
+	(fun (env, mapr, newds) r -> 
 	   let rr, ex = Env.find_or_normal_form env r in 
 	   try 
 	     raise (Inconsistent (Ex.union ex (MapR.find rr mapr)))
 	   with Not_found ->
 	     let uex = Ex.union ex dep in
 	     let mdis = 
-	       try MapR.find rr neqs with Not_found -> MapL.empty in
+	       try MapR.find rr env.neqs with Not_found -> MapL.empty in
 	     let mdis = 
 	       try 
 		 MapL.add d (Ex.merge uex (MapL.find d mdis)) mdis
 	       with Not_found -> 
 		 MapL.add d uex mdis
 	     in
-	     MapR.add rr mdis neqs, MapR.add rr uex mapr, (rr, ex, mapr)::newds
+	     let env = Env.init_leaf env rr in
+             let env = {env with neqs = MapR.add rr mdis env.neqs} in
+             env, MapR.add rr uex mapr, (rr, ex, mapr)::newds
 	)
-	(env.neqs, MapR.empty, [])
+	(env, MapR.empty, [])
 	rl
     in
-    let env = { env with neqs = neqs } in
     List.fold_left 
       (fun env (r1, ex1, mapr) -> 
 	 MapR.fold (fun r2 ex2 env -> 
@@ -554,6 +555,7 @@ module Make ( R : Sig.X ) = struct
 			| _   -> env
 		      with Unsolvable -> env) mapr env)
       env newds
+
 			  
   let are_equal env t1 t2 = 
     let r1, ex_r1 = Env.lookup_by_t t1 env in
