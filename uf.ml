@@ -335,15 +335,22 @@ module Make ( R : Sig.X ) = struct
       try MapR.find r env.repr with Not_found -> normal_form env r
 
     let init_leaf env p = 
-      if MapR.mem p env.repr then env 
-      else begin
-        if debug_uf then fprintf fmt "init_leaf: %a@." R.print p;
-	{ env with
-	    repr    = MapR.add p (p, Ex.empty) env.repr;
-	    classes = update_classes p p env.classes;
-	    gamma   = add_to_gamma p p env.gamma ;
-	    neqs    = update_neqs p p Ex.empty env } 
-      end
+      if debug_uf then fprintf fmt "init_leaf: %a@." R.print p;
+      let in_repr = MapR.mem p env.repr in
+      let in_neqs = MapR.mem p env.neqs in
+      { env with
+	repr    = 
+	  if in_repr then env.repr 
+	  else MapR.add p (p, Ex.empty) env.repr;
+	classes = 
+	  if in_repr then env.classes
+	  else update_classes p p env.classes;
+	gamma   = 
+	  if in_repr then env.gamma
+	  else add_to_gamma p p env.gamma ;
+	neqs    =  
+	  if in_neqs then env.neqs 
+	  else update_neqs p p Ex.empty env } 
           
     let init_term env t = 
       let mkr, ctx = R.make t in
