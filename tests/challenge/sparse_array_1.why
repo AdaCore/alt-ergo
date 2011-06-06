@@ -50,12 +50,12 @@ function xorb(x: bool, y: bool) : bool = match_bool(y, match_bool(x, false,
 
 function notb(x: bool) : bool = match_bool(x, false, true)
 
-
+(*
 axiom CompatOrderMult :
   (forall x:int. forall y:int. forall z:int. ((x <= y) -> ((0 <= z) ->
   ((x * z) <= (y * z)))))
-
-
+*)
+(*
 axiom Select_eq :
   (forall m:('a3,'b) farray.
   (forall a1:'a3. forall a2:'a3.
@@ -67,7 +67,7 @@ axiom Select_neq :
   (forall a1:'a4. forall a2:'a4.
   (forall b:'b1 [((m[a1 <- b])[a2])]. ((not (a1 = a2)) ->
   (((m[a1 <- b])[a2]) = (m[a2]))))))
-
+*)
 
 logic const : 'b2 -> ('a5,'b2) farray
 
@@ -215,20 +215,19 @@ predicate permutation(n: int, a: int array1) =
 
 logic dirichlet : int, int array1, int -> int
 
-
+(*
 axiom Dirichlet :
   (forall n:int.
   (forall a:int array1. (permutation(n, a) ->
   (forall i:int. (((0 <= i) and (i <  n)) -> (((0 <= dirichlet(n, a, i)) and
   (dirichlet(n, a, i) <  n)) and (get(a, dirichlet(n, a, i)) = i)))))))
-
+*)
 
 axiom Inter6 :
   (forall a:sparse_array. (sa_invariant(a) -> ((card(a) = length1(a)) ->
   (permutation(card(a), back(a)) and
   (forall i:int. (((0 <= i) and (i <  card(a))) -> ((get(idx(a),
   i) = dirichlet(card(a), back(a), i)) and is_elt(a, i))))))))
-
 
 goal WP_parameter_set :
   (forall a:int. forall a1:int. forall a2:int.
