@@ -324,43 +324,6 @@ module Make (X : Sig.X) = struct
     let env = clean_use env result.remove in
     env, result.assume
 
-(*
-  let rec assume_literal env (a, ex) =
-    let env, (sa, ex), tao = 
-      match a with 
-	| LTerm ta -> 
-	    let env, l = add ta ex env in
-	    let env = List.fold_left assume_literal env l in
-	    env, term_canonical_view env ta ex, Some ta
-	| LSem sa -> 
-	    env, (sa,ex), None
-    in
-    Print.assume_literal sa;
-    match sa with
-      | A.Eq(r1, r2) ->
-	  let env, l = congruence_closure env r1 r2 ex in
-	  let env = List.fold_left assume_literal env l in
-	  let env , l = replay_atom env [sa, tao, ex] in
-	  let env = List.fold_left assume_literal env l	in
-	  if Options.nocontracongru then env
-	  else 
-	    let env = 
-	      List.fold_left assume_literal env (contra_congruence env r1 ex) 
-	    in
-	    List.fold_left assume_literal env (contra_congruence env r2 ex)
-      | A.Distinct (false, lr) ->
-	  if Uf.already_distinct env.uf lr then env
-	  else 
-	    let env = {env with uf = Uf.distinct env.uf lr ex} in
-	    let env , l = replay_atom env [sa, tao, ex] in
-	    List.fold_left assume_literal env l
-      | A.Distinct (true, _) -> assert false
-      | A.Builtin _ -> 
-	  let sa, ex = canonical_view env sa ex in
-	  let env, l = replay_atom env [sa, tao, ex] in
-	  List.fold_left assume_literal env l
-*)
-
 
   let semantic_view env la = 
     List.fold_left 
