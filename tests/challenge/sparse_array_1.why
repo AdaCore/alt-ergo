@@ -1,0 +1,260 @@
+(* this is a prelude for Alt-Ergo*)
+(* this is a prelude for Alt-Ergo integer arithmetic *)
+axiom tuple0_inversion : (forall u:unit. (u = void))
+
+
+type unit1
+
+type label
+
+logic at : 'a, label -> 'a
+
+
+logic old : 'a1 -> 'a1
+
+
+logic match_bool : bool, 'a2, 'a2 -> 'a2
+
+
+axiom match_bool_True :
+  (forall z:'a2. forall z1:'a2. (match_bool(true, z, z1) = z))
+
+
+axiom match_bool_False :
+  (forall z:'a2. forall z1:'a2. (match_bool(false, z, z1) = z1))
+
+
+logic index_bool : bool -> int
+
+
+axiom index_bool_True : (index_bool(true) = 0)
+
+
+axiom index_bool_False : (index_bool(false) = 1)
+
+
+axiom bool_inversion : (forall u:bool. ((u = true) or (u = false)))
+
+
+function andb(x: bool, y: bool) : bool = match_bool(y, match_bool(x, true,
+  false), false)
+
+
+function orb(x: bool, y: bool) : bool = match_bool(y, true, match_bool(x,
+  true, false))
+
+
+function xorb(x: bool, y: bool) : bool = match_bool(y, match_bool(x, false,
+  true), match_bool(x, true, false))
+
+
+function notb(x: bool) : bool = match_bool(x, false, true)
+
+
+axiom CompatOrderMult :
+  (forall x:int. forall y:int. forall z:int. ((x <= y) -> ((0 <= z) ->
+  ((x * z) <= (y * z)))))
+
+
+axiom Select_eq :
+  (forall m:('a3,'b) farray.
+  (forall a1:'a3. forall a2:'a3.
+  (forall b:'b [((m[a1 <- b])[a2])]. ((a1 = a2) -> (((m[a1 <- b])[a2]) = b)))))
+
+
+axiom Select_neq :
+  (forall m:('a4,'b1) farray.
+  (forall a1:'a4. forall a2:'a4.
+  (forall b:'b1 [((m[a1 <- b])[a2])]. ((not (a1 = a2)) ->
+  (((m[a1 <- b])[a2]) = (m[a2]))))))
+
+
+logic const : 'b2 -> ('a5,'b2) farray
+
+
+axiom Const : (forall b:'b3. forall a:'a6. ((const(b)[a]) = b))
+
+
+type 'a7 array1
+
+logic mk_array : int, (int,'a7) farray -> 'a7 array1
+
+
+logic mk_array_proj_1 : 'a7 array1 -> int
+
+
+axiom mk_array_proj_1_def :
+  (forall u:int. forall u1:(int,'a7) farray. (mk_array_proj_1(mk_array(u,
+  u1)) = u))
+
+
+logic mk_array_proj_2 : 'a7 array1 -> (int,'a7) farray
+
+
+axiom mk_array_proj_2_def :
+  (forall u:int. forall u1:(int,'a7) farray. (mk_array_proj_2(mk_array(u,
+  u1)) = u1))
+
+
+axiom array_inversion :
+  (forall u:'a7 array1. (u = mk_array(mk_array_proj_1(u),
+  mk_array_proj_2(u))))
+
+
+function elts(u: 'a7 array1) : (int,'a7) farray = mk_array_proj_2(u)
+
+
+function length(u: 'a7 array1) : int = mk_array_proj_1(u)
+
+
+function get(a: 'a8 array1, i: int) : 'a8 = (elts(a)[i])
+
+
+function set(a: 'a9 array1, i: int, v: 'a9) : 'a9 array1 =
+  mk_array(mk_array_proj_1(a), (elts(a)[i <- v]))
+
+
+type elt
+
+logic default : elt
+
+
+logic c1 : elt
+
+
+logic c2 : elt
+
+
+type sparse_array
+
+logic mk_sparse_array : elt array1, int array1, int array1,
+  int -> sparse_array
+
+
+logic mk_sparse_array_proj_1 : sparse_array -> elt array1
+
+
+axiom mk_sparse_array_proj_1_def :
+  (forall u:elt array1. forall u1:int array1. forall u2:int array1.
+  forall u3:int. (mk_sparse_array_proj_1(mk_sparse_array(u, u1, u2,
+  u3)) = u))
+
+
+logic mk_sparse_array_proj_2 : sparse_array -> int array1
+
+
+axiom mk_sparse_array_proj_2_def :
+  (forall u:elt array1. forall u1:int array1. forall u2:int array1.
+  forall u3:int. (mk_sparse_array_proj_2(mk_sparse_array(u, u1, u2,
+  u3)) = u1))
+
+
+logic mk_sparse_array_proj_3 : sparse_array -> int array1
+
+
+axiom mk_sparse_array_proj_3_def :
+  (forall u:elt array1. forall u1:int array1. forall u2:int array1.
+  forall u3:int. (mk_sparse_array_proj_3(mk_sparse_array(u, u1, u2,
+  u3)) = u2))
+
+
+logic mk_sparse_array_proj_4 : sparse_array -> int
+
+
+axiom mk_sparse_array_proj_4_def :
+  (forall u:elt array1. forall u1:int array1. forall u2:int array1.
+  forall u3:int. (mk_sparse_array_proj_4(mk_sparse_array(u, u1, u2,
+  u3)) = u3))
+
+
+axiom sparse_array_inversion :
+  (forall u:sparse_array. (u = mk_sparse_array(mk_sparse_array_proj_1(u),
+  mk_sparse_array_proj_2(u), mk_sparse_array_proj_3(u),
+  mk_sparse_array_proj_4(u))))
+
+
+function back(u: sparse_array) : int array1 = mk_sparse_array_proj_3(u)
+
+
+function card(u: sparse_array) : int = mk_sparse_array_proj_4(u)
+
+
+function idx(u: sparse_array) : int array1 = mk_sparse_array_proj_2(u)
+
+
+function val(u: sparse_array) : elt array1 = mk_sparse_array_proj_1(u)
+
+
+function length1(a: sparse_array) : int = length(val(a))
+
+
+predicate is_elt(a: sparse_array, i: int) = (((0 <= get(idx(a), i)) and
+  (get(idx(a), i) <  card(a))) and (get(back(a), get(idx(a), i)) = i))
+
+logic model : sparse_array, int -> elt
+
+
+axiom model_def :
+  (forall a:sparse_array. forall i:int. ((is_elt(a, i) -> (model(a,
+  i) = get(val(a), i))) and ((not is_elt(a, i)) -> (model(a, i) = default))))
+
+
+predicate sa_invariant(a: sparse_array) = ((((0 <= card(a)) and
+  (card(a) <= length1(a))) and (length1(a) <= 1000)) and
+  (((length(val(a)) = length(idx(a))) and
+  (length(idx(a)) = length(back(a)))) and
+  (forall i:int. (((0 <= i) and (i <  card(a))) -> (((0 <= get(back(a),
+  i)) and (get(back(a), i) <  length1(a))) and (get(idx(a), get(back(a),
+  i)) = i))))))
+
+predicate permutation(n: int, a: int array1) =
+  ((forall i:int. (((0 <= i) and (i <  n)) -> ((0 <= get(a, i)) and (get(a,
+   i) <  n)))) and
+  (forall i:int. forall j:int. ((((0 <= i) and (i <  j)) and (j <  n)) ->
+  (not (get(a, i) = get(a, j))))))
+
+logic dirichlet : int, int array1, int -> int
+
+
+axiom Dirichlet :
+  (forall n:int.
+  (forall a:int array1. (permutation(n, a) ->
+  (forall i:int. (((0 <= i) and (i <  n)) -> (((0 <= dirichlet(n, a, i)) and
+  (dirichlet(n, a, i) <  n)) and (get(a, dirichlet(n, a, i)) = i)))))))
+
+
+axiom Inter6 :
+  (forall a:sparse_array. (sa_invariant(a) -> ((card(a) = length1(a)) ->
+  (permutation(card(a), back(a)) and
+  (forall i:int. (((0 <= i) and (i <  card(a))) -> ((get(idx(a),
+  i) = dirichlet(card(a), back(a), i)) and is_elt(a, i))))))))
+
+
+goal WP_parameter_set :
+  (forall a:int. forall a1:int. forall a2:int.
+  (forall i:int.
+  (forall v:elt.
+  (forall rho:int.
+  (forall rho1:(int,int) farray.
+  (forall rho2:(int,int) farray.
+  (forall rho3:(int,elt) farray. ((((0 <= i) and (i <  a)) and
+  sa_invariant(mk_sparse_array(mk_array(a, rho3), mk_array(a1, rho2),
+  mk_array(a2, rho1), rho))) -> (((0 <= i) and (i <  a)) ->
+  (forall x:(int,elt) farray. ((x = (rho3[i <- v])) -> ((((0 <= i) and
+  (i <  a)) and sa_invariant(mk_sparse_array(mk_array(a, x), mk_array(a1,
+  rho2), mk_array(a2, rho1), rho))) ->
+  (forall result:bool. (((result = true) <->
+  is_elt(mk_sparse_array(mk_array(a, x), mk_array(a1, rho2), mk_array(a2,
+  rho1), rho), i)) -> ((not (result = true)) -> ((rho <  a) -> (((0 <= i) and
+  (i <  a1)) ->
+  (forall x1:(int,int) farray. ((x1 = (rho2[i <- rho])) -> (((0 <= rho) and
+  (rho <  a2)) ->
+  (forall x2:(int,int) farray. ((x2 = (rho1[rho <- i])) ->
+  (forall rho4:int. ((rho4 = (rho + 1)) ->
+  (sa_invariant(mk_sparse_array(mk_array(a, x), mk_array(a1, x1),
+  mk_array(a2, x2), rho4)) and ((model(mk_sparse_array(mk_array(a, x),
+  mk_array(a1, x1), mk_array(a2, x2), rho4), i) = v) and
+  (forall j:int. ((not (j = i)) -> (model(mk_sparse_array(mk_array(a, x),
+  mk_array(a1, x1), mk_array(a2, x2), rho4),
+  j) = model(mk_sparse_array(mk_array(a, rho3), mk_array(a1, rho2),
+  mk_array(a2, rho1), rho), j))))))))))))))))))))))))))))))
