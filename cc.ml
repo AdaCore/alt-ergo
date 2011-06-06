@@ -225,10 +225,10 @@ module Make (X : Sig.X) = struct
 	  let lr, ex  = fold_find_with_explanation find ex_a l in
 	  A.Builtin(b, s, List.rev lr), ex
 
-  let semantic_view env a ex_a =  view (Uf.find env.uf) (A.LT.view a) ex_a
+  let term_canonical_view env a ex_a =  
+    view (Uf.find env.uf) (A.LT.view a) ex_a
 
   let canonical_view env a ex_a = view (Uf.find_r env.uf) a ex_a
-
 
   let new_facts_by_contra_congruence env r bol ex = 
     match X.term_extract r with
@@ -324,13 +324,14 @@ module Make (X : Sig.X) = struct
     let env = clean_use env result.remove in
     env, result.assume
 
+(*
   let rec assume_literal env (a, ex) =
     let env, (sa, ex), tao = 
       match a with 
 	| LTerm ta -> 
 	    let env, l = add ta ex env in
 	    let env = List.fold_left assume_literal env l in
-	    env, semantic_view env ta ex, Some ta
+	    env, term_canonical_view env ta ex, Some ta
 	| LSem sa -> 
 	    env, (sa,ex), None
     in
@@ -358,7 +359,52 @@ module Make (X : Sig.X) = struct
 	  let sa, ex = canonical_view env sa ex in
 	  let env, l = replay_atom env [sa, tao, ex] in
 	  List.fold_left assume_literal env l
+*)
 
+
+  let semantic_view env la = 
+    List.fold_left 
+      (fun (env, acc, lsa) (a, ex) ->
+	 match a with 
+	   | LTerm ta -> 
+	       let env, l = add ta ex env in
+	       let sa, ex = term_canonical_view env ta ex in
+	       env, l@acc, (sa, Some ta, ex)::lsa
+	   | LSem (A.Builtin _ (* | A.Distinct _ *) as sa) -> (* ??? *)
+	       let sa, ex = canonical_view env sa ex in 
+	       env, acc, (sa, None, ex)::lsa
+	   | LSem sa ->
+	       env, acc, (sa, None, ex)::lsa)
+      (env, [], []) la
+    
+
+  let rec assume_literal env la =
+    let env, newc, lsa = semantic_view env la in
+    let env = 
+      List.fold_left
+	(fun env (sa, _, ex) ->
+	   Print.assume_literal sa;
+	   match sa with
+	     | A.Eq(r1, r2) ->
+		 let env, l = congruence_closure env r1 r2 ex in
+		 let env = assume_literal env l in
+		 if Options.nocontracongru then env
+		 else 
+		   let env = assume_literal env (contra_congruence env r1 ex) in
+		   assume_literal env (contra_congruence env r2 ex)
+	     | A.Distinct (false, lr) ->
+		 if Uf.already_distinct env.uf lr then env
+		 else 
+		   {env with uf = Uf.distinct env.uf lr ex}
+	     | A.Distinct (true, _) -> assert false
+	     | A.Builtin _ -> env)
+	env lsa
+    in
+    let env = assume_literal env newc in
+    let env, l = replay_atom env lsa in
+    assume_literal env l
+
+   
   let look_for_sat ?(bad_last=false) t base_env l =
     let rec aux bad_last dl base_env = function
       | [] -> 
@@ -379,7 +425,7 @@ module Make (X : Sig.X) = struct
 		  { t with gamma_finite = base_env; choices = List.rev dl }
 	end
       | ((c, size, true, ex_c) as a)::l ->
-	  let base_env = assume_literal base_env (LSem c, ex_c) in
+	  let base_env = assume_literal base_env [LSem c, ex_c] in
 	  aux bad_last (a::dl) base_env l
 
       | [(c, size, false, ex_c)] when bad_last ->
@@ -389,7 +435,7 @@ module Make (X : Sig.X) = struct
 
       | ((c, size, false, ex_c) as a)::l ->
 	  try
-	    let base_env = assume_literal base_env (LSem c, ex_c) in
+	    let base_env = assume_literal base_env [LSem c, ex_c] in
 	    aux bad_last (a::dl) base_env l
 	  with Exception.Inconsistent dep ->
             let neg_c = LR.neg (LR.make c) in
@@ -420,16 +466,15 @@ module Make (X : Sig.X) = struct
       
   let assume a ex t = 
     let a = LTerm a in
-    let t = { t with gamma = assume_literal t.gamma (a, ex) } in
-    let t = try_it (fun env -> assume_literal env (a, ex) ) t  in 
+    let t = { t with gamma = assume_literal t.gamma [a, ex] } in
+    let t = try_it (fun env -> assume_literal env [a, ex] ) t  in 
     t, 1
 
   let class_of t term = Uf.class_of t.gamma.uf term
 
   let add_and_process a t =
     let aux a ex env = 
-      let gamma, l = add a ex env in
-      List.fold_left assume_literal gamma l
+      let gamma, l = add a ex env in assume_literal gamma l
     in
     let t = { t with gamma = aux a Ex.empty t.gamma } in
     let t =  try_it (aux a Ex.empty) t in
@@ -458,7 +503,7 @@ module Make (X : Sig.X) = struct
 	  let are_eq = Uf.are_equal env.uf in
 	  let are_neq = Uf.are_distinct env.uf in
 	  let class_of = Uf.class_of env.uf in
-	  let rna, ex_rna = semantic_view env na Ex.empty in
+	  let rna, ex_rna = term_canonical_view env na Ex.empty in
           X.Rel.query env.relation (rna, Some na, ex_rna) 
 	    are_eq are_neq class_of 
     with Exception.Inconsistent d -> Yes d
