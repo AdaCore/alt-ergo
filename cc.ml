@@ -379,30 +379,32 @@ module Make (X : Sig.X) = struct
     
 
   let rec assume_literal env la =
-    let env, newc, lsa = semantic_view env la in
-    let env = 
-      List.fold_left
-	(fun env (sa, _, ex) ->
-	   Print.assume_literal sa;
-	   match sa with
-	     | A.Eq(r1, r2) ->
-		 let env, l = congruence_closure env r1 r2 ex in
-		 let env = assume_literal env l in
-		 if Options.nocontracongru then env
-		 else 
-		   let env = assume_literal env (contra_congruence env r1 ex) in
-		   assume_literal env (contra_congruence env r2 ex)
-	     | A.Distinct (false, lr) ->
-		 if Uf.already_distinct env.uf lr then env
-		 else 
-		   {env with uf = Uf.distinct env.uf lr ex}
-	     | A.Distinct (true, _) -> assert false
-	     | A.Builtin _ -> env)
-	env lsa
-    in
-    let env = assume_literal env newc in
-    let env, l = replay_atom env lsa in
-    assume_literal env l
+    if la = [] then env
+    else 
+      let env, newc, lsa = semantic_view env la in
+      let env = 
+	List.fold_left
+	  (fun env (sa, _, ex) ->
+	    Print.assume_literal sa;
+	    match sa with
+	      | A.Eq(r1, r2) ->
+		let env, l = congruence_closure env r1 r2 ex in
+		let env = assume_literal env l in
+		if Options.nocontracongru then env
+		else 
+		  let env = assume_literal env (contra_congruence env r1 ex) in
+		  assume_literal env (contra_congruence env r2 ex)
+	      | A.Distinct (false, lr) ->
+		if Uf.already_distinct env.uf lr then env
+		else 
+		  {env with uf = Uf.distinct env.uf lr ex}
+	      | A.Distinct (true, _) -> assert false
+	      | A.Builtin _ -> env)
+	  env lsa
+      in
+      let env = assume_literal env newc in
+      let env, l = replay_atom env lsa in
+      assume_literal env l
 
    
   let look_for_sat ?(bad_last=false) t base_env l =
