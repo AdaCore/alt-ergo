@@ -174,15 +174,17 @@ module Make ( R : Sig.X ) = struct
       MapR.iter (fun k s -> fprintf fmt "%a -> %a\n" R.print k lm_print s) m
 
     let all fmt env = 
-      fprintf fmt "------------------------------------------------------@.";
-      fprintf fmt "%a %a %a %a %a" 
-        pmake env.make 
-        prepr env.repr 
-        prules env.ac_rs 
-        pclasses env.classes
-        pneqs env.neqs;
-      fprintf fmt "------------------------------------------------------@."
-
+      if debug_uf then
+	begin
+	  fprintf fmt "-------------------------------------------------@.";
+	  fprintf fmt "%a %a %a %a %a" 
+            pmake env.make 
+            prepr env.repr 
+            prules env.ac_rs 
+            pclasses env.classes
+            pneqs env.neqs;
+	  fprintf fmt "-------------------------------------------------@."
+	end
   end
 
   
@@ -218,6 +220,7 @@ module Make ( R : Sig.X ) = struct
 	  let s = try MapR.find x gamma with Not_found -> SetR.empty in
 	  MapR.add x (SetR.add r s) gamma) gamma (R.leaves c)
 	
+    (* r1 = r2 => neqs(r1) \uplus neqs(r2) *)
     let update_neqs r1 r2 dep env = 
       let nq_r1 = lookup_for_neqs env r1 in
       let nq_r2 = lookup_for_neqs env r2 in
@@ -523,6 +526,7 @@ module Make ( R : Sig.X ) = struct
     ac_x equations env []
 
   let rec distinct env rl dep =
+    Print.all fmt env;
     let d = Lit.make (Literal.Distinct (false,rl)) in
     if debug_uf then fprintf fmt "[uf] distinct %a@." Lit.print d;
     let env, _, newds = 

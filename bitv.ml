@@ -16,7 +16,6 @@
 (**************************************************************************)
 
 open Format
-open Hashcons
 open Sig
 
 module Sy = Symbols
@@ -231,8 +230,8 @@ module Make(X : ALIEN) = struct
 	    begin 
 	      match T.view ti , T.view tj with
 		| { T.f = Sy.Int i } , { T.f = Sy.Int j } -> 
-		    let i = int_of_string i.node in
-		    let j = int_of_string j.node in
+		    let i = int_of_string i.Hashcons.node in
+		    let j = int_of_string j.Hashcons.node in
 		    let r1, ctx = make_rec t1 ctx in
 		    { sz = j - i + 1 ; bv = I_Ext (r1,i,j)}, ctx
 		| _ -> assert false
