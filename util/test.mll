@@ -28,11 +28,22 @@
   let filenum = ref 0
 
   let name = ref "alt-ergo"
+  let tex_file = ref "results.tex"
 
   let exi = ref ""
   let obj = ref ""
   let cobj = ref ""
   let ares = ref "Valid"
+
+  
+  let green s =
+    sprintf "[1;32m%s[1;0m" s
+    
+  let red s =
+    sprintf "[1;31m%s[1;0m" s
+
+  let ko_str = red "*KO"
+  let ok_str = green "OK"
 
   let flags= [Open_text; Open_excl; Open_creat]
 
@@ -68,7 +79,7 @@
     fname
       
   let out_tex =
-      open_out_gen [Open_creat; Open_trunc; Open_append] 0o666 "results.tex"
+      open_out_gen [Open_creat; Open_trunc; Open_append] 0o666 !tex_file
   let fmt_tex = formatter_of_out_channel out_tex
 
 
@@ -137,7 +148,7 @@ rule split = parse
       if !ares = "Incorrect" then 
 	Sys.command(sprintf "%s %s" !name fname) <> 0
       else
-	Sys.command(sprintf "%s %s | grep -q -w %s" !name fname !ares) = 0
+	Sys.command(sprintf "%s %s | grep -q -w \"%s\"" !name fname !ares) = 0
     in
     init_sec fname;
     sec_command fname;
@@ -145,6 +156,9 @@ rule split = parse
     sec_obj !obj;
     sec_desc code;
     sec_res !ares ok;
+    ignore(
+      if ok then print_endline (sprintf "%s  %s" fname ok_str)
+      else print_endline (sprintf "%s %s" fname ko_str));
     true
   }
   | sep { true }
@@ -164,8 +178,9 @@ rule split = parse
     close_in chan
       
   let _ = Arg.parse 
-    ["-n", Arg.Set_string name, "<name> the command line for Alt-Ergo"] 
-    process "file splitter for tests";
+    ["-n", Arg.Set_string name, "<name> the command line for Alt-Ergo (default alt-ergo)";
+     "-o", Arg.Set_string name, "<file.tex> output LaTeX file (default results.tex)"]
+    process "LaTeX tests report generator";
     Sys.chdir cwd
 
 }
