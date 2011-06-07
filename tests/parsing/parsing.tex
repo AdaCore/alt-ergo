@@ -1,0 +1,44 @@
+\documentclass[a4paper,12pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{fullpage}
+\usepackage{url}
+\usepackage{amsfonts}
+\usepackage{amstext}
+\usepackage{graphicx}
+\usepackage{color}
+\usepackage{alltt}
+\usepackage{verbatim}
+
+\definecolor{lightgray}{gray}{0.95}
+\makeatletter
+\def\verbatimgray{%
+  \def\verbatim@processline{%
+    {\setbox0=\hbox{\the\verbatim@line}%
+    \hsize=\wd0 \the\verbatim@line\par}}%
+  \@minipagetrue
+  \@tempswatrue
+  \@totalleftmargin\z@
+  \setbox0=\vbox\bgroup \verbatim
+}
+\def\endverbatimgray{%
+  \endverbatim
+  \unskip\setbox0=\lastbox
+  \egroup
+  \colorbox{lightgray}{\box0}%
+}
+\makeatother
+
+
+\begin{document}
+
+\section{Tests d'analyse lexicale et syntaxique}
+
+\input{results_exi}
+
+\input{results_table}
+
+\input{results}
+
+\end{document}
