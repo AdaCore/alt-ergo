@@ -29,6 +29,9 @@
 
   let name = ref "alt-ergo"
 
+  let exi = ref ""
+  let obj = ref ""
+  let cobj = ref ""
   let ares = ref "Valid"
 
   let flags= [Open_text; Open_excl; Open_creat]
@@ -45,6 +48,14 @@
   let newfile () = 
     let s = Printf.sprintf "%03d" !filenum in
     ("testfile-"^ !prefix^s^".mlw")
+
+  let rec split_char sep str =
+    try
+      let i = String.index str sep in
+      String.sub str 0 i ::
+	split_char sep (String.sub str (i+1) (String.length str - i - 1))
+    with Not_found ->
+      [str]
 
   let write str = 
     incr filenum;
@@ -70,8 +81,10 @@
     fprintf fmt_tex "%s %s\n" !name fname;
     fprintf fmt_tex "\\end{verbatim}\n@."
     
-  let sec_exigence refs =
-    fprintf fmt_tex "\\subsubsection{Référence de l\'exigence fonctionnelle}\n\n";
+  let sec_exigence s =
+    let refs = split_char ',' s in
+    fprintf fmt_tex 
+      "\\subsubsection{Référence de l\'exigence fonctionnelle}\n\n";
     fprintf fmt_tex "\\begin{itemize}\n";
     List.iter (fun r ->
       fprintf fmt_tex "\\item %s \n" r;
@@ -106,28 +119,39 @@ let pref = "$$$"
 let exi = "$exi:"
 let obj = "$obj:"
 let cobj = "$cobj:"
-let res = "$res:"
+let ares = "$res:"
 let comment = "$$" [^'\n']* ( '\n' | eof ) 
 let alpha= [ 'a'-'z' 'A'-'Z' ]
 let ident= (alpha | '_' | '-')+
 
 rule split = parse
     pref (ident as newpref) ' '* '\n' { new_prefix newpref; true }
-  | file { 
-    let fname = write (Lexing.lexeme lexbuf) in
+  | exi (file as f) { exi := f; true }
+  | obj  (file as f) { obj := f; true }
+  | cobj (file as f) { cobj := f; true }
+  | ares  (file as f) '\n' { ares := f; true }
+  | file {
+    let code = (Lexing.lexeme lexbuf) in
+    let fname = write code in
     let ok =
       if !ares = "Incorrect" then 
-	Sys.command(sprintf "%s %s" !name fname !ares) <> 0
+	Sys.command(sprintf "%s %s" !name fname) <> 0
       else
 	Sys.command(sprintf "%s %s | grep -q -w %s" !name fname !ares) = 0
     in
-    if ok
+    init_sec fname;
+    sec_command fname;
+    sec_exigence !exi;
+    sec_obj !obj;
+    sec_desc code;
+    sec_res !ares ok;
     true
   }
   | sep { true }
   | comment { true }
   | eof { false }
   | _ { failwith "????"}
+
 {
   let cwd=Sys.getcwd ()
 
