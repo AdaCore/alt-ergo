@@ -134,7 +134,7 @@ let spec = [
   "-proof", Arg.Set proof, "experimental support for succint proof";
   "-debug-proof", Arg.Set debug_proof, "experimental support for succint proof";
   "-goal-directed", Arg.Set goal_directed,
-  " instantiate lemmas only with the terms from the goal";
+   " instantiate lemmas only with the terms from the goal";
   "-bouclage", Arg.Set_int bouclage,
   " number of instantiations at each matching round";
   "-max-split", Arg.String set_max_split,
@@ -163,7 +163,7 @@ let cin =
   in
   Arg.parse spec set_file usage;
   match !ofile with Some f -> file := f ; open_in f 
-    | None -> 	smtfile := true ; stdin
+    | None -> stdin
 
 let type_only = ! type_only
 let parse_only = ! parse_only
