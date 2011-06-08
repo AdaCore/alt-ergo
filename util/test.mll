@@ -75,13 +75,23 @@
   let escu str =
     String.concat "\\_" (split_char '_' str)
 
-  let rec remove_trailing_whitespaces str =
+  let rec remove_trailing_whitespaces_end str =
     if String.length str > 0 && 
       (str.[String.length str - 1] = '\n' 
 	  || str.[String.length str - 1] = ' '
 	  || str.[String.length str - 1] = '\t')  then
-      remove_trailing_whitespaces (String.sub str 0 (String.length str - 1))
+      remove_trailing_whitespaces_end (String.sub str 0 (String.length str - 1))
     else str
+
+  let rec remove_trailing_whitespaces_begin str =
+    if String.length str > 0 && 
+      (str.[0] = '\n' || str.[0] = ' ' || str.[0] = '\t')  then
+      remove_trailing_whitespaces_begin 
+	(String.sub str 1 (String.length str - 1))
+    else str
+
+  let rec remove_trailing_whitespaces str =
+    remove_trailing_whitespaces_end (remove_trailing_whitespaces_begin str)
 
   let write str = 
     incr filenum;
@@ -142,11 +152,11 @@
       open_out_gen [Open_creat; Open_trunc; Open_append] 0o666 file in
     let fmt = formatter_of_out_channel out in
     fprintf fmt "\\subsection{Éxigences fonctionnelles et tests}\n@.";
-    fprintf fmt "\\begin{center}\\begin{tabular}{|l|l|}\n\\hline\n@.";
+    fprintf fmt "\\begin{center}\\begin{longtable}{|p{0.5\\textwidth}|p{0.5\\textwidth}|}\n\\hline\n@.";
     List.iter (fun (ex, fname) ->
       fprintf fmt "\\textsc{%s} & %s \\\\\\hline\n" ex (escu fname)
     ) (List.sort (fun (e1, _) (e2, _) -> String.compare e1 e2) !exi_tests);
-    fprintf fmt "\\end{tabular}\\end{center}\n@.";
+    fprintf fmt "\\end{longtable}\\end{center}\n@.";
     close_out out
     
   let dump_results_table file =
@@ -154,12 +164,12 @@
       open_out_gen [Open_creat; Open_trunc; Open_append] 0o666 file in
     let fmt = formatter_of_out_channel out in
     fprintf fmt "\\subsection{Résultats des tests}\n@.";
-    fprintf fmt "\\begin{center}\\begin{tabular}{|l|l|}\n\\hline\n@.";
+    fprintf fmt "\\begin{center}\\begin{longtable}{|p{0.5\\textwidth}|p{0.5\\textwidth}|}\n\\hline\n@.";
     List.iter (fun (fname, ok) ->
       fprintf fmt "%s & %s \\\\\\hline\n" (escu fname) 
 	(if ok then "OK" else "KO")
     ) (List.rev !results_table);
-    fprintf fmt "\\end{tabular}\\end{center}\n@.";
+    fprintf fmt "\\end{longtable}\\end{center}\n@.";
     close_out out
 
 }
@@ -179,7 +189,7 @@ rule split = parse
     pref (ident as newpref) ' '* '\n' { new_prefix newpref; true }
   | exi (file as f) { exi := f; true }
   | obj  (file as f) { obj := f; true }
-  | cobj (file as f) { cobj := f; true }
+  | cobj (file as f) { obj := ""; cobj := f; true }
   | ares  (file as f) '\n' { ares := f; true }
   | file {
     let code = remove_trailing_whitespaces (Lexing.lexeme lexbuf) in
@@ -215,6 +225,7 @@ rule split = parse
     Sys.chdir cwd;
     let chan=open_in file in
     Sys.chdir (Filename.dirname file);
+    ignore (Sys.command("rm -f testfile-*.mlw"));
     let buf=Lexing.from_channel chan in
     while split buf do () done;
     let fres = Filename.chop_extension !tex_file in
