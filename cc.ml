@@ -333,7 +333,10 @@ module Make (X : Sig.X) = struct
 	       let env, l = add ta ex env in
 	       let sa, ex = term_canonical_view env ta ex in
 	       env, l@acc, (sa, Some ta, ex)::lsa
-	   | LSem (A.Builtin _  | A.Distinct _ as sa) ->
+
+           (* XXX si on fait canonical_view pour A.Distinct, la theorie des tableaux
+              part dans les choux *)
+	   | LSem (A.Builtin _  (*| A.Distinct _*) as sa) ->
 	       let sa, ex = canonical_view env sa ex in 
 	       env, acc, (sa, None, ex)::lsa
 	   | LSem sa ->
