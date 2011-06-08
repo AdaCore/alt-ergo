@@ -44,7 +44,14 @@
   let red s =
     sprintf "[1;31m%s[1;0m" s
 
-  let ko_str = red "*KO"
+  let greenbg s =
+    sprintf "[1;102m%s[1;0m" s
+      
+  let redbg s =
+    sprintf "[1;101m%s[1;0m" s
+      
+
+  let ko_str = redbg "*KO"
   let ok_str = green "OK"
 
   let flags= [Open_text; Open_excl; Open_creat]
@@ -155,7 +162,8 @@
     fprintf fmt "\\begin{center}\\begin{longtable}{|p{0.5\\textwidth}|p{0.5\\textwidth}|}\n\\hline\n@.";
     List.iter (fun (ex, fname) ->
       fprintf fmt "\\textsc{%s} & %s \\\\\\hline\n" ex (escu fname)
-    ) (List.sort (fun (e1, _) (e2, _) -> String.compare e1 e2) !exi_tests);
+    ) (List.stable_sort (fun (e1, _) (e2, _) -> String.compare e1 e2) 
+	 (List.rev !exi_tests));
     fprintf fmt "\\end{longtable}\\end{center}\n@.";
     close_out out
     
@@ -209,7 +217,7 @@ rule split = parse
     sec_desc code;
     sec_res !ares ok;
     if ok then print_endline (sprintf "%s  %s" fname ok_str)
-    else print_endline (sprintf "%s %s" fname ko_str);
+    else print_endline (sprintf "%s %s" (red fname) ko_str);
     results_table := (fname, ok)::!results_table;
     true
   }
