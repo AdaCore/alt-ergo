@@ -51,10 +51,16 @@ module Make (X : Sig.X) = struct
     relation : X.Rel.t
   }
 
+  type choice_sign =
+    | CPos of Ex.exp (* The explication of this choice *)
+    | CNeg (* The choice has been already negated *)
+
   type t = { 
     gamma : env;
     gamma_finite : env ;
-    choices : (X.r A.view * Num.num * bool * Ex.t) list; 
+    choices : (X.r A.view * Num.num * choice_sign * Ex.t) list; 
+    (** the choice, the size, choice_sign,  the explication set,
+        the explication for this choice. *)
   }
 
   module Print = struct
@@ -106,6 +112,16 @@ module Make (X : Sig.X) = struct
       if debug_split then
         fprintf fmt "[case-split] I backtrack on %a : %a@."
           LR.print neg_c Ex.print ex_c
+
+    let split_assume c ex_c =
+      if debug_split then
+        fprintf fmt "[case-split] I assume %a : %a@."
+          LR.print c Ex.print ex_c
+
+    let split_backjump c dep =
+      if debug_split then
+        fprintf fmt "[case-split] I backjump on %a : %a@."
+          LR.print c Ex.print dep
 
     let assume_literal sa =
       if debug_cc then
@@ -381,18 +397,22 @@ module Make (X : Sig.X) = struct
 	    | [] -> 
 		{ t with gamma_finite = base_env; choices = List.rev dl }
 	    | l ->
-		let l = List.map 
-		  (fun (c,ex_c, size) -> (c, size, false, ex_c)) l in
-		let sz =
-		  List.fold_left
-		    (fun acc (a,s,_,_) -> 
-		       Num.mult_num acc s) (Num.Int 1) (l@dl) in
-		Print.split_size sz;
-		if Num.le_num sz max_split then aux false dl base_env l
-		else
-		  { t with gamma_finite = base_env; choices = List.rev dl }
+	      let l = List.map
+		(fun (c,ex_c, size) ->
+                  let exp = Ex.fresh_exp () in
+                  let ex_c_exp = Ex.add_fresh exp ex_c in
+                  (* A new explanation in order to track the choice *)
+                  (c, size, CPos exp, ex_c_exp)) l in
+	      let sz =
+		List.fold_left
+		  (fun acc (a,s,_,_) ->
+		     Num.mult_num acc s) (Num.Int 1) (l@dl) in
+              Print.split_size sz;
+	      if Num.le_num sz max_split then aux false dl base_env l
+	      else
+		{ t with gamma_finite = base_env; choices = List.rev dl }
 	end
-      | ((c, size, true, ex_c) as a)::l ->
+      | ((c, size, CNeg, ex_c) as a)::l ->
 	  let base_env = assume_literal base_env [LSem c, ex_c] in
 	  aux bad_last (a::dl) base_env l
 
@@ -402,14 +422,22 @@ module Make (X : Sig.X) = struct
       (*     Print.split_backtrack neg_c ex_c; *)
       (*     aux false dl base_env [LR.view neg_c, Num.Int 1, true, ex_c]  *)
 
-      | ((c, size, false, ex_c) as a)::l ->
+      | ((c, size, CPos exp, ex_c_exp) as a)::l ->
 	  try
-	    let base_env = assume_literal base_env [LSem c, ex_c] in
+            Print.split_assume (LR.make c) ex_c_exp;
+	    let base_env = assume_literal base_env [LSem c, ex_c_exp] in
 	    aux bad_last (a::dl) base_env l
 	  with Exception.Inconsistent dep ->
-            let neg_c = LR.neg (LR.make c) in
-	    Print.split_backtrack neg_c dep;
-	    aux false dl base_env [LR.view neg_c, Num.Int 1, true, dep] 
+            match Ex.remove_fresh exp dep with
+              | None ->
+                (* The choice doesn't participate to the inconsistency *)
+                Print.split_backjump (LR.make c) dep;
+                raise (Exception.Inconsistent dep)
+              | Some dep ->
+                (* The choice participates to the inconsistency *)
+                let neg_c = LR.neg (LR.make c) in
+	        Print.split_backtrack neg_c dep;
+	        aux false dl base_env [LR.view neg_c, Num.Int 1, CNeg, dep]
     in
     aux bad_last (List.rev t.choices) base_env l
 
@@ -423,6 +451,8 @@ module Make (X : Sig.X) = struct
 	    let env = f t.gamma_finite in
 	    look_for_sat t env []
 	  with Exception.Inconsistent _ -> 
+            if debug_split then
+              fprintf fmt "[case-split] I replay choices@.";
 	    (* we replay the conflict in look_for_sat, so we can
 	       safely ignore the explanation which is not useful *)
 	    look_for_sat ~bad_last:true 
