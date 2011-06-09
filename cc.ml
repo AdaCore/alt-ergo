@@ -396,10 +396,11 @@ module Make (X : Sig.X) = struct
 	  let base_env = assume_literal base_env [LSem c, ex_c] in
 	  aux bad_last (a::dl) base_env l
 
-      | [(c, size, false, ex_c)] when bad_last ->
-          let neg_c = LR.neg (LR.make c) in
-	  Print.split_backtrack neg_c ex_c;
-	  aux false dl base_env [LR.view neg_c, Num.Int 1, true, ex_c] 
+      (** This optimisation is not correct with the current explanation *)
+      (* | [(c, size, false, ex_c)] when bad_last -> *)
+      (*     let neg_c = LR.neg (LR.make c) in *)
+      (*     Print.split_backtrack neg_c ex_c; *)
+      (*     aux false dl base_env [LR.view neg_c, Num.Int 1, true, ex_c]  *)
 
       | ((c, size, false, ex_c) as a)::l ->
 	  try
