@@ -146,10 +146,20 @@ let is_point { ints = l; expl = e } =
       Some (v1, Explanation.union e2 (Explanation.union e1 e))
     | _ -> None
 
+let add_expl_zero i expl =
+  let res = List.map (fun x -> 
+    match x with
+      | (Large ((Num.Int 0), e1) , Large ((Num.Int 0), e2)) ->
+        (Large ((Num.Int 0), Explanation.union e1 expl),
+         Large ((Num.Int 0), Explanation.union e2 expl))
+      | _ -> x) i.ints in
+  { i with ints = res }
+
 let check_one_interval b1 b2 is_int =
     match b1, b2 with
       | Pinfty, _ | _, Minfty  -> raise (EmptyInterval Explanation.empty)
-      | (Strict (v1, e1) | Large (v1,e1)), (Strict (v2, e2) | Large (v2, e2)) ->
+      | (Strict (v1, e1) | Large (v1,e1)), 
+        (Strict (v2, e2) | Large (v2, e2)) ->
 	  let c = compare_num v1 v2 in 
 	  if c > 0 then raise 
 	    (EmptyInterval (Explanation.union e2 e1));
@@ -165,7 +175,7 @@ let min_borne b1 b2 =
   match b1, b2 with
     | Minfty , _ | _ , Minfty -> Minfty
     | b , Pinfty | Pinfty, b -> b
-    | (Strict (v1, _) | Large (v1, _)) , (Strict (v2, _) | Large (v2, _)) -> 
+    | (Strict (v1, _) | Large (v1, _)) , (Strict (v2, _) | Large (v2, _)) ->
 	let c = compare_num v1 v2 in
 	if c < 0 then b1
 	else if c > 0 then b2
@@ -322,11 +332,13 @@ let mult_borne b1 b2 =
   match b1,b2 with
     | Minfty, Pinfty | Pinfty, Minfty -> assert false
     | Minfty, b | b, Minfty ->
-	if compare_bornes b (borne_of true Explanation.empty (Int 0)) = 0 then b
+	if compare_bornes b (borne_of true Explanation.empty (Int 0)) = 0 
+        then b
 	else if pos_borne b then Minfty
 	else Pinfty
     | Pinfty, b | b, Pinfty ->
-	if compare_bornes b (borne_of true Explanation.empty (Int 0)) = 0 then b
+	if compare_bornes b (borne_of true Explanation.empty (Int 0)) = 0 
+        then b
 	else if pos_borne b then Pinfty
 	else Minfty
     | Strict (v1, e1), Strict (v2, e2) | Strict (v1, e1), Large (v2, e2)
@@ -498,7 +510,8 @@ let intersect_bornes (b1, b2) {ints = l; is_int = is_int; bexpl = bexpl} =
 
 (*
 let intersect ({ints=l1} as uints1) ({ints=l2} as uints2) =
-  (*fprintf fmt "%a inter %a (with %a) = " print uints1 print uints2 Explanation.print expl;*)
+  (*fprintf fmt "%a inter %a (with %a) = " print uints1 print uints2 
+  Explanation.print expl;*)
   let u =
     List.fold_left
       (fun u' bs ->
@@ -529,7 +542,8 @@ let build_relevant_bexpl be bexpl =
   ) be SB.empty
 *)
 
-let intersect ({ints=l1; expl=e1; is_int=is_int} as uints1) {ints=l2; expl=e2} =
+let intersect ({ints=l1; expl=e1; is_int=is_int} as uints1)
+    {ints=l2; expl=e2} =
   let rec step (l1,l2) acc acc_expl expl =
     match l1, l2 with
       | (lo1,up1)::r1, (lo2,up2)::r2 ->
@@ -832,11 +846,13 @@ let div i1 i2 =
   let inv_i2 = inv i2 in
   if inv_i2.ints = [Minfty, Pinfty] then inv_i2
   else
+    let i1 = match doesnt_contain_0 i2 with
+      | Sig.Yes ex -> add_expl_zero i1 ex
+      | Sig.No -> i1
+    in
     let ({ints=l; is_int=is_int} as i) = mult i1 inv_i2 in
     let l = 
       if is_int then 
 	List.map (fun (l,u) -> int_div_bornes l u) l
       else l in
     { i with ints = l }
-
-	
