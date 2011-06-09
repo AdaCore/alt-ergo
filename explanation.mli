@@ -16,6 +16,7 @@
 (**************************************************************************)
 
 type t
+(** An explanation set *)
 
 (* val everything : t *)
 
@@ -40,3 +41,15 @@ val print_proof : Format.formatter -> t -> unit
 val ids_of : t -> int list option
 
 val formulas_of : t -> Formula.Set.t
+
+(** Fresh *)
+
+type exp
+
+val fresh_exp : unit -> exp
+(** create a fresh explanation *)
+val remove_fresh : exp -> t -> t option
+(** try to remove a fresh explanation. Return None if the given explanation
+    is not in the set  *)
+val add_fresh : exp -> t -> t
+(** Add a fresh explanation to an explanation set *)

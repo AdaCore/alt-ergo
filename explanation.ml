@@ -15,15 +15,18 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type e = Dep of Formula.t | BJ of Formula.t
+type e = Dep of Formula.t | BJ of Formula.t | Fresh of int
 
 module ES = Set.Make(struct 
   type t = e 
   let compare e1 e2 = match e1,e2 with
     | Dep e1, Dep e2 -> Formula.compare e1 e2
     | Dep _, _ -> 1
+    | _, Dep _ -> -1
     | BJ e1, BJ e2 -> Formula.compare e1 e2
-    | BJ _, _ -> -1
+    | BJ _, _ -> 1
+    | _, BJ _ -> -1
+    | Fresh i1, Fresh i2 -> Pervasives.compare i1 i2
 end)
 
 type t = ES.t option
@@ -69,7 +72,9 @@ let print fmt = function
       Format.fprintf fmt "[";
       ES.iter (fun e -> match e with 
 	| Dep f -> Format.fprintf fmt "{Dep:%a}" Formula.print f
-	| BJ f -> Format.fprintf fmt "{BJ:%a}" Formula.print f) s;
+	| BJ f -> Format.fprintf fmt "{BJ:%a}" Formula.print f
+        | Fresh i -> Format.fprintf fmt "{Fresh:%i}" i;
+      ) s;
       Format.fprintf fmt "]"
 
 let print_proof fmt = function
@@ -77,6 +82,7 @@ let print_proof fmt = function
   | Some s -> 
       ES.iter (fun e -> match e with 
 	| (Dep f | BJ f) -> Format.fprintf fmt "  %a@." Formula.print f
+        | Fresh i -> ()
 	(* | BJ f  -> Format.fprintf fmt "  %a@." Formula.print f *)
       ) s
 
@@ -85,7 +91,9 @@ let ids_of = function
   | Some s ->
     Some (ES.fold (fun e acc ->
       let id = match e with
-	| Dep f | BJ f -> Formula.id f in
+	| Dep f | BJ f -> Formula.id f
+        | Fresh i -> assert false
+      in
       id::acc) s [])
 
 let formulas_of = function
@@ -94,4 +102,21 @@ let formulas_of = function
       ES.fold (fun e acc -> 
                  match e with 
 	             Dep f | BJ f -> Formula.Set.add f acc
+                   | Fresh _ -> acc
               )s Formula.Set.empty
+
+
+type exp = int
+
+let fresh_exp =
+  let r = ref (-1) in
+  fun () -> incr r; !r
+
+let remove_fresh i = function
+  | None -> Some None
+  | Some s when ES.mem (Fresh i) s -> Some (Some (ES.remove (Fresh i) s))
+  | _ -> None
+
+let add_fresh i = function
+  | None -> None
+  | Some s -> Some (ES.add (Fresh i) s)

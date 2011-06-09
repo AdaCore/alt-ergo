@@ -54,8 +54,8 @@ EXE = @EXE@
 
 INCLUDES = @OCAMLGRAPHLIB@ @LABLGTK2LIB@
 
-BFLAGS = -dtypes -g $(INCLUDES)
-OFLAGS = -dtypes $(INCLUDES)
+BFLAGS = -dtypes -g $(INCLUDES) -annot
+OFLAGS = -dtypes $(INCLUDES) -annot
 
 BIBBYTE=nums.cma graph.cma unix.cma
 
