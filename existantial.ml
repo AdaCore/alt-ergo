@@ -58,7 +58,7 @@ let rec apply_subst_formula env f =
 	  | TAlt l -> TAlt (List.map (apply_subst_term env) l)
 	  | TAbuilt(s,l) -> TAbuilt(s,List.map (apply_subst_term env) l)
 	  | TApred t -> TApred (apply_subst_term env t)
-	  | TAfalse | TAtrue -> assert false
+	  | TAfalse | TAtrue -> e.c 
 	in TFatom {e with c = a}
     | TFop (op, lf) ->
 	TFop (op, List.map (apply_subst_formula env) lf)

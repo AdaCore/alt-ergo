@@ -292,7 +292,8 @@ let _ =
 
 
        let toolbar = GButton.toolbar ~tooltips:true ~packing:rbox#pack () in
-
+       toolbar#set_icon_size `DIALOG;
+       
        let hb = GPack.paned `HORIZONTAL 
 	 ~border_width:3 ~packing:rbox#add () in
 
@@ -310,7 +311,7 @@ let _ =
 
        ignore (toolbar#insert_toggle_button
 	 ~text:" Remove context"
-	 ~icon:(GMisc.image ~stock:`CUT ())#coerce
+	 ~icon:(GMisc.image ~stock:`CUT ~icon_size:`LARGE_TOOLBAR ())#coerce
 	 ~callback:(remove_context env) ());
 
        let sw1 = GBin.scrolled_window
@@ -336,17 +337,19 @@ let _ =
 
        let buttonrun = toolbar#insert_button
 	 ~text:" Run Alt-Ergo"
-	 ~icon:(GMisc.image ~stock:`EXECUTE ())#coerce () in
+	 ~icon:(GMisc.image ~stock:`EXECUTE  ~icon_size:`LARGE_TOOLBAR()
+	 )#coerce () in
 
        let buttonstop = toolbar#insert_button
 	 ~text:" Abort"
-	 ~icon:(GMisc.image ~stock:`STOP ())#coerce () in
+	 ~icon:(GMisc.image ~stock:`STOP  ~icon_size:`LARGE_TOOLBAR()
+	 )#coerce () in
 	buttonstop#misc#hide ();
 
        toolbar#insert_space ();
 
        let resultbox = GPack.hbox () in
-       let result_image = GMisc.image
+       let result_image = GMisc.image ~icon_size:`LARGE_TOOLBAR
 	 ~stock:`DIALOG_QUESTION ~packing:resultbox#add () in
        let result_label = GMisc.label
 	 ~text:" " ~packing:resultbox#add () in
@@ -355,7 +358,8 @@ let _ =
        
        let buttonclean = toolbar#insert_button
 	 ~text:" Clean unused"
-	 ~icon:(GMisc.image ~stock:`CLEAR ())#coerce () in
+	 ~icon:(GMisc.image ~stock:`CLEAR  ~icon_size:`LARGE_TOOLBAR()
+	 )#coerce () in
 	buttonclean#misc#hide ();
 
 
