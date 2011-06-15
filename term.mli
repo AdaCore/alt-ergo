@@ -16,6 +16,10 @@
 (**************************************************************************)
 
 type t
+
+module Map : Map.S with type key = t
+module Set : Set.S with type elt = t
+
 type view = private {f: Symbols.t ; xs: t list; ty: Ty.t; tag : int}
 
 type subst = t Subst.t * Ty.subst
@@ -43,6 +47,7 @@ val equal : t -> t -> bool
 val hash : t -> int
 
 val vars_of : t -> Symbols.Set.t
+val vars_of_as_term : t -> Set.t
 val vty_of : t -> Ty.Svty.t
 
 val pred : t -> t
@@ -58,7 +63,4 @@ val print_list : Format.formatter -> t list -> unit
 
 val dummy : t 
 
-module Map : Map.S with type key = t
-module Set : Set.S with type elt = t
- 
 val subterms : Set.t -> t -> Set.t

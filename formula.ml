@@ -295,8 +295,9 @@ let mk_exists up bv trs f name id=
   make (Skolem(sko)) (Lemma(lem)) (size f) id
 
 (* forall up. let bv = t in f *)
-let mk_let up bv t f id =
+let mk_let _up bv t f id =
   let {Term.ty=ty} = Term.view t in
+  let up = Term.vars_of_as_term t in
   let up = T.Set.fold (fun y acc-> y::acc) up [] in
   let subst = Sy.Map.add bv (T.make (Sy.fresh "let") up ty) Sy.Map.empty in
   make

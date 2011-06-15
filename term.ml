@@ -122,6 +122,12 @@ let pred t = make (Sy.Op Sy.Minus) [t;int "1"] Ty.Tint
 let dummy = make Sy.dummy [] Ty.Tint
   (* verifier que ce type est correct et voir si on ne peut pas
   supprimer ce dummy*)
+
+module Set = 
+  Set.Make(struct type t' = t type t=t' let compare=compare end)
+    
+module Map = 
+  Map.Make(struct type t' = t type t=t' let compare=compare end)
   
 let vars_of = 
   let rec vars_of s t = 
@@ -129,6 +135,14 @@ let vars_of =
 	{ f=(Sy.Var _ as v);xs=[]} -> Sy.Set.add v s
       | {xs=l} -> List.fold_left vars_of s l
   in fun t -> vars_of Sy.Set.empty t
+
+let vars_of_as_term = 
+  let rec vars_of_as_term s t = 
+    match view t with
+	{ f=(Sy.Var _ );xs=[]} -> Set.add t s
+      | {xs=l} -> List.fold_left vars_of_as_term s l
+  in fun t -> vars_of_as_term Set.empty t
+
     
 let vty_of t = 
   let rec vty_of s t = 
@@ -158,11 +172,6 @@ let union_subst (s_t1, s_ty1) ((s_t2, s_ty2) as subst) =
   let s_ty = Ty.union_subst s_ty1 s_ty2 in
   s_t, s_ty
 
-module Set = 
-  Set.Make(struct type t' = t type t=t' let compare=compare end)
-    
-module Map = 
-  Map.Make(struct type t' = t type t=t' let compare=compare end)
 
 
 let rec subterms acc t = 
