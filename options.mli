@@ -68,4 +68,5 @@ val max_split : Num.num
 val rewriting : bool
 val proof : bool
 val debug_proof : bool
+val qualif : bool
 val debug_split : bool
