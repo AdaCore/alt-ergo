@@ -113,7 +113,7 @@ let infix_of_string = function
   | "%" | "mod" -> Some PPmod
   | "and" -> Some PPand
   | "or" -> Some PPor
-  | "=>" -> Some PPimplies
+  | "=>" | "implies" -> Some PPimplies
   | _ -> None
 
 
