@@ -459,9 +459,10 @@ and back_tracking env stop max_size =  match env.delta with
 	       (stop-1) (max_size + b_max_size))
   | [] -> 
       raise I_dont_know
-  | ({f=f;age=g;name=lem;mf=mf} as a,b,d)::l -> 
-      Print.decide f;
+  | (a,b,d)::l ->
       let a,b = max_formula a b in
+      let {f=f;age=g;name=lem;mf=mf} = a in
+      Print.decide f;
       let dep = unsat_rec {env with delta=l} (a,Ex.singleton f) stop max_size in
       if debug_sat then fprintf fmt "unsat_rec : %a@." Ex.print dep;
       try
