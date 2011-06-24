@@ -165,7 +165,7 @@ let cin =
   in
   Arg.parse spec set_file usage;
   match !ofile with Some f -> file := f ; open_in f 
-    | None -> stdin
+    | None -> smt2file := true; stdin
 
 let type_only = ! type_only
 let parse_only = ! parse_only
