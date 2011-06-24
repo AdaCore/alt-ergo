@@ -37,6 +37,8 @@ type gformula = {
   gf: bool
 }
 
+module H = Hashtbl.Make(Formula)
+
 type t = { 
     gamma : Ex.t MF.t; 
     delta : (gformula * gformula * Ex.t) list;
@@ -45,7 +47,7 @@ type t = {
     definitions : (int * Ex.t) MF.t;
     matching : MM.t
 }
-      
+
 exception Sat of t
 exception Unsat of Ex.t
 exception I_dont_know
@@ -250,6 +252,29 @@ let extract_model t =
 let print_model fmt s = 
   SF.iter (fprintf fmt "%a\n" F.print) s
 
+
+
+(* *)
+
+let activities = H.create 1017
+
+let weight = 0.1
+let current_weight = ref 0.1
+
+let incr_weight () = current_weight := !current_weight +. weight
+
+let incr_activity l = 
+  let v = try H.find activities l with Not_found -> 0. in
+  H.replace activities l (v +. !current_weight)
+
+let update_activity dep = 
+  F.Set.iter incr_activity (Ex.formulas_of dep)
+
+let max_formula a b = 
+  let c1 = try H.find activities a.f with Not_found -> 0. in
+  let c2 = try H.find activities b.f with Not_found -> 0. in
+  if c2 < c1 then a, b else b, a
+  
 (* sat-solver *)
 
 let elim {f=f} env = 
@@ -338,6 +363,7 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		bcp { env with lemmas=MF.add f (age,dep) env.lemmas }
 
 	    | F.Literal a ->
+		incr_weight ();
 	        (* let dep = Ex.union (Ex.singleton ~bj:false f) dep in *)
 		let env = 
 		  if mf && size < size_formula then 
@@ -401,7 +427,8 @@ let rec unsat_rec env fg stop max_size =
   try
     if stop < 0 then raise I_dont_know;
     back_tracking (assume env fg) stop max_size
-  with IUnsat d-> Print.unsat (); d
+  with IUnsat d-> 
+    Print.unsat (); d
 
 and back_tracking env stop max_size =  match env.delta with
     []  when stop >= 0  -> 
@@ -434,11 +461,13 @@ and back_tracking env stop max_size =  match env.delta with
       raise I_dont_know
   | ({f=f;age=g;name=lem;mf=mf} as a,b,d)::l -> 
       Print.decide f;
+      let a,b = max_formula a b in
       let dep = unsat_rec {env with delta=l} (a,Ex.singleton f) stop max_size in
       if debug_sat then fprintf fmt "unsat_rec : %a@." Ex.print dep;
       try
 	let dep' = Ex.remove f dep in
 	Print.backtracking (F.mk_not f);
+	update_activity dep;
 	unsat_rec
 	  (assume {env with delta=l} (b, Ex.union d dep'))
 	  ({a with f=F.mk_not f},dep') stop max_size

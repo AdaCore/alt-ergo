@@ -71,6 +71,8 @@ val free_vars : t -> Symbols.Set.t
 val apply_subst : Term.subst -> t -> t 
 
 val compare : t -> t -> int
+val equal : t -> t -> bool
+val hash : t -> int
 
 module Set : Set.S with type elt = t
 module Map : Map.S with type key = t
