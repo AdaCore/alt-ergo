@@ -246,6 +246,8 @@ let compare ((v1,_) as f1) ((v2,_) as f2)=
 	  
 let equal (f1,_) (f2,_) = f1 == f2
 
+let hash (f, _) = f.tag
+
 
 (* smart constructors *)
 let make pos neg size id =

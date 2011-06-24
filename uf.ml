@@ -395,8 +395,14 @@ module Make ( R : Sig.X ) = struct
 	      let g2, ex_g2 = normal_form env (Ac.subst p v g) in
 	      let d2, ex_d2 = normal_form env (R.subst p v d) in
 	      if R.equal g2 gx then (* compose *)
-                let ex = Ex.union ex_d2 (Ex.union dep_rl dep) in
-	        {env with ac_rs = RS.add_rule (g,d2, ex) env.ac_rs}
+		begin
+		  if R.equal g2 d2 then
+		    Format.eprintf "Compose : %a -> %a sur %a et %a@." 
+		      R.print p R.print v
+		      Ac.print g R.print d;
+                  let ex = Ex.union ex_d2 (Ex.union dep_rl dep) in
+	          {env with ac_rs = RS.add_rule (g,d2, ex) env.ac_rs}
+		  end
 	      else (* collapse *)
                 begin
                   if debug_ac then
