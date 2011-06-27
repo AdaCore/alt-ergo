@@ -41,6 +41,9 @@ let rec apply_subst_term env t =
     | TTvar x as tt -> 
 	(try (List.assoc x env).c.tt_desc with Not_found -> tt)
     | TTapp(s,l) -> TTapp(s,List.map (apply_subst_term env) l)
+    | TTreach(s,e1,e2) -> TTreach(apply_subst_term env s,
+				  apply_subst_term env e1,
+				  apply_subst_term env e2)
     | TTinfix(t1,s,t2) -> 
 	TTinfix(apply_subst_term env t1,s,apply_subst_term env t2)
     | tt -> tt

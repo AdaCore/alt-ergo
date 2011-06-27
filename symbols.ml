@@ -19,7 +19,7 @@ open Hashcons
 
 type operator = 
     Plus | Minus | Mult | Div | Modulo 
-  | Concat | Extract | Get | Set
+  | Concat | Extract | Get | Set | Reach
 
 type name_kind = Ac | Constructor | Other
 

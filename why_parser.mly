@@ -78,6 +78,7 @@
 %token RIGHTPAR RIGHTSQ RIGHTBR
 %token SLASH 
 %token THEN TIMES TRUE TYPE
+%token REACH
 
 /* Precedences */
 
@@ -335,6 +336,8 @@ lexpr:
       in
       List.fold_left (fun acc (i,v) -> mk_pp (PPset(acc, i, v))) acc l
     }
+| REACH LEFTPAR lexpr COMMA lexpr COMMA lexpr RIGHTPAR
+   { mk_pp (PPreach ($3, $5, $7)) }
 
 /* predicate or function calls */
 | ident

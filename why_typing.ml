@@ -226,6 +226,7 @@ let new_id =
 let rec freevars_term acc t = match t.c.tt_desc with
   | TTvar x -> Sy.add x acc
   | TTapp (_,lt) -> List.fold_left freevars_term acc lt
+  | TTreach (t1,t2,t3) -> List.fold_left freevars_term acc [t1;t2;t3]
   | TTinfix (t1,_,t2) | TTget(t1, t2) -> 
       List.fold_left freevars_term acc [t1; t2]
   | TTset(t1, t2, t3) ->
@@ -397,6 +398,24 @@ and type_term_desc env loc = function
 	      error (Unification(t, t')) loc
       end
 
+  | PPreach (t1, t2, t3) ->
+      begin
+	let te1 = type_term env t1 in
+	let te2 = type_term env t2 in
+	let te3 = type_term env t3 in
+	let ty1 = Ty.shorten te1.c.tt_ty in
+	let tykey2 = Ty.shorten te2.c.tt_ty in
+	let tykey3 = Ty.shorten te3.c.tt_ty in
+	try
+	  match ty1 with
+	    | Ty.Tfarray (tykey, _) ->
+		Ty.unify tykey tykey2; Ty.unify tykey tykey3;
+		TTreach(te1, te2, te3), Ty.Tbool
+	    | _ -> error ShouldHaveTypeArray t1.pp_loc
+	with
+	  | Ty.TypeClash(t, t') -> 
+	      error (Unification(t, t')) loc
+      end
   | PPif(t1,t2,t3) ->
       begin
 	let te1 = type_term env t1 in
@@ -479,7 +498,7 @@ let rec type_form env f =
 	  | _ -> error (NotAPropVar p) f.pp_loc
       end in r, freevars_form r
 	
-    | PPapp(p,args )->
+    | PPapp(p,args ) ->
       let r = 
 	begin
 	  let te_args = List.map (type_term env) args in
@@ -505,6 +524,29 @@ let rec type_form env f =
 	end 
       in r, freevars_form r
 	
+    | PPreach(t1, t2, t3) ->
+      let r = 
+	begin
+	  let te1 = type_term env t1 in
+	  let te2 = type_term env t2 in
+	  let te3 = type_term env t3 in
+	  let ty1 = te1.c.tt_ty in
+	  let tykey2 = te2.c.tt_ty in
+	  let tykey3 = te3.c.tt_ty in
+	  try
+	    match ty1 with
+	      | Ty.Tfarray (tykey, _) ->
+		Ty.unify tykey tykey2; Ty.unify tykey tykey3;
+		let t1 = {c = {tt_desc=TTreach(te1, te2, te3); tt_ty=Ty.Tbool};
+			  annot=new_id ()} in
+		TFatom { c = TApred t1; annot=new_id () }
+	      | _ -> error ShouldHaveTypeArray t1.pp_loc
+	  with
+	    | Ty.TypeClash(t, t') -> 
+	      error (Unification(t, t')) t1.pp_loc
+	end
+      in r, freevars_form r
+	    
     | PPdistinct (args) ->
       let r = 
 	begin
@@ -699,6 +741,11 @@ and alpha_rec ((up, m) as s) f =
 	let ff2 = alpha_renaming s f2 in
 	let ff3 = alpha_renaming s f3 in
 	PPset(ff1, ff2, ff3)
+    | PPreach(f1, f2, f3) ->
+	let ff1 = alpha_renaming s f1 in
+	let ff2 = alpha_renaming s f2 in
+	let ff3 = alpha_renaming s f3 in
+	PPreach(ff1, ff2, ff3)
     | PPextract(f1, f2, f3) ->
 	let ff1 = alpha_renaming s f1 in
 	let ff2 = alpha_renaming s f2 in
@@ -888,6 +935,8 @@ let rec mono_term {c = {tt_ty=tt_ty; tt_desc=tt_desc}; annot = id} =
         TTget (mono_term t1, mono_term t2)
     | TTset (t1,t2,t3) -> 
         TTset(mono_term t1, mono_term t2, mono_term t3)
+    | TTreach (t1,t2,t3) -> 
+        TTreach(mono_term t1, mono_term t2, mono_term t3)
     | TTextract (t1,t2,t3) -> 
         TTextract(mono_term t1, mono_term t2, mono_term t3)
     | TTconcat (t1,t2)->

@@ -65,6 +65,11 @@ let rec make_term {c = { tt_ty = ty; tt_desc = tt }} =
 	let t2 = make_term t2 in
 	let t3 = make_term t3 in
 	T.make (Symbols.Op Symbols.Set) [t1; t2; t3] ty
+    | TTreach (t1, t2, t3) ->
+	let t1 = make_term t1 in
+	let t2 = make_term t2 in
+	let t3 = make_term t3 in
+	T.make (Symbols.Op Symbols.Reach) [t1; t2; t3] ty
     | TTextract (t1, t2, t3) ->
 	let t1 = make_term t1 in
 	let t2 = make_term t2 in

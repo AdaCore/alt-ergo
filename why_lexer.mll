@@ -70,7 +70,8 @@
 	"true", TRUE;
 	"type", TYPE;
 	"unit", UNIT;
-	"void", VOID]
+	"void", VOID;
+        "reach", REACH;]
 	       
   let newline lexbuf =
     let pos = lexbuf.lex_curr_p in

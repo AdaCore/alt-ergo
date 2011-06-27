@@ -54,6 +54,7 @@ and pp_desc =
   | PPprefix of pp_prefix * lexpr
   | PPget of lexpr * lexpr
   | PPset of lexpr * lexpr * lexpr
+  | PPreach of lexpr * lexpr * lexpr
   | PPextract of lexpr * lexpr * lexpr
   | PPconcat of lexpr * lexpr
   | PPif of lexpr * lexpr * lexpr
@@ -106,6 +107,8 @@ and 'a tt_desc =
   | TTapp of Symbols.t * ('a tterm, 'a) annoted list
   | TTget of ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
   | TTset of 
+      ('a tterm, 'a) annoted * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
+  | TTreach of 
       ('a tterm, 'a) annoted * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
   | TTextract of 
       ('a tterm, 'a) annoted * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
