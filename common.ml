@@ -131,6 +131,8 @@ let rec print_term fmt t = match t.c.tt_desc with
       fprintf fmt "%a[%a]" print_term t1 print_term t2
   | TTset (t1, t2, t3) ->
       fprintf fmt "%a[%a<-%a]" print_term t1 print_term t2 print_term t3
+  | TTreach (t1, t2, t3) ->
+      fprintf fmt "reach(%a, %a, %a)" print_term t1 print_term t2 print_term t3
   | TTextract (t1, t2, t3) ->
       fprintf fmt "%a^{%a,%a}" print_term t1 print_term t2 print_term t3
   | TTconcat (t1, t2) ->

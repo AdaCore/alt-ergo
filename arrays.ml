@@ -88,8 +88,7 @@ module Make(X : ALIEN) = struct
       let add k v ex mp = add k (Conseq.add (v,ex) (find k mp)) mp
     end
 
-    (* ensemble de termes "get" avec leurs arguments et leurs types*)
-    type gtype = {g:T.t; gt:T.t; gi:T.t; gty:Ty.t}
+    type gtype = {g:Term.t; gt:Term.t; gi:Term.t; gty:Ty.t}
     module G :Set.S with type elt = gtype = Set.Make
       (struct type t = gtype let compare t1 t2 = T.compare t1.g t2.g end)
 
@@ -108,12 +107,15 @@ module Make(X : ALIEN) = struct
       let add k v mp = add k (S.add v (find k mp)) mp
     end
 
+    module Reach = Reachability.Make(X)
+
     type t = 
         {gets  : G.t;               (* l'ensemble des "get" croises*)
          tbset : S.t TBS.t ;        (* map t |-> set(t,-,-) *)
-         split : LRset.t;            (* l'ensemble des case-split possibles *)
+         split : LRset.t;           (* l'ensemble des case-split possibles *)
          conseq   : Conseq.t LRmap.t; (* consequences des splits *)
-         seen  : T.Set.t Tmap.t     (* combinaisons (get,set) deja splitees *) }
+         seen  : T.Set.t Tmap.t;    (* combinaisons (get,set) deja splitees *)
+         reach : Reach.t}            (* environement pour l'atteignabilité *)
           
 
     let empty _ = 
@@ -121,7 +123,8 @@ module Make(X : ALIEN) = struct
        tbset = TBS.empty;
        split = LRset.empty;
        conseq   = LRmap.empty;
-       seen  = Tmap.empty}
+       seen  = Tmap.empty;
+       reach = Reach.empty()}
 
     module Debug = struct
 
@@ -342,21 +345,24 @@ module Make(X : ALIEN) = struct
           fprintf fmt "[Arrays.case-split] %a@." LR.print a;
         [LR.view a, Ex.empty, Num.Int 2] 
       with Not_found ->
-        if debug_arrays then fprintf fmt "[Arrays.case-split] Nothing@.";
-        []
+	Reach.case_split env.reach
           
     let assume env la ~are_eq ~are_neq ~class_of = 
       (* instantiation des axiomes des tableaux *)
       Debug.assume fmt la; 
+      let envr, {assume=lr; remove=rr} = 
+        (*env.reach, {assume=[]; remove=[]} in*)
+	Reach.assume env.reach la are_eq are_neq class_of in
       let env = new_terms env la in
       let env, atoms = new_splits are_eq are_neq env Conseq.empty class_of in
       let env, atoms = new_equalities env atoms la class_of in
-      Debug.env fmt env;
-      Debug.new_equalities fmt atoms;
+      (*Debug.env fmt env;
+      Debug.new_equalities fmt atoms;*)
       let l = Conseq.fold (fun (a,ex) l -> ((LTerm a, ex)::l)) atoms [] in
-      env, { assume = l; remove = [] }
+      {env with reach=envr}, { assume = lr @ l; remove = rr }
 	  
     let query _ _ ~are_eq ~are_neq ~class_of = Sig.No
     let add env r = env
+
   end
 end
