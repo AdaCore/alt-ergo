@@ -350,7 +350,8 @@ module Make (X : Sig.X) = struct
 	       let sa, ex = term_canonical_view env ta ex in
 	       env, l@acc, (sa, Some ta, ex)::lsa
 
-           (* XXX si on fait canonical_view pour A.Distinct, la theorie des tableaux
+           (* XXX si on fait canonical_view pour
+	      A.Distinct, la theorie des tableaux
               part dans les choux *)
 	   | LSem (A.Builtin _  (*| A.Distinct _*) as sa) ->
 	       let sa, ex = canonical_view env sa ex in 

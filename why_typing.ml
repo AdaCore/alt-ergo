@@ -537,9 +537,9 @@ let rec type_form env f =
 	    match ty1 with
 	      | Ty.Tfarray (tykey, _) ->
 		Ty.unify tykey tykey2; Ty.unify tykey tykey3;
-		let t1 = {c = {tt_desc=TTreach(te1, te2, te3); tt_ty=Ty.Tbool};
-			  annot=new_id ()} in
-		TFatom { c = TApred t1; annot=new_id () }
+		  TFatom 
+		    { c = TAbuilt(Builtin.is_builtin "reach", [te1;te2;te3]);
+		      annot=new_id () } 
 	      | _ -> error ShouldHaveTypeArray t1.pp_loc
 	  with
 	    | Ty.TypeClash(t, t') -> 

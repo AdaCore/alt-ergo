@@ -417,19 +417,6 @@ module Make(X : Sig.X) = struct
       (env, splits, assume, conseq) t =
     let res =
     match T.view t with
-      | {T.f=Sy.Op Sy.Reach; T.xs=[st; e1; e2]} ->
-	let r = {r = t; rst = st; re1 = e1; re2 = e2} in
-	let e = are_eq T.vrai t, are_eq T.faux t in
-	let r = (match e with
-	  | Sig.Yes _, Sig.Yes _ -> assert false
-	  | Sig.No, Sig.No -> (env, splits, assume, conseq)
-	  | Sig.No, Sig.Yes exp ->
-	    add_R env are_eq are_neq class_of r exp false
-	      (splits, assume, conseq)
-	  | Sig.Yes exp, Sig.No ->
-	    add_R env are_eq are_neq class_of r exp true
-	      (splits, assume, conseq)) in
-	r
       | {T.f=Sy.Op Sy.Get; T.xs=[st; e]; T.ty=ty} ->
 	(match (T.view st).T.ty with
 	  | Ty.Tfarray (ty1, Ty.Text ([ty2], hO)) ->
@@ -512,6 +499,8 @@ module Make(X : Sig.X) = struct
     in
     {env with split=spl; conseq=cons}, eqs
 
+  let symb_reach = Hstring.make "reach"
+
   let assume env la ~are_eq ~are_neq ~class_of =
     Debug.assume fmt la; 
     let fct acc r =
@@ -527,6 +516,12 @@ module Make(X : Sig.X) = struct
       let env, splits, assume, conseq =
 	List.fold_left (fun acc (a,_,_) ->
 	  match a with
+	    (*| A.Builtin (b, s, [st;e1;e2]) when Hstring.equal s symb_reach ->
+		
+		let r = {rst = st; re1 = e1; re2 = e2} in
+		add_R env are_eq are_neq class_of r exp b
+		  (splits, assume, conseq)
+	    *)
 	    | A.Eq (t1,t2) -> fct (fct acc t1) t2
 	    | A.Builtin (_,_,l) | A.Distinct (_, l) -> L.fold_left fct acc l)
 	  (env, env.split, ESet.empty, env.conseq) la in
