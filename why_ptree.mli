@@ -108,8 +108,6 @@ and 'a tt_desc =
   | TTget of ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
   | TTset of 
       ('a tterm, 'a) annoted * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
-  | TTreach of 
-      ('a tterm, 'a) annoted * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
   | TTextract of 
       ('a tterm, 'a) annoted * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
   | TTconcat of ('a tterm, 'a) annoted * ('a tterm, 'a) annoted

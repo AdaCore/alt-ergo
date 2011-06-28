@@ -156,8 +156,6 @@ let symbs_of_term add set pol concl t =
       | TTapp (Symbols.Name (hs,_), l) ->
 	  add !pol concl hs;
 	  List.iter symb_rec l
-      | TTreach (t1,t2,t3) ->
-	  List.iter symb_rec [t1;t2;t3]
       | TTinfix (t1,_,t2) -> symb_rec t1; symb_rec  t2
       | _ -> ()
   in symb_rec t
@@ -185,8 +183,6 @@ let symbs_in_formula add set f =
 			   symbs_of_term add set pol'' concl'' t
 		  ) l args
 	end
-    | TFatom {c = TApred {c={tt_desc = TTreach (t1,t2,t3)}}} ->
-      List.iter (symbs_of_term add set pol concl) [t1;t2;t3]
     | TFatom {c = (TAbuilt(_,l)  | TAeq l | TAneq l | TAdistinct l
 		  | TAle l | TAlt l)} ->
 	List.iter (symbs_of_term add set pol concl) l

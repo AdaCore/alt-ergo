@@ -226,7 +226,6 @@ let new_id =
 let rec freevars_term acc t = match t.c.tt_desc with
   | TTvar x -> Sy.add x acc
   | TTapp (_,lt) -> List.fold_left freevars_term acc lt
-  | TTreach (t1,t2,t3) -> List.fold_left freevars_term acc [t1;t2;t3]
   | TTinfix (t1,_,t2) | TTget(t1, t2) -> 
       List.fold_left freevars_term acc [t1; t2]
   | TTset(t1, t2, t3) ->
@@ -392,25 +391,6 @@ and type_term_desc env loc = function
 	    | Ty.Tfarray (tykey,tyval) ->
 		Ty.unify tykey tykey2;Ty.unify tyval tyval2;
 		TTset(te1, te2, te3), ty1
-	    | _ -> error ShouldHaveTypeArray t1.pp_loc
-	with
-	  | Ty.TypeClash(t, t') -> 
-	      error (Unification(t, t')) loc
-      end
-
-  | PPreach (t1, t2, t3) ->
-      begin
-	let te1 = type_term env t1 in
-	let te2 = type_term env t2 in
-	let te3 = type_term env t3 in
-	let ty1 = Ty.shorten te1.c.tt_ty in
-	let tykey2 = Ty.shorten te2.c.tt_ty in
-	let tykey3 = Ty.shorten te3.c.tt_ty in
-	try
-	  match ty1 with
-	    | Ty.Tfarray (tykey, _) ->
-		Ty.unify tykey tykey2; Ty.unify tykey tykey3;
-		TTreach(te1, te2, te3), Ty.Tbool
 	    | _ -> error ShouldHaveTypeArray t1.pp_loc
 	with
 	  | Ty.TypeClash(t, t') -> 
@@ -935,8 +915,6 @@ let rec mono_term {c = {tt_ty=tt_ty; tt_desc=tt_desc}; annot = id} =
         TTget (mono_term t1, mono_term t2)
     | TTset (t1,t2,t3) -> 
         TTset(mono_term t1, mono_term t2, mono_term t3)
-    | TTreach (t1,t2,t3) -> 
-        TTreach(mono_term t1, mono_term t2, mono_term t3)
     | TTextract (t1,t2,t3) -> 
         TTextract(mono_term t1, mono_term t2, mono_term t3)
     | TTconcat (t1,t2)->

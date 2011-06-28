@@ -73,7 +73,7 @@ let rec depth_tterm t =
 	0 (* arithmetic triggers are not suitable *)
     | TTget (t1, t2) | TTconcat (t1, t2) ->
 	max (depth_tterm t1) (depth_tterm t2)
-    | TTset (t1, t2, t3) | TTextract (t1, t2, t3) | TTreach (t1, t2, t3) ->
+    | TTset (t1, t2, t3) | TTextract (t1, t2, t3) ->
 	max (depth_tterm t1) (max (depth_tterm t2) (depth_tterm t3))
     | TTlet (s, t1, t2) ->
 	max (depth_tterm t1 + 1) (depth_tterm t2)
@@ -141,13 +141,6 @@ let rec compare_tterm t1 t2 =
 	  if c<>0 then c else compare_tterm t3 u3
     | TTset _, _ -> -1
     | _, TTset _ -> 1
-    | TTreach(t1, t2, t3) , TTreach(u1, u2, u3) ->
-	let c = compare_tterm t1 u1 in
-	if c<>0 then c else
-	  let c = compare_tterm t2 u2 in
-	  if c<>0 then c else compare_tterm t3 u3
-    | TTreach _, _ -> -1
-    | _, TTreach _ -> 1
     | TTextract(t1, t2, t3) , TTextract(u1, u2, u3) ->
 	let c = compare_tterm t1 u1 in
 	if c<>0 then c else
@@ -262,7 +255,6 @@ let rec vars_of_term bv acc t = match t.c.tt_desc with
   | TTinfix (t1,_,t2) -> List.fold_left (vars_of_term bv) acc [t1;t2]
   | TTset (t1, t2, t3) -> List.fold_left (vars_of_term bv) acc [t1;t2;t3]
   | TTget (t1, t2) -> List.fold_left (vars_of_term bv) acc [t1;t2]
-  | TTreach (t1, t2, t3) -> List.fold_left (vars_of_term bv) acc [t1;t2;t3]
   | TTlet (_, t1, t2) -> List.fold_left (vars_of_term bv) acc [t1;t2]
   (* XXX TTlet ? *)
   | _ -> acc
@@ -278,7 +270,6 @@ let underscoring_term mvars underscores t =
 	  TTvar (Symbols.underscoring x)
     | TTvar _ -> t
     | TTapp (s,lt) -> TTapp(s,List.map under_rec lt)
-    | TTreach (t1,t2,t3) -> TTreach(under_rec t1, under_rec t2, under_rec t3)
     | TTinfix (t1,op,t2) -> TTinfix(under_rec t1,op,under_rec t2)
        (* XXX TTlet ? *)
     | _ -> t
@@ -326,7 +317,6 @@ let rec vty_term acc t =
     | TTinfix (t1,_,t2) -> vty_term (vty_term acc t1) t2
     | TTset (t1, t2, t3) -> List.fold_left vty_term acc [t1;t2;t3]
     | TTget (t1, t2) -> List.fold_left vty_term acc [t1;t2]
-    | TTreach (t1, t2, t3) -> List.fold_left vty_term acc [t1;t2;t3]
     | TTlet (_, t1, t2) -> List.fold_left vty_term acc [t1;t2]
     | _ -> acc
 
@@ -395,14 +385,6 @@ let potential_triggers =
 	    List.fold_left (potential_rec vars) 
 	      (STRS.add (t,bv_lf,vty_lf) acc) (*acc*) [t1;t2]
 	  else acc
-      | TTreach (t1, t2, t3) ->
-	  let vty_lf = List.fold_left vty_term vty_t [t1;t2;t3] in
-	  let bv_lf = List.fold_left (vars_of_term bv) Vterm.empty [t1;t2;t3] in
-	  if as_bv bv bv_lf or as_tyv vty vty_lf then
-	    List.fold_left (potential_rec vars) 
-	      (STRS.add (t,bv_lf,vty_lf) acc) (*acc*) [t1;t2;t3]
-	  else acc
-
       | _ -> acc
 
   in fun vars -> List.fold_left (potential_rec vars) STRS.empty
