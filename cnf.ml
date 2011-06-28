@@ -78,8 +78,6 @@ let rec make_term {c = { tt_ty = ty; tt_desc = tt }} =
 	let t2 = make_term t2 in
 	T.apply_subst subst t2
 
-    | _ -> assert false
-
 let make_form name f = 
   let rec make_form acc c id = match c with
     | TFatom a ->

@@ -15,6 +15,7 @@ module Make(X : Sig.X) = struct
   let todo = false
   let my_print_string s = if todo then print_string s
 
+  let hReach = Hstring.make "reach"
   let hSome = Hstring.make "Some"
   let hNone = Hstring.make "None"
   let hOption = Hstring.make "option"
@@ -22,8 +23,13 @@ module Make(X : Sig.X) = struct
     (*Ty.Tsum (hOption, [hSome; hNone])*)
 
   module LR = Literal.Make(struct type t = X.r include X end)
-  module TSet = Set.Make(T)
-  module TMap = Map.Make(T)
+  module TSet = Set.Make(struct type t = X.r include X end)
+  module TMap = Map.Make(struct type t = X.r*X.r
+				let compare (t11,t12) (t21, t22) =
+				  let c = X.compare t11 t21 in
+				  if c = 0 then X.compare t12 t22
+				  else c
+  end)
   module LRset = LR.Set
   module LRmap = struct
     include LR.Map
@@ -34,26 +40,26 @@ module Make(X : Sig.X) = struct
   type result = Known of (bool*Ex.t)
 		| Unknown
 
-  type rtype = {r : T.t; rst : T.t; re1 : T.t; re2 : T.t}
+  type rtype = {rst : X.r; re1 : X.r; re2 : X.r}
 
   module R = struct
-    include Map.Make(T)
+    include Map.Make(struct type t = X.r include X end)
     let find e m = try find e m with Not_found -> (Unknown, Unknown)
   end
   module RR = struct
-    include Map.Make(T)
+    include Map.Make(struct type t = X.r include X end)
     let find e m = try find e m with Not_found -> R.empty
   end
   module RMap = struct
-    include Map.Make(T)
+    include Map.Make(struct type t = X.r include X end)
     let find st m = try find st m with Not_found -> RR.empty
   end
 
-  type gtype = {g:T.t; gt:T.t; gi:T.t}
+  type gtype = {g:X.r; gt:X.r; gi:X.r}
       
   module ESet = Set.Make (struct 
-    type t = (A.LT.t*Ex.t)
-    let compare (t1, _) (t2, _) = A.LT.compare t1 t2 end)
+    type t = (LR.t*Ex.t)
+    let compare (t1, _) (t2, _) = LR.compare t1 t2 end)
 
   let add_rs {rst=st; re1=e1; re2=e2} (r1, r2) m =
     let tmap = RMap.find st m in
@@ -63,10 +69,10 @@ module Make(X : Sig.X) = struct
 
   type conseq =
     | Split of (T.t * T.t * (conseq option) * (conseq option))
-    | Lit of (A.LT.t)
+    | Lit of (LR.t)
 
   type t =
-      {gs : (T.t option*Ex.t) TMap.t;
+      {gs : (X.r*X.r option*Ex.t) TMap.t;
        rs : (((result*result) R.t) RR.t) RMap.t;
        split : LRset.t;
        conseq : ((conseq * Ex.t) list) LRmap.t}
@@ -79,14 +85,8 @@ module Make(X : Sig.X) = struct
 
   exception Unsat of Ex.t
 
-  let make_r st e1 e2 =
-    let r = T.make (Sy.Op Sy.Reach) [st; e1; e2] Ty.Tbool in
-    r
-
-  let make_f st e =
-    let ty = (T.view e).T.ty in
-    let f = T.make (Sy.Op Sy.Get) [st; e] (ty_option ty) in
-    f
+  let make_r st e1 e2 b =
+    LR.make (A.Builtin (b, hReach, [st;e1;e2]))
 
   let rec find_val l =
     match l with
@@ -125,9 +125,9 @@ module Make(X : Sig.X) = struct
 	    match fst(k) with
 	      | Unknown -> ()
 	      | Known (true, _) ->
-		fprintf fmt "%a@." T.print (make_r st e1 e2)
+		fprintf fmt "%a@." LR.print (make_r st e1 e2 true)
 	      | Known (false, _) -> 
-		fprintf fmt "-%a@." T.print (make_r st e1 e2))
+		fprintf fmt "%a@." LR.print (make_r st e1 e2 false))
 	    r) rr)
     let print_splits fmt = 
       LRset.iter (fun a -> fprintf fmt "%a@." LR.print a)
@@ -147,47 +147,42 @@ module Make(X : Sig.X) = struct
           fprintf fmt "[Reach] %d implied equalities@."
 	    (ESet.cardinal st);
           ESet.iter (fun (a,ex) -> fprintf fmt "  %a : %a@."
-            A.LT.print a Ex.print ex) st
+            LR.print a Ex.print ex) st
         end
   end
     
   (* REFLEXIVITY : If R(st, e1, e2)=false, assume e1 <> e2 *)
-  let handle_refl are_eq are_neq {r=r; re1=e1; re2=e2} ex assume =
-    match are_eq e1 e2 with
-      | Sig.Yes ex2 -> raise (Unsat (Ex.union ex ex2))
-      | Sig.No ->
-	if are_neq e1 e2 <> Sig.No then
-	  assume
-	else
-	  let diff = A.LT.make (A.Distinct (false, [e1; e2])) in
-	  (ESet.add (diff, ex) assume)
+  let handle_refl {rst=st; re1=e1; re2=e2} ex assume =
+    if e1 = e2 then raise (Unsat ex)
+    else
+      let diff = LR.make (A.Distinct (false, [e1; e2])) in
+      (ESet.add (diff, ex) assume)
 
   (* ANTISYMMETRY : If R(st, e1, e2)=true and R(st, e2, e1)=true,
      assume e1 = e2 *)
-  let handle_antisym are_eq {re1=e1; re2=e2} ex1 v acc =
+  let handle_antisym {re1=e1; re2=e2} ex1 v acc =
     my_print_string "antisym\n";
     match v with
       | Known (true, ex2) ->
-	(match are_eq e1 e2 with
-	  | Sig.Yes _ -> acc
-	  | Sig.No ->
-	    ESet.add (A.LT.make (A.Eq (e1, e2)), Ex.union ex1 ex2) acc)
+	if e1 = e2 then acc
+	else
+	  ESet.add (LR.make (A.Eq (e1, e2)), Ex.union ex1 ex2) acc
       | _ -> acc 
 
   (* TRANSITIVITY : If R(st, e1, e2)=true, for all R(st, e3, e1)=true, assume
      R(st, e3, e2)=true, and, for all R(st, e2, e3)=true assume
      R(st, e1, e3)=rue *)
-  let handle_trans r1 r2 are_eq {rst=st; re1=e1; re2=e2} ex1 acc =
+  let handle_trans r1 r2 {rst=st; re1=e1; re2=e2} ex1 acc =
     my_print_string "trans\n";
     let acc = R.fold (fun e3 (_, v) acc ->
       match v with
 	| Known (true, ex2) ->
-	  if are_eq e1 e3 <> Sig.No || are_eq e3 e2 <> Sig.No then
+	  if e1 = e3 || e3 = e2 then
 	    acc
 	  else
 	    (my_print_string "+++ trans\n";
 	    let ex = Ex.union ex1 ex2 in
-	    let res = (A.LT.make (A.Eq (make_r st e3 e2, T.vrai))) in
+	    let res = make_r st e3 e2 true in
 	    match R.find e3 r2 with
 	      | _, Known (true, _) -> acc
 	      | _, Known (false, ex3) -> raise (Unsat (Ex.union ex ex3))
@@ -196,12 +191,12 @@ module Make(X : Sig.X) = struct
     R.fold (fun e3 (v, _) acc ->
       match v with
 	| Known (true, ex2) ->
-	  if are_eq e1 e3 <> Sig.No || are_eq e3 e2 <> Sig.No then
+	  if e1 = e3 || e3 = e2 then
 	    acc
 	  else
 	    (my_print_string "+++ trans\n";
 	    let ex = Ex.union ex1 ex2 in
-	    let res = (A.LT.make (A.Eq (make_r st e1 e3, T.vrai))) in
+	    let res = make_r st e1 e3 true in
 	    match R.find e3 r1 with
 	      | Known (true, _), _ -> acc
 	      | Known (false, ex3), _ -> raise (Unsat (Ex.union ex ex3))
@@ -210,21 +205,21 @@ module Make(X : Sig.X) = struct
 
   (* ORDERING : If R(st, e1, e2)=true, for all R(st, e1, e3)=true, assume
      either R(st, e3, e2)=true or R(st, e2, e3)=true *)
-  let handle_order r1 r2 are_eq {r=r; rst=st; re1=e1; re2=e2} ex1
+  let handle_order r1 r2 {rst=st; re1=e1; re2=e2} ex1
       acc splits conseqs =
     my_print_string "order\n";
     R.fold (fun e3 (v, _) (splits, acc, conseqs) ->
       match v with
 	| Known (true, ex) ->
 	  let ex1 = Ex.union ex1 ex in
-	  if are_eq e1 e3 <> Sig.No || are_eq e3 e2 <> Sig.No then
+	  if e1 = e3 || e3 = e2 then
 	    (splits, acc, conseqs)
 	  else
 	    (my_print_string "+++ order\n";
 	    let res1 = 
-	      (A.LT.make (A.Eq (make_r st e2 e3, T.vrai))) in
+	      make_r st e2 e3 true in
 	    let res2 = 
-	      (A.LT.make (A.Eq (make_r st e3 e2, T.vrai))) in
+	      make_r st e3 e2 true in
 	    match R.find e3 r2 with
 	      | Known (false, ex2), Known (false, ex3) ->
 		raise (Unsat (Ex.union ex1 (Ex.union ex2 ex3)))
@@ -235,121 +230,100 @@ module Make(X : Sig.X) = struct
 	      | Unknown, Known (false, ex2) ->
 		splits, ESet.add (res1, Ex.union ex1 ex2) acc, conseqs
 	      | Unknown, Unknown ->
-		let t = make_r st e3 e2 in
-		let eq = (A.LT.make (A.Eq (t, t))) in
-		let split = (LR.make (A.Eq (fst(X.make(t)),
-					    fst(X.make(T.faux))))) in
-		let conseqs = LRmap.add split (Lit res1, ex1)
+		let conseqs = LRmap.add (LR.neg res1) (Lit res2, ex1)
 		  conseqs in
-		LRset.add split splits, ESet.add (eq, Ex.empty) acc, conseqs)
+		LRset.add res1 splits, acc, conseqs)
 	| _ -> (splits, acc, conseqs)
     ) r1 (splits, acc, conseqs)
 
   (* REACH1 : If st[e1] = Some e2, assume R(st, e1, e2)=true *)
-  let handle_reach1 r are_eq are_neq res ex {g=k; gt=st; gi=e}
+  let handle_reach1 r res ex {g=k; gt=st; gi=e}
       assume splits conseqs =
     my_print_string "reach1\n";
     match res with
       | None -> (splits, assume, conseqs)
       | Some e2 -> 
 	(my_print_string "+++ reach1\n";
-	match are_eq e2 e, fst(R.find e2 r) with
-	  | Sig.Yes _, _
-	  | Sig.No, Known (true, _) -> (splits, assume, conseqs)
-	  | Sig.No, Known (false, ex3) -> raise (Unsat (Ex.union ex ex3))
-	  | Sig.No, Unknown ->
-	    let res = A.LT.make (A.Eq (make_r st e e2, T.vrai)) in
+	match fst(R.find e2 r) with
+	  | Known (true, _) -> (splits, assume, conseqs)
+	  | Known (false, ex3) -> raise (Unsat (Ex.union ex ex3))
+	  | Unknown ->
+	    let res : LR.t = make_r st e e2 true in
 	    (splits, ESet.add (res, ex) assume, conseqs))
 
   (* REACH2 : If R(st, e1, e2)=true and st[e1] = None, assume e1 = e2
      and if st[e1] = Some e3, assume either e1 = e2 or R(st, e3, e2)=true *)
-  let handle_reach2 r are_eq are_neq res k e1 e2 st ex assume splits
+  let handle_reach2 r res k e1 e2 st ex assume splits
       conseqs =
     my_print_string "reach2\n";
     (* e1 = e2 nothing to do *)
-    if are_eq e1 e2 <> Sig.No then (splits, assume, conseqs)
+    if e1 = e2 then (splits, assume, conseqs)
     else
       (my_print_string "+++ reach2\n";
       match res with
 	(* k = None -> e1 = e2 *)
 	| None -> 
-	  let res = A.LT.make (A.Eq (e1, e2)) in
-	  (match are_neq e1 e2 with
-	    | Sig.Yes ex2 -> raise (Unsat (Ex.union ex ex2))
-	    | Sig.No -> (splits, ESet.add (res, ex) assume, conseqs))
+	  let res = LR.make (A.Eq (e1, e2)) in
+	  (splits, ESet.add (res, ex) assume, conseqs)
 	(* k = Some e3 *)
 	| Some e3 ->
-	  match are_eq e2 e3, snd (R.find e3 r) with
-	    | Sig.Yes _, _
-	    | Sig.No, Known (true, _) ->
-	      (* R(e3, e2) and k = Some e3 nothing to do *)
+	  match snd (R.find e3 r) with
+	    | Known (true, _) ->
+	      (* R(st, e3, e2) nothing to do *)
 	      (splits, assume, conseqs)
-	    | Sig.No, Known (false, ex2) ->
-	      (* not R(e3, e2) -> e1 = e2 *)
-	      let res = A.LT.make (A.Eq (e1, e2)) in
+	    | Known (false, ex2) ->
+	      (* not R(st, e3, e2) -> e1 = e2 *)
+	      let res = LR.make (A.Eq (e1, e2)) in
 	      let ex = Ex.union ex ex2 in
-	      (match are_neq e1 e2 with
-		| Sig.Yes ex2 -> raise (Unsat (Ex.union ex ex2))
-		| Sig.No -> (splits, ESet.add (res, ex) assume, conseqs))
-	    | Sig.No, Unknown ->
-	      let res = A.LT.make (A.Eq (make_r st e3 e2, T.vrai)) in
-	      (* k = Some e3 -> R(e3, e2) or e1 = e2 *)
-	      match are_neq e1 e2 with
-		| Sig.Yes ex2 ->
-		  (splits, ESet.add (res, Ex.union ex2 ex) assume, conseqs)
-		| Sig.No ->
-		  let cc = LR.make (A.Distinct (false,
-						[fst (X.make e1);
-						 fst (X.make e2)])) in
-		  let conseqs = LRmap.add (cc) (Lit res, ex)
-		    conseqs in
-		  (LRset.add cc splits, assume, conseqs))
+	      (splits, ESet.add (res, ex) assume, conseqs)
+	    | Unknown ->
+	      (* R(st, e3, e2) or e1 = e2 *)
+	      let res = make_r st e3 e2 true in
+	      let eq = LR.make (A.Eq (e1, e2)) in
+	      let conseqs = LRmap.add (LR.neg eq) (Lit res, ex)
+		conseqs in
+	      (LRset.add eq splits, assume, conseqs))
 
-  let rhandle_reach2 f r are_eq are_neq {rst=st; re1=e1; re2=e2} ex
+  let rhandle_reach2 f r {rst=st; re1=e1; re2=e2} ex
       assume splits conseqs =
     my_print_string "r reach2\n";
-    let k = make_f st e1 in
-    try (let res, ex2 = TMap.find k f in
-	 handle_reach2 r are_eq are_neq res k e1 e2 st (Ex.union ex ex2)
+    try (let k, res, ex2 = TMap.find (st, e1) f in
+	 handle_reach2 r res k e1 e2 st (Ex.union ex ex2)
 	   assume splits conseqs)
     with Not_found -> (splits, assume, conseqs)
 
-  let fhandle_reach2 map r are_eq are_neq res ex {g=k; gt=st; gi=e}
+  let fhandle_reach2 map r res ex {g=k; gt=st; gi=e}
       assume splits conseqs =
     my_print_string "f reach2\n";
-    RR.fold (fun e2 (v, _) (splits, assume, conseqs) ->
+    R.fold (fun e2 (v, _) (splits, assume, conseqs) ->
       match v with
 	| Known (true, ex1) -> 
 	  let r = RR.find e2 map in
-	  handle_reach2 r are_eq are_neq res k e e2 st (Ex.union ex ex1)
+	  handle_reach2 r res k e e2 st (Ex.union ex ex1)
 	    assume splits conseqs
 	| _ -> (splits, assume, conseqs)) r (splits, assume, conseqs)
 
   (* WELL-FOUNDED : If st[e] = Some e3 and R(st, e2, e)=true
      then assume e3 <> e2 *)
-  let handle_wf are_eq are_neq res e2 ex assume =
+  let handle_wf res e2 ex assume =
     my_print_string "wf\n";
     match res with
-      | None -> 
-        my_print_string "------------\n";assume
+      | None -> assume
       | Some e3 ->
         my_print_string "++wf\n";
-	match are_eq e3 e2 with
-	  | Sig.Yes ex2 -> raise (Unsat (Ex.union ex2 ex))
-	  | Sig.No ->
-	    if are_neq e3 e2 <> Sig.No then assume
-	    else
-	      let eq = A.LT.neg (A.LT.make (A.Eq (e3, e2))) in
-	      (ESet.add (eq, ex) assume)
+	if e3 = e2 then
+	  raise (Unsat ex)
+	else 
+	  let eq = LR.neg (LR.make (A.Eq (e3, e2))) in
+	  (ESet.add (eq, ex) assume)
 	
-  let rhandle_wf f are_eq are_neq {rst=st; re1=e1; re2=e2} ex assume =
+  let rhandle_wf f {rst=st; re1=e1; re2=e2} ex assume =
     my_print_string "r wf\n";
-    let k = make_f st e2 in
-    try (let res, ex2 = TMap.find k f in
-	 handle_wf are_eq are_neq res e1 (Ex.union ex ex2) assume)
+    try (let k, res, ex2 = TMap.find (st, e2) f in
+	 handle_wf res e1 (Ex.union ex ex2) assume)
     with Not_found ->  assume 
 
-  let fhandle_wf r are_eq are_neq res ex {g=k; gt=st; gi=e} assume =
+  let fhandle_wf r res ex {g=k; gt=st; gi=e} assume =
     my_print_string "f wf\n";
     match res with
       | None -> assume
@@ -362,34 +336,34 @@ module Make(X : Sig.X) = struct
 	    R.fold (fun e3 (_, v) acc ->
 	      match v with
 		| Known (true, ex2) ->
-		  handle_wf are_eq are_neq res e3 (Ex.union ex ex2) acc
+		  handle_wf res e3 (Ex.union ex ex2) acc
 		| _ -> acc) r assume
 
   (* add_R assumes that R(st, e1, e2) = b (true or false) *)
-  let add_R env are_eq are_neq class_of ({rst=st; re1=e1; re2=e2} as r) exp
+  let add_R env ({rst=st; re1=e1; re2=e2} as r) exp
       b (splits, assume, conseq) =
     let map =  RMap.find st (env.rs) in
     let cluster1 = RR.find e1 map in
     let cluster2 = RR.find e2 map in
     let (v1, v2) = R.find e2 cluster1 in
     match v1 with
-      | Known (b_old, _) -> if b=b_old then (env, splits, assume, conseq)
-	else assert false
+      | Known (b_old, ex) -> if b=b_old then (env, splits, assume, conseq)
+	else raise (Unsat (Ex.union ex exp))
       | Unknown ->
 	let splits, assume, conseq = if b then
-	    if are_eq e1 e2 <> Sig.No then
+	    if e1 = e2 then
 	      (splits, assume, conseq)
 	    else
-	      let assume = handle_antisym are_eq r exp v2 assume in
-	      let assume = handle_trans cluster1 cluster2 are_eq r exp assume in
+	      let assume = handle_antisym r exp v2 assume in
+	      let assume = handle_trans cluster1 cluster2 r exp assume in
 	      let splits, assume, conseq = handle_order cluster1 cluster2 
-		are_eq r exp assume splits conseq in
+		r exp assume splits conseq in
 	      let splits, assume, conseq = rhandle_reach2 env.gs cluster2
-		are_eq are_neq r exp assume splits conseq in
-	      let assume = rhandle_wf env.gs are_eq are_neq r exp assume in
+		r exp assume splits conseq in
+	      let assume = rhandle_wf env.gs r exp assume in
 	      (splits, assume, conseq)
 	  else
-	    let assume = handle_refl are_eq are_neq r exp
+	    let assume = handle_refl r exp
 	      assume in
 	    splits, assume, conseq
 	in
@@ -397,20 +371,20 @@ module Make(X : Sig.X) = struct
 	(env, splits, assume, conseq)
 
   (* add_F assumes that f(st, e) = res (None or Some e') *)
-  let add_F env are_eq are_neq res ex ({g=k; gt=st; gi=e} as f)
+  let add_F env res ex ({g=k; gt=st; gi=e} as f)
       (splits, assume, conseq) =
-    try (ignore (TMap.find k env.gs); 
+    try (ignore (TMap.find (st, e) env.gs); 
 	 (env, splits, assume, conseq))
     with Not_found ->
       let map = RMap.find st env.rs in
-      let r = RR.find e map in
+      let r : (result * result) R.t = RR.find e map in
       let (splits, assume, conseq) =
-	handle_reach1 r are_eq are_neq res ex f assume splits conseq in
+	handle_reach1 r res ex f assume splits conseq in
       let (splits, assume, conseq) = 
-	fhandle_reach2 map r are_eq are_neq res ex f
+	fhandle_reach2 map r res ex f
 	  assume splits conseq in
-      let assume = fhandle_wf r are_eq are_neq res ex f assume in
-      let env = {env with gs = TMap.add k (res, ex) env.gs} in
+      let assume = fhandle_wf r res ex f assume in
+      let env = {env with gs = TMap.add (st, e) (k, res, ex) env.gs} in
       (env, splits, assume, conseq)
 
   let assume_one are_eq are_neq class_of
@@ -421,19 +395,20 @@ module Make(X : Sig.X) = struct
 	(match (T.view st).T.ty with
 	  | Ty.Tfarray (ty1, Ty.Text ([ty2], hO)) ->
 	    if ty1 = ty2 && hO = hOption then
-	      let f = {g = t; gt = st; gi = e} in
+	      let f = {g = fst(X.make(t)); gt = fst(X.make(st));
+		       gi = fst(X.make(e))} in
 	      (try (
 		let res = find_val (class_of t) in
-		let ex = match res with
+		let ex, res = match res with
 		  | None ->
 		    (match are_eq t (make_none e) with
 		      | Sig.No -> assert false
-		      | Sig.Yes ex -> ex)
+		      | Sig.Yes ex -> ex, None)
 		  | Some e ->
 		    (match are_eq t (make_some e) with
 		      | Sig.No -> assert false
-		      | Sig.Yes ex -> ex) in
-		add_F env are_eq are_neq res ex f (splits, assume, conseq))
+		      | Sig.Yes ex -> ex, Some(fst(X.make e))) in
+		add_F env res ex f (splits, assume, conseq))
 	      with Not_found -> (env, splits, assume, conseq))
 	    else (env, splits, assume, conseq)
 	  | _ -> (env, splits, assume, conseq))
@@ -499,8 +474,6 @@ module Make(X : Sig.X) = struct
     in
     {env with split=spl; conseq=cons}, eqs
 
-  let symb_reach = Hstring.make "reach"
-
   let assume env la ~are_eq ~are_neq ~class_of =
     Debug.assume fmt la; 
     let fct acc r =
@@ -514,14 +487,12 @@ module Make(X : Sig.X) = struct
     in 
     try (
       let env, splits, assume, conseq =
-	List.fold_left (fun acc (a,_,_) ->
+	List.fold_left (fun ((env,splits, assume, conseq) as acc) (a,_,ex) ->
 	  match a with
-	    (*| A.Builtin (b, s, [st;e1;e2]) when Hstring.equal s symb_reach ->
-		
+	    | A.Builtin (b, s, [st;e1;e2]) when Hstring.equal s hReach ->
 		let r = {rst = st; re1 = e1; re2 = e2} in
-		add_R env are_eq are_neq class_of r exp b
+		add_R env r ex b
 		  (splits, assume, conseq)
-	    *)
 	    | A.Eq (t1,t2) -> fct (fct acc t1) t2
 	    | A.Builtin (_,_,l) | A.Distinct (_, l) -> L.fold_left fct acc l)
 	  (env, env.split, ESet.empty, env.conseq) la in
@@ -531,7 +502,7 @@ module Make(X : Sig.X) = struct
       Debug.env fmt env;
       Debug.new_equalities fmt assume;
       (env,
-       { assume = ESet.fold (fun (a, e) acc -> (LTerm a, e)::acc) assume [];
+       { assume = ESet.fold (fun (a, e) acc -> (LSem (LR.view a), e)::acc) assume [];
 	 remove = [] }))
     with Unsat e -> 
       (env, { assume = [LTerm A.LT.faux, e];
