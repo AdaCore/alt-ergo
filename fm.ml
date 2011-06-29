@@ -310,20 +310,20 @@ module Make
        (*else acc*))
       use_x env' 
 
-  let update_ple0 env p is_le expl =
-    if P.is_empty p then env
+  let update_ple0 env p0 is_le expl =
+    if P.is_empty p0 then env
     else 
-      let ty = P.type_info p in
-      let a, _ = P.choose p in
+      let ty = P.type_info p0 in
+      let a, _ = P.choose p0 in
       let p, change =
 	if a </ Int 0 then
-	  P.mult (P.create [] (Int (-1)) ty) p, true
-	else p, false in
+	  P.mult (P.create [] (Int (-1)) ty) p0, true
+	else p0, false in
       let p, c, _ = P.normal_form p in
       let c = minus_num c in
       let u =
 	if change then
-	  Intervals.new_borne_inf expl c is_le (Intervals.undefined ty)
+          Intervals.new_borne_inf expl c is_le (Intervals.undefined ty)
 	else
 	  Intervals.new_borne_sup expl c is_le (Intervals.undefined ty) in
       let u =
@@ -333,7 +333,10 @@ module Make
 	  i
 	with Not_found -> u
       in
-      { env with polynomes = MP.add p u env.polynomes }
+      let env = { env with polynomes = MP.add p u env.polynomes } in
+      match P.to_list p0 with
+        | [a,x], v -> fst(update_intervals env [] expl (a, x, v) is_le)
+        | _ -> env
 
   let update_polynomes env expl =
     let polynomes = MP.fold
