@@ -22,7 +22,6 @@ and at_desc =
   | ATprefix of Symbols.t * aterm 
   | ATget of aterm * aterm
   | ATset of aterm * aterm * aterm
-  | ATreach of aterm * aterm * aterm
   | ATextract of aterm * aterm * aterm
   | ATconcat of aterm * aterm
   | ATlet of Symbols.t * aterm * aterm
