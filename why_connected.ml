@@ -206,8 +206,7 @@ let rec is_quantified_term vars at =
   | ATprefix (_, at) ->
       is_quantified_term vars at
   | ATextract (at1, at2, at3)
-  | ATset (at1, at2, at3)
-  | ATreach (at1, at2, at3) ->
+  | ATset (at1, at2, at3) ->
       is_quantified_term vars at1
       || is_quantified_term vars at2
       || is_quantified_term vars at3
@@ -243,8 +242,7 @@ let rec aterm_used_vars goal_vars at =
     | ATprefix (_, at) | ATlet (_, _, at) -> aterm_used_vars goal_vars at
     | ATinfix (at1, _, at2) | ATget (at1, at2) | ATconcat (at1, at2) ->
 	(aterm_used_vars goal_vars at1)@(aterm_used_vars goal_vars at2)
-    | ATset (at1, at2, at3) | ATextract (at1, at2, at3)
-    | ATreach (at1, at2, at3) ->
+    | ATset (at1, at2, at3) | ATextract (at1, at2, at3) ->
 	(aterm_used_vars goal_vars at1)@
 	  (aterm_used_vars goal_vars at2)@
 	  (aterm_used_vars goal_vars at3)
@@ -740,7 +738,7 @@ and connect_at_desc env sbuf = function
 	connect_aterm env sbuf t1;
 	connect_aterm env sbuf t2
     | ATprefix (_, t) -> connect_aterm env sbuf t
-    | ATset (t1,t2,t3) | ATextract (t1,t2,t3) | ATreach (t1,t2,t3) ->
+    | ATset (t1,t2,t3) | ATextract (t1,t2,t3) ->
 	connect_aterm env sbuf t1;
 	connect_aterm env sbuf t2;
 	connect_aterm env sbuf t3

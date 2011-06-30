@@ -30,7 +30,6 @@ and at_desc =
   | ATprefix of Symbols.t * aterm 
   | ATget of aterm * aterm
   | ATset of aterm * aterm * aterm
-  | ATreach of aterm * aterm * aterm
   | ATextract of aterm * aterm * aterm
   | ATconcat of aterm * aterm
   | ATlet of Symbols.t * aterm * aterm
@@ -162,7 +161,7 @@ and findin_at_desc tag buffer = function
 	if r = None then findin_aterm tag buffer t2
 	else r
     | ATprefix (_,t) -> findin_aterm tag buffer t
-    | ATset (t1, t2, t3) | ATextract (t1, t2, t3) | ATreach (t1, t2, t3) ->
+    | ATset (t1, t2, t3) | ATextract (t1, t2, t3)  ->
 	let r = findin_aterm tag buffer t1 in
 	if r = None then
 	  let r = findin_aterm tag buffer t2 in
@@ -394,9 +393,6 @@ and print_tt_desc fmt = function
       fprintf fmt "%a[%a<-%a]" print_tterm t print_tterm t1 print_tterm t2
   | TTget (t, t1) ->
       fprintf fmt "%a[%a]" print_tterm t print_tterm t1
-  | TTreach (t, t1, t2) ->
-      fprintf fmt "reach(%a, %a, %a)" 
-	print_tterm t print_tterm t1 print_tterm t2
 
 let print_tatom fmt a = match a.Why_ptree.c with
   | TAtrue -> fprintf fmt "true" 
@@ -550,7 +546,7 @@ and make_dep_at_desc d ex dep = function
     | ATget (t1, t2) | ATconcat (t1, t2) ->
 	let dep = make_dep_aterm d ex dep t1 in
 	make_dep_aterm d ex dep t2
-    | ATset (t1, t2, t3) | ATextract (t1, t2, t3) | ATreach (t1, t2, t3) ->
+    | ATset (t1, t2, t3) | ATextract (t1, t2, t3)  ->
 	let dep = make_dep_aterm d ex dep t1 in
 	let dep = make_dep_aterm d ex dep t2 in
 	make_dep_aterm d ex dep t3
@@ -641,8 +637,6 @@ and of_tt_desc (buffer:sbuffer) = function
   | TTget (t1, t2) -> ATget (of_tterm buffer t1, of_tterm buffer t2)
   | TTset (t, t1, t2) ->
       ATset (of_tterm buffer t, of_tterm buffer t1, of_tterm buffer t2)
-  | TTreach (t, t1, t2) ->
-      ATreach (of_tterm buffer t, of_tterm buffer t1, of_tterm buffer t2)
   | TTextract (t, t1, t2) ->
       ATextract (of_tterm buffer t, of_tterm buffer t1, of_tterm buffer t2)
   | TTconcat (t1, t2) -> ATconcat (of_tterm buffer t1, of_tterm buffer t2)
@@ -760,8 +754,6 @@ and to_tt_desc = function
     | ATprefix (s, t) -> TTprefix (s, to_tterm 0 t)
     | ATget (t1, t2) -> TTget (to_tterm 0 t1, to_tterm 0 t2)
     | ATset (t1, t2, t3) -> TTset (to_tterm 0 t1, to_tterm 0 t2, to_tterm 0 t3)
-    | ATreach (t1, t2, t3) ->
-      TTreach (to_tterm 0 t1, to_tterm 0 t2, to_tterm 0 t3)
     | ATextract (t1, t2, t3) ->
 	TTextract (to_tterm 0 t1, to_tterm 0 t2, to_tterm 0 t3)
     | ATconcat (t1, t2) -> TTconcat (to_tterm 0 t1, to_tterm 0 t2)
@@ -941,11 +933,6 @@ and add_at_desc_at (buffer:sbuffer) tags iter at =
 	buffer#insert ~iter ~tags "<-";
 	add_aterm_at buffer tags iter t3;
 	buffer#insert ~iter ~tags "]"
-    | ATreach (t1, t2, t3) ->
-	buffer#insert ~iter ~tags 
-	  (sprintf "reach(");
-	add_aterm_list_at buffer tags iter "," [t1;t2;t3];
-	buffer#insert ~iter ~tags ")"
     | ATextract (t1, t2, t3) ->
 	add_aterm_at buffer tags iter t1;
 	buffer#insert ~iter ~tags "^{";
@@ -1175,7 +1162,7 @@ let rec isin_aterm sl { at_desc = at_desc } =
     | ATconcat (t1, t2) | ATlet (_, t1, t2) ->
       isin_aterm sl t1 || isin_aterm sl t2
     | ATprefix (_,t) -> isin_aterm sl t
-    | ATset (t1, t2, t3) | ATextract (t1, t2, t3) | ATreach (t1, t2, t3) ->
+    | ATset (t1, t2, t3) | ATextract (t1, t2, t3)  ->
       isin_aterm sl t1 || isin_aterm sl t2 || isin_aterm sl t3 
 
 and isin_aterm_list sl atl =
@@ -1195,7 +1182,7 @@ and findtags_aaterm sl aat acc =
     | ATconcat (t1, t2) | ATlet (_, t1, t2) ->
       if isin_aterm sl t1 || isin_aterm sl t2 then aat.tag::acc else acc
     | ATprefix (_,t) -> if isin_aterm sl t then aat.tag::acc else acc
-    | ATset (t1, t2, t3) | ATextract (t1, t2, t3) | ATreach (t1, t2, t3) ->
+    | ATset (t1, t2, t3) | ATextract (t1, t2, t3)  ->
       if isin_aterm sl t1 || isin_aterm sl t2 || isin_aterm sl t3 
       then aat.tag::acc else acc
 
@@ -1294,7 +1281,7 @@ let rec listsymbols at acc =
     | ATconcat (t1, t2) | ATlet (_, t1, t2) ->
       listsymbols t1 (listsymbols t2 acc)
     | ATprefix (_,t) -> listsymbols t acc
-    | ATset (t1, t2, t3) | ATextract (t1, t2, t3) | ATreach (t1, t2, t3) ->
+    | ATset (t1, t2, t3) | ATextract (t1, t2, t3)  ->
       listsymbols t1 (listsymbols t2 (listsymbols t3 acc))
 
 let findtags_atyped_delc_dep sl td acc =
