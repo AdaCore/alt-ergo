@@ -19,8 +19,12 @@ open Num
 open Format
 open Options
 
-type borne = Strict of (num * Explanation.t) | Large of (num * Explanation.t) 
-	     | Pinfty | Minfty
+module Ex = Explanation
+
+type borne = 
+  | Strict of (num * Ex.t) 
+  | Large of (num * Ex.t) 
+  | Pinfty | Minfty
 
 let compare_bornes b1 b2 =
   match b1, b2 with
@@ -73,31 +77,14 @@ let compare_bu_bu b1 b2 =
       let c = compare_num v1 v2 in
       if c = 0 then 1 else c
 
-(*      
-module SB =
-  Set.Make(struct
-    type t = (borne * borne)
-    let compare (l1,u1) (l2,u2) =
-      let cl = compare_bornes l1 l2 in
-      if cl <> 0 then cl
-      else compare_bornes u1 u2
-  end)
-  *)
-
-(* module SB =  *)
-(*   Set.Make(struct  *)
-(*     type t = borne *)
-(*     let compare = compare_bornes  *)
-(*   end) *)
-
 type t = { 
   ints : (borne * borne) list;
   is_int : bool;
-  expl: Explanation.t
+  expl: Ex.t
 }
 
-exception EmptyInterval of Explanation.t
-exception NotConsistent of Explanation.t
+exception EmptyInterval of Ex.t
+exception NotConsistent of Ex.t
 exception Not_a_float
 
 let print_borne fmt = function
@@ -105,7 +92,7 @@ let print_borne fmt = function
   | Pinfty -> fprintf fmt "+inf"
   | Strict (v, e) | Large (v, e) ->
     if verbose || proof then 
-      fprintf fmt "%s %a" (string_of_num v) Explanation.print e
+      fprintf fmt "%s %a" (string_of_num v) Ex.print e
     else fprintf fmt "%s" (string_of_num v)
       
 let print_interval fmt (b1,b2) =
@@ -119,55 +106,61 @@ let print_interval fmt (b1,b2) =
     
 let print fmt {ints = ints; is_int = b; expl = e } = 
   List.iter (fun i -> fprintf fmt "%a" print_interval i) ints;
-  if verbose || proof then fprintf fmt " %a" Explanation.print e
+  if verbose || proof then fprintf fmt " %a" Ex.print e
   
 
 let undefined ty = {
   ints = [Minfty, Pinfty];
   is_int =  ty  = Ty.Tint;
-  expl = Explanation.empty
+  expl = Ex.empty
 }
 
 let point b ty e = {
   ints = [Large (b, e), Large (b, e)]; 
   is_int = ty  = Ty.Tint;
-  expl = Explanation.empty
+  expl = Ex.empty
 }
 
 let explain_borne = function
   | Large (_, e) | Strict (_, e) -> e
-  | _ -> Explanation.empty
+  | _ -> Ex.empty
+
+let add_expl_to_borne b e =
+  match b with
+    | Large (n, e') -> Large (n, Ex.union e e')
+    | Strict (n, e') -> Strict (n, Ex.union e e')
+    | Pinfty | Minfty -> b
 
 let borne_of k e n = if k then Large (n, e) else Strict (n, e)
 
 let is_point { ints = l; expl = e } =
   match l with
     | [Large (v1, e1) , Large (v2, e2)] when v1 =/ v2 ->
-      Some (v1, Explanation.union e2 (Explanation.union e1 e))
+      Some (v1, Ex.union e2 (Ex.union e1 e))
     | _ -> None
 
 let add_expl_zero i expl =
   let res = List.map (fun x -> 
     match x with
       | (Large ((Num.Int 0), e1) , Large ((Num.Int 0), e2)) ->
-        (Large ((Num.Int 0), Explanation.union e1 expl),
-         Large ((Num.Int 0), Explanation.union e2 expl))
+        (Large ((Num.Int 0), Ex.union e1 expl),
+         Large ((Num.Int 0), Ex.union e2 expl))
       | _ -> x) i.ints in
   { i with ints = res }
 
 let check_one_interval b1 b2 is_int =
     match b1, b2 with
-      | Pinfty, _ | _, Minfty  -> raise (EmptyInterval Explanation.empty)
+      | Pinfty, _ | _, Minfty  -> raise (EmptyInterval Ex.empty)
       | (Strict (v1, e1) | Large (v1,e1)), 
         (Strict (v2, e2) | Large (v2, e2)) ->
 	  let c = compare_num v1 v2 in 
 	  if c > 0 then raise 
-	    (EmptyInterval (Explanation.union e2 e1));
+	    (EmptyInterval (Ex.union e2 e1));
 	  if c = 0 then begin
 	    match b1, b2 with
 	      | Large _, Large _ when not is_int || is_integer_num v1 ->
 		  ()
-	      | _ -> raise (EmptyInterval (Explanation.union e2 e1))
+	      | _ -> raise (EmptyInterval (Ex.union e2 e1))
 	  end
       | _ -> ()
 
@@ -196,15 +189,15 @@ let max_borne b1 b2 =
 	  | _, _ -> b1
 	
 let pos_borne b1 =
-  compare_bornes b1 (borne_of true Explanation.empty (Int 0)) >= 0
+  compare_bornes b1 (borne_of true Ex.empty (Int 0)) >= 0
 let pos_borne_strict b1 = 
-  compare_bornes b1 (borne_of true Explanation.empty (Int 0)) > 0
+  compare_bornes b1 (borne_of true Ex.empty (Int 0)) > 0
 let neg_borne b1 = 
-  compare_bornes b1 (borne_of true Explanation.empty (Int 0)) <= 0
+  compare_bornes b1 (borne_of true Ex.empty (Int 0)) <= 0
 let neg_borne_strict b1 = 
-  compare_bornes b1 (borne_of true Explanation.empty (Int 0)) < 0
+  compare_bornes b1 (borne_of true Ex.empty (Int 0)) < 0
 let zero_borne b1 = 
-  compare_bornes b1 (borne_of true Explanation.empty (Int 0)) = 0
+  compare_bornes b1 (borne_of true Ex.empty (Int 0)) = 0
 
 exception Found of Sig.answer
 
@@ -216,7 +209,7 @@ let doesnt_contain_0 {ints=l} =
 	if neg_borne_strict old_u && pos_borne_strict l then 
 	  raise (Found 
 		   (Sig.Yes 
-		      (Explanation.union 
+		      (Ex.union 
 			 (explain_borne old_u) (explain_borne l))));
 	u) Minfty l in
     if neg_borne_strict max then Sig.Yes (explain_borne max)
@@ -241,18 +234,6 @@ let is_strict_smaller i1 i2 =
 let is_strict_smaller {ints=i1} {ints=i2} = 
   is_strict_smaller i1 i2
 
-(*      
-  let inf_greater =
-      | (b1,_)::_, (b2,_)::_ ->compare_bornes b1 b2 > 0
-  in
-  let sup_lesser =
-    match List.rev i1, List.rev i2 with
-      | _, [] -> false
-      | [], _ -> true
-      | (_,b1)::_, (_,b2)::_ -> compare_bornes b1 b2 < 0
-  in
-  inf_greater || sup_lesser
-*)
 
 let rec union_bornes l =
   match l with
@@ -275,9 +256,9 @@ let add_borne b1 b2 =
     | Minfty, _ | _, Minfty -> Minfty
     | Pinfty, _ | _, Pinfty -> Pinfty
     | Large (v1, e1), Large (v2, e2) -> 
-      Large (v1 +/ v2, Explanation.union e1 e2)
+      Large (v1 +/ v2, Ex.union e1 e2)
     | (Large (v1, e1) | Strict (v1, e1)), (Large (v2, e2) | Strict (v2, e2)) ->
-      Strict (v1 +/ v2, Explanation.union e1 e2)
+      Strict (v1 +/ v2, Ex.union e1 e2)
 
 let add_interval l (b1,b2) =
   List.fold_right
@@ -291,7 +272,7 @@ let add {ints = l1; is_int = is_int; expl = e1} {ints = l2; expl = e2}=
     List.fold_left
       (fun l bs -> let i = add_interval l1 bs in i@l) [] l2 
   in
-  union { ints = l ; is_int = is_int; expl = Explanation.union e1 e2 }
+  union { ints = l ; is_int = is_int; expl = Ex.union e1 e2 }
 
 let minus_borne = function
   | Minfty -> Pinfty
@@ -303,7 +284,7 @@ let scale_borne n b =
   assert (n >=/ Int 0);
   if n =/ Int 0 then 
     match b with
-    | Pinfty | Minfty -> Large (Int 0, Explanation.empty)
+    | Pinfty | Minfty -> Large (Int 0, Ex.empty)
     | Large (_, e) | Strict (_, e) ->  Large (Int 0, e)
   else match b with
     | Pinfty | Minfty -> b
@@ -316,13 +297,6 @@ let scale_interval n (b1,b2) =
      minus_borne (scale_borne (minus_num n) b1))
   else (scale_borne n b1, scale_borne n b2)
 
-(*
-let scale_bexpl n be =
-  SB.fold (fun (b1,b2) acc ->
-    if n >=/ (Int 0) then SB.add ((scale_borne n b1), (scale_borne n b2)) acc
-    else SB.add ((scale_borne n b2), (scale_borne n b1)) acc
-  ) be SB.empty
-  *)
 
 let scale n uints =
   let l = List.map (scale_interval n) uints.ints in
@@ -332,20 +306,20 @@ let mult_borne b1 b2 =
   match b1,b2 with
     | Minfty, Pinfty | Pinfty, Minfty -> assert false
     | Minfty, b | b, Minfty ->
-	if compare_bornes b (borne_of true Explanation.empty (Int 0)) = 0 
+	if compare_bornes b (borne_of true Ex.empty (Int 0)) = 0 
         then b
 	else if pos_borne b then Minfty
 	else Pinfty
     | Pinfty, b | b, Pinfty ->
-	if compare_bornes b (borne_of true Explanation.empty (Int 0)) = 0 
+	if compare_bornes b (borne_of true Ex.empty (Int 0)) = 0 
         then b
 	else if pos_borne b then Pinfty
 	else Minfty
     | Strict (v1, e1), Strict (v2, e2) | Strict (v1, e1), Large (v2, e2)
     | Large (v1, e1), Strict (v2, e2) -> 
-      Strict (v1 */ v2, Explanation.union e1 e2)
+      Strict (v1 */ v2, Ex.union e1 e2)
     | Large (v1, e1), Large (v2, e2) -> 
-      Large (v1 */ v2, Explanation.union e1 e2)
+      Large (v1 */ v2, Ex.union e1 e2)
 
 let mult_borne_inf b1 b2 =
   match b1,b2 with
@@ -358,42 +332,42 @@ let mult_borne_sup b1 b2 =
     | _, _ -> mult_borne b1 b2
 
 type interval_class = 
-  | P of Explanation.t 
-  | M of Explanation.t 
-  | N of Explanation.t 
+  | P of Ex.t 
+  | M of Ex.t 
+  | N of Ex.t 
   | Z
 
 let class_of (l,u) =
   if zero_borne l && zero_borne u then Z
   else if pos_borne l && pos_borne u then P (explain_borne l)
   else if neg_borne l && neg_borne u then N (explain_borne u)
-  else M (Explanation.union (explain_borne l) (explain_borne u))
+  else M (Ex.union (explain_borne l) (explain_borne u))
 
 let mult_bornes (a,b) (c,d) =
   (* see util/intervals_mult.png *)
   match class_of (a,b), class_of (c,d) with
     | P e1, P e2 -> 
-      mult_borne_inf a c, mult_borne_sup b d, Explanation.union e1 e2
+      mult_borne_inf a c, mult_borne_sup b d, Ex.union e1 e2
     | P e1, M e2 -> 
-      mult_borne_inf b c, mult_borne_sup b d, Explanation.union e1 e2
+      mult_borne_inf b c, mult_borne_sup b d, Ex.union e1 e2
     | P e1, N e2 -> 
-      mult_borne_inf b c, mult_borne_sup a d, Explanation.union e1 e2
+      mult_borne_inf b c, mult_borne_sup a d, Ex.union e1 e2
     | M e1, P e2 -> 
-      mult_borne_inf a d, mult_borne_sup b d, Explanation.union e1 e2
+      mult_borne_inf a d, mult_borne_sup b d, Ex.union e1 e2
     | M e1, M e2 -> 
       min_borne (mult_borne_inf a d) (mult_borne_inf b c),
       max_borne (mult_borne_sup a c) (mult_borne_sup b d), 
-      Explanation.union e1 e2
+      Ex.union e1 e2
     | M e1, N e2 ->
-      mult_borne_inf b c, mult_borne_sup a c, Explanation.union e1 e2
+      mult_borne_inf b c, mult_borne_sup a c, Ex.union e1 e2
     | N e1, P e2 ->
-      mult_borne_inf a d, mult_borne_sup b c, Explanation.union e1 e2
+      mult_borne_inf a d, mult_borne_sup b c, Ex.union e1 e2
     | N e1, M e2 ->
-      mult_borne_inf a d, mult_borne_sup a c, Explanation.union e1 e2
+      mult_borne_inf a d, mult_borne_sup a c, Ex.union e1 e2
     | N e1, N e2 ->
-      mult_borne_inf b d, mult_borne_sup a c, Explanation.union e1 e2
-    | Z, (P _ | M _ | N _ | Z) -> (a, b, Explanation.empty)
-    | (P _ | M _ | N _ ), Z -> (c, d, Explanation.empty)
+      mult_borne_inf b d, mult_borne_sup a c, Ex.union e1 e2
+    | Z, (P _ | M _ | N _ | Z) -> (a, b, Ex.empty)
+    | (P _ | M _ | N _ ), Z -> (c, d, Ex.empty)
       
 let rec power_borne_inf p b =
   match p with
@@ -406,7 +380,7 @@ let rec power_borne_sup p b =
     | p -> mult_borne_sup b (power_borne_sup (p-1) b)
 
 let max_merge b1 b2 =
-  let ex = Explanation.union (explain_borne b1) (explain_borne b2) in
+  let ex = Ex.union (explain_borne b1) (explain_borne b2) in
   let max = max_borne b1 b2 in
   match max with
     | Minfty | Pinfty -> max
@@ -420,7 +394,7 @@ let power_bornes p (b1,b2) =
       | p when p mod 2 = 0 ->
 	  (* max_merge to have explanations !!! *)
 	  let m = max_merge (power_borne_sup p b1) (power_borne_sup p b2) in
-	  (Large (Int 0, Explanation.empty), m)
+	  (Large (Int 0, Ex.empty), m)
       | _ -> (power_borne_inf p b1, power_borne_sup p b2)
   else if pos_borne b1 && pos_borne b2 then
     (power_borne_inf p b1, power_borne_sup p b2)
@@ -431,8 +405,6 @@ let power_bornes p (b1,b2) =
       | _ -> (power_borne_inf p b1, power_borne_sup p b2)
   else assert false
     
-(* let intersect2 (l1, u1) (l2, u2) = (max_borne l1 l2, min_borne u1 u2) *)
-
 let int_of_borne_inf b =
   match b with
     | Minfty | Pinfty -> b
@@ -471,80 +443,11 @@ let int_bornes l u =
 let int_div_bornes l u = 
   int_div_of_borne_inf l, int_div_of_borne_sup u
 
-(*
-let expl_of_bexpl be =
-  SB.fold (fun (b1,b2) acc -> 
-    let acc = match b1 with
-      | Large (_,e1) | Strict (_, e1) -> Explanation.union e1 acc
-      | _ -> acc in
-    match b2 with
-      | Large (_,e2) | Strict (_, e2) -> Explanation.union e2 acc
-      | _ -> acc
-  ) be Explanation.empty
-*)
-
-(*
-let intersect_bornes (b1, b2) {ints = l; is_int = is_int; bexpl = bexpl} =
-  let l = List.map (intersect2 (b1, b2)) l in
-  let l, be = 
-    List.fold_right
-      (fun (l, u) (l', be) -> try
-	 let l,u = if is_int then int_bornes l u else l,u in
-	 check_one_interval l u is_int;
-	 (l, u)::l', be
-       with EmptyInterval be' -> (l', SB.union be be')
-      ) l ([], SB.empty) 
-  in
-  let l = union_bornes l in
-  (*debug: 
-     let s = if is_strict_smaller l old.ints then "<" else ">=" in
-     fprintf fmt "%a %s %a@." print {ints=l;is_int=is_int;expl=expl}
-       s print old;
-  let e = 
-    if is_strict_smaller l old.ints then Explanation.union e expl
-    else e in 
-  if l = [] then raise (NotConsistent e)
-  else *)
-  { ints = l; is_int = is_int; bexpl = (SB.union be bexpl) }
-*)
-
-(*
-let intersect ({ints=l1} as uints1) ({ints=l2} as uints2) =
-  (*fprintf fmt "%a inter %a (with %a) = " print uints1 print uints2 
-  Explanation.print expl;*)
-  let u =
-    List.fold_left
-      (fun u' bs ->
-	let ui = intersect_bornes bs uints2 in
-	{ u' with ints = (u'.ints)@(ui.ints);
-	  expl = Explanation.union ui.expl u'.expl }
-      ) {ints = []; is_int = uints1.is_int; expl = Explanation.empty}
-      uints1.ints in
-  let u = union u in
-  let e = 
-    if is_strict_smaller u uints2 then 
-      Explanation.union uints1.expl uints2.expl
-    else uints2.expl in
-  let u = { u with expl = e } in
-  (*fprintf fmt "%a@." print u;*)
-  if u.ints = [] then raise (NotConsistent u.expl) else u
-*)
-
-(*
-let build_relevant_bexpl be bexpl =
-  SB.fold (fun (b1, b2) acc ->
-    SB.fold (fun (b'1, b'2) acc' ->
-      let b = if compare_bornes b2 b'1 < 0 || compare_bornes b1 b'2 > 0 
-	then (b'1, b'2)
-	else (min_borne b1 b'1, max_borne b2 b'2)
-      in
-      SB.add b acc') bexpl SB.empty
-  ) be SB.empty
-*)
 
 let intersect ({ints=l1; expl=e1; is_int=is_int} as uints1)
     {ints=l2; expl=e2} =
-  let rec step (l1,l2) acc acc_expl expl =
+  (* fprintf fmt "intersect %a inter %a@." print uints1 print uints2; *)
+  let rec step (l1,l2) acc expl =
     match l1, l2 with
       | (lo1,up1)::r1, (lo2,up2)::r2 ->
 	let (lo1,up1), (lo2,up2) = 
@@ -555,46 +458,35 @@ let intersect ({ints=l1; expl=e1; is_int=is_int} as uints1)
 	let clu = compare_bl_bu lo1 up2 in
 	let cul = compare_bu_bl up1 lo2 in
 	if cul < 0 then
-	  let acc_expl = 
-	    (*if r1 <> [] && compare_bu_bl (snd (List.hd r1)) lo2 < 0 then expl
-	      else Explanation.union (explain_borne up1) 
-	      (Explanation.union (explain_borne lo2) expl) *)
-	    if r1 = [] || (r1 <> [] &&
-		not (compare_bl_bu lo2 (snd (List.hd r1)) > 0)) then
-	      Explanation.union (explain_borne up1) (explain_borne lo2)
-	    else acc_expl
-	  in
-	  step (r1, l2) acc acc_expl expl
+	  let nexpl  = Ex.union (explain_borne up1) (explain_borne lo2) in
+	  match r1 with
+	    | [] -> step (r1, l2) acc (Ex.union nexpl expl)
+	    | (lor1,upr1)::rr1 ->
+	      let lor1 = add_expl_to_borne lor1 nexpl in
+	      let r1 = (lor1,upr1)::rr1 in
+	      step (r1, l2) acc expl
 	else if clu > 0 then 
-	  let acc_expl = 
-	    (*if r2 <> [] && compare_bu_bl (snd (List.hd r2)) lo1 < 0 then expl
-	      else Explanation.union (explain_borne up2) 
-	      (Explanation.union (explain_borne lo1) expl) *)
-	    if r2 = [] || (r2 <> [] &&
-		not (compare_bl_bu lo1 (snd (List.hd r2)) > 0)) then 
-	      Explanation.union (explain_borne up2) (explain_borne lo1)
-	    else acc_expl
-	  in
-	  step (l1, r2) acc acc_expl expl
+	  let nexpl  = Ex.union (explain_borne up2) (explain_borne lo1) in
+	  match r2 with
+	    | [] -> step (l1, r2) acc (Ex.union nexpl expl)
+	    | (lor2,upr2)::rr2 ->
+	      let lor2 = add_expl_to_borne lor2 nexpl in
+	      let r2 = (lor2,upr2)::rr2 in
+	      step (l1, r2) acc expl
 	else if cll = 0 && cuu = 0 then 
-	  step (r1, r2) ((lo1,up1)::acc) 
-	    Explanation.empty (Explanation.union expl acc_expl)
+	  step (r1, r2) ((lo1,up1)::acc) expl
 	else if cll <= 0 && cuu >= 0 then 
-	  step (l1, r2) ((lo2,up2)::acc) 
-	    Explanation.empty (Explanation.union expl acc_expl)
+	  step (l1, r2) ((lo2,up2)::acc) expl
 	else if cll >= 0 && cuu <= 0 then 
-	  step (r1, l2) ((lo1,up1)::acc)
-	    Explanation.empty (Explanation.union expl acc_expl)
+	  step (r1, l2) ((lo1,up1)::acc) expl
 	else if cll <= 0 && cuu <= 0 && cul >= 0 then 
-	  step (r1, l2) ((lo2,up1)::acc)
-	    Explanation.empty (Explanation.union expl acc_expl)
+	  step (r1, l2) ((lo2,up1)::acc) expl
 	else if cll >= 0 && cuu >= 0 && clu <= 0 then 
-	  step (l1, r2) ((lo1,up2)::acc)
-	    Explanation.empty (Explanation.union expl acc_expl)
+	  step (l1, r2) ((lo1,up2)::acc) expl
 	else assert false
-      | [], _ | _, [] ->  List.rev acc, (Explanation.union expl acc_expl)
+      | [], _ | _, [] ->  List.rev acc, expl
     in
-  let l, expl = step (l1,l2) [] Explanation.empty (Explanation.union e1 e2) in
+  let l, expl = step (l1,l2) [] (Ex.union e1 e2) in
   if l = [] then raise (NotConsistent expl)
   else { uints1 with ints = l; expl = expl }
 
@@ -603,24 +495,13 @@ let new_borne_sup expl b ~is_le uints =
   intersect 
     { ints = [Minfty, (borne_of is_le expl b)];
       is_int = uints.is_int;
-      expl = Explanation.empty } uints
-(* let e =
-    if is_strict_smaller new_u uints then Explanation.union expl uints.expl
-    else uints.expl in 
-  if new_u.ints = [] then raise (NotConsistent (expl_of_bexpl new_u.bexpl))
-  else new_u *)
+      expl = Ex.empty } uints
 
 let new_borne_inf expl b ~is_le uints =
   intersect 
     { ints = [(borne_of is_le expl b), Pinfty];
       is_int = uints.is_int;
-      expl = Explanation.empty } uints
-  (* let e =
-     if is_strict_smaller new_u uints then Explanation.union expl uints.expl
-    else uints.expl in
-  if new_u.ints = [] then raise (NotConsistent (expl_of_bexpl new_u.bexpl))
-  else new_u *)
-
+      expl = Ex.empty } uints
 
 let complement ({ints=l; expl=e} as uints) =
   let rec step l prev acc =
@@ -642,34 +523,6 @@ let complement ({ints=l; expl=e} as uints) =
   in
   { uints with ints = step l Minfty [] }
     
-(*
-let exclude_bornes (b1,b2) ui =
-  let bu = match b1 with
-    | Strict v -> Large v
-    | Large v -> Strict v
-    | _ -> b1 in
-  let bl = match b2 with
-    | Strict v -> Large v
-    | Large v -> Strict v
-    | _ -> b2 in
-  let u1 = intersect_bornes (Minfty, bu) ui in
-  let u2 = intersect_bornes (bl, Pinfty) ui in
-  let u = {ui with ints = u1.ints@u2.ints;
-    expl = Explanation.union u1.expl u2.expl} in
-  if u.ints = [] then raise (NotConsistent u.expl) else u
-    
-let exclude uints1 uints2 =
-  let u = 
-    union (List.fold_left 
-	     (fun u bs ->
-	       exclude_bornes bs u) uints2 uints1.ints) in
-  let e = 
-    if is_strict_smaller u uints2 then 
-      Explanation.union uints1.expl uints2.expl
-    else uints2.expl in
-  let u = { u with expl = e } in
-  if u.ints = [] then raise (NotConsistent u.expl) else u
-*)
 
 let exclude uints1 uints2 =
   intersect (complement uints1) uints2 
@@ -681,12 +534,12 @@ let mult u1 u2 =
 	List.fold_left 
 	  (fun (l, ex) b2 ->
 	    let bl, bu, ex' = mult_bornes b1 b2 in
-	    (bl, bu)::l, Explanation.union ex ex') (l', expl) u2.ints)
-      ([], Explanation.empty) u1.ints
+	    (bl, bu)::l, Ex.union ex ex') (l', expl) u2.ints)
+      ([], Ex.empty) u1.ints
   in
   union { ints=resl; is_int = u1.is_int;
-	  expl = Explanation.union expl 
-                 (Explanation.union u1.expl u2.expl) }
+	  expl = Ex.union expl 
+                 (Ex.union u1.expl u2.expl) }
 
 let power n u =
   let l = List.map (power_bornes n) u.ints in
