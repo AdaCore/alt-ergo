@@ -338,11 +338,13 @@ module Make
 
   let update_polynomes env expl =
     let polynomes, monomes = MP.fold
-      (fun p i (polynomes, monomes) ->
+      (fun p ip (polynomes, monomes) ->
 	 let new_i = intervals_from_monomes env p in
-	 let i = Intervals.intersect new_i i in
-	 let monomes = update_monomes_from_poly p i polynomes monomes in
-	 MP.add p i polynomes, monomes
+	 let i = Intervals.intersect new_i ip in
+	 if Intervals.is_strict_smaller i ip then
+	   let monomes = update_monomes_from_poly p i polynomes monomes in
+	   MP.add p i polynomes, monomes
+	 else polynomes, monomes
       ) env.polynomes (env.polynomes, env.monomes) in
     {env with polynomes = polynomes; monomes = monomes }
 
@@ -452,14 +454,20 @@ module Make
           Intervals.new_borne_inf expl c is_le (Intervals.undefined ty)
 	else
 	  Intervals.new_borne_sup expl c is_le (Intervals.undefined ty) in
-      let u =
+      let u, pu =
 	try 
 	  let pu = MP.find p env.polynomes in
 	  let i = Intervals.intersect u pu in
-	  i
-	with Not_found -> u
+	  i, pu
+	with Not_found -> u, Intervals.undefined ty
       in
-      let env = { env with polynomes = MP.add p u env.polynomes } in
+      let env = 
+	if Intervals.is_strict_smaller u pu then
+	  let polynomes = MP.add p u env.polynomes in
+	  let monomes = update_monomes_from_poly p u polynomes env.monomes in
+	  { env with polynomes = polynomes; monomes = monomes }
+	else env
+      in
       match P.to_list p0 with
         | [a,x], v -> fst(update_intervals env [] expl (a, x, v) is_le)
         | _ -> env
@@ -647,7 +655,14 @@ module Make
 	    with Not_found -> Intervals.undefined ty
 	  in
 	  let i = Intervals.exclude i1 i2 in
-	  let env ={ env with polynomes = MP.add p i env.polynomes } in
+	  let env = 
+	    if Intervals.is_strict_smaller i i2 then
+	      let polynomes = MP.add p i env.polynomes in
+	      let monomes = update_monomes_from_poly p i polynomes env.monomes
+	      in
+	      { env with polynomes = polynomes; monomes = monomes }
+	    else env
+	  in
 	  env, eqs
 					      
   let add_equality env eqs p expl =
@@ -674,16 +689,24 @@ module Make
 	  else P.mult (P.create [] (Int (-1)) ty) p in
 	  let p, c, _ = P.normal_form p in
 	  let i = Intervals.point (minus_num c) ty expl in
-	  let i = 
+	  let i, ip = 
 	    try
-	      let i' =  MP.find p env.polynomes in
-	      Intervals.intersect i i'
-	    with Not_found -> i
+	      let ip =  MP.find p env.polynomes in
+	      Intervals.intersect i ip, ip
+	    with Not_found -> i, Intervals.undefined ty
 	  in
-	  let env = { env with 
-                        polynomes = MP.add p i env.polynomes;
-                        known_eqs = SX.add (P.alien_of p) env.known_eqs
-                    } in
+	  let env = 
+	    if Intervals.is_strict_smaller i ip then
+	      let polynomes = MP.add p i env.polynomes in
+	      let monomes = update_monomes_from_poly p i polynomes env.monomes
+	      in
+	      { env with polynomes = polynomes; monomes = monomes }
+	    else env
+	  in
+	  let env = 
+	    { env with 
+	      known_eqs = SX.add (P.alien_of p) env.known_eqs
+            } in
 	  env, eqs
 
   let normal_form a = match a with
