@@ -310,14 +310,41 @@ module Make
        (*else acc*))
       use_x env' 
 
+  let update_monomes_from_poly p i polynomes monomes =
+    let lp, _ = P.to_list p in
+    let ty = P.type_info p in
+    List.fold_left (fun monomes (a,x) ->
+      let np = P.remove x p in
+      let (np,c,d) = P.normal_form_pos np in
+      try 
+	let inp = MP.find np polynomes in
+	(* fprintf fmt "up: %a in %a = (%a in %a, %s, %s) @." *)
+	(*   P.print p Intervals.print i P.print np Intervals.print inp  *)
+	(*   (string_of_num c) (string_of_num d); *)
+	let new_ix =
+	  Intervals.scale 
+	    ((Int 1) // a)
+	    (Intervals.add i
+	       (Intervals.scale (minus_num d)
+		  (Intervals.add inp 
+		     (Intervals.point c ty Explanation.empty)))) in
+	(* fprintf fmt "   %a in %a @." *)
+	(*   X.print x Intervals.print new_ix; *)
+	let old_ix, ux = MX.find x monomes in
+	let ix = Intervals.intersect old_ix new_ix in
+	MX.add x (ix, ux) monomes
+      with Not_found -> monomes)
+      monomes lp
+
   let update_polynomes env expl =
-    let polynomes = MP.fold
-      (fun p i polynomes ->
+    let polynomes, monomes = MP.fold
+      (fun p i (polynomes, monomes) ->
 	 let new_i = intervals_from_monomes env p in
 	 let i = Intervals.intersect new_i i in
-	 MP.add p i polynomes
-      ) env.polynomes env.polynomes in
-    {env with polynomes = polynomes }
+	 let monomes = update_monomes_from_poly p i polynomes monomes in
+	 MP.add p i polynomes, monomes
+      ) env.polynomes (env.polynomes, env.monomes) in
+    {env with polynomes = polynomes; monomes = monomes }
 
 
   let find_one_eq x u =
