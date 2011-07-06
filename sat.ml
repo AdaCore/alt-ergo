@@ -256,7 +256,7 @@ let print_model fmt s =
 
 (* *)
 
-let activities = H.create 1017
+let activities = if vsid then H.create 1017 else H.create 0
 
 let weight = 0.1
 let current_weight = ref 0.1
@@ -363,7 +363,7 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		bcp { env with lemmas=MF.add f (age,dep) env.lemmas }
 
 	    | F.Literal a ->
-		incr_weight ();
+		if vsid then incr_weight ();
 	        (* let dep = Ex.union (Ex.singleton ~bj:false f) dep in *)
 		let env = 
 		  if mf && size < size_formula then 
@@ -460,7 +460,7 @@ and back_tracking env stop max_size =  match env.delta with
   | [] -> 
       raise I_dont_know
   | (a,b,d)::l ->
-      let a,b = max_formula a b in
+      let a,b = if vsid then max_formula a b else a,b in
       let {f=f;age=g;name=lem;mf=mf} = a in
       Print.decide f;
       let dep = unsat_rec {env with delta=l} (a,Ex.singleton f) stop max_size in
@@ -468,7 +468,7 @@ and back_tracking env stop max_size =  match env.delta with
       try
 	let dep' = Ex.remove f dep in
 	Print.backtracking (F.mk_not f);
-	update_activity dep;
+	if vsid then update_activity dep;
 	unsat_rec
 	  (assume {env with delta=l} (b, Ex.union d dep'))
 	  ({a with f=F.mk_not f},dep') stop max_size

@@ -67,13 +67,14 @@ let nocontracongru = ref false
 let omega = ref false
 let arrays = ref false
 let pairs = ref false
-let term_like_pp = ref false
+let term_like_pp = ref true
 let types = ref false 
 let all_models = ref false
 let goal_directed = ref false
 let proof = ref false
 let debug_proof = ref false
 let qualif = ref false
+let vsid = ref false
 let max_split = ref (Num.Int 1000000)
 
 let show_version () = Format.printf "Alt-Ergo %s@." Version.version; exit 0
@@ -139,6 +140,7 @@ let spec = [
   "-bouclage", Arg.Set_int bouclage,
   " number of instantiations at each matching round";
   "-qualif", Arg.Set qualif, "output rules used on stderr";
+  "-vsid", Arg.Set vsid, "use VSID heuristic in SAT";
   "-max-split", Arg.String set_max_split,
   (Format.sprintf " maximum size of case-split (default value : %s)" 
      (Num.string_of_num !max_split));
@@ -214,4 +216,5 @@ let rewriting = !rewriting
 let proof = !proof
 let debug_proof = !debug_proof && proof
 let qualif = !qualif
+let vsid = !vsid
 let debug_split = !debug_split

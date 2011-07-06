@@ -69,4 +69,5 @@ val rewriting : bool
 val proof : bool
 val debug_proof : bool
 val qualif : bool
+val vsid : bool
 val debug_split : bool
