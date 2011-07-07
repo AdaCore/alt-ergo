@@ -347,12 +347,12 @@ module Make(X : ALIEN) = struct
       with Not_found ->
 	Reach.case_split env.reach
           
-    let assume env la ~are_eq ~are_neq ~class_of = 
+    let assume env la ~are_eq ~are_neq ~class_of ~find = 
       (* instantiation des axiomes des tableaux *)
       Debug.assume fmt la; 
       let envr, {assume=lr; remove=rr} = 
         (*env.reach, {assume=[]; remove=[]} in*)
-	Reach.assume env.reach la are_eq are_neq class_of in
+	Reach.assume env.reach la are_eq are_neq class_of find in
       let env = new_terms env la in
       let env, atoms = new_splits are_eq are_neq env Conseq.empty class_of in
       let env, atoms = new_equalities env atoms la class_of in
@@ -361,7 +361,7 @@ module Make(X : ALIEN) = struct
       let l = Conseq.fold (fun (a,ex) l -> ((LTerm a, ex)::l)) atoms [] in
       {env with reach=envr}, { assume = lr @ l; remove = rr }
 	  
-    let query _ _ ~are_eq ~are_neq ~class_of = Sig.No
+    let query _ _ ~are_eq ~are_neq ~class_of ~find = Sig.No
     let add env r = env
 
   end

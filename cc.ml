@@ -334,8 +334,9 @@ module Make (X : Sig.X) = struct
     let are_eq = Uf.are_equal env.uf in
     let are_neq = Uf.are_distinct env.uf in
     let class_of = Uf.class_of env.uf in
+    let find = Uf.find env.uf in
     let relation, result  = 
-      X.Rel.assume env.relation sa are_eq are_neq class_of in
+      X.Rel.assume env.relation sa are_eq are_neq class_of find in
     let env = { env with relation = relation } in
     let env = clean_use env result.remove in
     env, result.assume
@@ -503,9 +504,10 @@ module Make (X : Sig.X) = struct
 	  let are_eq = Uf.are_equal env.uf in
 	  let are_neq = Uf.are_distinct env.uf in
 	  let class_of = Uf.class_of env.uf in
+	  let find = Uf.find env.uf in
 	  let rna, ex_rna = term_canonical_view env na Ex.empty in
           X.Rel.query env.relation (rna, Some na, ex_rna) 
-	    are_eq are_neq class_of 
+	    are_eq are_neq class_of find
     with Exception.Inconsistent d -> Yes d
 
   let empty () = 
