@@ -376,32 +376,36 @@ struct
       r5=X5.Rel.empty ();
     }
 	
-    let assume env sa ~are_eq ~are_neq ~class_of = 
+    let assume env sa ~are_eq ~are_neq ~class_of ~find = 
       let env1, { assume = a1; remove = rm1} = 
-	X1.Rel.assume env.r1 sa ~are_eq ~are_neq ~class_of in
+	X1.Rel.assume env.r1 sa ~are_eq ~are_neq ~class_of ~find in
       let env2, { assume = a2; remove = rm2} = 
-	X2.Rel.assume env.r2 sa ~are_eq ~are_neq ~class_of in
+	X2.Rel.assume env.r2 sa ~are_eq ~are_neq ~class_of ~find in
       let env3, { assume = a3; remove = rm3} = 
-	X3.Rel.assume env.r3 sa ~are_eq ~are_neq ~class_of in
+	X3.Rel.assume env.r3 sa ~are_eq ~are_neq ~class_of ~find in
       let env4, { assume = a4; remove = rm4} = 
-	X4.Rel.assume env.r4 sa ~are_eq ~are_neq ~class_of in
+	X4.Rel.assume env.r4 sa ~are_eq ~are_neq ~class_of ~find in
       let env5, { assume = a5; remove = rm5} = 
-	X5.Rel.assume env.r5 sa ~are_eq ~are_neq ~class_of in
+	X5.Rel.assume env.r5 sa ~are_eq ~are_neq ~class_of ~find in
       {r1=env1; r2=env2; r3=env3; r4=env4; r5=env5}, 
       { assume = a1@a2@a3@a4@a5;
 	remove = rm1@rm2@rm3@rm4@rm5;}
 	
-    let query env a ~are_eq ~are_neq ~class_of = 
-      match X1.Rel.query env.r1 a ~are_eq ~are_neq ~class_of with
+    let query env a ~are_eq ~are_neq ~class_of ~find = 
+      match X1.Rel.query env.r1 a ~are_eq ~are_neq ~class_of ~find with
 	| Yes _ as ans -> ans
-	| No -> match X2.Rel.query env.r2 a ~are_eq ~are_neq ~class_of with
+	| No -> 
+	  match X2.Rel.query env.r2 a ~are_eq ~are_neq ~class_of ~find with
 	    | Yes _ as ans -> ans
-	    | No -> match X3.Rel.query env.r3 a ~are_eq ~are_neq ~class_of with
+	    | No ->
+	      match X3.Rel.query env.r3 a ~are_eq ~are_neq ~class_of ~find with
 		| Yes _ as ans -> ans
 		| No -> 
-		    match X4.Rel.query env.r4 a ~are_eq ~are_neq ~class_of with
+		    match X4.Rel.query env.r4 a ~are_eq ~are_neq ~class_of
+		      ~find with
 		      | Yes _ as ans -> ans
 		      | No -> X5.Rel.query env.r5 a ~are_eq ~are_neq ~class_of
+			~find
 		      
     let case_split env = 
       let seq1 = X1.Rel.case_split env.r1 in

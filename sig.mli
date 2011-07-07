@@ -40,7 +40,8 @@ module type RELATION = sig
     (r input) list -> 
     are_eq : (Term.t -> Term.t -> answer) -> 
     are_neq : (Term.t -> Term.t -> answer) -> 
-    class_of : (Term.t -> Term.t list) ->
+    class_of : (Term.t -> Term.t list) -> 
+    find : (Term.t -> r * Explanation.t) ->
     t * r result
 
   val query : 
@@ -48,7 +49,8 @@ module type RELATION = sig
     r input -> 
     are_eq : (Term.t -> Term.t -> answer) -> 
     are_neq : (Term.t -> Term.t -> answer) -> 
-    class_of : (Term.t -> Term.t list) ->
+    class_of : (Term.t -> Term.t list) -> 
+    find : (Term.t -> r * Explanation.t) ->
     answer
 
   val case_split : t -> (r Literal.view * Explanation.t * Num.num) list
