@@ -37,6 +37,7 @@ module STRS = Set.Make(
 	  if c=0 then 
 	    let c=compare_term a1 a2 in if c=0 then compare_term b1 b2 else c
 	  else c
+      | TTconst (Treal r1) , TTconst (Treal r2) -> Num.compare_num r1 r2
       | x , y -> Pervasives.compare x y
     and compare_list l1 l2 = match l1,l2 with
 	[] , _ -> -1
