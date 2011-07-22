@@ -181,10 +181,10 @@ module Make (X : X) = struct
           [sb]
       | _ -> 
 	  let l = List.map T.view (X.class_of uf t) in
-	  let s_ty , l = 
+	  let s_ty, l = 
 	    List.fold_left
-	      (fun (s_ty,l) ({T.f=f;ty=ty_t} as t) -> 
-		 if Symbols.compare f_pat f=0 then 
+	      (fun (s_ty,l) ({T.f=f; ty=ty_t} as t) -> 
+		 if Symbols.compare f_pat f = 0 then 
 		   try
 		     let s_ty = Ty.matching s_ty ty_pat ty_t in
 		     s_ty , t::l 
@@ -198,11 +198,12 @@ module Make (X : X) = struct
 	  
 
   and matchterms env uf sg pats xs = 
-    try List.fold_left2 
-          (fun sb_l pt arg -> 
-            let sb_ll = List.map (fun sg -> matchterm env uf sg pt arg) sb_l in
-            List.flatten sb_ll
-          )[sg] pats xs 
+    try 
+      List.fold_left2 
+        (fun sb_l pat arg -> 
+           let sb_ll = List.map (fun sg -> matchterm env uf sg pat arg) sb_l in
+           List.flatten sb_ll)
+	[sg] pats xs 
     with Invalid_argument _ -> raise Echec
 
   let matchpat env uf pat_info lsubst ({gen=g; goal=b} as sg,pat) = 
@@ -212,12 +213,12 @@ module Make (X : X) = struct
       | _ -> 
 	  try  
 	    MT.fold 
-	      (fun t xs l -> 
+	      (fun t xs lsubst -> 
 		 try 
-		   let gen , but = infos max (||) t g b env in
+		   let gen, but = infos max (||) t g b env in
 		   (matchterms env uf
-			{sg with gen=gen ; goal=but } pats xs) @ l 
-		 with Echec -> l)
+			{sg with gen=gen ; goal=but } pats xs) @ lsubst
+		 with Echec -> lsubst)
 	      (SubstT.find f env.fils) lsubst
 	  with Not_found -> lsubst
 	    

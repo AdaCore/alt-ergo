@@ -149,8 +149,6 @@ let add_terms env s goal age lem =
   in
   { env with matching = Term.Set.fold (MM.add_term infos) s env.matching }
 
-(*exception EnoughLemmasAlready of int * (gformula * Ex.t) list*)
-
 exception EnoughLemmasAlready of t * int
 
 let b_max_size = 100

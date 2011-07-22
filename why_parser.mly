@@ -67,6 +67,7 @@
 %token <string> FLOAT
 %token <Num.num> NUM
 %token <string> STRING
+%token WITH
 %token AND LEFTARROW ARROW AC AT AXIOM REWRITING
 %token BAR HAT
 %token BOOL COLON COMMA PV DISTINCT DOT ELSE EOF EQUAL
@@ -93,9 +94,10 @@
 %left TIMES SLASH PERCENT AT
 %nonassoc HAT
 %nonassoc uminus
-%nonassoc NOT
+%nonassoc NOT DOT
 %right prec_named
 %left LEFTSQ
+%nonassoc LIDENT
 
 /* Entry points */
 
@@ -124,23 +126,15 @@ list1_decl:
 ;
 
 decl:
-
-| TYPE ident
+| TYPE type_vars ident
    { if qualif then fprintf fmt "[rule] TR-Lexical-decl@.";
-     TypeDecl (loc_i 2, [], $2, []) }
-
-| TYPE ident EQUAL list1_constructors_sep_bar
+     TypeDecl (loc_ij 1 2, $2, $3, Abstract) }
+| TYPE type_vars ident EQUAL list1_constructors_sep_bar
    { if qualif then fprintf fmt "[rule] TR-Lexical-decl@.";
-     TypeDecl (loc_i 2,[], $2, $4 ) }
-
-| TYPE type_var ident
+     TypeDecl (loc_i 2, $2, $3, Enum $5 ) }
+| TYPE type_vars ident EQUAL record_type
    { if qualif then fprintf fmt "[rule] TR-Lexical-decl@.";
-     TypeDecl (loc_ij 1 2, [$2], $3, []) }
-| TYPE LEFTPAR list1_type_var_sep_comma RIGHTPAR ident
-   { if qualif then fprintf fmt "[rule] TR-Lexical-decl@.";
-     TypeDecl (loc_ij 2 5, $3, $5, []) }
-
-
+     TypeDecl (loc_i 2, $2, $3, Record $5 ) }
 | LOGIC ac_modifier list1_ident_sep_comma COLON logic_type
    { if qualif then fprintf fmt "[rule] TR-Lexical-decl@.";
      Logic (loc (), $2, $3, $5) }
@@ -248,23 +242,7 @@ list1_constructors_sep_bar:
 
 lexpr:
 
-/* constants */
-| INTEGER
-   { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
-     mk_pp (PPconst (ConstInt $1)) }
-| NUM
-   { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
-     mk_pp (PPconst (ConstReal $1)) }
-| TRUE
-   { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
-     mk_pp (PPconst ConstTrue) }
-| FALSE
-   { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
-     mk_pp (PPconst ConstFalse) }    
-| VOID 
-   { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
-     mk_pp (PPconst ConstVoid) }    
-
+| simple_expr { $1 }
 
 /* binary operators */
 
@@ -323,29 +301,13 @@ lexpr:
    { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
      mk_pp (PPconcat($1, $3)) }
 
-/* arrays */
+/* reachability */
 
-| lexpr LEFTSQ lexpr RIGHTSQ
-    { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
-      mk_pp(PPget($1, $3)) }
-| lexpr LEFTSQ array_assignements RIGHTSQ
-    { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
-      let acc, l = match $3 with
-	| [] -> assert false
-	| (i, v)::l -> mk_pp (PPset($1, i, v)), l 
-      in
-      List.fold_left (fun acc (i,v) -> mk_pp (PPset(acc, i, v))) acc l
-    }
 | REACH LEFTPAR lexpr COMMA lexpr COMMA lexpr RIGHTPAR
    { mk_pp (PPreach ($3, $5, $7)) }
 
 /* predicate or function calls */
-| ident
-   { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
-     mk_pp (PPvar $1) }
-| ident LEFTPAR list0_lexpr_sep_comma RIGHTPAR 
-   { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
-     mk_pp (PPapp ($1, $3)) }
+
 | DISTINCT LEFTPAR list2_lexpr_sep_comma RIGHTPAR 
    { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
      mk_pp (PPdistinct $3) }
@@ -375,6 +337,62 @@ lexpr:
 | LEFTPAR lexpr RIGHTPAR
    { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
      $2 }
+;
+
+simple_expr : 
+
+/* constants */
+| INTEGER
+   { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
+     mk_pp (PPconst (ConstInt $1)) }
+| NUM
+   { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
+     mk_pp (PPconst (ConstReal $1)) }
+| TRUE
+   { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
+     mk_pp (PPconst ConstTrue) }
+| FALSE
+   { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
+     mk_pp (PPconst ConstFalse) }    
+| VOID 
+   { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
+     mk_pp (PPconst ConstVoid) }    
+| ident
+   { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
+     mk_pp (PPvar $1) }
+
+/* records */
+
+| LEFTBR list1_label_expr_sep_PV RIGHTBR
+   { mk_pp (PPrecord $2) }
+
+| LEFTBR simple_expr WITH list1_label_expr_sep_PV RIGHTBR
+    { mk_pp (PPwith($2, $4)) }
+
+| simple_expr DOT ident
+   { mk_pp (PPdot($1, $3)) }
+
+/* function or predicat calls */
+
+| ident LEFTPAR list0_lexpr_sep_comma RIGHTPAR 
+   { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
+     mk_pp (PPapp ($1, $3)) }
+
+
+/* arrays */
+
+| simple_expr LEFTSQ lexpr RIGHTSQ
+    { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
+      mk_pp(PPget($1, $3)) }
+| simple_expr LEFTSQ array_assignements RIGHTSQ
+    { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
+      let acc, l = match $3 with
+	| [] -> assert false
+	| (i, v)::l -> mk_pp (PPset($1, i, v)), l 
+      in
+      List.fold_left (fun acc (i,v) -> mk_pp (PPset(acc, i, v))) acc l
+    }
+
 ;
 
 array_assignements:
@@ -438,11 +456,42 @@ relation:
 | NOTEQ { PPneq }
 ;
 
+record_type:
+| LEFTBR list1_label_sep_PV RIGHTBR
+   { $2 }
+;
+
+list1_label_sep_PV:
+| label_with_type                         { [$1] }
+| label_with_type PV list1_label_sep_PV   { $1::$3 }
+;
+
+label_with_type:
+| ident COLON primitive_type
+   { $1,$3 }
+;
+
+
+list1_label_expr_sep_PV:
+| ident EQUAL lexpr
+   { [$1, $3] }
+| ident EQUAL lexpr PV list1_label_expr_sep_PV
+   { ($1, $3) :: $5 }
+;
+
 type_var:
 | QUOTE ident 
     { if qualif then fprintf fmt "[rule] TR-Lexical-car-type@.";
       $2 }
 ;
+
+type_vars:
+| /* empty */
+  { [] }
+| type_var 
+   { [$1] }
+| LEFTPAR list1_type_var_sep_comma RIGHTPAR 
+   { $2 }
 
 list1_type_var_sep_comma:
 | type_var                                { [$1] }

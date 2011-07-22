@@ -72,6 +72,11 @@ let rec make_term {c = { tt_ty = ty; tt_desc = tt }} =
 	T.make (Symbols.Op Symbols.Extract) [t1; t2; t3] ty
     | TTconcat (t1, t2) ->
 	T.make (Symbols.Op Symbols.Concat) [make_term t1; make_term t2] ty
+    | TTdot (t, s) -> 
+	T.make (Symbols.Op (Symbols.Access s)) [make_term t] ty
+    | TTrecord lbs -> 
+	let lbs = List.map (fun (_, t) -> make_term t) lbs in
+	T.make (Symbols.Op Symbols.Record) lbs ty
     | TTlet (s, t1, t2) ->
 	let t1 = make_term t1 in
 	let subst = Symbols.Map.add s t1 Symbols.Map.empty, Ty.esubst in

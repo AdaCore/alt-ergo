@@ -74,6 +74,10 @@ let rec depth_tterm t =
 	0 (* arithmetic triggers are not suitable *)
     | TTget (t1, t2) | TTconcat (t1, t2) ->
 	max (depth_tterm t1) (depth_tterm t2)
+    | TTdot(t, _) -> 1 + depth_tterm t
+    | TTrecord lbs ->
+	1 + (List.fold_left 
+	       (fun acc (lb, t) -> max (depth_tterm t) acc) 0 lbs)
     | TTset (t1, t2, t3) | TTextract (t1, t2, t3) ->
 	max (depth_tterm t1) (max (depth_tterm t2) (depth_tterm t3))
     | TTlet (s, t1, t2) ->
@@ -154,6 +158,32 @@ let rec compare_tterm t1 t2 =
 	if c<>0 then c else compare_tterm t2 u2
     | TTconcat _, _ -> -1
     | _, TTconcat _ -> 1
+    | TTdot(t1, a1), TTdot(t2,a2) ->
+	let c = compare a1 a2 in
+	if c<>0 then c else
+	  compare_tterm t1 t2
+    | TTdot _, _ -> -1
+    | _, TTdot _ -> 1
+    | TTrecord lbs1, TTrecord lbs2 ->
+	let s1 = List.length lbs1 in
+	let s2 = List.length lbs2 in
+	let c = compare s1 s2 in
+	if c <> 0 then c
+	else
+	  begin
+	    try
+	      List.iter2 
+		(fun (lb1, t1) (lb2, t2) -> 
+		   let c = Hstring.compare lb1 lb2 in
+		   if c<>0 then raise (Out c);
+		   let c = compare_tterm t1 t2 in
+		   if c<>0 then raise (Out c)) 
+		lbs1 lbs2;
+	      0
+	    with Out n -> n
+	  end
+    | TTrecord _, _ -> -1
+    | _, TTrecord _ -> 1
     | TTlet (s1, t1, u1) , TTlet (s2, t2, u2) ->
 	let c = Symbols.compare s1 s2 in
 	if c<>0 then c else

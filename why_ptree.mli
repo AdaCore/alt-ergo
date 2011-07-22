@@ -54,6 +54,9 @@ and pp_desc =
   | PPprefix of pp_prefix * lexpr
   | PPget of lexpr * lexpr
   | PPset of lexpr * lexpr * lexpr
+  | PPdot of lexpr * string
+  | PPrecord of (string * lexpr) list
+  | PPwith of lexpr * (string * lexpr) list
   | PPreach of lexpr * lexpr * lexpr
   | PPextract of lexpr * lexpr * lexpr
   | PPconcat of lexpr * lexpr
@@ -71,6 +74,11 @@ type plogic_type =
 
 type name_kind = Symbols.name_kind
 
+type body_type_decl = 
+  | Record of (string * ppure_type) list  (* lbl : t *)
+  | Enum of string list
+  | Abstract
+
 type decl = 
   | Axiom of loc * string * lexpr
   | Rewriting of loc * string * lexpr list
@@ -79,7 +87,7 @@ type decl =
   | Predicate_def of loc * string * (loc * string * ppure_type) list * lexpr
   | Function_def 
       of loc * string * (loc * string * ppure_type) list * ppure_type * lexpr
-  | TypeDecl of loc * string list * string * string list
+  | TypeDecl of loc * string list * string * body_type_decl
 
 type file = decl list
 
@@ -111,6 +119,8 @@ and 'a tt_desc =
   | TTextract of 
       ('a tterm, 'a) annoted * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
   | TTconcat of ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
+  | TTdot of ('a tterm, 'a) annoted * Hstring.t
+  | TTrecord of (Hstring.t * ('a tterm, 'a) annoted) list
   | TTlet of Symbols.t * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
 
 type 'a tatom = 
@@ -162,7 +172,7 @@ type 'a tdecl =
   | TFunction_def of 
       loc * string * (string * ppure_type) list * 
 	ppure_type * ('a tform, 'a) annoted
-  | TTypeDecl of loc * string list * string * string list
+  | TTypeDecl of loc * string list * string * body_type_decl
 
 
 (* Sat entry *)

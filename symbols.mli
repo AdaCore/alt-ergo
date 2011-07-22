@@ -16,7 +16,8 @@
 (**************************************************************************)
 
 type operator = 
-    Plus | Minus | Mult | Div | Modulo | Concat | Extract | Get | Set | Reach
+  | Plus | Minus | Mult | Div | Modulo | Concat | Extract 
+  | Get | Set | Reach | Access of Hstring.t | Record
 
 type name_kind = Ac | Constructor | Other
 

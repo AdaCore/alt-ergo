@@ -21,8 +21,10 @@ type error =
   | BitvExtract of int*int
   | BitvExtractRange of int*int
   | ClashType of string
+  | ClashLabel of string * string
   | ClashParam of string
-  | TypeBadArityDecl
+  | TypeDuplicateVar of string
+  | UnboundedVar of string
   | UnknownType of string
   | WrongArity of string * int
   | SymbAlreadyDefined of string 
@@ -38,7 +40,15 @@ type error =
   | ShouldHaveTypeBitv of Ty.t
   | ArrayIndexShouldHaveTypeInt
   | ShouldHaveTypeArray
+  | ShouldHaveTypeRecord of Ty.t
+  | ShouldBeARecord
+  | ShouldHaveLabel of string * string
+  | NoLabelInType of Hstring.t * Ty.t
   | ShouldHaveTypeProp
+  | NoRecordType of Hstring.t
+  | DuplicateLabel of Hstring.t
+  | WrongLabel of Hstring.t * Ty.t
+  | WrongNumberOfLabels
   | Notrigger 
   | CannotGeneralize
   | SyntaxError
