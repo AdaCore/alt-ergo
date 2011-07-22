@@ -462,7 +462,7 @@ let decls_of_command (acc, predicates) = function
     let rec make_vt = function
       | nb when nb = n -> []
       | nb -> (Printf.sprintf "\'a%d" nb)::(make_vt (nb + 1)) in
-    (TypeDecl (pos, make_vt n, string_of_symbol sy, []))::acc, predicates
+    (TypeDecl (pos, make_vt n, string_of_symbol sy, Abstract))::acc, predicates
   | CDefineSort (pos, sy, (_, syl), so) -> assert false
   | CDeclareFun (pos, sy, (_, sol), so) ->
     let ppt = ppure_type_of_sort so in

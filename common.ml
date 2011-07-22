@@ -22,8 +22,10 @@ type error =
   | BitvExtract of int*int
   | BitvExtractRange of int*int
   | ClashType of string
+  | ClashLabel of string * string
   | ClashParam of string
-  | TypeBadArityDecl
+  | TypeDuplicateVar of string
+  | UnboundedVar of string
   | UnknownType of string
   | WrongArity of string * int
   | SymbAlreadyDefined of string 
@@ -39,7 +41,15 @@ type error =
   | ShouldHaveTypeBitv of Ty.t
   | ArrayIndexShouldHaveTypeInt
   | ShouldHaveTypeArray
+  | ShouldHaveTypeRecord of Ty.t
+  | ShouldBeARecord
+  | ShouldHaveLabel of string * string
+  | NoLabelInType of Hstring.t * Ty.t
   | ShouldHaveTypeProp
+  | NoRecordType of Hstring.t
+  | DuplicateLabel of Hstring.t
+  | WrongLabel of Hstring.t * Ty.t
+  | WrongNumberOfLabels
   | Notrigger 
   | CannotGeneralize
   | SyntaxError
@@ -56,10 +66,14 @@ let report fmt = function
       fprintf fmt "the type %s is already defined" s
   | ClashParam s -> 
       fprintf fmt "parameter %s is bound twice" s
+  | ClashLabel (s,t) -> 
+      fprintf fmt "the label %s already appears in type %s" s t
   | CannotGeneralize -> 
       fprintf fmt "cannot generalize the type of this expression"
-  | TypeBadArityDecl -> 
-      fprintf fmt "bad arity declaration"
+  | TypeDuplicateVar s ->
+      fprintf fmt "duplicate type variable %s" s
+  | UnboundedVar s ->
+      fprintf fmt "unbounded variable %s" s
   | UnknownType s -> 
       fprintf fmt "unknown type %s" s
   | WrongArity(s,n) -> 
@@ -94,8 +108,25 @@ let report fmt = function
 	Ty.print t
   | ShouldHaveTypeArray ->
       fprintf fmt "this expression should have type farray"
+  | ShouldHaveTypeRecord t ->
+      fprintf fmt "this expression has type %a but it should have a record type"
+	Ty.print t
+  | ShouldBeARecord ->
+      fprintf fmt "this expression should have a record type"
+  | ShouldHaveLabel (s, a) ->
+      fprintf fmt "this expression has type %s which has no label %s" s a
+  | NoLabelInType (lb, ty) ->
+      fprintf fmt "no label %s in type %a" (Hstring.view lb) Ty.print ty
   | ShouldHaveTypeProp -> 
       fprintf fmt "this expression should have type prop"
+  | NoRecordType s ->
+      fprintf fmt "no record type has label %s" (Hstring.view s)
+  | DuplicateLabel s -> 
+      fprintf fmt "label %s is defined several times" (Hstring.view s)
+  | WrongLabel (s, ty) -> 
+      fprintf fmt "wrong label %s in type %a" (Hstring.view s) Ty.print ty
+  | WrongNumberOfLabels -> 
+      fprintf fmt "wrong number of labels"
   | ArrayIndexShouldHaveTypeInt -> 
       fprintf fmt "index of arrays should hava type int"
   | Notrigger -> 
@@ -135,6 +166,13 @@ let rec print_term fmt t = match t.c.tt_desc with
       fprintf fmt "%a^{%a,%a}" print_term t1 print_term t2 print_term t3
   | TTconcat (t1, t2) ->
       fprintf fmt "%a @ %a" print_term t1 print_term t2
+  | TTdot (t1, s) ->
+      fprintf fmt "%a.%s" print_term t1 (Hstring.view s)
+  | TTrecord l ->
+      fprintf fmt "{ ";
+      List.iter 
+	(fun (s, t) -> fprintf fmt "%s = %a" (Hstring.view s) print_term t) l;
+      fprintf fmt " }"
   | TTlet (s, t1, t2) ->
       fprintf fmt "let %a=%a in %a" Symbols.print s print_term t1 print_term t2
 

@@ -437,8 +437,17 @@ and X1 : Sig.THEORY  with type t = TX1.t and type r = CX.r =
        let embed =  CX.embed1
      end)
 
-and X2 : Sig.THEORY with type r = CX.r and type t = CX.r Pairs.abstract =
+(*and X2 : Sig.THEORY with type r = CX.r and type t = CX.r Pairs.abstract =
   Pairs.Make
+    (struct
+       include CX
+       let extract = extract2
+       let embed = embed2
+     end)
+*)
+
+and X2 : Sig.THEORY with type r = CX.r and type t = CX.r Records.abstract =
+  Records.Make
     (struct
        include CX
        let extract = extract2

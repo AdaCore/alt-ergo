@@ -44,37 +44,6 @@ module T = Make(H)
   
 let view t = t
 
-(* fresh variables must be smaller than problem's variables.
-   thus, Instead of comparinf t1.tag with t2.tag, 
-   we compare t2.tag and t1.tag
-   But we keep true and false as repr
- *)
-let compare t1 t2 =
-  let c = Pervasives.compare t2.tag t1.tag in
-  if c = 0 then c else
-  match (view t1).f, (view t2).f with
-    | (Sy.True | Sy.False ), _ -> -1
-    | _, (Sy.True | Sy.False ) -> 1
-    | _,_ -> c
-
-let sort = List.sort compare
-
-let make s l ty = T.hashcons {f=s;xs=l;ty=ty;tag=0 (* dumb_value *) }
-
-let fresh_name ty = make (Sy.name (Common.fresh_string())) [] ty
-
-let shorten t = 
-  let {f=f;xs=xs;ty=ty} = view t in
-  make f xs (Ty.shorten ty)
-
-let vrai = make (Sy.True) [] Ty.Tbool
-let faux = make (Sy.False) [] Ty.Tbool
-let void = make (Sy.Void) [] Ty.Tunit
-
-let int i = make (Sy.int i) [] Ty.Tint
-let real r = make (Sy.real r) [] Ty.Treal
-let bitv bt ty = make (Sy.Bitv bt) [] ty
-
 let rec print fmt t = 
   let {f=x;xs=l;ty=ty} = view t in
   match x, l with
@@ -109,6 +78,41 @@ and print_list fmt = function
   | [] -> ()
   | [t] -> print fmt t
   | t::l -> Format.fprintf fmt "%a,%a" print t print_list l
+
+
+
+
+(* fresh variables must be smaller than problem's variables.
+   thus, Instead of comparinf t1.tag with t2.tag, 
+   we compare t2.tag and t1.tag
+   But we keep true and false as repr
+ *)
+let compare t1 t2 =
+  let c = Pervasives.compare t2.tag t1.tag in
+  if c = 0 then c else
+  match (view t1).f, (view t2).f with
+    | (Sy.True | Sy.False ), _ -> -1
+    | _, (Sy.True | Sy.False ) -> 1
+    | _,_ -> c
+
+let sort = List.sort compare
+
+let make s l ty = T.hashcons {f=s;xs=l;ty=ty;tag=0 (* dumb_value *) }
+
+let fresh_name ty = make (Sy.name (Common.fresh_string())) [] ty
+
+let shorten t = 
+  let {f=f;xs=xs;ty=ty} = view t in
+  make f xs (Ty.shorten ty)
+
+let vrai = make (Sy.True) [] Ty.Tbool
+let faux = make (Sy.False) [] Ty.Tbool
+let void = make (Sy.Void) [] Ty.Tunit
+
+let int i = make (Sy.int i) [] Ty.Tint
+let real r = make (Sy.real r) [] Ty.Treal
+let bitv bt ty = make (Sy.Bitv bt) [] ty
+
 
 let is_int t = (view t).ty= Ty.Tint
 let is_real t = (view t).ty= Ty.Treal

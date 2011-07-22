@@ -241,7 +241,7 @@ let fsig_to_fdef (pos,fsig) =
                     curry_sort_to_type fsig.fres ))
 
 let sortdecl_to_type (pos,s) =
-  TypeDecl (pos,[], s, [])
+  TypeDecl (pos,[], s, Abstract)
     
 
 let bench_to_why = function

@@ -71,7 +71,9 @@
 	"type", TYPE;
 	"unit", UNIT;
 	"void", VOID;
-        "reach", REACH;]
+        "reach", REACH;
+	"with", WITH
+      ]
 	       
   let newline lexbuf =
     let pos = lexbuf.lex_curr_p in

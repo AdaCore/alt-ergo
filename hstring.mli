@@ -30,3 +30,5 @@ val compare : t -> t -> int
 val hash : t -> int
 
 val empty : t 
+
+val list_assoc : t -> (t * 'a) list -> 'a

@@ -35,3 +35,7 @@ let compare s1 s2 = compare s1.tag s2.tag
 let hash s = s.tag
 
 let empty = make ""
+
+let rec list_assoc x = function
+  | [] -> raise Not_found
+  | (y, v) :: l -> if equal x y then v else list_assoc x l

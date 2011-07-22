@@ -254,7 +254,7 @@ module Make ( R : Sig.X ) = struct
       in di_un ([],[],[]) (l_1,l_2)
 
 
-    (* mise en forme normale modulo env *)
+    (* Debut : Code pour la mise en forme normale modulo env *)
     exception List_minus_exn
     let list_minus l_1 l_2 = 
       let rec di_un l1 l_1 l_2 = 
@@ -333,6 +333,9 @@ module Make ( R : Sig.X ) = struct
       if rewriting && verbose then 
         fprintf fmt "canon %a = %a@." R.print r R.print rr;
       rr,ex
+
+    (* Fin : Code pour la mise en forme normale modulo env *)
+
 
     let find_or_normal_form env r =
       try MapR.find r env.repr with Not_found -> normal_form env r

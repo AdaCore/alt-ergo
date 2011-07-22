@@ -70,11 +70,11 @@ module type THEORY = sig
   (** Name of the theory*)
   val name : string
   (** return true if the atom is owned by the theory*)
-  val is_mine_a : Literal.LT.t -> bool
+  (*val is_mine_a : Literal.LT.t -> bool*)
   (** return true if the symbol is owned by the theory*)
   val is_mine_symb : Symbols.t -> bool
   (** return true if the type is owned by the theory*)
-  val is_mine_type : t -> bool
+  (*val is_mine_type : t -> bool*)
 
   (** return true when the argument is an unsolvable function of the theory *)
   val unsolvable : t -> bool

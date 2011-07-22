@@ -18,8 +18,8 @@
 open Hashcons
 
 type operator = 
-    Plus | Minus | Mult | Div | Modulo 
-  | Concat | Extract | Get | Set | Reach
+  | Plus | Minus | Mult | Div | Modulo | Concat | Extract 
+  | Get | Set | Reach | Access of Hstring.t | Record
 
 type name_kind = Ac | Constructor | Other
 
@@ -56,18 +56,21 @@ let compare_kind k1 k2 = match k1, k2 with
   | _    , Other -> -1
   | Constructor, Constructor -> 0
 
-let compare s1 s2 =  match s1,s2 with
-  | Name (n1,k1) , Name (n2,k2) -> 
+let compare s1 s2 =  match s1, s2 with
+  | Name (n1,k1), Name (n2,k2) -> 
       let c = compare_kind k1 k2 in
       if c = 0 then Hstring.compare n1 n2 else c
-  | Name _ , _ ->  -1
-  | _ , Name _ -> 1
-  | Var n1 , Var n2 -> Hstring.compare n1 n2
-  | Var _ , _ -> -1
-  | _ , Var _ -> 1
-  | Int i1 , Int i2 -> Hstring.compare i1 i2
-  | Int _ , _ -> -1
-  | _ , Int _ -> 1
+  | Name _, _ ->  -1
+  | _, Name _ -> 1
+  | Var n1, Var n2 -> Hstring.compare n1 n2
+  | Var _, _ -> -1
+  | _ ,Var _ -> 1
+  | Int i1, Int i2 -> Hstring.compare i1 i2
+  | Int _, _ -> -1
+  | _ ,Int _ -> 1
+  | Op(Access s1), Op(Access s2) -> Hstring.compare s1 s2
+  | Op(Access _), _ -> -1
+  | _, Op(Access _) -> 1
   | _  -> Pervasives.compare s1 s2
   
 let equal s1 s2 = compare s1 s2 = 0
@@ -76,11 +79,12 @@ let hash = function
   | Name (n,Ac) -> Hstring.hash n * 19 + 1
   | Name (n,_) -> Hstring.hash n * 19
   | Var n (*| Int n*) -> Hstring.hash n * 19 + 1
+  | Op (Access s) -> Hstring.hash s + 19
   | s -> Hashtbl.hash s
 	
 let to_string =  function
   | Name (n,_) -> Hstring.view n
-  | Var x -> (Hstring.view x)
+  | Var x -> "*var* "^(Hstring.view x)
   | Int n -> Hstring.view n
   | Real n -> Hstring.view n
   | Bitv s -> "[|"^s^"|]"
@@ -89,6 +93,10 @@ let to_string =  function
   | Op Mult -> "*"
   | Op Div -> "/"
   | Op Modulo -> "%"
+  | Op (Access s) -> "@Access_"^(Hstring.view s) 
+  | Op Record -> "@Record"
+  | Op Get -> "get"
+  | Op Set -> "set"
   | True -> "true"
   | False -> "false"
   | Void -> "void"
@@ -104,7 +112,6 @@ let fresh =
 
 let is_get f = equal f (Op Get) 
 let is_set f = equal f (Op Set)
-
 
 module Map =
   Map.Make(struct type t' = t type t=t' let compare=compare end)
