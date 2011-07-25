@@ -48,8 +48,7 @@ module STRS = Set.Make(
     let compare (t1,_,_) (t2,_,_) = compare_term t1 t2
   end)
 
-let sort = 
-  List.sort (fun l1 l2 -> compare (List.length l1) (List.length l2) )
+let sort = List.sort (fun l1 l2 -> compare (List.length l1) (List.length l2))
       
 let compare_tconstant c1 c2 =
   match c1, c2 with
@@ -234,35 +233,33 @@ module SLLT =
   Set.Make(
     struct 
       type t = (int tterm, int) annoted list * Vterm.t * Vtype.t
-      let compare (_, y1, _) (_, y2, _)  = 
-	Vterm.compare y1 y2
+      let compare (_, y1, _) (_, y2, _)  = Vterm.compare y1 y2
     end)
 
 let parties bv vty l = 
   let rec parties_rec (llt, llt_ok)  l = 
     match l with 
-	[] -> llt_ok
+      | [] -> llt_ok
       | (t, bv1, vty1)::l -> 
 	  let llt, llt_ok = 
 	    SLLT.fold
 	      (fun (l, bv2, vty2) (llt, llt_ok) ->
-		 let lt, bv3, vty3 = 
-		   t::l, Vterm.union bv2 bv1, Vtype.union vty2 vty1 
-		 in 
-		 let e = (lt, bv3, vty3) in
+		 let bv3 = Vterm.union bv2 bv1 in
+		 let vty3 = Vtype.union vty2 vty1 in
+		 let e = t::l, bv3, vty3 in
 		 if Vterm.subset bv bv3 && Vtype.subset vty vty3 then
 		   llt, SLLT.add e llt_ok
 		 else 
 		   SLLT.add e llt, llt_ok) 
 	      llt (llt, llt_ok)
 	  in
-	  parties_rec (SLLT.add ([t],bv1,vty1) llt, llt_ok) l
+	  parties_rec (SLLT.add ([t], bv1, vty1) llt, llt_ok) l
   in 
   SLLT.elements (parties_rec (SLLT.empty, SLLT.empty) l)
 	 
 let strict_subset bv vty = 
   List.exists 
-    (fun (_,bv',vty') -> 
+    (fun (_, bv',vty') -> 
        (Vterm.subset bv bv' && not(Vterm.equal bv bv')  
 	&& Vtype.subset vty vty') 
        or (Vtype.subset vty vty' && not(Vtype.equal vty vty') 
@@ -310,7 +307,7 @@ let underscoring_term mvars underscores t =
 let underscoring_mt bv mt = 
   let vars , mvars = 
     List.fold_left 
-      (fun (vars,mvars) t -> 
+      (fun (vars, mvars) t -> 
 	 let vs = vars_of_term bv Vterm.empty t in
 	 let mvars = Vterm.union mvars (Vterm.inter vars vs) in
 	 Vterm.union vars vs , mvars) (Vterm.empty,Vterm.empty) mt in
@@ -320,23 +317,17 @@ let underscoring_mt bv mt =
 let multi_triggers gopt bv vty trs =
   let terms = simplification bv vty trs in
   let l_parties = parties bv vty terms  in 
-  let lm = List.map (fun (lt,_,_) -> lt) l_parties in
-(*    List.fold_left 
-      (fun acc (lt, bv', vty') ->
-	 if Vterm.subset bv bv' && Vtype.subset vty vty' then lt::acc else acc) 
-      [] l_parties*)
+  let lm = List.map (fun (lt, _, _) -> lt) l_parties in
   let mv , mt = List.partition (List.exists is_var) lm in
   let mv , mt = sort mv , sort mt in
   let lm = if gopt || triggers_var then mt@mv else mt in
   let m = at_most redondance  lm in
-  (*(List.map (underscoring_mt bv) m)@
-    (List.map (underscoring_mt bv) (List.map List.rev m))*)
-  at_most redondance m 
+  at_most redondance m
 
 let rec vty_ty acc t = 
   let t = Ty.shorten t in
   match t with
-    | Ty.Tvar { Ty.v = i ; value = None } -> Vtype.add i acc 
+    | Ty.Tvar { Ty.v = i; value = None } -> Vtype.add i acc 
     | Ty.Text(l,_) -> List.fold_left vty_ty acc l
     | Ty.Tfarray (t1,t2) -> vty_ty (vty_ty acc t1) t2
     | _ -> acc
@@ -371,42 +362,40 @@ let csort = Symbols.name "c_sort"
 let filter_mono vterm vtype (t, bv_t, vty_t) = 
   Vterm.subset vterm bv_t && Vtype.subset vtype vty_t && 
     match t.c.tt_desc with
-      | TTapp(s,_) -> 
-	  not (Symbols.equal s csort)
+      | TTapp(s, _) -> not (Symbols.equal s csort)
       | _ -> true
-	    
-
+	  
 let as_bv bv s = not (Vterm.is_empty (Vterm.inter bv s))
 let as_tyv vty s = not (Vtype.is_empty (Vtype.inter vty s))
 
 let potential_triggers = 
-  let rec potential_rec ((bv,vty) as vars) acc t = 
+  let rec potential_rec ( (bv, vty) as vars) acc t = 
     let vty_t = vty_term Vtype.empty t in
     match t.c.tt_desc with
       | TTvar x ->
 	  if Vterm.mem x bv or as_tyv vty vty_t then
-	    STRS.add (t,Vterm.singleton x, vty_t) acc
+	    STRS.add (t, Vterm.singleton x, vty_t) acc
 	  else acc
       | TTapp(s,lf)-> 
 	  let vty_lf = List.fold_left vty_term vty_t lf in
 	  let bv_lf = List.fold_left (vars_of_term bv) Vterm.empty lf in
 	  if as_bv bv bv_lf or as_tyv vty vty_lf then
 	    List.fold_left (potential_rec vars) 
-	      (STRS.add (t,bv_lf,vty_lf) acc) lf
+	      (STRS.add (t, bv_lf, vty_lf) acc) lf
 	  else acc
       | TTinfix(t1,_,t2) | TTlet (_, t1, t2) -> (* XXX TTlet ? *)
 	  let vty_lf = List.fold_left vty_term vty_t [t1;t2] in
 	  let bv_lf = List.fold_left (vars_of_term bv) Vterm.empty [t1;t2] in
 	  if as_bv bv bv_lf or as_tyv vty vty_lf then
-	    List.fold_left (potential_rec vars) 
-	      (STRS.add (t,bv_lf,vty_lf) acc) (*acc*) [t1;t2]
+	    List.fold_left 
+	      (potential_rec vars) (STRS.add (t, bv_lf, vty_lf) acc) [t1;t2]
 	  else acc
       | TTset (t1, t2, t3) ->
 	  let vty_lf = List.fold_left vty_term vty_t [t1;t2;t3] in
 	  let bv_lf = List.fold_left (vars_of_term bv) Vterm.empty [t1;t2;t3] in
 	  if as_bv bv bv_lf or as_tyv vty vty_lf then
 	    List.fold_left (potential_rec vars) 
-	      (STRS.add (t,bv_lf,vty_lf) acc) (*acc*) [t1;t2;t3]
+	      (STRS.add (t, bv_lf, vty_lf) acc) [t1;t2;t3]
 	  else acc
 	    
       | TTget (t1, t2) ->
@@ -414,13 +403,13 @@ let potential_triggers =
 	  let bv_lf = List.fold_left (vars_of_term bv) Vterm.empty [t1;t2] in
 	  if as_bv bv bv_lf or as_tyv vty vty_lf then
 	    List.fold_left (potential_rec vars) 
-	      (STRS.add (t,bv_lf,vty_lf) acc) (*acc*) [t1;t2]
+	      (STRS.add (t, bv_lf, vty_lf) acc) [t1;t2]
 	  else acc
       | _ -> acc
 
   in fun vars -> List.fold_left (potential_rec vars) STRS.empty
 
-let filter_good_triggers (bv,vty) = 
+let filter_good_triggers (bv, vty) = 
   List.filter 
     (fun l ->
        let s1 = List.fold_left (vars_of_term bv) Vterm.empty l in
@@ -432,28 +421,39 @@ let make_triggers gopt vterm vtype trs =
       [] -> 
 	multi_triggers gopt vterm vtype trs
     | trs' -> 
-	let f l = at_most redondance (List.map (fun (t,_,_) -> [t]) l) in
-	let trs_v, trs_nv = 
-	  List.partition (fun (t,_,_) -> is_var t) trs' in
+	let f l = at_most redondance (List.map (fun (t, _, _) -> [t]) l) in
+	let trs_v, trs_nv = List.partition (fun (t, _, _) -> is_var t) trs' in
 	let ll = 
 	  if trs_nv=[] then
 	    if triggers_var || gopt then 
 	      f trs_v 
-	    else [](*multi_triggers vars trs*)
+	    else [] (*multi_triggers vars trs*)
 	  else f trs_nv 
 	in 
 	if glouton then ll@(multi_triggers gopt vterm vtype trs) else ll
 
 let rec make_rec gopt vterm vtype f = 
   let c, trs = match f.c with
-    | TFatom {c=(TAfalse | TAtrue)} ->
-      f.c, STRS.empty
+    | TFatom {c = (TAfalse | TAtrue)} ->
+	f.c, STRS.empty
     | TFatom a ->
       if Vterm.is_empty vterm && Vtype.is_empty vtype then 
 	f.c, STRS.empty
       else 
 	let l = match a.c with    
-	  | TAeq l | TAneq l | TAle l | TAlt l | TAbuilt(_,l) -> l
+	  | TAeq l -> 
+	      let v = {tt_desc = TTapp(Common.fake_eq, l); tt_ty = Ty.Tbool} in
+	      [ { c = v; annot = a.annot } ]
+	  | TAneq ([t1; t2] as l)-> 
+	      let v ={ tt_desc = TTapp(Common.fake_neq, l); tt_ty = Ty.Tbool} in
+	      [ { c = v; annot = a.annot } ]
+	  | TAle l -> 
+	      let v ={ tt_desc = TTapp(Common.fake_le, l); tt_ty = Ty.Tbool} in
+	      [ { c = v; annot = a.annot } ]
+	  | TAlt l ->
+	      let v ={ tt_desc = TTapp(Common.fake_lt, l); tt_ty = Ty.Tbool} in
+	      [ { c = v; annot = a.annot } ]
+	  | TAneq l | TAbuilt(_,l) -> l
 	  | TApred t -> [t]
 	  | _ -> assert false
 	in
@@ -524,7 +524,7 @@ let rec make_rec gopt vterm vtype f =
       in
       let trs = 
 	STRS.filter 
-	  (fun (_,bvt,_) -> Vterm.is_empty (Vterm.inter bvt vterm')) trs in
+	  (fun (_, bvt, _) -> Vterm.is_empty (Vterm.inter bvt vterm')) trs in
       let r  = {qf with qf_triggers = trs' ; qf_form = f'} in
       (match f.c with 
 	| TFforall _ -> TFforall r , trs 

@@ -211,8 +211,7 @@ let print_binder fmt (s, t) =
 let print_binders fmt l = 
   List.iter (fun c -> fprintf fmt "%a, " print_binder c) l
 
-let print_triggers fmt ll = 
-  List.iter (fun l -> fprintf fmt "%a | " print_term_list l) ll
+let print_triggers fmt = List.iter (fprintf fmt "%a | " print_term_list)
  
 let rec print_formula fmt f = 
   match f.c with
@@ -239,4 +238,8 @@ let fresh_string =
     incr cpt;
     "!k" ^ (string_of_int !cpt)
 
+let fake_eq =  Symbols.name "@eq"
+let fake_neq =  Symbols.name "@neq"
+let fake_lt =  Symbols.name "@lt"
+let fake_le =  Symbols.name "@le"
 

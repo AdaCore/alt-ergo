@@ -24,7 +24,7 @@ module Sy = Symbols
 
 type lemma = {
   qvars: Sy.Set.t;
-  triggers : T.t list list;
+  triggers : (T.t list * Literal.LT.t option) list;
   main : t;
   name : string
 }
@@ -66,11 +66,11 @@ module View = struct
 	
   let rec compare_pclause v1 v2 = match v1 , v2 with
     | Unit(x1,y1) , Unit(x2,y2) -> 
-	  let c = compare_t x1 x2 in if c<>0 then c else compare_t y1 y2
+	let c = compare_t x1 x2 in if c<>0 then c else compare_t y1 y2
     | Unit _ , _ -> -1
     | _, Unit _ -> 1
     | Clause(x1,y1) , Clause(x2,y2) -> 
-	  let c = compare_t x1 x2 in if c<>0 then c else compare_t y1 y2
+	let c = compare_t x1 x2 in if c<>0 then c else compare_t y1 y2
     | Clause _ , _ -> -1
     | _ , Clause _ -> 1
     | Literal a1 , Literal a2 -> Literal.LT.compare a1 a2
@@ -93,14 +93,15 @@ module View = struct
     if c<>0 then c else
       let c = Sy.Set.compare l1.qvars l2.qvars in
       if c<>0 then c else 
-	compare_list (compare_list T.compare) l1.triggers l2.triggers
-  and compare_skolem s1 s2 = 
+	compare_list (fun (t1,_) (t2,_) -> compare_list T.compare t1 t2)
+	  l1.triggers l2.triggers
+ and compare_skolem s1 s2 = 
     let c = compare_t s1.sko_f s2.sko_f in
     if c<>0 then c else
-(*      let c = Ty.compare_subst s1.ssubst_ty s2.ssubst_ty in
-        if c<>0 then c else Sy.Map.compare T.compare s1.ssubst s2.ssubst*)
+      (*      let c = Ty.compare_subst s1.ssubst_ty s2.ssubst_ty in
+              if c<>0 then c else Sy.Map.compare T.compare s1.ssubst s2.ssubst*)
       Term.compare_subst s1.sko_subst s2.sko_subst
-  and compare_let l1 l2 =
+ and compare_let l1 l2 =
     let c = compare_t l1.let_f l2.let_f in
     if c<>0 then c else 
       let c = T.compare l1.let_term l2.let_term in
@@ -131,7 +132,10 @@ module View = struct
 
     | Lemma({triggers = lt1; main = (f1,_)}),
       Lemma({triggers = lt2; main = (f2,_)}) -> 
-	(try List.for_all2 (List.for_all2 T.equal) lt1 lt2 && f1==f2
+	(try 
+	   List.for_all2 
+	     (fun (l1, _) (l2, _) -> List.for_all2 T.equal l1 l2) lt1 lt2 && 
+	     f1==f2
 	 with Invalid_argument _ -> false)
 
     | Skolem {sko_subst = s1; sko_f = (f1, _)}, 
@@ -156,7 +160,7 @@ module View = struct
     | _, _ -> false
 	
   let hashlt = List.fold_left (fun acc x->acc*19 + T.hash x)
-  let hashllt = List.fold_left (fun acc x->acc*19 + hashlt 0 x)
+  let hashllt = List.fold_left (fun acc (x, _) ->acc*19 + hashlt 0 x)
     
   let hashc acc = function 
     | Unit((f1,_),(f2,_)) -> (* XXX : Same as Clause ? *)
@@ -213,7 +217,8 @@ let rec print fmt f =
       if verbose then
 	fprintf fmt "(lemma: %s)[%a] %a" 
 	  n
-	  (fun fmt -> List.iter (fprintf fmt "%a@ |" T.print_list)) 
+	  (fun fmt -> 
+	     List.iter (fun (l, _) -> fprintf fmt "%a@ |" T.print_list l)) 
 	  trs print f
       else 
 	fprintf fmt "lem %s" n
@@ -350,7 +355,8 @@ and iapply_subst ((s_t,s_ty) as subst) p n = match p, n with
       let s_t = Sy.Set.fold Sy.Map.remove vars s_t in
       let subst = s_t , s_ty in
       let f = apply_subst subst f in
-      let trs = List.map (List.map (T.apply_subst subst)) trs in
+      let trs =
+	List.map (fun (l, r) -> List.map (T.apply_subst subst) l, r) trs in
       let slem = Lemma({lem with triggers = trs; main = f}) in
 (*      let ssko = Skolem {sko with 
 	    ssubst = union_subst sko.ssubst subst;

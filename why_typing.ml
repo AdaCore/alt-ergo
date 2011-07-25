@@ -1070,13 +1070,11 @@ let rec monomorphize_form tf =
           {qf with
              qf_form = monomorphize_form qf.qf_form;
              qf_triggers = List.map (List.map mono_term) qf.qf_triggers}
-
     | TFexists qf ->
         TFexists 
           {qf with
              qf_form = monomorphize_form qf.qf_form;
              qf_triggers = List.map (List.map mono_term) qf.qf_triggers}
-
     | TFlet (l, sy, tt, tf) ->
         TFlet(l,sy, mono_term tt, monomorphize_form tf)
     | TFnamed (hs,tf) ->

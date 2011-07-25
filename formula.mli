@@ -19,7 +19,7 @@ type t
 
 type lemma =
     { qvars: Symbols.Set.t;  (* toplevel quantified variables *)
-      triggers : Term.t list list; (* multi-triggers *)
+      triggers : (Term.t list * Literal.LT.t option) list; (* multi-triggers *)
       main : t;  (* the main lemma's formula *)
       name : string; }
       
@@ -50,9 +50,11 @@ val mk_imp : t -> t -> int -> t
 val mk_if : Term.t -> t -> t -> int -> t
 val mk_iff : t -> t -> int -> t
 val mk_lit : Literal.LT.t -> int -> t
-val mk_forall : Term.Set.t -> Term.Set.t -> Term.t list list -> t ->
+val mk_forall : Term.Set.t -> Term.Set.t -> 
+  (Term.t list * Literal.LT.t option) list -> t ->
   string -> int -> t
-val mk_exists : Term.Set.t -> Term.Set.t -> Term.t list list -> t ->
+val mk_exists : Term.Set.t -> Term.Set.t -> 
+  (Term.t list * Literal.LT.t option) list -> t ->
   string -> int -> t
 val mk_let : Term.Set.t -> Symbols.t -> Term.t -> t -> int -> t
 

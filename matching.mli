@@ -18,6 +18,7 @@
 type gsubst = { sbt : Term.subst ; gen : int ; goal : bool}
 
 type trigger_info = {
+  trigger_query : Literal.LT.t option; 
   trigger_age : int ; 
   trigger_orig : Formula.t ; 
   trigger_formula : Formula.t ; 

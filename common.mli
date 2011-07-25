@@ -64,6 +64,11 @@ val print_term : Format.formatter -> ('a tterm, 'a) annoted -> unit
 val print_formula : Format.formatter -> ('a tform, 'a) annoted 
   -> unit
 val print_binders : Format.formatter -> (Symbols.t * Ty.t) list -> unit
-val print_triggers : Format.formatter -> ('a tterm, 'a) annoted list list 
-  -> unit
+val print_triggers : 
+  Format.formatter -> (('a tterm, 'a) annoted list) list  -> unit
 val fresh_string : unit -> string
+
+val fake_eq : Symbols.t
+val fake_neq : Symbols.t
+val fake_lt : Symbols.t
+val fake_le : Symbols.t
