@@ -175,12 +175,13 @@ let mtriggers env formulas max_size =
 	   match F.view lem with
 	       F.Lemma {F.triggers = tgs; main = f} -> 
 		 List.fold_left 
-		   (fun env tg ->
+		   (fun env (tg, a) ->
 		      let info = 
 			{ Matching.trigger_age = age ; 
 			  trigger_orig = lem ;
 			  trigger_formula = f ;
-			  trigger_dep = dep }
+			  trigger_dep = dep ; 
+			  trigger_query = a }
 		      in
 		      { env with 
 			  matching = 
@@ -195,18 +196,23 @@ let mtriggers env formulas max_size =
 
 let new_facts mode env = 
   List.fold_left
-    (fun acc ({Matching.trigger_formula=f; 
+    (fun acc ({Matching.trigger_formula=f; trigger_query = guard; 
 	       trigger_age=age; trigger_dep=dep }, subst_list) ->
        List.fold_left
 	 (fun acc {Matching.sbt=s;gen=g;goal=b} ->
-	    if mode && not b then acc
-	    else
-	      begin
-		let nf = F.apply_subst s f in
-		if MF.mem nf env.gamma then acc else
-		  let p = {f=nf;age=1+(max g age);name=Some f;mf=true;gf=b} in
-		  (p,dep)::acc
-	      end
+	    match guard with
+	      | Some a when 
+		  CcX.query (Literal.LT.apply_subst s a) env.tbox = No -> acc
+	      | _ ->
+		  if mode && not b then acc
+		  else
+		    begin
+		      let nf = F.apply_subst s f in
+		      if MF.mem nf env.gamma then acc else
+			let p = 
+			  {f=nf;age=1+(max g age);name=Some f;mf=true;gf=b} in
+			(p,dep)::acc
+		    end
 	 ) 
 	 acc subst_list
     )

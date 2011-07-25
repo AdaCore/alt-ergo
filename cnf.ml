@@ -83,6 +83,31 @@ let rec make_term {c = { tt_ty = ty; tt_desc = tt }} =
 	let t2 = make_term t2 in
 	T.apply_subst subst t2
 
+let make_trigger = function
+  | [{c={ tt_desc = TTapp(s, [t1; t2])}}] 
+      when Symbols.equal s Common.fake_eq -> 
+      let lit = A.LT.make (A.Eq (make_term t1, make_term t2)) in
+      [make_term t1; make_term t2], Some lit
+
+  | [{c={ tt_desc = TTapp(s, l) } }] when Symbols.equal s Common.fake_neq ->
+      let l = List.map make_term l in
+      let lit = A.LT.make (A.Distinct (false, l)) in
+      l, Some lit
+      
+  | [{c={ tt_desc = TTapp(s, l) } }] when Symbols.equal s Common.fake_le ->
+      let l = List.map make_term l in
+      let ale = Builtin.is_builtin "<=" in
+      let lit = A.LT.make (A.Builtin(true,ale,l)) in
+      l, Some lit
+
+  | [{c={ tt_desc = TTapp(s, l) } }] when Symbols.equal s Common.fake_lt -> 
+      let l = List.map make_term l in
+      let alt = Builtin.is_builtin "<" in
+      let lit = A.LT.make (A.Builtin(true,alt,l)) in
+      l, Some lit
+
+  | lt -> List.map make_term lt, None
+
 let make_form name f = 
   let rec make_form acc c id = match c with
     | TFatom a ->
@@ -153,7 +178,7 @@ let make_form name f =
     | (TFforall qf | TFexists qf) as f -> 
 	let bvars = varset_of_list qf.qf_bvars in
 	let upvars = varset_of_list qf.qf_upvars in
-	let trs = List.map (List.map make_term) qf.qf_triggers in
+	let trs = List.map make_trigger qf.qf_triggers in
 	let ff , lit = make_form acc qf.qf_form.c qf.qf_form.annot in
 	begin match f with
 	  | TFforall _ -> F.mk_forall upvars bvars trs ff name id, lit

@@ -30,6 +30,7 @@ type gsubst = {
 }
 
 type trigger_info = {
+  trigger_query : Literal.LT.t option ; 
   trigger_age : int ; (* age d'un trigger *)
   trigger_orig : Formula.t ; (* lemme d'origine *)
   trigger_formula : Formula.t ; (* formule associee au trigger *)
