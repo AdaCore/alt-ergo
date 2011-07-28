@@ -84,27 +84,39 @@ let rec make_term {c = { tt_ty = ty; tt_desc = tt }} =
 	T.apply_subst subst t2
 
 let make_trigger = function
-  | [{c={ tt_desc = TTapp(s, [t1; t2])}}] 
+  | [{c={ tt_desc = TTapp(s, t1::t2::l)}}] 
       when Symbols.equal s Common.fake_eq -> 
+      let trs = List.filter (fun t -> not (List.mem t l)) [t1; t2] in
+      let trs = List.map make_term trs in
       let lit = A.LT.make (A.Eq (make_term t1, make_term t2)) in
-      [make_term t1; make_term t2], Some lit
+      trs, Some lit
 
-  | [{c={ tt_desc = TTapp(s, l) } }] when Symbols.equal s Common.fake_neq ->
-      let l = List.map make_term l in
-      let lit = A.LT.make (A.Distinct (false, l)) in
-      l, Some lit
+  | [{c={ tt_desc = TTapp(s, t1::t2::l) } }] 
+      when Symbols.equal s Common.fake_neq ->
+      let trs = List.filter (fun t -> not (List.mem t l)) [t1; t2] in
+      let trs = List.map make_term trs in
+      let lit = A.LT.make (A.Distinct (false, [make_term t1; make_term t2])) in
+      trs, Some lit
       
-  | [{c={ tt_desc = TTapp(s, l) } }] when Symbols.equal s Common.fake_le ->
-      let l = List.map make_term l in
+  | [{c={ tt_desc = TTapp(s, t1::t2::l) } }] 
+      when Symbols.equal s Common.fake_le ->
+      let trs = List.filter (fun t -> not (List.mem t l)) [t1; t2] in
+      let trs = List.map make_term trs in
       let ale = Builtin.is_builtin "<=" in
-      let lit = A.LT.make (A.Builtin(true,ale,l)) in
-      l, Some lit
+      let lit = 
+	A.LT.make (A.Builtin(true, ale , [make_term t1; make_term t2])) 
+      in
+      trs, Some lit
 
-  | [{c={ tt_desc = TTapp(s, l) } }] when Symbols.equal s Common.fake_lt -> 
-      let l = List.map make_term l in
+  | [{c={ tt_desc = TTapp(s, t1::t2::l) } }] 
+      when Symbols.equal s Common.fake_lt -> 
+      let trs = List.filter (fun t -> not (List.mem t l)) [t1; t2] in
+      let trs = List.map make_term trs in
       let alt = Builtin.is_builtin "<" in
-      let lit = A.LT.make (A.Builtin(true,alt,l)) in
-      l, Some lit
+      let lit = 
+	A.LT.make (A.Builtin(true, alt, [make_term t1; make_term t2])) 
+      in
+      trs, Some lit
 
   | lt -> List.map make_term lt, None
 
@@ -127,19 +139,31 @@ let make_form name f =
 	      let lit = A.LT.make (A.Distinct (false, lt)) in
 	      lit , lit::acc
 	  | TAle [t1;t2] -> 
-	      (try 
-		 let ale = Builtin.is_builtin "<=" in
-		 let lit = 
-		   A.LT.make (A.Builtin(true,ale,[make_term t1;make_term t2]))
-		 in lit , lit::acc
-	       with Not_found -> assert false)
-	  | TAlt [t1;t2] ->  
-	      (try 
-		 let alt = Builtin.is_builtin "<" in
-		 let lit = 
-		   A.LT.make (A.Builtin(true,alt,[make_term t1;make_term t2])) 
-		 in lit , lit::acc
-	       with Not_found -> assert false)
+	      let ale = Builtin.is_builtin "<=" in
+	      let lit = 
+		A.LT.make (A.Builtin(true,ale,[make_term t1;make_term t2]))
+	      in lit , lit::acc
+ 	  | TAlt [t1;t2] ->  
+	      begin match t1.c.tt_ty with
+		| Ty.Tint -> 
+		    let one = 
+		      {c = {tt_ty = Ty.Tint; 
+			    tt_desc = TTconst(Tint "1")}; annot = t1.annot} in
+		    let tt2 = 
+		      T.make (Symbols.Op Symbols.Minus) 
+			[make_term t2; make_term one] Ty.Tint in
+		    let ale = Builtin.is_builtin "<=" in
+		    let lit = 
+		      A.LT.make (A.Builtin(true,ale,[make_term t1; tt2]))
+		    in lit , lit::acc
+		| _ -> 
+		    let alt = Builtin.is_builtin "<" in
+		    let lit = 
+		      A.LT.make 
+			(A.Builtin(true, alt, [make_term t1; make_term t2])) 
+		    in lit, lit::acc
+	      end
+
 	  (*| TTreach (t1, t2, t3) ->
 	let t1 = make_term t1 in
 	let t2 = make_term t2 in

@@ -267,11 +267,7 @@ module Env = struct
       
 end
 
-let new_id = 
-  let r = ref 0 in 
-  let next () = 
-    r := !r+1; !r 
-  in next
+let new_id = let r = ref 0 in fun () -> r := !r+1; !r
 
 let rec freevars_term acc t = match t.c.tt_desc with
   | TTvar x -> Sy.add x acc
@@ -557,20 +553,6 @@ let rec join_exists f = match f.pp_desc with
   | PPnamed (_, f) -> join_exists f
   | _ -> [] , f
 
-let make_le_or_lt p l = 
-  let s = match p with PPle -> "<=" | PPlt -> "<" | _ -> assert false in
-  try 
-    let _ = Builtin.is_builtin s in 
-    (match p with 
-      | PPle -> TAle l
-      | PPlt -> TAlt l
-      | _ -> assert false)
-  with Not_found -> 
-    let s = Symbols.name s in (* XXX *)
-    let t2 = {c={tt_desc=TTconst Ttrue;tt_ty=Ty.Tbool}; annot=new_id ()} in
-    let t1 = {c={tt_desc=TTapp(s,l);tt_ty=Ty.Tbool}; annot=new_id ()} in 
-    TAeq [t1;t2]
-
 let rec type_form env f = 
   let form, vars = match f.pp_desc with
     | PPconst ConstTrue -> 
@@ -611,7 +593,6 @@ let rec type_form env f =
 			   c = {tt_desc=TTapp(s,te_args); tt_ty=Ty.Tbool};
 			   annot=new_id (); } 
 			 in
-			 (* TFatom (TAeq[t1;{tt_desc=TTtrue;tt_ty=Ty.Tbool}]) *)
 			 TFatom { c = TApred t1; annot=new_id () })
 		    with 
 		      | Ty.TypeClash(t1,t2) -> 
@@ -673,66 +654,41 @@ let rec type_form env f =
           let f2,_ = type_form env q in
           TFop(OPand, [f1;f2])
 	in r, freevars_form r
-    | PPinfix(t1, (PPlt | PPgt | PPle | PPge | PPeq | PPneq as op) ,t2) -> 
-	let r = begin
+    | PPinfix(t1, (PPeq | PPneq as op), t2) -> 
+	let r = 
 	  let tt1 = type_term env t1 in
 	  let tt2 = type_term env t2 in
 	  try
 	    Ty.unify tt1.c.tt_ty tt2.c.tt_ty;
 	    match op with
-	      | PPeq -> 
-		  TFatom {c = TAeq [tt1;tt2]; annot=new_id ()}
-	      | PPneq -> TFatom {c = TAneq [tt1;tt2]; annot=new_id ()}
-	      | _ ->
-		  let ty = Ty.shorten tt1.c.tt_ty in 
-		  match ty with
-		    | Ty.Tint | Ty.Treal -> begin 
-			match op with
-			  | PPle ->
-			      TFatom {c = make_le_or_lt PPle [tt1;tt2];
-				      annot = new_id ()}
-			  | PPge ->
-			      TFatom {c = make_le_or_lt PPle [tt2;tt1];
-				      annot = new_id ()}
-			  | PPlt -> begin match ty with
-			      | Ty.Tint -> 
-				  let one = 
-				    { c = {tt_ty = Ty.Tint ;
-					   tt_desc = TTconst(Tint "1")};
-				      annot = new_id () } in
-				  let desc = 
-				    TTinfix(tt2, Symbols.Op Symbols.Minus,one)
-				  in
-				  TFatom 
-				    { c = (make_le_or_lt PPle 
-					     [tt1; {tt2 with c={tt2.c with tt_desc=desc}}]);
-					   annot = new_id ()}
-			      | _ -> 
-				  TFatom { c = make_le_or_lt PPlt [tt1;tt2];
-					   annot = new_id ()}
-			    end
-			  | PPgt -> begin match ty with
-			      | Ty.Tint ->
-				  let one = 
-				    { c = {tt_ty = Ty.Tint ;
-					   tt_desc = TTconst(Tint "1")};
-				      annot = new_id () } in
-				  let desc = 
-				    TTinfix(tt1, Symbols.Op Symbols.Minus, one) 
-				  in
-				  TFatom 
-				    { c = (make_le_or_lt PPle
-					     [tt2;{tt1 with c={tt1.c with tt_desc=desc}}]);
-			      	      annot = new_id ()}
-			      | _ -> 
-				  TFatom { c = make_le_or_lt PPlt [tt2;tt1];
-					   annot = new_id () }
-			    end
-			  | _ -> assert false
-		      end
-		    | _ -> error (ShouldHaveTypeIntorReal ty) t1.pp_loc
+	      | PPeq -> TFatom {c = TAeq [tt1; tt2]; annot = new_id()}
+	      | PPneq -> TFatom {c = TAneq [tt1; tt2]; annot = new_id()}
+	      | _ -> assert false
 	  with Ty.TypeClash(t1,t2) -> error (Unification(t1,t2)) f.pp_loc
-	end in r, freevars_form r
+	in r, freevars_form r
+    | PPinfix(t1, (PPlt | PPgt | PPge | PPle as op), t2) -> 
+	let r = 
+	  let tt1 = type_term env t1 in
+	  let tt2 = type_term env t2 in
+	  try
+	    Ty.unify tt1.c.tt_ty tt2.c.tt_ty;
+	    let ty = Ty.shorten tt1.c.tt_ty in 
+	    match ty with
+	      | Ty.Tint | Ty.Treal -> 
+		  let top = 
+		    match op with
+		      | PPlt -> TAlt [tt1; tt2]
+		      | PPgt -> TAlt [tt2; tt1]
+		      | PPle -> TAle [tt1; tt2]
+		      | PPge -> TAle [tt2; tt1]
+		      | PPeq -> TAeq [tt1; tt2]
+		      | PPneq -> TAneq [tt1; tt2]
+		      | _ -> assert false
+		  in
+		  TFatom {c = top; annot=new_id ()}
+	      | _ -> error (ShouldHaveTypeIntorReal ty) t1.pp_loc
+	  with Ty.TypeClash(t1,t2) -> error (Unification(t1,t2)) f.pp_loc
+	in r, freevars_form r
     | PPinfix(f1,op ,f2) -> 
 	begin
 	  let f1,fv1 = type_form env f1 in
