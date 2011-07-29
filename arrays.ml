@@ -365,4 +365,6 @@ module Make(X : ALIEN) = struct
     let add env r = env
 
   end
+
+  let term_extract _ = None
 end

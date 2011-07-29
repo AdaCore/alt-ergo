@@ -374,7 +374,8 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		    add_terms env (A.LT.terms_of a) gf age lem
 		  else env 
 		in
-		let tbox, cpt = CcX.assume a dep env.tbox in
+		let tbox, new_terms, cpt = CcX.assume a dep env.tbox in
+		let env = add_terms env new_terms gf age lem in
 		steps := Int64.add (Int64.of_int cpt) !steps;
 		if stepsb <> -1 
 		  && Int64.compare !steps (Int64.of_int stepsb) > 0 then 

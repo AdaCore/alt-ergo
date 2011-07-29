@@ -124,6 +124,8 @@ module Make(X : ALIEN) = struct
       if debug_sum then fprintf fmt "\tthe equation is unsolvable@.";
       raise Unsolvable
 
+  let term_extract _ = None
+
   module Rel = struct
     type r = X.r
 

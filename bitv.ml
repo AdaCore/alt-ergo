@@ -761,6 +761,8 @@ module Make(X : ALIEN) = struct
 
   let fully_interpreted sb = true
 
+  let term_extract _ = None
+
   module Rel = struct
 
     type r = X.r
