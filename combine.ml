@@ -156,7 +156,15 @@ struct
 
   let term_embed t = Term t
 
-  let term_extract = function Term t -> Some t | _ -> None
+  let term_extract r = 
+    match r with 
+      | X1 _ -> X1.term_extract r 
+      | X2 _ -> X2.term_extract r 
+      | X3 _ -> X3.term_extract r 
+      | X4 _ -> X4.term_extract r 
+      | X5 _ -> X5.term_extract r 
+      | Ac _ -> None (* SYLVAIN : TODO *)
+      | Term t -> Some t
 
   let subst p v r = 
     if equal p v then r 

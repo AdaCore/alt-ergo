@@ -25,7 +25,7 @@ module type S = sig
   type t
 
   val empty : unit -> t
-  val assume : Literal.LT.t -> Explanation.t -> t -> t * int
+  val assume : Literal.LT.t -> Explanation.t -> t -> t * Term.Set.t * int
   val query : Literal.LT.t -> t -> answer
   val class_of : t -> Term.t -> Term.t list
 end
@@ -335,7 +335,7 @@ module Make (X : Sig.X) = struct
     let are_neq = Uf.are_distinct env.uf in
     let class_of = Uf.class_of env.uf in
     let find = Uf.find env.uf in
-    let relation, result  = 
+    let relation, result = 
       X.Rel.assume env.relation sa are_eq are_neq class_of find in
     let env = { env with relation = relation } in
     let env = clean_use env result.remove in
@@ -362,61 +362,64 @@ module Make (X : Sig.X) = struct
       (env, [], []) la
     
 
-  let rec assume_literal env la =
-    if la = [] then env
+  let rec assume_literal lt env la =
+    if la = [] then env, lt
     else 
       let env, newc, lsa = semantic_view env la in
-      let env = 
+      let env, lt = 
 	List.fold_left
-	  (fun env (sa, _, ex) ->
+	  (fun (env, lt) (sa, _, ex) ->
 	    Print.assume_literal sa;
 	    match sa with
 	      | A.Eq(r1, r2) ->
 		let env, l = congruence_closure env r1 r2 ex in
-		let env = assume_literal env l in
-		if Options.nocontracongru then env
+		let env, lt = assume_literal lt env l in
+		if Options.nocontracongru then env, lt
 		else 
-		  let env = assume_literal env (contra_congruence env r1 ex) in
-		  assume_literal env (contra_congruence env r2 ex)
+		  let env, lt = 
+		    assume_literal lt env (contra_congruence env r1 ex) 
+		  in
+		  assume_literal lt env (contra_congruence env r2 ex)
 	      | A.Distinct (false, lr) ->
-		if Uf.already_distinct env.uf lr then env
+		if Uf.already_distinct env.uf lr then env, lt
 		else 
-		  {env with uf = Uf.distinct env.uf lr ex}
+		  {env with uf = Uf.distinct env.uf lr ex}, lt
 	      | A.Distinct (true, _) -> assert false
-	      | A.Builtin _ -> env)
-	  env lsa
+	      | A.Builtin _ -> env, lt)
+	  (env, lt) lsa
       in
-      let env = assume_literal env newc in
+      let env, lt = assume_literal lt env newc in
       let env, l = replay_atom env lsa in
-      assume_literal env l
+      assume_literal (lt@l) env l
 
    
-  let look_for_sat ?(bad_last=false) t base_env l =
-    let rec aux bad_last dl base_env = function
+  let look_for_sat ?(bad_last=false) lt t base_env l =
+    let rec aux lt bad_last dl base_env = function
       | [] -> 
 	begin
           match X.Rel.case_split base_env.relation with
 	    | [] -> 
-		{ t with gamma_finite = base_env; choices = List.rev dl }
+		{ t with gamma_finite = base_env; choices = List.rev dl }, lt
 	    | l ->
-	      let l = List.map
-		(fun (c,ex_c, size) ->
-                  let exp = Ex.fresh_exp () in
-                  let ex_c_exp = Ex.add_fresh exp ex_c in
-                  (* A new explanation in order to track the choice *)
-                  (c, size, CPos exp, ex_c_exp)) l in
+	      let l = 
+		List.map
+		  (fun (c, ex_c, size) ->
+                     let exp = Ex.fresh_exp () in
+                     let ex_c_exp = Ex.add_fresh exp ex_c in
+                     (* A new explanation in order to track the choice *)
+                     (c, size, CPos exp, ex_c_exp)) l in
 	      let sz =
 		List.fold_left
 		  (fun acc (a,s,_,_) ->
 		     Num.mult_num acc s) (Num.Int 1) (l@dl) in
               Print.split_size sz;
-	      if Num.le_num sz max_split then aux false dl base_env l
+	      if Num.le_num sz max_split then aux lt false dl base_env l
 	      else
-		{ t with gamma_finite = base_env; choices = List.rev dl }
+		{ t with gamma_finite = base_env; choices = List.rev dl }, lt
 	end
       | ((c, size, CNeg, ex_c) as a)::l ->
-	  let base_env = assume_literal base_env [LSem c, ex_c] in
-	  aux bad_last (a::dl) base_env l
+	  let base_env, lt = assume_literal lt base_env [LSem c, ex_c] in
+	  aux lt bad_last (a::dl) base_env l
 
       (** This optimisation is not correct with the current explanation *)
       (* | [(c, size, false, ex_c)] when bad_last -> *)
@@ -427,8 +430,8 @@ module Make (X : Sig.X) = struct
       | ((c, size, CPos exp, ex_c_exp) as a)::l ->
 	  try
             Print.split_assume (LR.make c) ex_c_exp;
-	    let base_env = assume_literal base_env [LSem c, ex_c_exp] in
-	    aux bad_last (a::dl) base_env l
+	    let base_env, lt = assume_literal lt base_env [LSem c, ex_c_exp] in
+	    aux lt bad_last (a::dl) base_env l
 	  with Exception.Inconsistent dep ->
             match Ex.remove_fresh exp dep with
               | None ->
@@ -439,46 +442,76 @@ module Make (X : Sig.X) = struct
                 (* The choice participates to the inconsistency *)
                 let neg_c = LR.neg (LR.make c) in
 	        Print.split_backtrack neg_c dep;
-	        aux false dl base_env [LR.view neg_c, Num.Int 1, CNeg, dep]
+	        aux lt false dl base_env [LR.view neg_c, Num.Int 1, CNeg, dep]
     in
-    aux bad_last (List.rev t.choices) base_env l
+    aux lt bad_last (List.rev t.choices) base_env l
 
   let try_it f t =
     Print.begin_case_split ();
     let r =
       try 
-	if t.choices = [] then look_for_sat t t.gamma []
+	if t.choices = [] then look_for_sat [] t t.gamma []
 	else
 	  try
-	    let env = f t.gamma_finite in
-	    look_for_sat t env []
+	    let env, lt = f t.gamma_finite in
+	    look_for_sat lt t env []
 	  with Exception.Inconsistent _ -> 
             if debug_split then
               fprintf fmt "[case-split] I replay choices@.";
 	    (* we replay the conflict in look_for_sat, so we can
 	       safely ignore the explanation which is not useful *)
 	    look_for_sat ~bad_last:true 
-	      { t with choices = []} t.gamma t.choices
+	      [] { t with choices = []} t.gamma t.choices
       with Exception.Inconsistent d ->
 	Print.end_case_split (); 
 	raise (Exception.Inconsistent d)
     in
     Print.end_case_split (); r
+
+  let extract_from_semvalues =
+    List.fold_left
+      (fun acc r -> 
+	 match X.term_extract r with Some t -> SetT.add t acc | _ -> acc) 
       
+  let extract_terms_from_choices = 
+    List.fold_left 
+      (fun acc (a, _, _, _) -> 
+	 match a with
+	   | A.Eq(r1, r2) -> extract_from_semvalues acc [r1; r2]
+	   | A.Distinct (_, l) -> extract_from_semvalues acc l
+	   | _ -> acc) 
+
+  let extract_terms_from_assumed = 
+    List.fold_left 
+      (fun acc (a, _) -> 
+	 match a with
+	   | LTerm r -> begin
+	       match Literal.LT.view r with 
+		 | Literal.Eq (t1, t2) -> 
+		     SetT.add t1 (SetT.add t2 acc)
+		 | Literal.Distinct (_, l) | Literal.Builtin (_, _, l) -> 
+		     List.fold_right SetT.add l acc
+	     end
+	   | _ -> acc)
+
   let assume a ex t = 
     let a = LTerm a in
-    let t = { t with gamma = assume_literal t.gamma [a, ex] } in
-    let t = try_it (fun env -> assume_literal env [a, ex] ) t  in 
-    t, 1
+    let gamma, lt = assume_literal [] t.gamma [a, ex] in
+    let t = { t with gamma = gamma } in
+    let t, lt = try_it (fun env -> assume_literal lt env [a, ex] ) t  in 
+    let choices = extract_terms_from_choices SetT.empty t.choices in
+    let all_terms = extract_terms_from_assumed choices lt in
+    t, all_terms, 1
 
   let class_of t term = Uf.class_of t.gamma.uf term
 
   let add_and_process a t =
     let aux a ex env = 
-      let gamma, l = add a ex env in assume_literal gamma l
+      let gamma, l = add a ex env in assume_literal [] gamma l
     in
-    let t = { t with gamma = aux a Ex.empty t.gamma } in
-    let t =  try_it (aux a Ex.empty) t in
+    let gamma, _ = aux a Ex.empty t.gamma in
+    let t = { t with gamma = gamma } in
+    let t, _ =  try_it (aux a Ex.empty) t in
     Use.print t.gamma.use; t    
 
   let query a t =
@@ -518,9 +551,8 @@ module Make (X : Sig.X) = struct
     }
     in
     let t = { gamma = env; gamma_finite = env; choices = [] } in
-    fst 
-      (assume 
-	 (A.LT.make (A.Distinct (false, [T.vrai; T.faux])))
-	 Ex.empty t)
+    let t, _, _ = 
+      assume (A.LT.make (A.Distinct (false, [T.vrai; T.faux]))) Ex.empty t
+    in t
 
 end

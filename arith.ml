@@ -489,6 +489,8 @@ module Make
       | _ -> false
 
 
+  let term_extract _ = None
+
   module Rel = Fm.Make (X) 
     (struct
        include P 
