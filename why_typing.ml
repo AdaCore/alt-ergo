@@ -274,8 +274,11 @@ let rec freevars_term acc t = match t.c.tt_desc with
   | TTapp (_,lt) -> List.fold_left freevars_term acc lt
   | TTinfix (t1,_,t2) | TTget(t1, t2) -> 
       List.fold_left freevars_term acc [t1; t2]
-  | TTset(t1, t2, t3) ->
+  | TTset (t1, t2, t3) ->
       List.fold_left freevars_term acc [t1; t2; t3]
+  | TTdot (t1, _) -> freevars_term acc t1
+  | TTrecord lbs -> 
+      List.fold_left (fun acc (_, t) -> freevars_term acc t) acc lbs
   | _ -> acc
       
 let freevars_atom a = match a.c with
