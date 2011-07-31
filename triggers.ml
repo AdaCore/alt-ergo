@@ -52,7 +52,7 @@ module STRS = Set.Make(
 
 let sort = List.sort (fun l1 l2 -> compare (List.length l1) (List.length l2))
 
-let neg_pol = function Pos -> Neg | Neg -> Pos
+let neg_pol x= x (*function Pos -> Neg | Neg -> Pos*)
       
 let compare_tconstant c1 c2 =
   match c1, c2 with
@@ -288,6 +288,9 @@ let rec vars_of_term bv acc t = match t.c.tt_desc with
   | TTset (t1, t2, t3) -> List.fold_left (vars_of_term bv) acc [t1;t2;t3]
   | TTget (t1, t2) -> List.fold_left (vars_of_term bv) acc [t1;t2]
   | TTlet (_, t1, t2) -> List.fold_left (vars_of_term bv) acc [t1;t2]
+  | TTdot (t1, _) -> vars_of_term bv acc t1
+  | TTrecord lbs -> 
+      List.fold_left (fun acc (_, t) -> vars_of_term bv acc t) acc lbs
   (* XXX TTlet ? *)
   | _ -> acc
 
@@ -334,6 +337,9 @@ let rec vty_ty acc t =
     | Ty.Tvar { Ty.v = i; value = None } -> Vtype.add i acc 
     | Ty.Text(l,_) -> List.fold_left vty_ty acc l
     | Ty.Tfarray (t1,t2) -> vty_ty (vty_ty acc t1) t2
+    | Ty.Trecord {Ty.args = args; lbs = lbs} ->
+	let acc = List.fold_left vty_ty acc args in
+	List.fold_left (fun acc (_, t) -> vty_ty acc t) acc lbs
     | _ -> acc
     
 let rec vty_term acc t = 
@@ -343,6 +349,8 @@ let rec vty_term acc t =
     | TTinfix (t1,_,t2) -> vty_term (vty_term acc t1) t2
     | TTset (t1, t2, t3) -> List.fold_left vty_term acc [t1;t2;t3]
     | TTget (t1, t2) -> List.fold_left vty_term acc [t1;t2]
+    | TTdot (t1, _) -> vty_term acc t1
+    | TTrecord lbs -> List.fold_left (fun acc (_, t) -> vty_term acc t) acc lbs
     | TTlet (_, t1, t2) -> List.fold_left vty_term acc [t1;t2]
     | _ -> acc
 
@@ -382,10 +390,10 @@ let potential_triggers =
 	  else acc
 
       | TTapp(s, lf) when 
-	  Symbols.equal s Common.fake_eq or 
-	    Symbols.equal s Common.fake_neq or
-	    Symbols.equal s Common.fake_lt or
-	    Symbols.equal s Common.fake_le -> 
+	  Symbols.equal s Common.fake_eq 
+	  or Symbols.equal s Common.fake_neq 
+	  or Symbols.equal s Common.fake_lt 
+	  or Symbols.equal s Common.fake_le -> 
 
           let vty_lf = List.fold_left vty_term vty_t lf in
 	  let bv_lf = List.fold_left (vars_of_term bv) Vterm.empty lf in
@@ -430,6 +438,22 @@ let potential_triggers =
 	    List.fold_left (potential_rec vars) 
 	      (STRS.add (t, bv_lf, vty_lf) acc) [t1;t2]
 	  else acc
+      | TTdot (t1 , a) -> 
+	  let vty_lf = vty_term vty_t t1 in
+	  let bv_lf = vars_of_term bv Vterm.empty t1 in
+	  if as_bv bv bv_lf or as_tyv vty vty_lf then
+	      potential_rec vars (STRS.add (t, bv_lf, vty_lf) acc) t1
+	  else acc
+	  
+      | TTrecord lbs ->
+	  let lt = List.map snd lbs in
+	  let vty_lf = List.fold_left vty_term vty_t lt in
+	  let bv_lf = List.fold_left (vars_of_term bv) Vterm.empty lt in
+	  if as_bv bv bv_lf or as_tyv vty vty_lf then
+	    List.fold_left (potential_rec vars) 
+	      (STRS.add (t, bv_lf, vty_lf) acc) lt
+	  else acc
+
       | _ -> acc
 
   in fun vars -> List.fold_left (potential_rec vars) STRS.empty
@@ -462,28 +486,37 @@ let rec make_rec pol gopt vterm vtype f =
     | TFatom {c = (TAfalse | TAtrue)} ->
 	f.c, STRS.empty
     | TFatom a ->
-      if Vterm.is_empty vterm && Vtype.is_empty vtype then 
-	f.c, STRS.empty
-      else 
-	let l = match a.c with    
-	  | TAeq l when pol = Neg -> 
-	      let v = {tt_desc = TTapp(Common.fake_eq, l); tt_ty = Ty.Tbool} in
-	      [ { c = v; annot = a.annot } ]
-	  | TAneq ([t1; t2] as l) when pol = Neg -> 
-	      let v ={ tt_desc = TTapp(Common.fake_neq, l); tt_ty = Ty.Tbool} in
-	      [ { c = v; annot = a.annot } ]
-	  | TAle l when pol = Neg -> 
-	      let v ={ tt_desc = TTapp(Common.fake_le, l); tt_ty = Ty.Tbool} in
-	      [ { c = v; annot = a.annot } ]
-	  | TAlt l when pol = Neg ->
-	      let v ={ tt_desc = TTapp(Common.fake_lt, l); tt_ty = Ty.Tbool} in
-	      [ { c = v; annot = a.annot } ]
-	  | TAle l | TAlt l | TAeq l | TAneq l | TAbuilt(_,l) -> l
-	  | TApred t -> [t]
-	  | _ -> assert false
-	in
-	f.c, potential_triggers (vterm, vtype) l
-	  
+	if Vterm.is_empty vterm && Vtype.is_empty vtype then 
+	    f.c, STRS.empty
+	else 
+	  begin
+	  let l = match a.c with    
+	    | TAeq l when pol = Neg -> 
+		let v = 
+		  {tt_desc = TTapp(Common.fake_eq, l); tt_ty = Ty.Tbool} 
+		in
+		[ { c = v; annot = a.annot } ]
+	    | TAneq ([t1; t2] as l) when pol = Neg -> 
+		let v =
+		  { tt_desc = TTapp(Common.fake_neq, l); tt_ty = Ty.Tbool} 
+		in
+		[ { c = v; annot = a.annot } ]
+	    | TAle l when pol = Neg -> 
+		let v =
+		  { tt_desc = TTapp(Common.fake_le, l); tt_ty = Ty.Tbool} 
+		in
+		[ { c = v; annot = a.annot } ]
+	    | TAlt l when pol = Neg ->
+		let v =
+		  { tt_desc = TTapp(Common.fake_lt, l); tt_ty = Ty.Tbool} 
+		in
+		[ { c = v; annot = a.annot } ]
+	    | TAle l | TAlt l | TAeq l | TAneq l | TAbuilt(_,l) -> l
+	    | TApred t -> [t]
+	    | _ -> assert false
+	  in
+	  f.c, potential_triggers (vterm, vtype) l
+	  end
     | TFop (OPimp, [f1; f2]) -> 
 	
 	let f1, trs1  = make_rec (neg_pol pol) gopt vterm vtype f1 in
@@ -495,90 +528,91 @@ let rec make_rec pol gopt vterm vtype f =
 	let f1, trs1  = make_rec (neg_pol pol) gopt vterm vtype f1 in
 	TFop(OPnot, [f1]), trs1
 
-(* | OPiff 
-	| OPif of ('a tterm, 'a) annoted *)
+    (* | OPiff 
+       | OPif of ('a tterm, 'a) annoted *)
 
     | TFop (op, lf) -> 
-      let lf, trs = 
-	List.fold_left
-	  (fun (lf, trs1) f ->
-	    let f, trs2 = make_rec pol gopt vterm vtype f in
-	    f::lf, STRS.union trs1 trs2) ([], STRS.empty) lf in
-      TFop(op,List.rev lf), trs
+	let lf, trs = 
+	  List.fold_left
+	    (fun (lf, trs1) f ->
+	       let f, trs2 = make_rec pol gopt vterm vtype f in
+	       f::lf, STRS.union trs1 trs2) ([], STRS.empty) lf in
+	TFop(op,List.rev lf), trs
 
     | TFforall ({ qf_form= {c = TFop(OPiff,[{c=TFatom _} as f1;f2]); 
 			    annot = ido}} as qf) -> 
-      let vtype' = vty_form Vtype.empty qf.qf_form in
-      let vterm' = 
-	List.fold_left (fun b (s,_) -> Vterm.add s b) Vterm.empty qf.qf_bvars 
-      in
+	let vtype' = vty_form Vtype.empty qf.qf_form in
+	let vterm' = 
+	  List.fold_left (fun b (s,_) -> Vterm.add s b) Vterm.empty qf.qf_bvars 
+	in
 
-      let vterm'' = Vterm.union vterm vterm' in
-      let vtype'' = Vtype.union vtype vtype' in
-      let f1', trs1 = make_rec pol gopt vterm'' vtype'' f1 in
-      let f2', trs2 = make_rec pol gopt vterm'' vtype'' f2 in
-      let trs12 = 
-	if Options.notriggers || qf.qf_triggers = [] then
-	  begin
-	    (make_triggers false vterm' vtype' (STRS.elements trs1))@
-	      (make_triggers false vterm' vtype' (STRS.elements trs2))
-	  end
-	else 
-	  begin
-	    let lf = filter_good_triggers (vterm', vtype') qf.qf_triggers in
-	    if lf<>[] then lf
-	    else
+	let vterm'' = Vterm.union vterm vterm' in
+	let vtype'' = Vtype.union vtype vtype' in
+	let f1', trs1 = make_rec pol gopt vterm'' vtype'' f1 in
+	let f2', trs2 = make_rec pol gopt vterm'' vtype'' f2 in
+	let trs12 = 
+	  if Options.notriggers || qf.qf_triggers = [] then
+	    begin
 	      (make_triggers false vterm' vtype' (STRS.elements trs1))@
 		(make_triggers false vterm' vtype' (STRS.elements trs2))
-	  end
-      in
-      let trs = 
-	STRS.filter 
-	  (fun (_, bvt, _) -> Vterm.is_empty (Vterm.inter bvt vterm')) 
-	  (STRS.union trs1 trs2) in
-      let r  = 
-	{ qf with 
-	  qf_triggers = trs12 ; 
-	  qf_form = {c=TFop(OPiff,[f1'; f2']); annot = ido} }
-      in
-      begin
-	match f.c with 
-	  | TFforall _ -> TFforall r, trs 
-	  | _ -> TFexists r , trs
-      end
+	    end
+	  else 
+	    begin
+	      let lf = filter_good_triggers (vterm', vtype') qf.qf_triggers in
+	      if lf<>[] then lf
+	      else
+		(make_triggers false vterm' vtype' (STRS.elements trs1))@
+		  (make_triggers false vterm' vtype' (STRS.elements trs2))
+	    end
+	in
+	let trs = 
+	  STRS.filter 
+	    (fun (_, bvt, _) -> Vterm.is_empty (Vterm.inter bvt vterm')) 
+	    (STRS.union trs1 trs2) in
+	let r  = 
+	  { qf with 
+	      qf_triggers = trs12 ; 
+	      qf_form = {c=TFop(OPiff,[f1'; f2']); annot = ido} }
+	in
+	begin
+	  match f.c with 
+	    | TFforall _ -> TFforall r, trs 
+	    | _ -> TFexists r , trs
+	end
 
-  | TFforall qf | TFexists qf -> 
-      let vtype' = vty_form Vtype.empty qf.qf_form in
-      let vterm' = 
-	List.fold_left (fun b (s,_) -> Vterm.add s b) Vterm.empty qf.qf_bvars in
-      let f', trs = 
-	make_rec pol gopt 
-	  (Vterm.union vterm vterm') (Vtype.union vtype vtype') qf.qf_form in
-      let trs' = 
-	if Options.notriggers || qf.qf_triggers=[] then
-	  make_triggers gopt vterm' vtype' (STRS.elements trs)
-	else 
-	  let lf = filter_good_triggers (vterm',vtype') qf.qf_triggers in
-	  if lf <> [] then lf
-	  else make_triggers gopt vterm' vtype' (STRS.elements trs)
-      in
-      let trs = 
-	STRS.filter 
-	  (fun (_, bvt, _) -> Vterm.is_empty (Vterm.inter bvt vterm')) trs in
-      let r  = {qf with qf_triggers = trs' ; qf_form = f'} in
-      (match f.c with 
-	| TFforall _ -> TFforall r , trs 
-	| _ -> TFexists r , trs)
+    | TFforall qf | TFexists qf -> 
+	let vtype' = vty_form Vtype.empty qf.qf_form in
+	let vterm' = 
+	  List.fold_left 
+	    (fun b (s,_) -> Vterm.add s b) Vterm.empty qf.qf_bvars in
+	let f', trs = 
+	  make_rec pol gopt 
+	    (Vterm.union vterm vterm') (Vtype.union vtype vtype') qf.qf_form in
+	let trs' = 
+	  if Options.notriggers || qf.qf_triggers=[] then
+	    make_triggers gopt vterm' vtype' (STRS.elements trs)
+	  else 
+	    let lf = filter_good_triggers (vterm',vtype') qf.qf_triggers in
+	    if lf <> [] then lf
+	    else make_triggers gopt vterm' vtype' (STRS.elements trs)
+	in
+	let trs = 
+	  STRS.filter 
+	    (fun (_, bvt, _) -> Vterm.is_empty (Vterm.inter bvt vterm')) trs in
+	let r  = {qf with qf_triggers = trs' ; qf_form = f'} in
+	(match f.c with 
+	   | TFforall _ -> TFforall r , trs 
+	   | _ -> TFexists r , trs)
 
-  | TFlet (up, v, t, f) ->
-      let f, trs = make_rec pol gopt vterm vtype f in 
-      let trs = STRS.union trs (potential_triggers (vterm, vtype) [t]) in
-       (* XXX correct for terms *)
-      TFlet (up, v, t, f), trs
+    | TFlet (up, v, t, f) ->
+	let f, trs = make_rec pol gopt vterm vtype f in 
+	let trs = STRS.union trs (potential_triggers (vterm, vtype) [t]) in
+	(* XXX correct for terms *)
+	TFlet (up, v, t, f), trs
 
-  | TFnamed(lbl, f) -> 
-      let f, trs = make_rec pol gopt vterm vtype f in
-      TFnamed(lbl, f), trs
+    | TFnamed(lbl, f) -> 
+	let f, trs = make_rec pol gopt vterm vtype f in
+	TFnamed(lbl, f), trs
   in
   { f with c = c }, trs
 	  
