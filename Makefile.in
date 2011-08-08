@@ -55,7 +55,7 @@ EXE = @EXE@
 INCLUDES = @OCAMLGRAPHLIB@ @LABLGTK2LIB@
 
 BFLAGS = -dtypes -g $(INCLUDES) -annot
-OFLAGS = -dtypes $(INCLUDES) -annot
+OFLAGS = -dtypes $(INCLUDES) -annot -for-pack AltErgo
 
 BIBBYTE=nums.cma graph.cma unix.cma
 
@@ -80,8 +80,11 @@ all: $(OCAMLBEST)
 #      puf.cmo \
 #      satbj.cmo  
 
-CMO = version.cmo exception.cmo \
-      print_color.cmo options.cmo loc.cmo \
+PRECMO = version.cmo print_color.cmo preoptions.cmo
+
+OPTIONSCMO = parseoptions.cmo
+
+CMO = options.cmo exception.cmo loc.cmo \
       hashcons.cmo hstring.cmo builtin.cmo symbols.cmo \
       subst.cmo ty.cmo common.cmo term.cmo literal.cmo formula.cmo \
       explanation.cmo \
@@ -97,6 +100,8 @@ CMO = version.cmo exception.cmo \
       triggers.cmo cnf.cmo why_typing.cmo matching.cmo \
       sat.cmo frontend.cmo
 
+PRECMX = $(PRECMO:.cmo=.cmx)
+OPTIONSCMX = $(OPTIONSCMO:.cmo=.cmx)
 CMX = $(CMO:.cmo=.cmx)
 
 MAINCMO = $(CMO) main.cmo
@@ -116,11 +121,19 @@ GUICMX = $(GUICMO:.cmo=.cmx)
 byte: $(NAME).byte
 opt: $(NAME).opt
 
-$(NAME).byte: $(MAINCMO)
+$(NAME).byte: $(PRECMO) $(OPTIONSCMO) $(MAINCMO) 
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLC) $(BFLAGS) -o $@ $(BIBBYTE) $^
 
-$(NAME).opt: $(MAINCMX)
+$(NAME).pack: $(PRECMO) $(MAINCMO)
+	$(if $(QUIET),@echo 'Library $@' &&) 
+	$(OCAMLC) $(BFLAGS) -pack -o $(NAME).cmo $^
+
+$(NAME).xpack: $(PRECMX) $(CMX)
+	$(if $(QUIET),@echo 'Library $@' &&) 
+	$(OCAMLOPT) $(INCLUDES)  -pack -o AltErgo.cmx $^
+
+$(NAME).opt: $(PRECMX) $(OPTIONSCMX) $(MAINCMX)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLOPT) $(OFLAGS) -o $@ $(BIBOPT) $^
 
