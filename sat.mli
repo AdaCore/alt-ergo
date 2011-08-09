@@ -42,7 +42,7 @@ val pred_def : t -> Formula.t -> t
 (* [unsat env f size] checks the unsatisfiability of [f] in
    [env]. Raises I_dont_know when the proof tree's height reaches
    [size]. Raises Sat if [f] is satisfiable in [env] *)
-val unsat : t -> gformula -> int -> Explanation.t
+val unsat : t -> gformula -> Explanation.t
 
 val start : unit -> unit
 val stop : unit -> int64

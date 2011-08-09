@@ -223,9 +223,9 @@ let rec print fmt f =
       else 
 	fprintf fmt "lem %s" n
 
-  | Unit(f1, f2) -> fprintf fmt "%a & %a " print f1 print f2
+  | Unit(f1, f2) -> fprintf fmt "@[%a &@ %a@]" print f1 print f2
 
-  | Clause(f1, f2) -> fprintf fmt "(%a v %a) " print f1 print f2
+  | Clause(f1, f2) -> fprintf fmt "@[(%a v@ %a)@]" print f1 print f2
 
   | Skolem{sko_f=f} -> fprintf fmt "<sko> (%a)" print f
 
