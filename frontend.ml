@@ -77,7 +77,7 @@ let process_decl print_status (env, consistent, dep) d =
 	  let dep = 
 	    if consistent then
 	      let dep' = Sat.unsat env 
-		{Sat.f=f;age=0;name=None;mf=true;gf=true} stopb in
+		{Sat.f=f;age=0;name=None;mf=true;gf=true} in
 	      Explanation.union dep' dep
 	    else dep
           in

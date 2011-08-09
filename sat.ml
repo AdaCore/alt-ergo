@@ -479,7 +479,7 @@ and back_tracking env stop max_size =  match env.delta with
 	  ({a with f=F.mk_not f},dep') stop max_size
       with Not_found -> Print.backjumping (F.mk_not f); dep 
 	
-let unsat env fg stop = 
+let unsat env fg = 
   try
     let env = assume env (fg,Ex.empty) in
     let env = add_terms env (F.terms fg.f) fg.gf fg.age fg.name in
@@ -490,7 +490,7 @@ let unsat env fg stop =
     let _ , l = mround false true env max_max_size in
     let env = List.fold_left assume env l in
 
-    back_tracking env stop 100
+    back_tracking env stopb 100
   with IUnsat dep -> Print.unsat ();dep
 
 let assume env fg = 
