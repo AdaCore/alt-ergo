@@ -607,29 +607,6 @@ let rec type_form env f =
 	  end 
 	in r, freevars_form r
 	  
-    | PPreach(t1, t2, t3) ->
-	let r = 
-	  begin
-	    let te1 = type_term env t1 in
-	    let te2 = type_term env t2 in
-	    let te3 = type_term env t3 in
-	    let ty1 = te1.c.tt_ty in
-	    let tykey2 = te2.c.tt_ty in
-	    let tykey3 = te3.c.tt_ty in
-	    try
-	      match ty1 with
-		| Ty.Tfarray (tykey, _) ->
-		    Ty.unify tykey tykey2; Ty.unify tykey tykey3;
-		    TFatom 
-		      { c = TAbuilt(Builtin.is_builtin "reach", [te1;te2;te3]);
-			annot=new_id () } 
-		| _ -> error ShouldHaveTypeArray t1.pp_loc
-	    with
-	      | Ty.TypeClash(t, t') -> 
-		  error (Unification(t, t')) t1.pp_loc
-	  end
-	in r, freevars_form r
-	  
     | PPdistinct (args) ->
 	let r = 
 	  begin
@@ -816,11 +793,6 @@ and alpha_rec ((up, m) as s) f =
 	let ff2 = alpha_renaming s f2 in
 	let ff3 = alpha_renaming s f3 in
 	PPset(ff1, ff2, ff3)
-    | PPreach(f1, f2, f3) ->
-	let ff1 = alpha_renaming s f1 in
-	let ff2 = alpha_renaming s f2 in
-	let ff3 = alpha_renaming s f3 in
-	PPreach(ff1, ff2, ff3)
     | PPextract(f1, f2, f3) ->
 	let ff1 = alpha_renaming s f1 in
 	let ff2 = alpha_renaming s f2 in

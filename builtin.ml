@@ -20,8 +20,7 @@ let () =
   List.iter 
     (fun (x,y) -> Hashtbl.add symbols x y) 
        [ "<=", Hstring.make "<="; 
-         "<", Hstring.make "<" ;
-	 "reach", Hstring.make "reach";
+         "<", Hstring.make "<" 
        ]
 
 

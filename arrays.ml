@@ -356,8 +356,8 @@ module Make(X : ALIEN) = struct
       let env = new_terms env la in
       let env, atoms = new_splits are_eq are_neq env Conseq.empty class_of in
       let env, atoms = new_equalities env atoms la class_of in
-      (*Debug.env fmt env;
-      Debug.new_equalities fmt atoms;*)
+      (*Debug.env fmt env;*)
+      Debug.new_equalities fmt atoms;
       let l = Conseq.fold (fun (a,ex) l -> ((LTerm a, ex)::l)) atoms [] in
       {env with reach=envr}, { assume = lr @ l; remove = rr }
 	  

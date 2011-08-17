@@ -301,11 +301,6 @@ lexpr:
    { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
      mk_pp (PPconcat($1, $3)) }
 
-/* reachability */
-
-| REACH LEFTPAR lexpr COMMA lexpr COMMA lexpr RIGHTPAR
-   { mk_pp (PPreach ($3, $5, $7)) }
-
 /* predicate or function calls */
 
 | DISTINCT LEFTPAR list2_lexpr_sep_comma RIGHTPAR 
