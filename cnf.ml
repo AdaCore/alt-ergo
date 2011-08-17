@@ -163,13 +163,6 @@ let make_form name f =
 			(A.Builtin(true, alt, [make_term t1; make_term t2])) 
 		    in lit, lit::acc
 	      end
-
-	  (*| TTreach (t1, t2, t3) ->
-	let t1 = make_term t1 in
-	let t2 = make_term t2 in
-	let t3 = make_term t3 in
-	T.make (Symbols.Op Symbols.Reach) [t1; t2; t3] ty
-	  *)
 	  | TAbuilt(n,lt) ->
 	      let lit = A.LT.make (A.Builtin(true,n,List.map make_term lt)) in
 	      lit , lit::acc
