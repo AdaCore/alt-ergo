@@ -1,0 +1,591 @@
+type 'a option
+logic None : 'a option
+logic Some : 'a -> 'a option
+
+axiom diff :
+forall a : 'a. None <> Some(a)
+
+logic reach : ('a, 'a option) farray, 'a, 'a -> prop
+
+(********** AXIOMATIQUE ***********)
+(*
+(* REFLEXIVITY *)
+
+axiom refl :
+forall st : ('a, 'a option) farray. forall x, y : 'a [reach (st, x, y)].
+reach (st, x, x) and reach (st, y, y)
+
+(* ANTISYMMETRY *)
+
+axiom asym :
+forall st : ('a, 'a option) farray. forall x, y : 'a [reach (st, x, y), reach (st, y, x)].
+reach (st, x, y) -> reach (st, y, x) -> x = y
+
+(* TRANSITIVITY *)
+
+axiom trans :
+forall st : ('a, 'a option) farray.
+forall x1, x2, x3 : 'a [reach (st, x1, x2), reach (st, x2, x3)].
+reach (st, x1, x2) -> reach (st, x2, x3) -> reach (st, x1, x3)
+
+(* ORDERING *)
+
+axiom order :
+forall st : ('a, 'a option) farray.
+forall x1, x2, x3 : 'a [reach (st, x1, x2), reach (st, x1, x3)].
+reach (st, x1, x2) -> reach (st, x1, x3) -> (reach (st, x2, x3) or reach (st, x3, x2))
+
+(* reach1 *)
+
+axiom reach1 :
+forall st : ('a, 'a option) farray. forall x1, x2 : 'a [st [x1], Some (x2)].
+st [x1] = Some (x2) -> reach (st, x1, x2)
+
+(* reach2 NONE *)
+
+axiom reach2n :
+forall st : ('a, 'a option) farray.
+forall x1, x2 : 'a [st [x1], reach (st, x1, x2)].
+reach (st, x1, x2) -> st [x1] = None -> x1 = x2
+
+(* reach2 SOME *)
+
+axiom reach2s :
+forall st : ('a, 'a option) farray.
+forall x1, x2, x3 : 'a [st [x1], Some(x3), reach (st, x1, x2)].
+reach (st, x1, x2) -> st [x1] = Some(x3) -> x1 = x2  or reach (st, x3, x2)
+
+(* WELL-FOUNDED *)
+
+axiom wf :
+forall st : ('a, 'a option) farray.
+forall x1, x2, x3 : 'a [st [x1], reach (st, x2, x1), Some (x3)].
+st [x1] = Some (x3) -> reach (st, x2, x1) -> x3 <> x2
+
+(* WF UPDATE *)
+
+axiom wf_u :
+forall st : ('a, 'a option) farray. forall x1, x2 : 'a [st [x1 <- Some (x2)]].
+not reach (st, x2, x1)
+
+(* UPDATE SOME *)
+
+axiom u_some :
+forall st : ('a, 'a option) farray.
+forall e1, e2, x1, x2 : 'a [reach (st [e1 <- Some (e2)], x1, x2)].
+reach (st [e1 <- Some (e2)], x1, x2) -> 
+(not reach (st, x1, e1) or e1 = x2 or reach (st, x1, x2) and not reach (st, e1, x2) or
+ reach (st, e2, x2)) and (reach (st, x1, e1) or reach (st, x1, x2))
+
+(* UPDATE NONE *)
+
+axiom u_none :
+forall st : ('a, 'a option) farray.
+forall e, x1, x2 : 'a [reach (st [e <- None], x1, x2)].
+reach (st [e <- None], x1, x2) -> 
+(not reach (st, x1, e) or e = x2 or reach (st, x1, x2) and not reach (st, e, x2)) and 
+(reach (st, x1, e) or reach (st, x1, x2))
+
+(* UPDATE INV *)
+
+axiom update_inv1 :
+forall st : ('a, 'a option) farray. forall k : 'a option.
+forall e, x1, x2 : 'a [st [e <- k], reach (st, x1, x2)].
+reach (st, x1, x2) -> (reach (st, e, x2) and reach (st, x1, e) or reach (st [e <- k], x1, x2))
+
+axiom update_inv2 :
+forall st : ('a, 'a option) farray. forall k : 'a option.
+forall e, x : 'a [st [e <- k], reach (st, x, e)].
+reach (st, x, e) -> reach (st [e <- k], x, e)
+
+axiom update_inv3 :
+forall st : ('a, 'a option) farray.
+forall e1, e2, x1, x2 : 'a [st [e1 <- Some (e2)], reach (st, x1, x2), reach (st, e2, x2)].
+reach (st, x1, x2) -> reach (st, e2, x2) -> reach (st [e1 <- Some (e2)], x1, x2)
+
+axiom update_inv4 :
+forall st : ('a, 'a option) farray.
+forall e1, e2, x1, x2 : 'a [st [e1 <- Some (e2)], reach (st, x1, e1), reach (st, e2, x2)].
+reach (st, x1, e1) -> reach (st, e2, x2) -> reach (st [e1 <- Some (e2)], x1, x2)
+*)
+(********** TESTS ***********)
+
+logic next : (int, int option) farray
+
+(* Test *)
+
+goal gtest :
+    forall ee1, ee2, e1, e2, e3 : int. forall upd:(int, int option) farray.
+    upd = next[ee1 <- Some(ee2)] ->
+    e1 <> ee1 ->
+    next[e1] = Some(e2) ->
+    upd[e2] = Some(e3) ->
+    e1 <> e3
+
+(* Test Well Founded < 1'' *)
+
+goal gWFS :
+   forall e1, e2, e3 : int.
+   next[e1] = Some(e3) ->
+   reach(next, e2, e1) ->
+   e2 <> e3
+
+(* Test Transitivity < 1'' *)
+
+goal gTransS :
+     forall a,b,c : int.
+     reach(next, a, b) ->
+     reach(next, b, c) ->
+     reach(next, a, c) (*and false*)
+
+(* Test Transitivity 4'' *)
+
+goal gTransB :
+     forall a,b1,b2,b3,b4,b5,b6,b7,b8,b9,c : int.
+     reach(next,  a, b1) ->
+     reach(next, b1, b2) ->
+     reach(next, b2, b3) ->
+     reach(next, b3, b4) ->
+     reach(next, b4, b5) ->
+     reach(next, b5, b6) ->
+     reach(next, b6, b7) ->
+     reach(next, b7, b8) ->
+     reach(next, b8, b9) ->
+     reach(next, b9,  c) ->
+     reach(next,  a,  c) (*and false*)
+
+(* Test Ordering < 1'' *)
+
+goal gOrderS :
+     forall a,b,c : int.
+     reach(next, a, b) ->
+     reach(next, a, c) ->
+     not reach(next, c, b) ->
+     reach(next, b, c) (*and false*)
+
+(* Test Ordering 2'' *)
+
+goal gOrderB :
+     forall a1,a2,a3,a4,a5,a6,a7,a8,a9,b : int.
+     reach(next, a1, b) ->
+     reach(next, a1, a2) ->
+     not reach(next, b, a2) ->
+     reach(next, a2, a3) ->
+     not reach(next, b, a3) ->
+     reach(next, a3, a4) ->
+     not reach(next, b, a4) ->
+     reach(next, a4, a5) ->
+     not reach(next, b, a5) ->
+     reach(next, a5, a6) ->
+     not reach(next, b, a6) ->
+     reach(next, a6, a7) ->
+     not reach(next, b, a7) ->
+     reach(next, a7, a8) ->
+     not reach(next, b, a8) ->
+     reach(next, a8, a9) ->
+     not reach(next, b, a9) ->
+     reach(next, a9, b) (*and false*)
+
+(* Test reach1  < 1'' *)
+
+goal greach1S : 
+     forall a,b : int.
+     next[a] = Some(b) -> reach(next, a, b) (*and false*)
+
+(* Test reach1 3' *)
+
+goal greach1B : 
+     forall a,a1,a2,a3,a4,a5,a6,a7,a8,a9,b : int.
+     next[a] = Some(a1) ->
+     next[a1] = Some(a2) ->
+     next[a2] = Some(a3) ->
+     next[a3] = Some(a4) ->
+     next[a4] = Some(a5) ->
+     next[a5] = Some(a6) ->
+     next[a6] = Some(a7) ->
+     next[a7] = Some(a8) ->
+     next[a8] = Some(a9) ->
+     next[a9] = Some(b) ->
+	reach(next,a,b) (*and false*)
+
+(* Test reach2  < 1'' *)
+
+goal greach2S :
+     forall a,b,c : int.
+     reach(next, a, c) ->
+     next[a] = Some(b) ->
+     a <> c ->
+     reach(next, b, c) (*and false*)
+
+(* Test reach2 8'' *)
+
+goal greach2B :
+     forall a,b1,b2,b3,b4,b5,b6,b7,b8,b9,bb1,c : int.
+     reach(next, a, c) ->
+     next[a] = Some(b1) ->
+     a <> c ->
+     next[bb1] = Some(b2) ->
+     b1 <> c ->
+     next[b2] = Some(b3) ->
+     b2 <> c ->
+     next[b3] = Some(b4) ->
+     b3 <> c ->
+     next[b4] = Some(b5) ->
+     b4 <> c ->
+     next[b5] = Some(b6) ->
+     b5 <> c ->
+     next[b6] = Some(b7) ->
+     b6 <> c ->
+     next[b7] = Some(b8) ->
+     b7 <> c ->
+     next[b8] = Some(b9) ->
+     b8 <> c ->
+     b1 = bb1 ->
+     reach(next, b9, c) (*and false*)
+
+(* Test upd positive some < 1'' *)
+
+goal gUpd1S : 
+     forall a,b,c,dd : int. forall d : int option. forall upd:(int, int option) farray.
+     (d = None or d = Some (dd)) ->
+     upd = next[c <- d] -> 
+     reach(upd,a,b) ->
+     not reach(next, a, c) ->
+     reach(next, a, b) (*and false*)
+
+(* Test upd positive some > 5'*)
+
+goal gUpd1B : 
+     forall a,b,c1,c2,c3,c4,c5,c6,c7,c8,c9,dd : int. forall d : int option.
+	forall upd1,upd2,upd3,upd4,upd5,upd6,upd7,upd8,upd9:(int, int option) farray.
+     (d = None or d = Some (dd)) ->
+     reach(upd9,a,b) ->
+     upd9 = upd8[c9 <- d] -> 
+     not reach(upd8, a, c9) ->
+     upd8 = upd7[c8 <- d] -> 
+     not reach(upd7, a, c8) ->
+     upd7 = upd6[c7 <- d] -> 
+     not reach(upd6, a, c7) ->
+     upd6 = upd5[c6 <- d] -> 
+     not reach(upd5, a, c6) ->
+     upd5 = upd4[c5 <- d] -> 
+     not reach(upd4, a, c5) ->
+     upd4 = upd3[c4 <- d] -> 
+     not reach(upd3, a, c4) ->
+     upd3 = upd2[c3 <- d] -> 
+     not reach(upd2, a, c3) ->
+     upd2 = upd1[c2 <- d] -> 
+     not reach(upd1, a, c2) ->
+     upd1 = next[c1 <- d] -> 
+     not reach(next, a, c1) ->
+     reach(next,a,b) (*and false*)
+
+(* Test upd positive some < 1'' *)
+
+goal gUpd2S : 
+     forall a,b,c,dd : int. forall d : int option. forall upd:(int, int option) farray.
+     (d = None or d = Some (dd)) ->
+     upd = next[c <- d] -> 
+     reach(upd,a,b) ->
+     not reach(next, a, b) ->
+     reach(next, a, c) (*and false*)
+
+(* Test upd positive some 40'' *)
+
+goal gUpd2B : 
+     forall a,b,c1,c2,c3,c4,c5,c6,c7,c8,c9,dd : int. forall d : int option.
+	forall upd1,upd2,upd3,upd4,upd5,upd6,upd7,upd8,upd9:(int, int option) farray.
+     (d = None or d = Some (dd)) ->
+     reach(upd9,a,b) ->
+     upd9 = upd8[c9 <- d] -> 
+     not reach(upd8, a, b) ->
+     upd8 = upd7[c8 <- d] -> 
+     not reach(upd7, a, c9) ->
+     upd7 = upd6[c7 <- d] -> 
+     not reach(upd6, a, c8) ->
+     upd6 = upd5[c6 <- d] -> 
+     not reach(upd5, a, c7) ->
+     upd5 = upd4[c5 <- d] -> 
+     not reach(upd4, a, c6) ->
+     upd4 = upd3[c4 <- d] -> 
+     not reach(upd3, a, c5) ->
+     upd3 = upd2[c3 <- d] -> 
+     not reach(upd2, a, c4) ->
+     upd2 = upd1[c2 <- d] -> 
+     not reach(upd1, a, c3) ->
+     upd1 = next[c1 <- d] -> 
+     not reach(next, a, c2) ->
+     reach(next,a,c1) (*and false*)
+
+(* Test upd positive some < 1'' *)
+
+goal gUpd3S : 
+     forall a,b,c,d : int. forall upd:(int, int option) farray.
+     upd = next[c <- Some(d)] -> 
+     reach(upd,a,b) ->
+     reach(next, a, c) ->
+     (not reach(next, a, b) or reach(next, c, b)) ->
+     b <> c ->
+     reach(next,d,b) (*and false*)
+
+(* Test upd positive some > 5' *)
+
+goal gUpd31B : 
+     forall a, b,c1,c2,c3,c4,c5,c6,c7,c8,c9,d1,d2,d3,d4,d5,d6,d7,d8,d9 : int.
+	forall upd1,upd2,upd3,upd4,upd5,upd6,upd7,upd8,upd9:(int, int option) farray.
+     reach(upd9,d9,b) ->
+     b <> c9 ->
+     upd9 = upd8[c9 <- Some(d8)] -> 
+     reach(upd8, d9, c9) ->
+     not reach(upd8, d9, b) ->
+     b <> c8 ->
+     upd8 = upd7[c8 <- Some(d7)] -> 
+     reach(upd7, d8, c8) ->
+     not reach(upd7, d8, b) ->
+     b <> c7 ->
+     upd7 = upd6[c7 <- Some(d6)] -> 
+     reach(upd6, d7, c7) ->
+     not reach(upd6, d7, b) ->
+     b <> c6 ->
+     upd6 = upd5[c6 <- Some(d5)] -> 
+     reach(upd5, d6, c6) ->
+     not reach(upd5, d6, b) ->
+     b <> c5 ->
+     upd5 = upd4[c5 <- Some(d4)] -> 
+     reach(upd4, d5, c5) ->
+     not reach(upd4, d5, b) ->
+     b <> c4 ->
+     upd4 = upd3[c4 <- Some(d3)] -> 
+     reach(upd3, d4, c4) ->
+     not reach(upd3, d4, b) ->
+     b <> c3 ->
+     upd3 = upd2[c3 <- Some(d2)] -> 
+     reach(upd2, d3, c3) ->
+     not reach(upd2, d3, b) ->
+     b <> c2 ->
+     upd2 = upd1[c2 <- Some(d1)] -> 
+     reach(upd1, d2, c2) ->
+     not reach(upd1, d2, b) ->
+     b <> c1 ->
+     upd1 = next[c1 <- Some(a)] -> 
+     reach(next, d1, c1) ->
+     not reach(next, d1, b) ->
+     reach(next,a,b) (*and false*)
+
+(* Test upd positive some > 5' *)
+goal gUpd32B : 
+     forall a, b,c1,c2,c3,c4,c5,c6,c7,c8,c9,d1,d2,d3,d4,d5,d6,d7,d8,d9 : int.
+	forall upd1,upd2,upd3,upd4,upd5,upd6,upd7,upd8,upd9:(int, int option) farray.
+     reach(upd9,d9,b) ->
+     b <> c9 ->
+     upd9 = upd8[c9 <- Some(d8)] -> 
+     reach(upd8, d9, c9) ->
+     reach(upd8, c9, b) ->
+     b <> c8 ->
+     upd8 = upd7[c8 <- Some(d7)] -> 
+     reach(upd7, d8, c8) ->
+     reach(upd7, c8, b) ->
+     b <> c7 ->
+     upd7 = upd6[c7 <- Some(d6)] -> 
+     reach(upd6, d7, c7) ->
+     reach(upd6, c7, b) ->
+     b <> c6 ->
+     upd6 = upd5[c6 <- Some(d5)] -> 
+     reach(upd5, d6, c6) ->
+     reach(upd5, c6, b) ->
+     b <> c5 ->
+     upd5 = upd4[c5 <- Some(d4)] -> 
+     reach(upd4, d5, c5) ->
+     reach(upd4, c5, b) ->
+     b <> c4 ->
+     upd4 = upd3[c4 <- Some(d3)] -> 
+     reach(upd3, d4, c4) ->
+     reach(upd3, c4, b) ->
+     b <> c3 ->
+     upd3 = upd2[c3 <- Some(d2)] -> 
+     reach(upd2, d3, c3) ->
+     reach(upd2, c3, b) ->
+     b <> c2 ->
+     upd2 = upd1[c2 <- Some(d1)] -> 
+     reach(upd1, d2, c2) ->
+     reach(upd1, c2, b) ->
+     b <> c1 ->
+     upd1 = next[c1 <- Some(a)] -> 
+     reach(next, d1, c1) ->
+     reach(next, c1, b) ->
+     reach(next,a,b) (*and false*)
+
+(* Test upd positive some < 1'' *)
+
+goal gUpd4S : 
+     forall a,b,c,d : int. forall upd:(int, int option) farray.
+     upd = next[c <- Some(d)] -> 
+     reach(upd,a,b) ->
+     not reach(next,d,b) ->
+     (not reach(next, a, b) or reach(next, c, b)) ->
+     b <> c ->
+     not reach(next,a,c) (*and false*)
+
+(* Test upd positive some < 1'' *)
+
+goal gUpd5S : 
+     forall a,b,c,d : int. forall upd:(int, int option) farray.
+     upd = next[c <- Some(d)] -> 
+     reach(upd,a,b) ->
+     (not reach(next, a, c) or reach(next, a, b) and not reach(next, c, b)
+	or b = c or reach(next,d,b)) (*and false*)
+
+(* Test upd inv 1 < 1'' *)
+
+goal gUpdI1S :
+     forall a,b,c,dd : int. forall d : int option. forall upd:(int, int option) farray.
+     (d = None or d = Some(dd)) ->
+     reach(next, a, b) ->
+     not reach(next, c, b) ->
+     upd = next[c <- d] ->
+     reach(upd,a,b) (*and false*)
+
+(* Test upd inv 1 > 5' *)
+
+goal gUpdI1B :
+     forall a,b,c1,c2,c3,c4,c5,c6,c7,c8,c9,dd : int. forall d : int option.
+forall updI11,updI12,updI13,updI14,updI15,updI16,updI17,updI18,updI19:(int, int option) farray.
+     (d = None or d = Some(dd)) ->
+     reach(next, a, b) -> 
+     updI11 = next[c1 <- d] ->
+     not reach(next, c1, b) ->
+     updI12 = updI11[c2 <- d] ->
+     not reach(updI11, c2, b) ->
+     updI13 = updI12[c3 <- d] ->
+     not reach(updI12, c3, b) ->
+     updI14 = updI13[c4 <- d] ->
+     not reach(updI13, c4, b) ->
+     updI15 = updI14[c5 <- d] ->
+     not reach(updI14, c5, b) ->
+     updI16 = updI15[c6 <- d] ->
+     not reach(updI15, c6, b) ->
+     updI17 = updI16[c7 <- d] ->
+     not reach(updI16, c7, b) ->
+     updI18 = updI17[c8 <- d] ->
+     not reach(updI17, c8, b) ->
+     updI19 = updI18[c9 <- d] ->
+     not reach(updI18, c9, b) ->
+     reach(updI19,a,b) (*and false*)
+
+(* Test upd inv 2 < 1'' *)
+
+goal gUpdI2S :
+     forall a,b,c,dd : int. forall upd:(int, int option) farray. forall d : int option.
+     (d = None or d = Some(dd)) ->
+     reach(next, a, b) ->
+     not reach(next, a, c) ->
+     upd = next[c <- d] ->
+     reach(upd,a,b) (*and false*)
+
+(* Test upd inv 2 > 5' *)
+
+goal gUpdI2B :
+     forall a,b,c1,c2,c3,c4,c5,c6,c7,c8,c9,dd : int. forall d : int option.
+forall updI21,updI22,updI23,updI24,updI25,updI26,updI27,updI28,updI29:(int, int option) farray.
+     (d = None or d = Some(dd)) ->
+     reach(next, a, b) -> 
+     updI21 = next[c1 <- d] ->
+     not reach(next, a, c1) ->
+     updI22 = updI21[c2 <- d] ->
+     not reach(updI21, a, c2) ->
+     updI23 = updI22[c3 <- d] ->
+     not reach(updI22, a, c3) ->
+     updI24 = updI23[c4 <- d] ->
+     not reach(updI23, a, c4) ->
+     updI25 = updI24[c5 <- d] ->
+     not reach(updI24, a, c5) ->
+     updI26 = updI25[c6 <- d] ->
+     not reach(updI25, a, c6) ->
+     updI27 = updI26[c7 <- d] ->
+     not reach(updI26, a, c7) ->
+     updI28 = updI27[c8 <- d] ->
+     not reach(updI27, a, c8) ->
+     updI29 = updI28[c9 <- d] ->
+     not reach(updI28, a, c9) ->
+     reach(updI29,a,b) (*and false*)
+
+(* Test upd inv 3 < 1'' *)
+
+goal gUpdI3S :
+     forall a,b,c : int. forall upd:(int, int option) farray. forall d : int option.
+     (d = None or d = Some(c)) ->
+     reach(next, a, b) ->
+     upd = next[b <- d] ->
+     reach(upd,a,b) (*and false*)
+
+(* Test upd inv 4 < 1'' *)
+
+goal gUpdI4S :
+     forall a,b,c,d : int. forall upd:(int, int option) farray.
+     reach(next, a, b) ->
+     reach(next, c, b) ->
+     upd = next[d <- Some(c)] ->
+     reach(upd,a,b) (*and false*)
+
+(* Test upd inv 4 > 5' *)
+
+goal gUpdI4B :
+     forall a,b,c1,c2,c3,c4,c5,c6,c7,c8,c9,d : int.
+forall updI41,updI42,updI43,updI44,updI45,updI46,updI47,updI48,updI49:(int, int option) farray.
+     reach(next, a, b) -> 
+     updI41 = next[d <- Some(c1)] ->
+     reach(next, c1, b) ->
+     updI42 = updI41[d <- Some(c2)] ->
+     reach(updI41, c2, b) ->
+     updI43 = updI42[d <- Some(c3)] ->
+     reach(updI42, c3, b) ->
+     updI44 = updI43[d <- Some(c4)] ->
+     reach(updI43, c4, b) ->
+     updI45 = updI44[d <- Some(c5)] ->
+     reach(updI44, c5, b) ->
+     updI46 = updI45[d <- Some(c6)] ->
+     reach(updI45, c6, b) ->
+     updI47 = updI46[d <- Some(c7)] ->
+     reach(updI46, c7, b) ->
+     updI48 = updI47[d <- Some(c8)] ->
+     reach(updI47, c8, b) ->
+     updI49 = updI48[d <- Some(c9)] ->
+     reach(updI48, c9, b) ->
+     reach(updI49,a,b) (*and false*)
+
+(* Test upd inv 4 < 1'' *)
+
+goal gUpdI5S :
+     forall a,b,c,d : int. forall upd:(int, int option) farray.
+     reach(next, a, d) ->
+     reach(next, c, b) ->
+     upd = next[d <- Some(c)] ->
+     reach(upd,a,b) (*and false*)
+
+(* Test upd inv 4 > 5'*)
+
+goal gUpdI5B :
+     forall a,b,c1,c2,c3,c4,c5,c6,c7,c8,c9,d1,d2,d3,d4,d5,d6,d7,d8,d9 : int.
+forall updI51,updI52,updI53,updI54,updI55,updI56,updI57,updI58,updI59:(int, int option) farray.
+     reach(next, a, d1) -> 
+     updI51 = next[d1 <- Some(c1)] ->
+     reach(next, c1, d2) ->
+     updI52 = updI51[d2 <- Some(c2)] ->
+     reach(updI51, c2, d3) ->
+     updI53 = updI52[d3 <- Some(c3)] ->
+     reach(updI52, c3, d4) ->
+     updI54 = updI53[d4 <- Some(c4)] ->
+     reach(updI53, c4, d5) ->
+     updI55 = updI54[d5 <- Some(c5)] ->
+     reach(updI54, c5, d6) ->
+     updI56 = updI55[d6 <- Some(c6)] ->
+     reach(updI55, c6, d7) ->
+     updI57 = updI56[d7 <- Some(c7)] ->
+     reach(updI56, c7, d8) ->
+     updI58 = updI57[d8 <- Some(c8)] ->
+     reach(updI57, c8, d9) ->
+     updI59 = updI58[d9 <- Some(c9)] ->
+     reach(updI58, c9, b) ->
+     reach(updI59,a,b) (*and false*)
+
+
