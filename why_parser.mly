@@ -328,10 +328,6 @@ lexpr:
 | LET ident EQUAL lexpr IN lexpr
    { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
      mk_pp (PPlet ($2, $4, $6)) }
-
-| LEFTPAR lexpr RIGHTPAR
-   { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
-     $2 }
 ;
 
 simple_expr : 
@@ -388,6 +384,9 @@ simple_expr :
       List.fold_left (fun acc (i,v) -> mk_pp (PPset(acc, i, v))) acc l
     }
 
+| LEFTPAR lexpr RIGHTPAR
+   { if qualif then fprintf fmt "[rule] TR-Lexical-expr@.";
+     $2 }
 ;
 
 array_assignements:
