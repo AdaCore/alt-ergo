@@ -67,6 +67,7 @@ BIBGUIOPT=threads.cmxa lablgtk.cmxa lablgtksourceview2.cmxa gtkThread.cmx
 #############
 
 NAME = alt-ergo
+LIBNAME = altErgo
 BYTE=$(NAME).byte
 OPT=$(NAME).opt
 
@@ -96,15 +97,18 @@ CMO = options.cmo exception.cmo loc.cmo \
       uf.cmo use.cmo intervals.cmo fm.cmo arith.cmo \
       records.cmo bitv.cmo reachability.cmo arrays.cmo sum.cmo \
       combine.cmo cc.cmo \
-      heap.cmo existantial.cmo pruning.cmo \
+      heap.cmo existantial.cmo \
       triggers.cmo cnf.cmo why_typing.cmo matching.cmo \
-      sat.cmo frontend.cmo
+      sat.cmo 
+
+CMOFRONT = pruning.cmo frontend.cmo
 
 PRECMX = $(PRECMO:.cmo=.cmx)
 OPTIONSCMX = $(OPTIONSCMO:.cmo=.cmx)
 CMX = $(CMO:.cmo=.cmx)
+CMXFRONT = $(CMOFRONT:.cmo=.cmx)
 
-MAINCMO = $(CMO) main.cmo
+MAINCMO = $(CMO) $(CMOFRONT) main.cmo
 MAINCMX = $(MAINCMO:.cmo=.cmx)
 
 RUNCMO = $(CMO) run.cmo
@@ -115,7 +119,7 @@ GENERATED = version.ml \
 	smt_parser.ml smt_parser.mli smt_lex.ml \
 	smtlib2_parse.ml smtlib2_parse.mli smtlib2_lex.ml
 
-GUICMO = $(CMO) why_annoted.cmo why_connected.cmo gui.cmo
+GUICMO = $(CMO) $(CMOFRONT) why_annoted.cmo why_connected.cmo gui.cmo
 GUICMX = $(GUICMO:.cmo=.cmx)
 
 byte: $(NAME).byte
@@ -125,13 +129,13 @@ $(NAME).byte: $(PRECMO) $(OPTIONSCMO) $(MAINCMO)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLC) $(BFLAGS) -o $@ $(BIBBYTE) $^
 
-$(NAME).pack: $(PRECMO) $(MAINCMO)
+pack: $(PRECMO) $(CMO)
 	$(if $(QUIET),@echo 'Library $@' &&) 
-	$(OCAMLC) $(BFLAGS) -pack -o $(NAME).cmo $^
+	$(OCAMLC) $(BFLAGS) -pack -o $(LIBNAME).cmo $^
 
-$(NAME).xpack: $(PRECMX) $(CMX)
+xpack: $(PRECMX) $(CMX)
 	$(if $(QUIET),@echo 'Library $@' &&) 
-	$(OCAMLOPT) $(INCLUDES)  -pack -o AltErgo.cmx $^
+	$(OCAMLOPT) $(INCLUDES)  -pack -o $(LIBNAME).cmx $^
 
 $(NAME).opt: $(PRECMX) $(OPTIONSCMX) $(MAINCMX)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
@@ -189,7 +193,7 @@ headers:
 # installation
 ##############
 
-install-indep: install-man install-prelude
+install-indep: install-man install-prelude install-pack
 
 install: install-indep 
 	mkdir -p $(BINDIR)
@@ -216,6 +220,12 @@ install-gui: install-indep
 	cp -f altgr-ergo.opt $(BINDIR)/altgr-ergo$(EXE)
 	cp -f util/gtk-lang/alt-ergo.lang /usr/share/gtksourceview-2.0/language-specs/alt-ergo.lang
 
+install-pack: xpack pack
+	mkdir -p $(LIBDIR)
+	cp -f $(LIBNAME).cmx $(LIBDIR)
+	cp -f $(LIBNAME).o $(LIBDIR)
+	cp -f $(LIBNAME).cmo $(LIBDIR)
+	cp -f $(LIBNAME).cmi $(LIBDIR)
 
 # documentation
 ###############
