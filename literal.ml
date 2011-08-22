@@ -136,8 +136,8 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
     let lbl = if lbl = "" then lbl else lbl^":" in
     match view a with
       | Eq (z1, z2) -> 
-	  if equal z1 z2 then () else
-	  Format.fprintf fmt "%s%a=%a" lbl X.print z1 X.print z2
+	  if equal z1 z2 then Format.fprintf fmt "True"
+	  else Format.fprintf fmt "%s%a=%a" lbl X.print z1 X.print z2
       | Distinct (b,(z::l)) -> 
 	  let b = if b then "~" else "" in
 	  Format.fprintf fmt "%s%s%a" lbl b X.print z;
