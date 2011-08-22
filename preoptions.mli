@@ -73,4 +73,5 @@ val vsid : bool ref
 val debug_split : bool ref
 
 val show_version : unit -> unit
+val show_libdir : unit -> unit
 val set_max_split : string -> unit

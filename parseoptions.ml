@@ -48,6 +48,7 @@ let spec = [
   "-dsplit", Arg.Set debug_split, "  sets the debugging flag of case-split analysis";
    "-v", Arg.Set verbose, "  sets the verbose mode";
   "-version", Arg.Unit show_version, "  prints the version number";
+  "-where", Arg.Unit show_libdir, "  prints the directory of the library";
   "-ddispatch", Arg.Set debug_dispatch, "  sets the debugging flag of sat";
   "-stop", Arg.Set_int stopb, " <n> set the stop bound";
   "-steps", Arg.Set_int stepsb, " <n> set the maximum number of steps";
