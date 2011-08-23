@@ -393,9 +393,9 @@ module Make (X : Sig.X) = struct
       assume_literal (lt@l) env l
 
    
-  let look_for_sat ?(bad_last=false) lt t base_env l =
-    let rec aux lt bad_last dl base_env = function
-      | [] -> 
+  let look_for_sat ?(bad_last=No) lt t base_env l =
+    let rec aux lt bad_last dl base_env li = match li, bad_last with
+      | [], _ -> 
 	begin
           match X.Rel.case_split base_env.relation with
 	    | [] -> 
@@ -413,21 +413,22 @@ module Make (X : Sig.X) = struct
 		  (fun acc (a,s,_,_) ->
 		     Num.mult_num acc s) (Num.Int 1) (l@dl) in
               Print.split_size sz;
-	      if Num.le_num sz max_split then aux lt false dl base_env l
+	      if Num.le_num sz max_split then aux lt No dl base_env l
 	      else
 		{ t with gamma_finite = base_env; choices = List.rev dl }, lt
 	end
-      | ((c, size, CNeg, ex_c) as a)::l ->
+      | ((c, size, CNeg, ex_c) as a)::l, _ ->
 	  let base_env, lt = assume_literal lt base_env [LSem c, ex_c] in
 	  aux lt bad_last (a::dl) base_env l
 
       (** This optimisation is not correct with the current explanation *)
-      (* | [(c, size, false, ex_c)] when bad_last -> *)
+      (* | [(c, size, CPos exp, ex_c)], Yes dep -> *)
       (*     let neg_c = LR.neg (LR.make c) in *)
+      (* 	  let ex_c = Ex.union ex_c dep in *)
       (*     Print.split_backtrack neg_c ex_c; *)
-      (*     aux false dl base_env [LR.view neg_c, Num.Int 1, true, ex_c]  *)
+      (*     aux No dl base_env [LR.view neg_c, Num.Int 1, CNeg, ex_c] *)
 
-      | ((c, size, CPos exp, ex_c_exp) as a)::l ->
+      | ((c, size, CPos exp, ex_c_exp) as a)::l, _ ->
 	  try
             Print.split_assume (LR.make c) ex_c_exp;
 	    let base_env, lt = assume_literal lt base_env [LSem c, ex_c_exp] in
@@ -442,7 +443,7 @@ module Make (X : Sig.X) = struct
                 (* The choice participates to the inconsistency *)
                 let neg_c = LR.neg (LR.make c) in
 	        Print.split_backtrack neg_c dep;
-	        aux lt false dl base_env [LR.view neg_c, Num.Int 1, CNeg, dep]
+	        aux lt No dl base_env [LR.view neg_c, Num.Int 1, CNeg, dep]
     in
     aux lt bad_last (List.rev t.choices) base_env l
 
@@ -455,12 +456,12 @@ module Make (X : Sig.X) = struct
 	  try
 	    let env, lt = f t.gamma_finite in
 	    look_for_sat lt t env []
-	  with Exception.Inconsistent _ -> 
+	  with Exception.Inconsistent dep -> 
             if debug_split then
               fprintf fmt "[case-split] I replay choices@.";
 	    (* we replay the conflict in look_for_sat, so we can
 	       safely ignore the explanation which is not useful *)
-	    look_for_sat ~bad_last:true 
+	    look_for_sat ~bad_last:(Yes dep)
 	      [] { t with choices = []} t.gamma t.choices
       with Exception.Inconsistent d ->
 	Print.end_case_split (); 
