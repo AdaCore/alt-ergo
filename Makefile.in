@@ -71,7 +71,7 @@ LIBNAME = altErgo
 BYTE=$(NAME).byte
 OPT=$(NAME).opt
 
-all: $(OCAMLBEST) 
+all: pack xpack $(OCAMLBEST) pack xpack
 
 # bytecode and native-code compilation
 ######################################
@@ -129,13 +129,17 @@ $(NAME).byte: $(PRECMO) $(OPTIONSCMO) $(MAINCMO)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLC) $(BFLAGS) -o $@ $(BIBBYTE) $^
 
-pack: $(PRECMO) $(CMO)
+$(LIBNAME).cmo: $(PRECMO) $(CMO) 
 	$(if $(QUIET),@echo 'Library $@' &&) 
 	$(OCAMLC) $(BFLAGS) -pack -o $(LIBNAME).cmo $^
 
-xpack: $(PRECMX) $(CMX)
+pack: $(LIBNAME).cmo
+
+$(LIBNAME).cmx: $(PRECMX) $(CMX)
 	$(if $(QUIET),@echo 'Library $@' &&) 
 	$(OCAMLOPT) $(INCLUDES)  -pack -o $(LIBNAME).cmx $^
+
+xpack: $(LIBNAME).cmx
 
 $(NAME).opt: $(PRECMX) $(OPTIONSCMX) $(MAINCMX)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
