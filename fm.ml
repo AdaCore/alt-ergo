@@ -43,6 +43,7 @@ module Make
   (P : EXTENDED_Polynome with type r = X.r) = struct
 
   module MP = Map.Make(P)
+  module SP = Set.Make(P)
   module SX = Set.Make(struct type t = X.r include X end)
   module MX = Map.Make(struct type t = X.r include X end)
   
@@ -95,6 +96,7 @@ module Make
     monomes: (Intervals.t * SX.t) MX.t;
     polynomes : Intervals.t MP.t;
     known_eqs : SX.t;
+    improved : SP.t;
   }
 
   module Debug = struct
@@ -157,12 +159,19 @@ module Make
     monomes = MX.empty ; 
     polynomes = MP.empty ; 
     known_eqs = SX.empty ; 
+    improved = SP.empty ; 
   }
 
   let replace_inequation env x ineq = 
     { env with
 	inequations = (x, ineq)::(List.remove_assoc x env.inequations) }
 
+
+  let up_improved env p oldi newi =
+    if Intervals.is_strict_smaller newi oldi then
+      { env with improved = SP.add p env.improved }
+    else env
+    
 (*
   let oldify_inequations env =
     { env with
@@ -337,16 +346,17 @@ module Make
       monomes lp
 
   let update_polynomes env expl =
-    let polynomes, monomes = MP.fold
-      (fun p ip (polynomes, monomes) ->
+    let polynomes, monomes, improved = MP.fold
+      (fun p ip (polynomes, monomes, improved) ->
 	 let new_i = intervals_from_monomes env p in
 	 let i = Intervals.intersect new_i ip in
 	 if Intervals.is_strict_smaller i ip then
 	   let monomes = update_monomes_from_poly p i polynomes monomes in
-	   MP.add p i polynomes, monomes
-	 else polynomes, monomes
-      ) env.polynomes (env.polynomes, env.monomes) in
-    {env with polynomes = polynomes; monomes = monomes }
+	   let improved = SP.add p improved in
+	   MP.add p i polynomes, monomes, improved
+	 else polynomes, monomes, improved
+      ) env.polynomes (env.polynomes, env.monomes, env.improved) in
+    {env with polynomes = polynomes; monomes = monomes ; improved = improved}
 
 
   let find_one_eq x u =
@@ -465,7 +475,11 @@ module Make
 	if Intervals.is_strict_smaller u pu then
 	  let polynomes = MP.add p u env.polynomes in
 	  let monomes = update_monomes_from_poly p u polynomes env.monomes in
-	  { env with polynomes = polynomes; monomes = monomes }
+	  let improved = SP.add p env.improved in
+	  { env with 
+	    polynomes = polynomes; 
+	    monomes = monomes; 
+	    improved = improved }
 	else env
       in
       match P.to_list p0 with
@@ -660,7 +674,11 @@ module Make
 	      let polynomes = MP.add p i env.polynomes in
 	      let monomes = update_monomes_from_poly p i polynomes env.monomes
 	      in
-	      { env with polynomes = polynomes; monomes = monomes }
+	      let improved = SP.add p env.improved in
+	      { env with 
+		polynomes = polynomes;
+		monomes = monomes;
+		improved = improved}
 	    else env
 	  in
 	  env, eqs
@@ -700,7 +718,11 @@ module Make
 	      let polynomes = MP.add p i env.polynomes in
 	      let monomes = update_monomes_from_poly p i polynomes env.monomes
 	      in
-	      { env with polynomes = polynomes; monomes = monomes }
+	      let improved = SP.add p env.improved in
+	      { env with 
+		polynomes = polynomes;
+		monomes = monomes;
+		improved = improved }
 	    else env
 	  in
 	  let env = 
@@ -769,7 +791,8 @@ module Make
     let env, eqs = equalities_from_polynomes env eqs in
     equalities_from_monomes env eqs
 
-  let assume env la ~are_eq ~are_neq ~class_of ~find = 
+  let assume env la ~are_eq ~are_neq ~class_of ~find =
+    let env = {env with improved = SP.empty} in
     Debug.env env;
     let env, eqs, new_ineqs, expl =
       List.fold_left
@@ -912,5 +935,11 @@ module Make
       | choices -> choices
    
   let add env _ = env
+
+  let extract_improved env =
+    SP.fold
+      (fun p acc ->
+	MP.add p (MP.find p env.polynomes) acc)
+      env.improved MP.empty
 
 end

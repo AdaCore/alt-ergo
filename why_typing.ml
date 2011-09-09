@@ -313,23 +313,33 @@ let rec type_term env f =
 
 and type_term_desc env loc = function
   | PPconst ConstTrue -> 
+      if qualif then fprintf fmt "[rule] Const type %a@." Ty.print Ty.Tbool;
       TTconst Ttrue, Ty.Tbool
   | PPconst ConstFalse -> 
+      if qualif then fprintf fmt "[rule] Const type %a@." Ty.print Ty.Tbool;
       TTconst Tfalse, Ty.Tbool
   | PPconst ConstVoid -> 
+      if qualif then fprintf fmt "[rule] Const type %a@." Ty.print Ty.Tunit;
       TTconst Tvoid, Ty.Tunit
   | PPconst (ConstInt n) -> 
+      if qualif then fprintf fmt "[rule] Const type %a@." Ty.print Ty.Tint;
       TTconst(Tint n), Ty.Tint
   | PPconst (ConstReal n) -> 
+      if qualif then fprintf fmt "[rule] Const type %a@." Ty.print Ty.Treal;
       TTconst(Treal n), Ty.Treal
   | PPconst (ConstBitv n) -> 
+      if qualif then fprintf fmt "[rule] Const type %a@." Ty.print 
+      (Ty.Tbitv (String.length n));
       TTconst(Tbitv n), Ty.Tbitv (String.length n)
   | PPvar p -> 
       begin
 	try let s,t = Env.find env p in TTvar s , t
 	with Not_found -> 
 	  match Env.fresh_type env p loc with
-	    | s, { Env.args = []; result = ty} -> TTvar s , ty 
+	    | s, { Env.args = []; result = ty} -> 
+	      if qualif then fprintf fmt "[rule] Var_\\delta type %a@." 
+		Ty.print ty;
+	      TTvar s , ty 
 	    | _ -> error (ShouldBeApply p) loc
       end
   | PPapp(p,args) -> 
@@ -339,6 +349,7 @@ and type_term_desc env loc = function
 	let s, {Env.args = lt; result = t} = Env.fresh_type env p loc in
 	try
 	  List.iter2 Ty.unify lt lt_args; 
+	  if qualif then fprintf fmt "[rule] App type %a@." Ty.print t;
 	  TTapp(s,te_args), t
 	with 
 	  | Ty.TypeClash(t1,t2) -> 
@@ -354,8 +365,14 @@ and type_term_desc env loc = function
 	let ty1 = Ty.shorten te1.c.tt_ty in
 	let ty2 = Ty.shorten te2.c.tt_ty in
 	match ty1, ty2 with
-	    Ty.Tint, Ty.Tint -> TTinfix(te1,s,te2) , ty1
-	  | Ty.Treal, Ty.Treal -> TTinfix(te1,s,te2), ty2
+	  | Ty.Tint, Ty.Tint -> 
+	    if qualif then fprintf fmt "[rule] OpBin type %a@."
+	      Ty.print ty1;
+	    TTinfix(te1,s,te2) , ty1
+	  | Ty.Treal, Ty.Treal -> 
+	    if qualif then fprintf fmt "[rule] OpBin type %a@."
+	      Ty.print ty2; 
+	    TTinfix(te1,s,te2), ty2
 	  | Ty.Tint, _ -> error (ShouldHaveType(ty2,Ty.Tint)) t2.pp_loc
 	  | Ty.Treal, _ -> error (ShouldHaveType(ty2,Ty.Treal)) t2.pp_loc
 	  | _ -> error (ShouldHaveTypeIntorReal ty1) t1.pp_loc
@@ -368,18 +385,27 @@ and type_term_desc env loc = function
 	let ty1 = Ty.shorten te1.c.tt_ty in
 	let ty2 = Ty.shorten te2.c.tt_ty in
 	match ty1, ty2 with
-	    Ty.Tint, Ty.Tint -> TTinfix(te1,s,te2) , ty1
+	  | Ty.Tint, Ty.Tint ->  
+	    if qualif then fprintf fmt "[rule] OpMod type %a@."
+	      Ty.print ty1;
+	    TTinfix(te1,s,te2) , ty1
 	  | _ -> error (ShouldHaveTypeInt ty1) t1.pp_loc
       end
   | PPprefix(PPneg, {pp_desc=PPconst (ConstInt n)}) -> 
+    if qualif then fprintf fmt "[rule] OpUnarith type %a@." 
+      Ty.print Ty.Tint;
       TTconst(Tint ("-"^n)), Ty.Tint
   | PPprefix(PPneg, {pp_desc=PPconst (ConstReal n)}) -> 
+    if qualif then fprintf fmt "[rule] OpUnarith type %a@." 
+      Ty.print Ty.Treal;
       TTconst(Treal (Num.minus_num n)), Ty.Treal
   | PPprefix(PPneg, e) -> 
       let te = type_term env e in
       let ty = Ty.shorten te.c.tt_ty in
       if ty<>Ty.Tint && ty<>Ty.Treal then
 	error (ShouldHaveTypeIntorReal ty) e.pp_loc;
+      if qualif then fprintf fmt "[rule] OpUnarith type %a@." 
+	Ty.print ty;
       TTprefix(Symbols.Op Symbols.Minus, te), ty
   | PPconcat(t1, t2) ->
       begin
@@ -388,7 +414,10 @@ and type_term_desc env loc = function
 	let ty1 = Ty.shorten te1.c.tt_ty in
 	let ty2 = Ty.shorten te2.c.tt_ty in
 	match ty1, ty2 with
-	    Ty.Tbitv n , Ty.Tbitv m -> TTconcat(te1, te2), Ty.Tbitv (n+m)
+	  | Ty.Tbitv n , Ty.Tbitv m -> 
+	    if qualif then fprintf fmt "[rule] OpConcat type %a@." 
+	      Ty.print (Ty.Tbitv (n+m));
+	    TTconcat(te1, te2), Ty.Tbitv (n+m)
 	  | Ty.Tbitv _ , _ -> error (ShouldHaveTypeBitv ty2) t2.pp_loc
 	  | _ , Ty.Tbitv _ -> error (ShouldHaveTypeBitv ty1) t1.pp_loc
 	  | _ -> error (ShouldHaveTypeBitv ty1) t1.pp_loc
@@ -406,6 +435,8 @@ and type_term_desc env loc = function
 	      if j>=n then error (BitvExtractRange(n,j) ) loc;
 	      let tei = type_term env ei in
 	      let tej = type_term env ej in
+	      if qualif then fprintf fmt "[rule] OpExtract type %a@." 
+		Ty.print (Ty.Tbitv (j-i+1));
 	      TTextract(te, tei, tej), Ty.Tbitv (j-i+1)
 	  | _ -> error (ShouldHaveType(tye,Ty.Tbitv (j+1))) loc
       end
@@ -419,6 +450,8 @@ and type_term_desc env loc = function
 	  | Ty.Tfarray (tykey,tyval) ->
 	      begin try
 	        Ty.unify tykey tykey2;
+		if qualif then fprintf fmt "[rule] OpGet type %a@." 
+		  Ty.print tyval;
                 TTget(te1, te2), tyval
 	      with
 	        | Ty.TypeClash(t1,t2) ->
@@ -438,6 +471,8 @@ and type_term_desc env loc = function
 	  match ty1 with
 	    | Ty.Tfarray (tykey,tyval) ->
 		Ty.unify tykey tykey2;Ty.unify tyval tyval2;
+		if qualif then fprintf fmt "[rule] OpSet type %a@." 
+		  Ty.print ty1;
 		TTset(te1, te2, te3), ty1
 	    | _ -> error ShouldHaveTypeArray t1.pp_loc
 	with
@@ -456,6 +491,8 @@ and type_term_desc env loc = function
 	let ty3 = Ty.shorten te3.c.tt_ty in
 	if not (Ty.equal ty2 ty3) then
 	  error (ShouldHaveType(ty3,ty2)) t3.pp_loc;
+	if qualif then fprintf fmt "[rule] Ite type %a@." 
+	  Ty.print ty2;
 	TTapp(Symbols.name "ite",[te1;te2;te3]) , ty2
       end
   | PPnamed(lbl, t) -> 
@@ -538,6 +575,8 @@ and type_term_desc env loc = function
       let te2 = type_term env t2 in
       let ty2 = Ty.shorten te2.c.tt_ty in
       let s, _ = Env.find env x in
+      if qualif then fprintf fmt "[rule] Let type %a@." 
+	Ty.print ty2;
       TTlet(s, te1, te2), ty2
   | _ -> error SyntaxError loc
 
