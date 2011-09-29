@@ -207,19 +207,20 @@ module Make (X : X) = struct
 	[sg] pats xs 
     with Invalid_argument _ -> raise Echec
 
-  let matchpat env uf pat_info lsubst ({gen=g; goal=b} as sg,pat) = 
+  let matchpat env uf pat_info lsubst ({sbt=st,sty; gen=g; goal=b} as sg, pat) = 
     let {T.f=f;xs=pats;ty=ty} = T.view pat in
     match f with
-	Symbols.Var _ -> all_terms f ty env pat_info sg
+      |	Symbols.Var _ -> all_terms f ty env pat_info sg
       | _ -> 
 	  try  
 	    MT.fold 
-	      (fun t xs lsubst -> 
-		 try 
-		   let gen, but = infos max (||) t g b env in
-		   (matchterms env uf
-			{sg with gen=gen ; goal=but } pats xs) @ lsubst
-		 with Echec -> lsubst)
+	      (fun t xs lsubst ->
+		try
+		  let s_ty = Ty.matching sty ty (T.view t).T.ty in
+		  let gen, but = infos max (||) t g b env in
+		  (matchterms env uf
+		     {sbt=st,s_ty; gen=gen ; goal=but } pats xs) @ lsubst
+		with Echec -> lsubst)
 	      (SubstT.find f env.fils) lsubst
 	  with Not_found -> lsubst
 	    
