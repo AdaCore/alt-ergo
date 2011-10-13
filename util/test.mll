@@ -146,8 +146,9 @@
   let scan_rules s =
     let rules = split_char '\n' s in
     List.fold_left (fun acc r ->
-      try Scanf.sscanf r "[rule] %s" 
-	    (fun nr -> if List.mem nr acc then acc else nr::acc)
+      try Scanf.sscanf r "[rule] %s %s@\n" 
+	    (fun r info ->
+	      if List.mem (r,info) acc then acc else (r,info)::acc)
       with Scanf.Scan_failure _ | End_of_file -> acc)
       [] rules
 
@@ -169,8 +170,8 @@
     fprintf fmt_tex 
       "\\subsubsection{Référence de l\'exigence fonctionnelle}\n\n";
     fprintf fmt_tex "\\begin{itemize}\n";
-    List.iter (fun r ->
-      fprintf fmt_tex "\\item \\textsc{%s} \n" r;
+    List.iter (fun (r,info) ->
+      fprintf fmt_tex "\\item \\textsc{%s} \\texttt{%s}\n" r info;
       exi_tests := (r, fname)::!exi_tests
     ) refs;
     fprintf fmt_tex "\\end{itemize}\n@."
