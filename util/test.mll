@@ -19,6 +19,12 @@
   open Format
 
 
+
+  module SS = Set.Make(struct
+    include String 
+    let compare s1 s2 = if compare s1 s2 = 0 then 0 else -1
+  end)
+
   let string_buf = Buffer.create 1024
 
   let preftab = Hashtbl.create 17 
@@ -97,7 +103,7 @@
 	(String.sub str 1 (String.length str - 1))
     else str
 
-  let rec remove_trailing_whitespaces str =
+  let remove_trailing_whitespaces str =
     remove_trailing_whitespaces_end (remove_trailing_whitespaces_begin str)
 
   let write str = 
@@ -110,8 +116,43 @@
     close_out chan;
     fname
       
+
+
+  (* Captures the output and exit status of a unix command : aux func*)
+  let syscall cmd =
+    (* fprintf std_formatter "syscall: %s@." cmd; *)
+    let inc, outc, errc = Unix.open_process_full cmd (Unix.environment ()) in  
+    let buf = Buffer.create 16 in
+    let buferr = Buffer.create 16 in
+    (try
+       while true do
+	 Buffer.add_channel buf inc 1
+       done
+     with End_of_file -> ());
+    (try
+       while true do
+	 Buffer.add_channel buferr errc 1
+       done
+     with End_of_file -> ());
+    let status = Unix.close_process_full (inc, outc, errc) in
+    let s =  Buffer.contents buferr in
+    let l = String.length s in
+    let serr = if l > 0 then String.sub s 0 ((String.length s) - 1) else s in
+    (Buffer.contents buf, status, serr)
+
+  let is_zero_status = function
+    | Unix.WEXITED n | Unix.WSIGNALED n | Unix.WSTOPPED n -> n = 0
+
+  let scan_rules s =
+    let rules = split_char '\n' s in
+    List.fold_left (fun acc r ->
+      try Scanf.sscanf r "[rule] %s" 
+	    (fun nr -> if List.mem nr acc then acc else nr::acc)
+      with Scanf.Scan_failure _ | End_of_file -> acc)
+      [] rules
+
   let out_tex =
-      open_out_gen [Open_creat; Open_trunc; Open_append] 0o666 !tex_file
+    open_out_gen [Open_creat; Open_trunc; Open_append] 0o666 !tex_file
   let fmt_tex = formatter_of_out_channel out_tex
 
 
@@ -124,8 +165,7 @@
     fprintf fmt_tex "%s %s\n" !name fname;
     fprintf fmt_tex "\\end{verbatim}\n@."
     
-  let sec_exigence s fname =
-    let refs = split_char ',' s in
+  let sec_exigence refs fname =
     fprintf fmt_tex 
       "\\subsubsection{Référence de l\'exigence fonctionnelle}\n\n";
     fprintf fmt_tex "\\begin{itemize}\n";
@@ -202,17 +242,16 @@ rule split = parse
   | file {
     let code = remove_trailing_whitespaces (Lexing.lexeme lexbuf) in
     let fname = write code in
+    let answ, status, rules = syscall (sprintf "%s %s" !name fname) in
     let ok =
-      if !ares = "Incorrect" then 
-	Sys.command(sprintf "%s %s" !name fname) <> 0
-      else if !ares = "Correct" then 
-	Sys.command(sprintf "%s %s" !name fname) = 0
-      else
-	Sys.command(sprintf "%s %s | grep -q -w \"%s\"" !name fname !ares) = 0
+      if !ares = "Incorrect" then not (is_zero_status status)
+      else if !ares = "Correct" then is_zero_status status
+      else is_zero_status status && 
+	Sys.command (sprintf "echo \"%s\" | grep -q -w \"%s\"" answ !ares) = 0
     in
     init_sec fname;
     sec_command fname;
-    sec_exigence !exi fname;
+    sec_exigence (scan_rules rules) fname;
     sec_obj !obj;
     sec_desc code;
     sec_res !ares ok;
