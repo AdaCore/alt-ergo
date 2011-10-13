@@ -337,7 +337,7 @@ and type_term_desc env loc = function
 	with Not_found -> 
 	  match Env.fresh_type env p loc with
 	    | s, { Env.args = []; result = ty} -> 
-	      if qualif then fprintf fmt "[rule] Var_\\delta type %a@." 
+	      if qualif then fprintf fmt "[rule] Var$_\\Delta$ type %a@." 
 		Ty.print ty;
 	      TTvar s , ty 
 	    | _ -> error (ShouldBeApply p) loc

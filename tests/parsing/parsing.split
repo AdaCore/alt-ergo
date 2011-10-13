@@ -181,11 +181,11 @@ $exi:TR-Lexical-identifier,TR-Lexical-decl
 $res:Correct
 $
 type a
-$
 
 $obj:Le test vérifie que \verb|type a0'b'__'_8| est bien reconnu par la règle \textlangle decl\textrangle .
 $exi:TR-Lexical-identifier,TR-Lexical-decl
 $res:Correct
+$
 type a0'b'__'_8
 
 $obj:Le test vérifie que \verb|type 'a t| est bien reconnu par la règle \textlangle decl\textrangle .
