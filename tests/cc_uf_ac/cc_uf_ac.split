@@ -1,0 +1,1229 @@
+$$$cc
+$cobj:La fonctionnalité à vérifier est que l'algorithme CC(X) implémente bien ses spécifications et que Alt-Ergo est capable de prouver des buts faisant intervenir de l'égalité et des symboles de fonction non interprétés.
+
+$res:Valid
+$
+type t
+logic a,b,c,d,e: t
+logic f,h : 'a -> 'a
+logic g: 'a , 'a -> 'a
+
+goal g1: 
+  forall x:t. h(x)=x and g(a,x)=a ->  g(g(a,h(x)),x)=a
+
+$res:Valid
+$
+type t
+logic a,b,c,d,e,f: t
+	
+goal g2: 
+  a=c and c=e and a<>b and b=d and d=f -> c<>f
+
+$res:Valid
+$
+type t
+logic a,b,c,d,e: t
+logic f : 'a -> 'a
+logic g,h: 'a , 'a -> 'a
+
+goal g3: 
+  forall x,y:t. f(f(f(a)))=a and f(f(f(f(f(a)))))=a and g(x,y)=x -> 
+  h(g(g(x,y),y),a)=h(x,f(a))
+
+$res:Valid
+$
+logic P,Q: int -> prop
+logic f: int -> int
+axiom a : 
+  forall x:int[P(f(x))]. 
+    P(f(x)) -> Q(x)
+goal g4:
+      forall a,b,c:int.
+    P(a) -> a= f(b) -> a = f(c) ->
+    Q(b) and Q(c)
+
+
+$res:Valid
+$
+logic P : int -> prop
+
+goal g5 : (exists x:int. P(x)) -> exists y:int. P(y)
+
+
+$res:Valid
+$
+logic f, g : int -> int
+logic h: int,int -> int
+logic a, b:int
+
+goal g6:
+  h(g(a),g(b)) = g(b) ->
+  f(h(g(a),g(b))) - f(g(b)) = 0
+
+
+$res:Valid
+$
+
+logic f, g : int -> int
+logic h: int,int -> int
+logic a, b:int
+
+goal g7:
+  h(g(a),g(b)) = g(b) ->
+  g(f(h(g(a),g(b))) - f(g(b))) = g(0) 
+
+
+$res:Valid
+$
+logic h,g,f: int,int -> int
+logic a, b:int
+
+goal g8:
+  h(g(a,a),g(b,b)) = g(b,b) ->
+  a = b ->
+  g(f(h(g(a,a),g(b,b)),b) - f(g(b,b),a),
+    f(h(g(a,a),g(b,b)),a) - f(g(b,b),b)) = g(0,0) 
+
+
+$res:Valid
+$
+
+logic h,g,f: int,int -> int
+logic a, b:int
+
+goal g9:
+  a = b ->
+  g(f(b,b) - f(b,a),
+    f(a,b) - f(a,a)) = g(0,0) 
+
+
+$res:Valid
+$
+
+logic f: int -> int
+logic a, b:int
+
+goal g10:
+  a = b ->
+  f(f(a) - f(b)) = f(0) 
+
+
+$res:Valid
+$
+
+logic f: int -> int
+logic a, b:int
+
+goal g11:
+  a = b ->
+  f(f(a) - f(b)) = f(f(b)-f(a)) 
+
+
+$res:Valid
+$
+
+logic f: int -> int
+logic a, b:int
+
+goal g12:
+  a = b ->
+  f(0) = f(f(a) - f(b))
+
+
+
+
+
+
+$$$ac_empty
+$cobj:La fonctionnalité à vérifier est que l'algorithme AC(X) implémente bien ses spécifications et que Alt-Ergo est capable de prouver des buts faisant intervenir de l'égalité et des symboles associatifs-commutatifs.
+
+
+
+$res:Valid
+$
+logic ac m: int,int -> int
+logic t1,t2,t3,t4,t5,t6,t7,t8:int
+
+goal g1: 
+  m(m(m(m(m(m(m(t1,t2),t3),t4),t5),t6),t7),t8) =
+  m(t1,m(t2,m(t3,m(t4,m(t5,m(t6,m(t7,t8)))))))
+
+
+$res:Valid
+$
+
+logic a, c, x, y, beta, gamma: int
+logic h: int -> int
+logic ac f: int, int -> int
+
+
+goal g2 :
+  f(a,h(x)) = gamma ->
+  f(a,c)    = beta ->
+  x = y ->
+  f(a,f(h(x),c)) = f(h(y),beta)
+
+
+$res:Valid
+$
+
+type set
+logic ac u: set,set -> set
+
+axiom idem : forall x,X: set. u(u(x,x),X)=u(x,X)
+goal g3: forall r,s,t: set. u(t,u(t,s)) = u(s,t)
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g4 : 
+  f(a,b) = gamma ->  
+  f(a,c) = beta  -> 
+  f(a,b) = gamma 
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+
+goal g5 : 
+  f(a,b) = gamma ->  
+  f(a,c) = beta  -> 
+  f(b,beta) = f(c,gamma) 
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g6 : 
+  gamma = f(a,b)->  
+  f(a,c) = beta  -> 
+  f(b,beta) = f(c,gamma) 
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g7 : 
+  f(a,b) = gamma ->  
+  beta   = f(a,c) -> 
+  f(b,beta) = f(c,gamma) 
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g8 : 
+  gamma  = f(a,b) ->  
+  beta   = f(a,c) -> 
+  f(b,beta) = f(c,gamma) 
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g9 : 
+  f(a,b) = gamma ->  
+  f(a,c) = beta  -> 
+  f(c,gamma) = f(b,beta)
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g10 : 
+  gamma = f(a,b)->  
+  f(a,c) = beta  -> 
+  f(c,gamma) = f(b,beta) 
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g11 : 
+  f(a,b) = gamma ->  
+  beta   = f(a,c) -> 
+  f(c,gamma) = f(b,beta) 
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g12 : 
+  gamma  = f(a,b) ->  
+  beta   = f(a,c) -> 
+  f(c,gamma) = f(b,beta)
+
+
+$res:Valid
+$
+logic a,b,c, beta,gamma,lambda : int
+logic ac f : int,int -> int
+
+goal g13 : 
+  f(a,b) = gamma ->  
+  f(a,c) = beta  -> 
+  f(b,f(lambda,beta)) = f(f(c,lambda),gamma) 
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma,lambda : int
+logic ac f : int,int -> int
+
+goal g14 : 
+  gamma = f(a,b)->  
+  f(a,c) = beta  -> 
+  f(gamma,f(lambda,f(b,beta))) = f(f(c,gamma),f(lambda,gamma)) 
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma,lambda : int
+logic ac f : int,int -> int
+
+goal g15 : 
+  f(a,b) = gamma ->  
+  beta   = f(a,c) -> 
+  f(f(b,beta),lambda) = f(lambda,f(c,gamma)) 
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma,lambda : int
+logic ac f : int,int -> int
+
+goal g16 : 
+  gamma  = f(a,b) ->  
+  beta   = f(a,c) -> 
+  f(lambda,f(b,beta)) = f(c,f(lambda,gamma)) 
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma,lambda : int
+logic ac f : int,int -> int
+
+goal g17 : 
+  f(a,b) = gamma ->  
+  f(a,c) = beta  -> 
+  f(f(c,gamma),lambda) = f(f(lambda,b),beta)
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma,lambda : int
+logic ac f : int,int -> int
+
+goal g18 : 
+  gamma = f(a,b)->  
+  f(a,c) = beta  -> 
+  f(lambda,f(c,gamma)) = f(b,f(beta,lambda)) 
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma,lambda : int
+logic ac f : int,int -> int
+
+goal g19 : 
+  f(a,b) = gamma ->  
+  beta   = f(a,c) -> 
+  f(lambda,f(c,gamma)) = f(b,f(lambda,beta)) 
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma,lambda : int
+logic ac f : int,int -> int
+
+goal g20 : 
+  gamma  = f(a,b) ->  
+  beta   = f(a,c) -> 
+  f(c,f(gamma,lambda)) = f(f(b,beta),lambda)
+
+
+$res:Valid
+$
+
+logic aa,a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g21 : 
+  a = aa ->
+  f(a,b) = gamma ->  
+  f(aa,c) = beta  -> 
+  f(b,beta) = f(c,gamma) 
+
+
+$res:Valid
+$
+
+logic aa,a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g22 : 
+  gamma = f(a,b)->  
+  f(aa,c) = beta  -> 
+  a = aa ->
+  f(b,beta) = f(c,gamma) 
+
+
+$res:Valid
+$
+
+logic aa,a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g23 : 
+  f(a,b) = gamma ->  
+  beta   = f(aa,c) -> 
+  a = aa ->
+  f(b,beta) = f(c,gamma) 
+
+
+$res:Valid
+$
+
+logic aa,a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g24 : 
+  gamma  = f(a,b) ->  
+  beta   = f(aa,c) -> 
+  a = aa ->
+  f(b,beta) = f(c,gamma) 
+
+
+$res:Valid
+$
+
+logic aa,a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g25 : 
+  f(a,b) = gamma ->  
+  f(aa,c) = beta  -> 
+  a = aa ->
+  f(c,gamma) = f(b,beta)
+
+
+$res:Valid
+$
+
+logic aa,a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g26 : 
+  gamma = f(a,b)->  
+  f(aa,c) = beta  -> 
+  a = aa ->
+  f(c,gamma) = f(b,beta) 
+
+
+$res:Valid
+$
+
+logic aa,a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g27 : 
+  f(a,b) = gamma ->  
+  beta   = f(aa,c) -> 
+  a = aa ->
+  f(c,gamma) = f(b,beta) 
+
+
+$res:Valid
+$
+
+logic aa, a,b,c, beta,gamma : int
+logic ac f : int,int -> int
+
+goal g28 : 
+  gamma  = f(a,b) ->  
+  beta   = f(aa,c) -> 
+  a = aa ->
+  f(c,gamma) = f(b,beta)
+
+
+$res:Valid
+$
+
+type a
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g29 : 
+  f(a,b) = gamma ->  
+  f(a,c) = beta  -> 
+  f(a,b) = gamma 
+
+
+$res:Valid
+$
+
+type a
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g30 : 
+  f(a,b) = gamma ->  
+  f(a,c) = beta  -> 
+  f(b,beta) = f(c,gamma) 
+
+
+$res:Valid
+$
+
+type a
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g31 : 
+  gamma = f(a,b)->  
+  f(a,c) = beta  -> 
+  f(b,beta) = f(c,gamma) 
+
+
+$res:Valid
+$
+
+type a
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g32 : 
+  f(a,b) = gamma ->  
+  beta   = f(a,c) -> 
+  f(b,beta) = f(c,gamma) 
+
+
+$res:Valid
+$
+
+type a
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g33 : 
+  gamma  = f(a,b) ->  
+  beta   = f(a,c) -> 
+  f(b,beta) = f(c,gamma) 
+
+
+$res:Valid
+$
+
+type a
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g34 : 
+  f(a,b) = gamma ->  
+  f(a,c) = beta  -> 
+  f(c,gamma) = f(b,beta)
+
+
+$res:Valid
+$
+
+type a
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g35 : 
+  gamma = f(a,b)->  
+  f(a,c) = beta  -> 
+  f(c,gamma) = f(b,beta) 
+
+
+$res:Valid
+$
+
+type a
+
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g36 : 
+  f(a,b) = gamma ->  
+  beta   = f(a,c) -> 
+  f(c,gamma) = f(b,beta) 
+
+
+$res:Valid
+$
+
+type a
+logic a,b,c, beta,gamma : a
+logic ac f : a,a -> a
+
+goal g37 : 
+  gamma  = f(a,b) ->  
+  beta   = f(a,c) -> 
+  f(c,gamma) = f(b,beta)
+
+$res:Valid
+$
+
+(* c = beta *)
+logic a,b,c, gamma : int
+logic ac f : int,int -> int
+
+goal g38 : 
+  c = f(a,c) -> 
+  f(a,b) = gamma ->  
+  f(b,c) = f(c,gamma)
+
+
+$res:Valid
+$
+
+(* c = beta *)
+logic a,b,c, gamma : int
+logic ac f : int,int -> int
+
+goal g39 : 
+  f(a,c) = c  -> 
+  f(a,b) = gamma ->  
+  f(b,c) = f(c,gamma)
+  
+
+$res:Valid
+$
+
+(* gamma |-> b et beta |-> c *)
+logic a, b, c : int
+logic ac f : int,int -> int
+
+goal g40 : 
+  c = f(a,b) ->  
+  b = f(a,c) -> 
+  f(c,c) = f(b,b)
+
+
+$res:Valid
+$
+
+(* gamma |-> b et beta |-> c *)
+logic a, b, c : int
+logic ac f : int,int -> int
+
+goal g41 : 
+  f(a,b) = c ->  
+  f(a,c) = b  -> 
+  f(b,b) = f(c,c)
+
+$res:Valid
+$
+
+logic a1, a2, a3, b1, b2, x,y,z ,beta, gamma : int
+logic ac f : int,int -> int
+
+goal g42 : 
+  f(a1,f(a2,f(a3,x))) = gamma ->
+  f(b1,f(b2,f(y,z)))  = beta   -> (* boucle ici*)
+  f(a1,f(a2,a3)) = f(b1,b2) ->
+  f(gamma,f(y,z)) = f(beta,x)
+
+
+$res:Valid
+$
+
+logic a1, a2, a3, b1, b2, x,y,z ,beta, gamma : int
+logic ac f : int,int -> int
+
+goal g43 : 
+  f(a1,f(a2,f(a3,x))) = gamma ->
+  f(b1,f(b2,f(y,z)))  = beta   -> (* boucle ici*)
+  f(a1,f(a2,a3)) = f(b1,b2) ->
+  f(gamma,f(y,z)) = f(beta,x)
+
+
+$res:Valid
+$
+
+(* une pc car f(a1,a2,a3) = f(b1,b2)*)
+logic a1, a2, a3, b1, b2, y ,beta, gamma : int
+logic ac f : int,int -> int
+
+goal g44 : 
+  f(a1,f(a2,a3)) = gamma ->
+  f(b1,f(b2,y))  = beta   -> (* boucle ici*)
+  f(b1,b2) = f(a1,f(a2,a3)) ->
+  f(gamma,y) = beta
+
+
+$res:Valid
+$
+
+(* pc sur a1 = a1 
+   ou seulement pc sur f(a1,a2,a3) = f(a1,b2)*)
+logic a1, a2, a3, b1, b2, x,y,z ,beta, gamma : int
+logic ac f : int,int -> int
+
+goal g45 : 
+  f(a1,f(a2,f(a3,x))) = gamma ->
+  f(a1,f(b2,f(y,z)))  = beta   ->
+  f(a1,f(a2,a3)) = f(a1,b2) ->
+  f(gamma,f(y,z)) = f(beta,x)
+
+
+$res:Valid
+$
+    
+(* pc sur a1 = a1 
+   ou seulement pc sur f(a1,a2,a3) = f(a1,b2)*)
+logic a1, a2, a3, b1, b2, x,y,z ,beta, gamma : int
+logic ac f : int,int -> int
+
+goal g46 : 
+  f(a1,f(a2,f(a3,x))) = gamma ->
+  f(a1,f(b2,f(y,z)))  = beta   ->
+  a3 = b2 ->
+  f(gamma,f(y,z)) = f(beta,f(a2,x))
+
+
+$res:Valid
+$
+(* pc sur a1 = a1 
+   ou seulement pc sur f(a1,a2,a3) = f(a1,b2)*)
+logic a1, a11, a2, a3, b1, b2, x,y,z ,beta, gamma : int
+logic ac f : int,int -> int
+
+goal g47 : 
+  f(a1,f(a2,f(a3,x))) = gamma ->
+  f(a1,f(b2,f(y,z)))  = beta   ->
+  f(a2,a3) = b2 ->
+  f(gamma,f(y,z)) = f(beta,x)
+
+
+$res:Valid
+$
+
+(* pc sur a1 = a1 
+   ou seulement pc sur f(a1,a2,a3) = f(a1,b2)*)
+
+logic a1, a11, a2, a3, b1, b2, x,y,z ,beta, gamma : int
+logic ac f : int,int -> int
+
+goal g48 : 
+  f(a1,f(a2,f(a3,x))) = gamma ->
+  f(a11,f(b2,f(y,z)))  = beta   ->
+  f(a2,f(a3,a1)) = f(b2,a11) ->
+  f(gamma,f(y,z)) = f(beta,x)
+
+
+$res:Valid
+$
+
+logic a,b,c,s : int
+logic g : int -> int
+logic ac f : int,int -> int
+
+goal g49: 
+  f(b,c)    = s ->
+  f(g(s),c) = b ->
+  f(g(s),s) = f(b,b)
+
+
+$res:Valid
+$
+
+logic a,b,c,s : int
+logic g : int -> int
+logic ac f : int,int -> int
+
+goal g50: 
+  f(b,c)    = s ->
+  f(g(s),c) = b ->
+  g(s) = s ->
+  f(s,s) = f(b,b)
+
+
+$res:Valid
+$
+
+logic a,b,c,gamma,beta,x: int
+logic ac f : int , int -> int
+
+goal g51 : 
+  f(a,b) = f(x,gamma) ->
+  f(a,c) = f(x,beta) ->
+  f(x,f(gamma,c)) = f(x,f(beta,b)) 
+
+
+$res:Valid
+$
+
+logic a,b,c,gamma,beta,x: int
+logic ac f : int , int -> int
+
+goal g52 : 
+  f(a,b) = f(x,gamma) ->
+  f(a,c) = f(x,beta) ->
+  f(a,f(gamma,c)) = f(a,f(beta,b))
+
+
+$res:Valid
+$
+
+logic a,b,c,gamma,beta,x,y : int
+logic ac f : int , int -> int
+
+goal g53 : 
+  f(a,b) = f(x,gamma) ->
+  f(a,c) = f(y,beta) ->
+  f(x,f(gamma,c)) = f(y,f(beta,b))
+
+
+$res:Valid
+$
+
+logic a,b,x,y,z : int
+logic ac f: int,int -> int
+
+goal g54:
+ f(a,x) = f(a,y) -> 
+ f(a,z) = b ->
+ f(z,f(a,y)) = f(x,b) and f(z,f(a,x)) = f(y,b)
+
+
+
+
+
+
+$res:Valid
+$
+
+logic a,b,c,d,x,y,gamma,beta : int
+logic ac f,g:int,int -> int
+
+goal g55 :
+  g(x,y) = f(a,b) ->
+  f(g(x,y),d) = gamma ->
+  f(a,c)      = beta ->
+  f(gamma,c) = f(beta,f(b,d))
+
+
+$res:Valid
+$
+
+logic a,b,c,x,gamma,beta,delta,omega : int
+logic ac f,g:int,int -> int
+
+goal g56 :
+  f(a,b) = gamma ->
+  f(a,c) = beta ->
+  g(x,gamma)= delta ->
+  g(x,beta) = omega ->
+  g(beta,delta) = g(gamma,omega)
+
+
+$res:Valid
+$
+
+logic a,b,c,x,gamma,beta,delta,omega : int
+logic ac f,g:int,int -> int
+
+goal g57 :
+  f(a,b) = gamma ->
+  f(a,c) = beta ->
+  g(x,gamma)= delta ->
+  g(x,beta) = omega ->
+  f(b,beta) = f(c,gamma)
+
+
+$res:Valid
+$
+
+logic a, b, c, x,y,z : int
+logic ac g : int, int -> int
+
+goal g58: 
+  
+  g(a,b) = g(x,y) -> 
+  g(a,c)=g(x,z) -> 
+  g(b,g(x,z)) = g(c,g(x,y)) 
+ 
+
+$res:Valid 
+$
+
+logic x,y,z,t,b : int
+logic ac f,g : int,int -> int
+
+goal g59:
+  f(z,g(y,x)) = t ->
+  y = b ->
+  f(z,g(x,b)) = t
+
+
+$res:Valid
+$
+
+logic x,y,z,t,gamma,beta : int
+logic ac f,g : int,int -> int
+
+goal g60:
+  f(x,g(y,z)) = gamma ->
+  f(x,t)      = beta ->
+  f(gamma,t) = f(beta,g(y,z))
+
+
+$res:Valid
+$
+
+logic  b, c,a, d,z,  subst : int
+logic ac f : int, int -> int
+logic g : int -> int
+
+goal g61 : 
+  f(a,c) = a ->
+  f(c, g (f (b, c))) = b -> 
+  g(f (b, c)) = f (b, c) -> 
+  f(b,b) = f(f(b,c),f(b,c))
+
+
+$res:Valid
+$
+
+logic  b, c,a, d,z, s : int
+logic ac f : int, int -> int
+logic g : int -> int
+
+goal g62 : 
+  f(b,c) = s ->
+  f(a,c) = a ->
+  f(c,g(s)) = b -> 
+  g(s) = s -> 
+  f(b,b) = f(s,s)
+
+
+$res:Valid
+$
+
+logic  b, c,a, d,z, s : int
+logic ac f : int, int -> int
+logic g : int -> int
+
+goal g63 : 
+  f(b,c) = s ->
+  f(a,c) = a ->
+  f(c,g(s)) = b -> 
+  g(s) = s -> 
+  f(b,b) = f(g(s),s)
+
+
+$res:Valid
+$
+
+logic  b, c,a, d,z, s : int
+logic ac f : int, int -> int
+logic g : int -> int
+
+goal g64 : 
+  s = f(b,c) ->
+  f(a,c) = a ->
+  f(c,g(s)) = b -> 
+  g(s) = s -> 
+  f(b,b) = f(s,s)
+
+
+$res:Valid
+$
+
+logic a,b,c :int
+logic ac f :int,int-> int
+
+goal g65 : a = b -> f(c,a) = f(c,b)
+
+
+$res:Valid
+$
+
+logic a, b, c, d, x, y : int
+logic ac g : int, int -> int
+
+goal g66: 
+  g(x,g(a,b)) = g(c,g(y,d)) -> 
+  g(g(a,b),g(b,x)) = g(g(c,d),g(y,b))
+
+
+$res:Valid
+$
+
+logic a,b,c,d,e,f,g,h,x,y,z,t : int
+logic ac k : int, int -> int
+ 
+goal g67: 
+  k(a,b)  =x ->
+  k(b,g)  =y ->
+  k(k(a,c),e)=z ->
+  k(g,h)  =t ->
+  k(z,(k(k(t,y),x)))=k(k(a,b),k(k(k(g,e),k(b,k(a,c))),k(h,g)))
+
+
+$res:Valid
+$
+
+logic a, b, c, d, x, y,t : int
+logic ac f : int, int -> int
+
+goal g68 : 
+  f(a,a) = a      -> 
+  f(a,b) = c      -> 
+  f(f(a,a),b) = a -> 
+  f(a,f(f(a,a),a)) = f(a,c)
+
+
+$res:Valid
+$
+
+logic a,b,aa,x : int
+logic ac f : int,int -> int
+
+goal g69:
+  a = a ->
+  b = b ->
+  aa = aa ->
+  a = aa -> f(a,b) = f(aa,b)
+
+
+$res:Valid
+$
+
+logic a,b,aa,x : int
+logic ac f : int,int -> int
+
+goal g70:
+  f(a,b) = x -> a = aa -> a+1=aa+1
+
+
+$res:Valid
+$
+
+logic a,b,aa,x : int
+logic ac f : int,int -> int
+
+goal g71:
+  f(a,b) = x -> a = aa -> f(a,b) = f(aa,b) = x
+
+
+$res:Valid
+$
+
+logic a,b,c,d,e,gamma,beta,x,y:int
+logic ac f,g : int,int -> int
+
+goal g72 :
+  f(a,b) = gamma ->
+  f(a,c) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduite *)
+  g(f(gamma,c),d) = x ->
+  g(f(beta,b),e) = y ->
+  g(x,e) = g(y,d)
+
+
+$res:Valid
+$
+
+logic a,b,c,d,e,gamma,beta,x,y:int
+logic ac f,g : int,int -> int
+
+goal g73 :
+  f(a,b) = gamma ->
+  f(a,c) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduite *)
+  f(f(gamma,c),d) = x ->
+  f(f(beta,b),e) = y ->
+  f(x,e) = f(y,d)
+
+
+$res:Valid
+$
+
+logic a,b,c,d,e,gamma,beta,x,y:int
+logic ac f,g : int,int -> int
+
+goal g74 :
+  f(a,b) = gamma ->
+  f(a,c) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduit *)
+  g(f(f(a,c),b),d) = x ->
+  g(f(beta,b),e) = y ->
+  g(x,e) = g(y,d)
+
+
+$res:Valid
+$
+
+logic a,b,c,d,e,gamma,beta,x,y:int
+logic ac f : int,int -> int
+logic g : int,int -> int
+
+axiom commut : forall x,y:int. g(x,y) = g(y,x)
+goal g75 :
+  f(a,b) = gamma ->
+  f(a,c) = beta ->
+  g(a,f(gamma,c)) = g(f(a,f(c,b)),a)
+
+
+
+$res:Valid
+$
+
+type set
+
+logic a,b :set
+logic ac union : set,set -> set
+
+axiom idem : forall x,X: set. union (union(x,x),X)=union(x,X)
+
+goal g76 : union(a,union(b,a)) = union(a,b)
+
+
+
+$res:Valid
+$
+logic a,b :int
+logic ac f : int,int -> int
+axiom idem : forall x,X: int. f (f(x,x),X)=f(x,X)
+
+goal g77 :
+ f(a,f(b,a)) = f(a,b)
+
+
+
+$res:Valid
+$
+
+logic a,b :int
+logic ac f : int,int -> int
+
+axiom idem : forall x,X: int. f (f(x,x),X)=f(x,X)
+
+goal g78 :
+ f(f(a,f(a,f(b,a))),f(a,b)) = f(f(a,b),f(b,b))
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,d,beta,gamma : int
+
+goal g79 : 
+  f(a,b) = gamma ->            (* 1 *)
+  f(a,d) = beta ->             (* 2 *)
+  f(a,c) = gamma ->            (* 3 *)
+  f(b,c) = beta ->             (* 4 *)
+
+    f(gamma , d) = f(beta , b)       (* 1 & 2 *)
+and f(gamma , c) = f(gamma , b)      (* 1 & 3 *) 
+and f(gamma , c) = f(beta , a)       (* 1 & 4 *)
+and f(beta , c)  = f(gamma , d)      (* 2 & 3 *)
+and true                             (* 2 & 4 *)
+and f(gamma , b) = f(beta , a)       (* 3 & 4 *)
+
+
+$res:Valid
+$
+
+logic a,b,c,d, x, y , beta , gamma : int
+
+logic ac f : int,int -> int
+
+goal g80 : 
+  (*1*) f(f(a,b),c) = gamma ->
+  (*2*) f(a,b) = x ->
+  (*3*) f(x,y) = beta ->
+  (*4*) f(gamma,y) = f(beta,c)
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int 
+logic a,b,c,beta,gamma : int
+
+goal g81 :
+  f(a,f(b,c)) = gamma ->
+  f(a,b) = gamma ->
+  f(a,c) = beta ->
+  f(beta,gamma) = f(a,gamma)
+
+
+$res:Valid
+$
+
+logic a,b,c,d,e,gamma,beta:int
+logic ac f,g : int,int -> int
+
+goal g82 :
+  f(f(a,a),f(a,b)) = f(f(a,a),b)->
+  f(a,b) = gamma ->
+  f(a,c) = beta ->
+  f(gamma,c) = f(beta,b)
+
+
+
+
+
+$$$case_split
+$cobj:La fonctionnalité à vérifier est que l'algorithme CC(X) implémente bien ses spécifications et que Alt-Ergo est capable de prouver des buts demandant un raisonnement par analyse par cas.
+
+$res:Valid
+$
+goal g1 : forall x,y,z:int.
+  -z <= 0 ->
+   3 * y - 8*x - 6 <= 0 -> 
+  -y + 12*x +3 <= 0 ->
+  y*y*y <= 1
+
+
+$res:Valid
+$
+goal g2 : forall x,y,z:int.
+   3 * y - 8*x - 6 <= 0 -> 
+  -y + 12*x +3 <= 0 ->
+  -y*y*y <= 0 ->
+  false
+
+
+
