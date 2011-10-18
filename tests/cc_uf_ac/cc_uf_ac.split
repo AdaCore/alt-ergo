@@ -1227,3 +1227,57 @@ goal g2 : forall x,y,z:int.
 
 
 
+
+
+
+
+$$$cc-false
+$cobj:La fonctionnalité à vérifier est que l'algorithme CC(X) implémente bien ses spécifications et que Alt-Ergo ne prouve pas des buts faux faisant intervenir de l'égalité et des symboles de fonction non interprétés.
+
+
+
+$res:I don't know
+$
+type t
+logic a,b,c,d,e: t
+logic f,h : 'a -> 'a
+logic g: 'a , 'a -> 'a
+
+goal g1: 
+  forall x:t. h(x)=x and g(a,x)=a ->  g(g(x,g(a,h(x))),x)=a
+
+
+$res:I don't know
+$
+type t
+logic a,b,c,d,e,f: t
+	
+goal g2: 
+  a=c and c=e and a<>b and b=f and d <> b -> c<>d
+
+
+$res:I don't know
+$
+type t
+logic a,b,c,d,e: t
+logic f : 'a -> 'a
+logic g,h: 'a , 'a -> 'a
+
+goal g3: 
+  forall x,y:t. f(f(f(a)))=a and f(f(f(f(f(f(a))))))=a and g(x,y)=x -> 
+  h(g(g(x,y),y),a)=h(x,f(a))
+
+
+
+$res:I don't know
+$
+logic P,Q: int -> prop
+logic f: int -> int
+axiom a : 
+  forall x:int[P(f(x))]. 
+    P(f(x)) -> Q(x)
+goal g4:
+      forall a,b,c:int.
+    P(a) -> a= f(b) -> a = f(f(c)) ->
+    Q(b) and Q(c)
+
