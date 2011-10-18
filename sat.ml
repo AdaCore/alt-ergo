@@ -351,7 +351,11 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
        if qualif = 2 then fprintf fmt "[rule] TR-Sat-Conflict-1@.";
        raise (IUnsat (Ex.union dep_gamma ex_nf))
      with Not_found -> ());
-    if MF.mem f env.gamma then env
+    if MF.mem f env.gamma then
+      begin
+	if qualif = 2 then fprintf fmt "[rule] TR-Sat-Remove@.";
+	env
+      end
     else 
       begin
 	let size = F.size f in

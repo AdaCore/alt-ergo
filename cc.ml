@@ -174,7 +174,8 @@ module Make (X : Sig.X) = struct
   let congruents env t1 s acc ex = 
     SetT.fold (equal_only_by_congruence env ex t1) s acc
 
-  let rec add_term ex (env, l) t = 
+  let rec add_term ex (env, l) t =
+    if qualif = 3 then fprintf fmt "[rule] TR-CCX-AddTerm@.";
     Print.add_to_use t;
     (* nothing to do if the term already exists *)
     if Uf.mem env.uf t then env, l
@@ -372,6 +373,7 @@ module Make (X : Sig.X) = struct
 	    Print.assume_literal sa;
 	    match sa with
 	      | A.Eq(r1, r2) ->
+		if qualif = 3 then fprintf fmt "[rule] TR-CCX-Congruence@.";
 		let env, l = congruence_closure env r1 r2 ex in
 		let env, lt = assume_literal lt env l in
 		if Options.nocontracongru then env, lt
@@ -381,22 +383,27 @@ module Make (X : Sig.X) = struct
 		  in
 		  assume_literal lt env (contra_congruence env r2 ex)
 	      | A.Distinct (false, lr) ->
+		if qualif = 3 then fprintf fmt "[rule] TR-CCX-Distinct@.";
 		if Uf.already_distinct env.uf lr then env, lt
 		else 
 		  {env with uf = Uf.distinct env.uf lr ex}, lt
 	      | A.Distinct (true, _) -> assert false
-	      | A.Builtin _ -> env, lt)
+	      | A.Builtin _ ->
+		if qualif = 3 then fprintf fmt "[rule] TR-CCX-Builtin@.";
+		env, lt)
 	  (env, lt) lsa
       in
       let env, lt = assume_literal lt env newc in
       let env, l = replay_atom env lsa in
       assume_literal (lt@l) env l
 
-   
+
   let look_for_sat ?(bad_last=No) lt t base_env l =
     let rec aux lt bad_last dl base_env li = match li, bad_last with
       | [], _ -> 
 	begin
+	  if qualif = 3 then
+	    fprintf fmt "[rule] TR-CCX-CS-Case-Split@.";
           match X.Rel.case_split base_env.relation with
 	    | [] -> 
 		{ t with gamma_finite = base_env; choices = List.rev dl }, lt
@@ -432,14 +439,20 @@ module Make (X : Sig.X) = struct
 	  try
             Print.split_assume (LR.make c) ex_c_exp;
 	    let base_env, lt = assume_literal lt base_env [LSem c, ex_c_exp] in
+	    if qualif = 3 then
+	      fprintf fmt "[rule] TR-CCX-CS-Normal-Run@.";
 	    aux lt bad_last (a::dl) base_env l
 	  with Exception.Inconsistent dep ->
             match Ex.remove_fresh exp dep with
               | None ->
                 (* The choice doesn't participate to the inconsistency *)
                 Print.split_backjump (LR.make c) dep;
+		if qualif = 3 then
+		  fprintf fmt "[rule] TR-CCX-CS-Case-Split-Conflict@.";
                 raise (Exception.Inconsistent dep)
               | Some dep ->
+		if qualif = 3 then
+		  fprintf fmt "[rule] TR-CCX-CS-Case-Split-Progress@.";
                 (* The choice participates to the inconsistency *)
                 let neg_c = LR.neg (LR.make c) in
 	        Print.split_backtrack neg_c dep;
@@ -459,12 +472,16 @@ module Make (X : Sig.X) = struct
 	  with Exception.Inconsistent dep -> 
             if debug_split then
               fprintf fmt "[case-split] I replay choices@.";
+	    if qualif = 3 then
+	      fprintf fmt "[rule] TR-CCX-CS-Case-Split-Erase-Choices@.";
 	    (* we replay the conflict in look_for_sat, so we can
 	       safely ignore the explanation which is not useful *)
 	    look_for_sat ~bad_last:(Yes dep)
 	      [] { t with choices = []} t.gamma t.choices
       with Exception.Inconsistent d ->
-	Print.end_case_split (); 
+	Print.end_case_split ();
+	if qualif = 3 then
+	  fprintf fmt "[rule] TR-CCX-CS-Conflict@.";
 	raise (Exception.Inconsistent d)
     in
     Print.end_case_split (); r
