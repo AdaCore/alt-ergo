@@ -1,0 +1,282 @@
+$$$terms
+$cobj:La fonctionnalité à vérifier est que Alt-Ergo est capable de typer correctement des termes.
+$obj:Le test vérifie que \verb|x| est bien typé comme entier et que l'égalité est bien formée.
+$res:Correct
+$
+logic x : int
+goal g1 : x=x
+
+
+$obj:Le test vérifie que \verb|x+y-z/2| est bien typé comme entier et que l'égalité est bien formée.
+$res:Correct
+$
+logic x,y,z : int
+goal g2 : x+y-z/2 = 0
+
+
+$obj:Le test vérifie que \verb|x| est bien typé comme formule et que les opérateurs logiques sont bien formés, et les précédences respectées.
+$res:Correct
+$
+logic x : prop
+logic aA7 : bool
+goal g3 : x and aA7 = true
+
+
+$obj:Le test vérifie que les opérateurs arithmétiques sur les entiers sont bien formés.
+$res:Correct
+$
+logic a,b,c,d,e,f : int
+goal g4 : a+b--c%4*2/0 <= -1--165/d/e*2/f
+
+
+$obj:Le test vérifie que les opérateurs arithmétiques sur les réels sont bien formés.
+$res:Correct
+$
+logic x,y,z : real
+goal g5 : (x+y - 3.0 > x-5.2) = z * 0xaA2fp-2
+
+
+
+$obj:Le test vérifie que les opérateurs logiques sont bien formés.
+$res:Correct
+$
+goal g6 : (1>2) -> true
+
+
+$$$arith
+$cobj:La fonctionnalité à vérifier est que Alt-Ergo est capable de typer correctement des expressions faisant intervenir des symboles arithmétiques.
+
+
+$obj:Le test vérifie que l'application de fonction est bien formée.
+$res:Correct
+$
+logic f : 'a -> 'a
+logic a : int
+
+goal g1 : f(a) + 1 = 2
+
+$$$polymorphisme
+$cobj:La fonctionnalité à vérifier est que Alt-Ergo est capable de typer correctement des expressions faisant intervenir des symboles polymorphes et que l'unification est bien effectuée.
+
+
+$obj:Le test vérifie que l'application d'une fonction polymorphe est bien formée.
+$res:Correct
+$
+type 'a t
+
+logic x : 'a t
+logic f : 'a t -> bool
+
+goal g1 : if f(x) then false else true
+
+
+$obj:Le test vérifie que l'application de fonction polymorphe est bien formée.
+$res:Correct
+$
+type 'a t
+
+logic x,y : 'a t
+logic f : 'a t ->'a
+
+goal g2 : f(x) = f(y)
+
+
+$obj:Le test vérifie que l'application de fonction polymorphe est bien formée.
+$res:Correct
+$
+type 'a t
+
+logic x : 'a t
+logic f : 'a t ->'a
+
+goal g3 : if f(x) then 2 = 3 else 2 = 4
+$
+type 'a t
+
+logic f : 'a t ->'a
+
+goal g1 : forall x:bool t. if f(x) then 1 = 4 else 2 = 4
+
+$$$ite
+$cobj:La fonctionnalité à vérifier est que Alt-Ergo est capable de typer correctement des expressions faisant intervenir des expressions \emph{if-then-else}.
+
+
+$obj:Le test vérifie que l'application de fonction polymorphe de f est bien dans \texttt{bool}.
+$res:Correct
+$
+logic f : 'a -> 'a
+logic a : bool
+
+goal g1 : if f(a) then false else 2 = 1
+
+$res:Correct
+$ 
+goal g3 : if false then 1 <= 2 else 1 = 1
+
+
+$obj:Le test vérifie que l'expression \emph{if-then-else} sur les termes est bien tyoée.
+$res:Correct
+$
+goal g4 : (if true then 1 else 1) + 2 = 2
+
+
+$obj:Le test vérifie que l'expression \emph{if-then-else} sur les termes est bien tyoée.
+$res:Correct
+$
+logic f : int -> int
+goal g5 : f(if true then 1 else 1) = 2
+
+
+$$$prop
+$cobj:La fonctionnalité à vérifier est que Alt-Ergo est capable de typer correctement des expressions faisant intervenir des expressions de type \texttt{prop}.
+
+$res:Correct
+$
+logic f : bool -> bool
+logic a : bool
+logic P : prop
+goal g1: if f(a) then P else not P
+
+
+$res:Correct
+$
+logic a : prop
+goal g2: a
+
+
+$obj:Le test vérifie que les opérateurs logiques sont bien définis sur des expressions de type \texttt{prop}. 
+$res:Correct
+$
+logic a,b,c : prop
+goal g2: a and b -> c
+
+
+$obj:Le test vérifie que les opérateurs logiques sont bien définis sur des prédicats de type \texttt{prop}
+$res:Correct
+$ 
+logic f : int -> prop
+goal g3 : f(3) and f(5)
+
+$obj:Le test vérifie que les opérateurs logiques sont bien définis sur des prédicats de type \texttt{prop}
+$res:Correct
+$
+logic P : bool -> prop
+logic f : bool -> bool
+goal g6 : f(true) = true and true and P(true)
+
+
+
+
+
+
+
+
+
+$$$terms
+$cobj:La fonctionnalité à vérifier est que Alt-Ergo rejette au typage les termes mal typés.
+
+$res:Incorrect
+$
+type t
+logic x: t
+logic f: int -> prop
+goal g1 : f(x)
+
+
+$res:Incorrect
+$
+type t
+logic f: t -> prop
+goal g2 : f(true)
+
+
+
+$res:Incorrect
+$
+type t
+logic f: t -> prop
+goal g3 : f(1)
+
+
+
+
+$$$polymorphisme
+$cobj:La fonctionnalité à vérifier est que Alt-Ergo rejette au typage les expressions mal typées en présence de symboles polymorphes.
+
+$res:Incorrect
+$
+type 'a t
+logic f: 'a t -> prop
+goal g1 : f(1)
+
+
+$obj:Le test vérifie que l'unifications des types \texttt{bool} et \texttt{int} n'est pas possible.
+$res:Incorrect
+$
+type 'a t
+logic x: int t
+logic y: bool t
+logic f: 'a t -> 'a
+goal g2 : f(x) = f(y)
+
+$$$prop
+$cobj:La fonctionnalité à vérifier est que Alt-Ergo rejette au typage les expressions utilisant incorrectement le type \texttt{prop}.
+
+$res:Incorrect
+$
+logic P : prop
+goal g1: P + 1 = 1
+
+
+$res:Incorrect
+$
+logic P : prop
+logic f: bool -> prop
+goal g2: f(P)
+
+
+$$$arith
+$cobj:La fonctionnalité à vérifier est que Alt-Ergo rejette au typage les expressions arithmétiques mal typées.
+
+
+$obj:Le test vérifie que le symbole \verb|<| n'est défini que sur les types \texttt{real} et \texttt{int}.
+$res:Incorrect
+$
+type t
+goal g1 : forall x,y : t. x<y
+
+
+$obj:Le test vérifie que le symbole \verb|>| n'est défini que sur les types \texttt{real} et \texttt{int}.
+$res:Incorrect
+$ 
+type t
+goal g2 : forall x,y : t. x>y
+
+
+
+$obj:Le test vérifie que le symbole \verb|<=| n'est défini que sur les types \texttt{real} et \texttt{int}.
+$res:Incorrect
+$ 
+type t
+goal g3 : forall x,y : t. x<=y
+
+
+
+$obj:Le test vérifie que le symbole \verb|>=| n'est défini que sur les types \texttt{real} et \texttt{int}.
+$res:Incorrect
+$ 
+type t
+goal g4 : forall x,y : t. x>=y
+
+
+
+$obj:Le test vérifie que les types \texttt{real} et \texttt{int} ne sont pas unifiables.
+$res:Incorrect
+$ 
+goal g5: forall x:int. forall y:real. x=y
+
+
+$obj:Le test vérifie que les types \texttt{real} et \texttt{int} ne sont pas unifiables.
+$res:Incorrect
+$
+goal g6: forall x:int. forall y:real. x<>y
