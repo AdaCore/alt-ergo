@@ -68,10 +68,11 @@ val max_split : Num.num ref
 val rewriting : bool ref
 val proof : bool ref
 val debug_proof : bool ref
-val qualif : bool ref
+val qualif : int ref
 val vsid : bool ref
 val debug_split : bool ref
 
 val show_version : unit -> unit
 val show_libdir : unit -> unit
 val set_max_split : string -> unit
+val set_proof : bool -> unit

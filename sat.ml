@@ -61,7 +61,7 @@ module Print = struct
     if debug_sat then
       begin
 	(match F.view f with
-	    F.Unit _ -> ()
+	  | F.Unit _ -> ()
 	      
 	  | F.Clause _ -> 
 	      printf "@[@{<C.Bold>[sat]@}";
@@ -220,6 +220,7 @@ let new_facts mode env =
 
 
 let mround predicate mode env max_size =
+  if qualif = 2 then fprintf fmt "[rule] TR-Sat-Mround@.";
   let round mode =
     Print.mround max_size;
     let axioms = if predicate then env.definitions else env.lemmas in
@@ -282,21 +283,36 @@ let max_formula a b =
 (* sat-solver *)
 
 let elim {f=f} env = 
-  MF.mem f env.gamma ||
-    match F.view f with 
+  if MF.mem f env.gamma then
+    (if qualif = 2 then fprintf fmt "[rule] TR-Sat-Bcp-Elim-1@.";
+     true)
+  else
+    let el = match F.view f with 
       | F.Literal a -> CcX.query a env.tbox <> No
       | _ -> false
+    in
+    if el then 
+      if qualif = 2 then fprintf fmt "[rule] TR-Sat-Assume-Let@.";
+    el
 
 let size_formula = 1_000_000
 
 let red {f=f} env = 
   let nf = F.mk_not f in
   try 
-    Yes (MF.find nf env.gamma)
+    let r = Yes (MF.find nf env.gamma) in
+    if qualif = 2 then fprintf fmt "[rule] TR-Sat-Bcp-Red-1@.";
+    r
   with Not_found -> 
-    match F.view nf with
+    let r = match F.view nf with
       |	F.Literal a -> CcX.query a env.tbox
       | _ -> No
+    in
+    (match r with 
+      |	Yes _ -> if qualif = 2 then fprintf fmt "[rule] TR-Sat-Bcp-Red-2@."
+      | No -> ());
+    r
+	
 
 let pred_def env f = 
   let ff = {f=f;age=0;name=None;mf=false;gf=false} in
@@ -331,7 +347,9 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
     (try (* Print.gamma env.gamma; *)
 	 (* fprintf fmt "ass:%a %a @." 
 	    F.print (F.mk_not f) Ex.print dep_gamma; *)
-       raise (IUnsat (Ex.union dep_gamma (MF.find (F.mk_not f) env.gamma)))
+       let ex_nf = MF.find (F.mk_not f) env.gamma in
+       if qualif = 2 then fprintf fmt "[rule] TR-Sat-Conflict-1@.";
+       raise (IUnsat (Ex.union dep_gamma ex_nf))
      with Not_found -> ());
     if MF.mem f env.gamma then env
     else 
@@ -346,18 +364,19 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 	  Print.assume ff dep;
 	  match F.view f with
 	    | F.Unit (f1, f2) ->
+	      if qualif = 2 then fprintf fmt "[rule] TR-Sat-Assume-U@.";
 	      let env = assume env 
 		({ f = f1; age = age; name = lem; mf = mf; gf = gf }, dep) in
 	      assume env 
 		({ f = f2; age = age; name = lem; mf = mf; gf = gf }, dep) 
 	    | F.Clause(f1,f2) -> 
-	        (* let dep = Ex.union (Ex.singleton ~bj:false f) dep in *)
+	      if qualif = 2 then fprintf fmt "[rule] TR-Sat-Assume-C@.";
 		let p1 = {f=f1;age=age;name=lem;mf=mf;gf=gf} in
 		let p2 = {f=f2;age=age;name=lem;mf=mf;gf=gf} in
 		bcp { env with delta = (p1,p2,dep)::env.delta }
 
 	    | F.Lemma _ ->
-	        (* let dep = Ex.union (Ex.singleton ~bj:false f) dep in *)
+	      if qualif = 2 then fprintf fmt "[rule] TR-Sat-Assume-Ax@.";
 		let age , dep = 
 		  try 
 		    let age' , dep' = MF.find f env.lemmas in
@@ -367,8 +386,8 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		bcp { env with lemmas=MF.add f (age,dep) env.lemmas }
 
 	    | F.Literal a ->
+	      if qualif = 2 then fprintf fmt "[rule] TR-Sat-Assume-Lit@.";
 		if vsid then incr_weight ();
-	        (* let dep = Ex.union (Ex.singleton ~bj:false f) dep in *)
 		let env = 
 		  if mf && size < size_formula then 
 		    add_terms env (A.LT.terms_of a) gf age lem
@@ -387,10 +406,12 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		bcp env
 
 	    | F.Skolem{F.sko_subst=sigma; sko_f=f} -> 
+	      if qualif = 2 then fprintf fmt "[rule] TR-Sat-Assume-Sko@.";
 		let f' = F.apply_subst sigma f in
 		assume env ({f=f';age=age;name=lem;mf=mf;gf=gf},dep)
 
             | F.Let {F.let_var=lvar; let_term=lterm; let_subst=s; let_f=lf} ->
+	      if qualif = 2 then fprintf fmt "[rule] TR-Sat-Assume-Let@.";
                 let f' = F.apply_subst s lf in
 		let id = F.id f' in
                 let v = Symbols.Map.find lvar (fst s) in
@@ -401,7 +422,8 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
                 assume env ({f=f';age=age;name=lem;mf=mf;gf=gf},dep)
       end
   with Exception.Inconsistent expl -> 
-    if debug_sat then fprintf fmt "inconsistent %a@." Ex.print expl; 
+    if debug_sat then fprintf fmt "inconsistent %a@." Ex.print expl;
+    if qualif = 2 then fprintf fmt "[rule] TR-Sat-Conflict-2@."; 
     raise (IUnsat expl)
     
 and bcp env =
@@ -473,11 +495,15 @@ and back_tracking env stop max_size =  match env.delta with
       try
 	let dep' = Ex.remove f dep in
 	Print.backtracking (F.mk_not f);
+	if qualif = 2 then fprintf fmt "[rule] TR-Sat-Decide@.";
 	if vsid then update_activity dep;
 	unsat_rec
 	  (assume {env with delta=l} (b, Ex.union d dep'))
 	  ({a with f=F.mk_not f},dep') stop max_size
-      with Not_found -> Print.backjumping (F.mk_not f); dep 
+      with Not_found -> 
+	Print.backjumping (F.mk_not f);
+	if qualif = 2 then fprintf fmt "[rule] TR-Sat-Backjumping@.";
+	dep 
 	
 let unsat env fg = 
   try

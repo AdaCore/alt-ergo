@@ -1,0 +1,122 @@
+$$$sat
+$cobj:La fonctionnalité à vérifier est que le SAT solveur d'Alt-Ergo est exécuté correctement sur un problème propositionel
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g1: A or not A
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g2: A -> not not A
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g3: A -> A
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g4: ((A -> B) -> A) -> A
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g5: (A -> B)-> (not B -> not A)
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g6: ((A -> B) and A) -> B
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g7: ((A -> B) and not B) -> not A
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g8: ((A -> B) and (B -> C)) -> (A -> C)
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g9: (A and (B or C)) -> ((A and B) or (A and C))
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g10: ((A and B) or (A and C)) -> (A and (B or C))
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g11: (A or (B and C)) -> ((A or B) and (A or C))
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g12: ((A or B) and (A or C)) -> (A or (B and C))
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g13: (not A -> A) -> A 
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g14: ((P -> (Q and R and S)) and not S) -> not P
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g15: (P and Q) -> (Q and P)
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g16: (A and A) or not A
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g17: not not A <-> A
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+(* De morgan *)
+goal g18: not(A and B) <-> (not A or not B)
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g19: not(A or B) <-> (not A and not B)
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+(* Distributivite *)
+goal g20: (A or (B and C)) <-> ((A or B) and (A or C))
+
+$res:Valid
+$
+logic A,B,C,P,Q,R,S: prop
+goal g21: (A and (B or C)) <-> ((A and B) or (A and C))
+
+
+$res:Valid
+$
+logic A,B,C,D : prop
+goal g22: (A or B) -> (B or A)
+
+
+$res:Valid
+$
+logic p,q,r : prop
+goal g23: (p -> q) and (p and q -> r) -> (p -> r)
+

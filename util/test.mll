@@ -152,44 +152,40 @@
       with Scanf.Scan_failure _ | End_of_file -> acc)
       [] rules
 
-  let out_tex =
-    open_out_gen [Open_creat; Open_trunc; Open_append] 0o666 !tex_file
-  let fmt_tex = formatter_of_out_channel out_tex
 
-
-  let init_sec n =
+  let init_sec n fmt_tex =
     fprintf fmt_tex "\\subsection{%s}\n@." (escu n)
     
-  let sec_command fname =
-    fprintf fmt_tex "\\subsubsection{Commande exécutée}\n\n";
+  let sec_command fname fmt_tex =
+    fprintf fmt_tex "\\subsubsection*{Commande exécutée}\n\n";
     fprintf fmt_tex "\\begin{verbatim}\n";
     fprintf fmt_tex "%s %s\n" !name fname;
     fprintf fmt_tex "\\end{verbatim}\n@."
     
-  let sec_exigence refs fname =
+  let sec_exigence refs fname fmt_tex =
     fprintf fmt_tex 
-      "\\subsubsection{Référence de l\'exigence fonctionnelle}\n\n";
+      "\\subsubsection*{Référence de l\'exigence fonctionnelle}\n\n";
     fprintf fmt_tex "\\begin{itemize}\n";
     List.iter (fun (r,info) ->
-      fprintf fmt_tex "\\item \\textsc{%s} \\texttt{%s}\n" r info;
+      fprintf fmt_tex "\\item \\textsc{%s} \\verb|%s|\n" r info;
       exi_tests := (r, fname)::!exi_tests
     ) refs;
     fprintf fmt_tex "\\end{itemize}\n@."
 
-  let sec_obj obj =
-    fprintf fmt_tex "\\subsubsection{Objectif(s) du test}\n\n";
+  let sec_obj obj fmt_tex =
+    fprintf fmt_tex "\\subsubsection*{Objectif(s) du test}\n\n";
     fprintf fmt_tex "%s\n\n" !cobj;
     fprintf fmt_tex "%s\n" obj
 
-  let sec_desc code =
-    fprintf fmt_tex "\\subsubsection{Description du test}\n\n";
+  let sec_desc code fmt_tex =
+    fprintf fmt_tex "\\subsubsection*{Description du test}\n\n";
     fprintf fmt_tex "\\begin{verbatimgray}\n";
     fprintf fmt_tex "%s\n" code;
     fprintf fmt_tex "\\end{verbatimgray}\n@."
     
 
-  let sec_res ares ok =
-    fprintf fmt_tex "\\subsubsection{Résultat attendu}\n\n";
+  let sec_res ares ok fmt_tex =
+    fprintf fmt_tex "\\subsubsection*{Résultat attendu}\n\n";
     fprintf fmt_tex "%s.\n" ares;
     fprintf fmt_tex "\n\\bigskip\n\n";
     fprintf fmt_tex "Résultat du test : \\textbf{%s}\n@." 
@@ -234,7 +230,7 @@ let comment = "$$" [^'\n']* ( '\n' | eof )
 let alpha= [ 'a'-'z' 'A'-'Z' ]
 let ident= (alpha | '_' | '-')+
 
-rule split = parse
+rule split fmt_tex = parse
     pref (ident as newpref) ' '* '\n' { new_prefix newpref; true }
   | exi (file as f) { exi := f; true }
   | obj  (file as f) { obj := f; true }
@@ -250,12 +246,12 @@ rule split = parse
       else is_zero_status status && 
 	Sys.command (sprintf "echo \"%s\" | grep -q -w \"%s\"" answ !ares) = 0
     in
-    init_sec fname;
-    sec_command fname;
-    sec_exigence (scan_rules rules) fname;
-    sec_obj !obj;
-    sec_desc code;
-    sec_res !ares ok;
+    init_sec fname fmt_tex;
+    sec_command fname fmt_tex;
+    sec_exigence (scan_rules rules) fname fmt_tex;
+    sec_obj !obj fmt_tex;
+    sec_desc code fmt_tex;
+    sec_res !ares ok fmt_tex;
     if ok then print_endline (sprintf "%s  %s" fname ok_str)
     else print_endline (sprintf "%s %s" (red fname) ko_str);
     results_table := (fname, ok)::!results_table;
@@ -274,8 +270,11 @@ rule split = parse
     let chan=open_in file in
     Sys.chdir (Filename.dirname file);
     ignore (Sys.command("rm -f testfile-*.mlw"));
+    let out_tex =
+      open_out_gen [Open_creat; Open_trunc; Open_append] 0o666 !tex_file in
+    let fmt_tex = formatter_of_out_channel out_tex in
     let buf=Lexing.from_channel chan in
-    while split buf do () done;
+    while split fmt_tex buf do () done;
     let fres = Filename.chop_extension !tex_file in
     dump_exi_tests (fres ^ "_exi.tex");
     dump_results_table (fres ^ "_table.tex");

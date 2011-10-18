@@ -74,7 +74,7 @@ let all_models = ref false
 let goal_directed = ref false
 let proof = ref false
 let debug_proof = ref false
-let qualif = ref false
+let qualif = ref (-1)
 let vsid = ref false
 let max_split = ref (Num.Int 1000000)
 
@@ -82,3 +82,5 @@ let show_version () = Format.printf "%s@." Version.version; exit 0
 let show_libdir () = Format.printf "%s@." Version.libdir; exit 0
 
 let set_max_split s = max_split := Num.num_of_string s
+
+let set_proof b = proof := b
