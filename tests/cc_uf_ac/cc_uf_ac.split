@@ -1281,3 +1281,47 @@ goal g4:
     P(a) -> a= f(b) -> a = f(f(c)) ->
     Q(b) and Q(c)
 
+
+
+
+$$$ac-false
+$cobj:La fonctionnalité à vérifier est que l'algorithme AC(X) implémente bien ses spécifications et que Alt-Ergo ne prouve pas des buts faux faisant intervenir de l'égalité et des symboles associatifs-commutatifs.
+
+
+$res:I don't know
+$
+
+logic a,b,c,gamma,beta,x : int
+logic ac f : int , int -> int
+
+goal g2 : 
+  f(a,b) = f(x,gamma) ->
+  f(a,c) = f(x,beta) ->
+  f(gamma,c) = f(beta,b)
+
+
+$res:I don't know
+$
+
+logic a,b,c,gamma,beta,x,u,v : int
+logic f : int , int -> int
+
+goal g3 : 
+  f(a,b)     = u ->
+  f(a,c)     = v ->
+  f(x,gamma) = u ->
+  f(x,beta)  = v ->
+  f(gamma,c) = f(beta,b)
+
+
+$res:I don't know
+$
+
+logic a,b,c,gamma,beta,x,y: int
+logic ac f : int , int -> int
+
+goal g4 : 
+  f(a,b) = f(x,gamma) ->
+  f(a,c) = f(x,beta) ->
+  f(x,f(gamma,c)) = f(y,f(beta,b))
+

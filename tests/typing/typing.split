@@ -172,7 +172,7 @@ goal g6 : f(true) = true and true and P(true)
 
 
 
-$$$terms
+$$$terms_incorrect
 $cobj:La fonctionnalité à vérifier est que Alt-Ergo rejette au typage les termes mal typés.
 
 $res:Incorrect
@@ -200,7 +200,7 @@ goal g3 : f(1)
 
 
 
-$$$polymorphisme
+$$$polymorphisme_incorrect
 $cobj:La fonctionnalité à vérifier est que Alt-Ergo rejette au typage les expressions mal typées en présence de symboles polymorphes.
 
 $res:Incorrect
@@ -219,7 +219,7 @@ logic y: bool t
 logic f: 'a t -> 'a
 goal g2 : f(x) = f(y)
 
-$$$prop
+$$$prop_incorrect
 $cobj:La fonctionnalité à vérifier est que Alt-Ergo rejette au typage les expressions utilisant incorrectement le type \texttt{prop}.
 
 $res:Incorrect
@@ -228,14 +228,7 @@ logic P : prop
 goal g1: P + 1 = 1
 
 
-$res:Incorrect
-$
-logic P : prop
-logic f: bool -> prop
-goal g2: f(P)
-
-
-$$$arith
+$$$arith_incorrect
 $cobj:La fonctionnalité à vérifier est que Alt-Ergo rejette au typage les expressions arithmétiques mal typées.
 
 
