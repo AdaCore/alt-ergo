@@ -1808,7 +1808,7 @@ goal g17:
 
 
 $$$ac_arith_mult_false
-$cobj:La fonctionnalité à vérifier est que le raisonnement fait par la coopération du module d'intervalles et de l'algorithme Ac(X) est correct et que Alt-Ergo ne prouve pas des buts faux faisant intervenir de l'arithmétique non linéaire.
+$cobj:La fonctionnalité à vérifier est que le raisonnement fait par la coopération du module d'intervalles et de l'algorithme AC(X) est correct et que Alt-Ergo ne prouve pas des buts faux faisant intervenir de l'arithmétique non linéaire.
 
 
 

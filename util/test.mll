@@ -25,6 +25,8 @@
     let compare s1 s2 = if compare s1 s2 = 0 then 0 else -1
   end)
 
+  module MS = Map.Make(String)
+
   let string_buf = Buffer.create 1024
 
   let preftab = Hashtbl.create 17 
@@ -42,7 +44,7 @@
   let ares = ref "Valid"
 
   let results_table = ref []
-  let exi_tests = ref []
+  let exi_tests = ref MS.empty
   
   let green s =
     sprintf "[1;32m%s[1;0m" s
@@ -168,7 +170,8 @@
     fprintf fmt_tex "\\begin{itemize}\n";
     List.iter (fun (r,info) ->
       fprintf fmt_tex "\\item \\textsc{%s} \\verb|%s|\n" r info;
-      exi_tests := (r, fname)::!exi_tests
+      let oldfs = try MS.find r !exi_tests with Not_found -> [] in
+      exi_tests := MS.add r (fname::oldfs) !exi_tests;
     ) refs;
     fprintf fmt_tex "\\end{itemize}\n@."
 
@@ -197,10 +200,13 @@
     let fmt = formatter_of_out_channel out in
     fprintf fmt "\\subsection{Éxigences fonctionnelles et tests}\n@.";
     fprintf fmt "\\begin{center}\\begin{longtable}{|p{0.5\\textwidth}|p{0.5\\textwidth}|}\n\\hline\n@.";
-    List.iter (fun (ex, fname) ->
-      fprintf fmt "\\textsc{%s} & %s \\\\\\hline\n" ex (escu fname)
-    ) (List.stable_sort (fun (e1, _) (e2, _) -> String.compare e1 e2) 
-	 (List.rev !exi_tests));
+    MS.iter (fun ex fnames ->
+      fprintf fmt "\\textsc{%s}\n" ex;
+      List.iter (fun fname ->
+	fprintf fmt "& %s \\\\\n" (escu fname)
+      ) (List.rev fnames);
+      fprintf fmt "\\hline\n";
+    ) !exi_tests;
     fprintf fmt "\\end{longtable}\\end{center}\n@.";
     close_out out
     
