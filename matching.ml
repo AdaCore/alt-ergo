@@ -216,7 +216,9 @@ module Make (X : X) = struct
 	    MT.fold 
 	      (fun t xs lsubst ->
 		try
-		  let s_ty = Ty.matching sty ty (T.view t).T.ty in
+		  let s_ty = 
+		    try Ty.matching sty ty (T.view t).T.ty 
+		    with Ty.TypeClash _ -> sty in
 		  let gen, but = infos max (||) t g b env in
 		  (matchterms env uf
 		     {sbt=st,s_ty; gen=gen ; goal=but } pats xs) @ lsubst
