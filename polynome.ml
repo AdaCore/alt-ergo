@@ -67,16 +67,43 @@ module Make (X : S) = struct
   type r = X.r
       
   module M : Map.S with type key = r = 
-    Map.Make(struct type t = r let compare x y = X.compare y x end)
+    Map.Make(
+      struct 
+        type t = r 
+            
+        (*sorted in decreasing order to comply with AC(X) order requirements*)
+        let compare x y = X.compare y x
+      end)
       
   type t = { m : num M.t; c : num; ty : Ty.t }
 
+
+  let map_to_list m = List.rev (M.fold (fun x a aliens -> (a, x)::aliens) m [])
+
+  exception Out of int
+
+  let compare_maps l1 l2 = 
+    try
+      List.iter2
+        (fun (a,x) (b,y) ->
+           let c = X.compare x y   in if c <> 0 then raise (Out c);
+           let c = compare_num a b in if c <> 0 then raise (Out c) )l1 l2;
+      0
+    with
+      | Out c -> c 
+      | Invalid_argument("List.iter2") -> List.length l1 - List.length l2
+            
   let compare p1 p2 = 
     let c = Ty.compare p1.ty p2.ty in
     if c <> 0 then c
-    else
-      let c = compare_num p1.c p2.c in
-      if c = 0 then M.compare compare_num p1.m p2.m else c
+    else match M.is_empty p1.m, M.is_empty p2.m with
+      | true , false -> -1
+      | false, true  -> 1
+      | true , true  -> compare_num p1.c p2.c
+      | false, false ->
+          let c =  compare_maps (map_to_list p1.m) (map_to_list p2.m) in
+          if c = 0 then compare_num p1.c p2.c else c
+
 
   let hash p = 
     abs (Hashtbl.hash p.m + 19*Hashtbl.hash p.c + 17 * Ty.hash p.ty)
@@ -200,9 +227,7 @@ module Make (X : S) = struct
       
   let remove x p = { p with m = M.remove x p.m }
       
-  let to_list p = 
-    let l = M.fold (fun x a aliens -> (a, x)::aliens ) p.m [] in
-    List.rev l, p.c
+  let to_list p = map_to_list p.m , p.c
 
   let type_info p = p.ty
 
