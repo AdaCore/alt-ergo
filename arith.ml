@@ -292,7 +292,9 @@ module Make
     is_mine p
 
 
-  let compare = P.compare
+  let compare_mine = P.compare
+
+  let compare x y = P.compare (embed x) (embed y)
 
   let hash = P.hash
 

@@ -86,11 +86,11 @@ struct
       
   and comparei a b = 
     match a, b with
-      | X1 x, X1 y -> X1.compare x y
-      | X2 x, X2 y -> X2.compare x y
-      | X3 x, X3 y -> X3.compare x y
-      | X4 x, X4 y -> X4.compare x y
-      | X5 x, X5 y -> X5.compare x y
+      | X1 x, X1 y -> X1.compare a b
+      | X2 x, X2 y -> X2.compare a b
+      | X3 x, X3 y -> X3.compare a b
+      | X4 x, X4 y -> X4.compare a b
+      | X5 x, X5 y -> X5.compare a b
       | Term x  , Term y  -> Term.compare x y
       | Ac x    , Ac    y -> AC.compare x y
       | _                 -> assert false

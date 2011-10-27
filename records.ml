@@ -99,8 +99,15 @@ module Make (X : ALIEN) = struct
 	  end
       | Other _ -> v
 
-  let compare t u = raw_compare (normalize t) (normalize u)
+  let embed r =
+    match X.extract r with
+      | Some p -> p
+      | None -> Other(r, X.type_info r)
+
+  let compare_mine t u = raw_compare (normalize t) (normalize u)
 	
+  let compare x y = compare (embed x) (embed y)
+
   let is_mine t =
     match normalize t with
       | Other(r, _) -> r
@@ -203,22 +210,22 @@ module Make (X : ALIEN) = struct
     | Record (lbs, _) ->
 	List.exists (fun (_, v) -> occurs x v) lbs
     | Access (_, v, _) -> occurs x v
-    | Other _ as v -> compare x v = 0
+    | Other _ as v -> compare_mine x v = 0
 
-  let direct_args_of_labels x = List.exists (fun (_, y) -> compare x y = 0) 
+  let direct_args_of_labels x = List.exists (fun (_, y)-> compare_mine x y = 0)
 
   let rec subst_access x s e = 
     match e with
       | Record (lbs, ty) -> 
 	  Record (List.map (fun (n,e') -> n, subst_access x s e') lbs, ty)
-      | Access (lb, e', _) when compare e e' = 0 -> 
+      | Access (lb, e', _) when compare_mine e e' = 0 -> 
 	  Hstring.list_assoc lb s
       | Access (lb', e', ty) -> Access (lb', subst_access x s e', ty)
       | Other _ -> e
 
   let rec find_list x = function
     | [] -> raise Not_found
-    | (y, t) :: _ when compare x y = 0 -> t
+    | (y, t) :: _ when compare_mine x y = 0 -> t
     | _ :: l -> find_list x l
 
   let split l = 
@@ -231,7 +238,7 @@ module Make (X : ALIEN) = struct
     split_rec [] l
 
   let rec solve_one u v =
-    if compare u v = 0 then [] else
+    if compare_mine u v = 0 then [] else
       match u, v with
 	| Access (a, x, _), v | v, Access (a, x, _) ->
 	    let nr, _ = mk_fresh_record x (Some(a,v)) in
