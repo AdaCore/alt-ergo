@@ -184,6 +184,12 @@ version.ml: config.status
 	@echo "let date = \""`date`"\"" >> version.ml
 	@echo "let libdir = \""$(LIBDIR)"\"" >> version.ml
 
+.PHONY: adacore-patch
+
+BASETAG=0.93
+PATCHRELEVANT= $(filter-out tests util, $(wildcard *))
+adacore-patch:
+	git diff --no-prefix $(BASETAG) $(PATCHRELEVANT) > alt-ergo-$(BASETAG).patch
 
 
 # file headers
