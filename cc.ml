@@ -27,7 +27,7 @@ module type S = sig
   type t
 
   val empty : unit -> t
-  val assume : Literal.LT.t -> Explanation.t -> t -> t * Term.Set.t * int
+  val assume : Literal.LT.t -> Explanation.t -> t -> t * Term.Set.t
   val query : Literal.LT.t -> t -> answer
   val class_of : t -> Term.t -> Term.t list
   val print_model : Format.formatter -> t -> unit
@@ -539,7 +539,7 @@ module Make (X : Sig.X) = struct
     let t, ch = try_it (fun env -> assume_literal env ch [a, ex] ) t  in 
     let choices = extract_terms_from_choices SetT.empty t.choices in
     let all_terms = extract_terms_from_assumed choices ch in
-    t, all_terms, 1
+    t, all_terms
 
   let class_of t term = Uf.class_of t.gamma.uf term
   
@@ -593,7 +593,7 @@ module Make (X : Sig.X) = struct
     }
     in
     let t = { gamma = env; gamma_finite = env; choices = [] } in
-    let t, _, _ = 
+    let t, _ =
       assume (A.LT.make (A.Distinct (false, [T.vrai; T.faux]))) Ex.empty t
     in t
 

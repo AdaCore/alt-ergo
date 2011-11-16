@@ -17,6 +17,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Format
 open Preoptions
 
 let fmt = fmt
@@ -143,3 +144,16 @@ let set_debug_split b = Preoptions.debug_split := b
 let set_restricted b = Preoptions.restricted := b
 let set_bottom_classes b = Preoptions.bottom_classes := b
 let set_timelimit b = Preoptions.timelimit := b
+
+let scale_steps steps = Int64.div steps (Int64.of_int 50)
+
+let steps = ref 0L
+
+let incr_steps cpt =
+  steps := Int64.add (Int64.of_int cpt) !steps;
+  if stepsb () <> -1
+    && Int64.compare (scale_steps !steps) (Int64.of_int (stepsb ())) > 0 then
+      begin
+	printf "Steps limit reached: %Ld@." (scale_steps !steps);
+	exit 1
+      end

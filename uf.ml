@@ -689,6 +689,7 @@ module Make ( R : Sig.X ) = struct
 
   let find env t = 
     if rules () = 3 then fprintf fmt "[rule] TR-UFX-Find@.";
+    Options.incr_steps 1;
     Env.lookup_by_t t env
 
   let find_r = 
