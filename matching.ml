@@ -209,6 +209,7 @@ module Make (X : X) = struct
 
   let matchpat env uf pat_info lsbt_acc ({sbt=st,sty;gen=g;goal=b} as sg, pat) = 
     let {T.f=f;xs=pats;ty=ty} = T.view pat in
+    Options.incr_steps 1;
     match f with
       |	Symbols.Var _ -> all_terms f ty env pat_info sg lsbt_acc
       | _ -> 

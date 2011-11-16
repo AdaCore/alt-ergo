@@ -21,6 +21,7 @@ val file : string ref
 val parse_only : bool
 val type_only : bool
 val stopb : int
+val steps : Int64.t ref
 val stepsb : int
 val age_limite : int
 val notriggers : bool
@@ -71,3 +72,7 @@ val debug_proof : bool
 val qualif : int
 val vsid : bool
 val debug_split : bool
+
+val incr_steps : int -> unit
+(* Increment the global number of steps. If this exceeds the specified number
+   of steps for the run, then exit. *)

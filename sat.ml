@@ -27,8 +27,6 @@ module SF = F.Set
 module MF = F.Map
 module Ex = Explanation
 
-let steps = ref 0L
-
 type gformula = { 
   f: F.t; 
   age: int; 
@@ -399,13 +397,7 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		in
 		let tbox, new_terms, cpt = CcX.assume a dep env.tbox in
 		let env = add_terms env new_terms gf age lem in
-		steps := Int64.add (Int64.of_int cpt) !steps;
-		if stepsb <> -1 
-		  && Int64.compare !steps (Int64.of_int stepsb) > 0 then 
-		  begin 
-		    printf "Steps limit reached: %Ld@." !steps;
-		    exit 1
-		  end;
+		Options.incr_steps cpt;
 		let env = { env with tbox = tbox } in
 		bcp env
 
@@ -535,5 +527,5 @@ let empty = {
   definitions = MF.empty
 } 
 
-let start () = steps := 0L
-let stop () = !steps
+let start () = Options.steps := 0L
+let stop () = !Options.steps

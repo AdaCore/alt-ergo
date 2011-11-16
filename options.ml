@@ -15,6 +15,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Format
 open Preoptions
 
 let fmt = fmt
@@ -29,6 +30,7 @@ let type_only = !type_only
 let parse_only = !parse_only
 let stopb = !stopb
 let stepsb = !stepsb
+let steps = ref 0L
 let age_limite = !age_limite
 let notriggers = !notriggers
 let debug = !debug
@@ -74,3 +76,12 @@ let debug_proof = !debug_proof && proof
 let qualif = !qualif
 let vsid = !vsid
 let debug_split = !debug_split
+
+let incr_steps cpt =
+  steps := Int64.add (Int64.of_int cpt) !steps;
+  if stepsb <> -1
+    && Int64.compare !steps (Int64.of_int stepsb) > 0 then
+      begin
+	printf "Steps limit reached: %Ld@." !steps;
+	exit 1
+      end
