@@ -189,7 +189,9 @@ version.ml: config.status
 BASETAG=0.93
 PATCHRELEVANT= $(filter-out tests util, $(wildcard *))
 adacore-patch:
+	git add -N configure
 	git diff --no-prefix $(BASETAG) $(PATCHRELEVANT) > alt-ergo-$(BASETAG).patch
+	git reset configure
 
 
 # file headers

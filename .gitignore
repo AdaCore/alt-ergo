@@ -7,7 +7,6 @@ Makefile
 .depend
 config.status
 config.log
-configure
 why_parser.ml
 why_parser.mli
 why_lexer.ml
