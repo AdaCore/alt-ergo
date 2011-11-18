@@ -80,7 +80,8 @@ let debug_split = !debug_split
 let incr_steps cpt =
   steps := Int64.add (Int64.of_int cpt) !steps;
   if stepsb <> -1
-    && Int64.compare !steps (Int64.of_int stepsb) > 0 then
+    && Int64.compare (Int64.div !steps (Int64.of_int 50))
+                     (Int64.of_int stepsb) > 0 then
       begin
 	printf "Steps limit reached: %Ld@." !steps;
 	exit 1

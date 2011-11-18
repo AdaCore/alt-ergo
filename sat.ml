@@ -395,9 +395,8 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		    add_terms env (A.LT.terms_of a) gf age lem
 		  else env 
 		in
-		let tbox, new_terms, cpt = CcX.assume a dep env.tbox in
+		let tbox, new_terms = CcX.assume a dep env.tbox in
 		let env = add_terms env new_terms gf age lem in
-		Options.incr_steps cpt;
 		let env = { env with tbox = tbox } in
 		bcp env
 
