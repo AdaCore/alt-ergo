@@ -73,6 +73,11 @@ val qualif : int
 val vsid : bool
 val debug_split : bool
 
+val scale_steps : Int64.t -> Int64.t
+  (* Return a value of steps suitably scaled for user, to allow further
+     modifications of the definition of steps without impacting the external
+     perception of what amount of work a step represents. *)
+
 val incr_steps : int -> unit
-(* Increment the global number of steps. If this exceeds the specified number
-   of steps for the run, then exit. *)
+  (* Increment the global number of steps. If this exceeds the specified number
+     of steps for the run, then exit. *)

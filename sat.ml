@@ -527,4 +527,4 @@ let empty = {
 } 
 
 let start () = Options.steps := 0L
-let stop () = !Options.steps
+let stop () = Options.scale_steps (!Options.steps)
