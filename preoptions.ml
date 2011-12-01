@@ -60,7 +60,7 @@ let satmode = ref false
 let bjmode = ref false
 let glouton = ref false
 let triggers_var = ref false
-let redondance = ref 4
+let redondance = ref 2
 let astuce = ref false
 let select = ref 0
 let no_rm_eq_existential = ref false
@@ -75,7 +75,6 @@ let goal_directed = ref false
 let proof = ref false
 let debug_proof = ref false
 let rules = ref (-1)
-let vsid = ref false
 let max_split = ref (Num.Int 1000000)
 let restricted = ref false
 

@@ -95,7 +95,7 @@ CMO = options.cmo exception.cmo loc.cmo \
       smtlib2_parse.cmo smtlib2_lex.cmo smtlib2_to_why.cmo \
       polynome.cmo ac.cmo \
       uf.cmo use.cmo intervals.cmo fm.cmo arith.cmo \
-      records.cmo bitv.cmo reachability.cmo arrays.cmo sum.cmo \
+      records.cmo bitv.cmo arrays.cmo sum.cmo \
       combine.cmo cc.cmo \
       heap.cmo existantial.cmo \
       triggers.cmo cnf.cmo why_typing.cmo matching.cmo \
@@ -177,7 +177,7 @@ challenge:$(OPT)
 testoptsel:$(OPT)
 	tests/test.sh "./$(OPT) -select 2 -glouton -triggers-var "
 
-VERSION=0.93.1
+VERSION=0.94
 
 version.ml: config.status
 	@echo "let version = \""$(VERSION)"\"" > version.ml

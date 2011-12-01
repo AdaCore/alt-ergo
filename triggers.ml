@@ -52,7 +52,7 @@ module STRS = Set.Make(
 
 let sort = List.sort (fun l1 l2 -> compare (List.length l1) (List.length l2))
 
-let neg_pol x= x (*function Pos -> Neg | Neg -> Pos*)
+let neg_pol x = x (*function Pos -> Neg | Neg -> Pos*)
       
 let compare_tconstant c1 c2 =
   match c1, c2 with

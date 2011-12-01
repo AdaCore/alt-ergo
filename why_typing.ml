@@ -114,23 +114,6 @@ module Types = struct
 		(fun fl (l,_) -> MString.add l id fl) env.from_labels lbs
 	  }
 
-	  (* hack for recursive records : to be completed *)
-	  (*let nenv = 
-	    { nenv with 
-		to_ty = MString.add id (Ty.text ty_vars id) nenv.to_ty } in
-	  let nv = Ty.Tvar (Ty.fresh_var ()) in
-	  let lbs = 
-	    List.map 
-	      (fun (x, pp) -> 
-		 x, ty_of_pp loc nenv (Some (id, vars, nv)) pp) lbs 
-	  in
-	  Ty.unify nv (Ty.trecord ty_vars id lbs);
-	  { to_ty = MString.add id (Ty.shorten nv) env.to_ty;
-	    from_labels = 
-	      List.fold_left 
-		(fun fl (l,_) -> MString.add l id fl) env.from_labels lbs
-	  }*)
-
   module SH = Set.Make(Hstring)
 
   let check_labels lbs ty loc = 

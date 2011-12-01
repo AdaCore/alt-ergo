@@ -771,11 +771,11 @@ module Make(X : ALIEN) = struct
     type t =  unit
 
     let empty () = ()
-    let assume _ _ ~are_eq ~are_neq ~class_of ~find =
+    let assume _ _ ~are_eq ~are_neq ~class_of =
       (), { assume = []; remove = [] }
     let add _ _ = ()
     let case_split _ = []    
-    let query _ _ ~are_eq ~are_neq ~class_of ~find = Sig.No
+    let query _ _ ~are_eq ~are_neq ~class_of = Sig.No
   end
 
 end

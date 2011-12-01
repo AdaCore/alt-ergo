@@ -69,5 +69,5 @@ val rewriting : bool
 val proof : bool
 val debug_proof : bool
 val rules : int
-val vsid : bool
 val debug_split : bool
+val restricted : bool

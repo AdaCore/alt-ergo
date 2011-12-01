@@ -256,29 +256,6 @@ let extract_model t =
 
 let print_model fmt s = 
   SF.iter (fprintf fmt "%a\n" F.print) s
-
-
-
-(* *)
-
-let activities = if vsid then H.create 1017 else H.create 0
-
-let weight = 0.1
-let current_weight = ref 0.1
-
-let incr_weight () = current_weight := !current_weight +. weight
-
-let incr_activity l = 
-  let v = try H.find activities l with Not_found -> 0. in
-  H.replace activities l (v +. !current_weight)
-
-let update_activity dep = 
-  F.Set.iter incr_activity (Ex.formulas_of dep)
-
-let max_formula a b = 
-  let c1 = try H.find activities a.f with Not_found -> 0. in
-  let c2 = try H.find activities b.f with Not_found -> 0. in
-  if c2 < c1 then a, b else b, a
   
 (* sat-solver *)
 
@@ -391,7 +368,6 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 
 	    | F.Literal a ->
 	      if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-Lit@.";
-		if vsid then incr_weight ();
 		let env = 
 		  if mf && size < size_formula then 
 		    add_terms env (A.LT.terms_of a) gf age lem
@@ -491,7 +467,6 @@ and back_tracking env stop max_size =  match env.delta with
   | [] -> 
       raise I_dont_know
   | (a,b,d)::l ->
-      let a,b = if vsid then max_formula a b else a,b in
       let {f=f;age=g;name=lem;mf=mf} = a in
       Print.decide f;
       let dep = unsat_rec {env with delta=l} (a,Ex.singleton f) stop max_size in
@@ -500,7 +475,6 @@ and back_tracking env stop max_size =  match env.delta with
 	let dep' = Ex.remove f dep in
 	Print.backtracking (F.mk_not f);
 	if rules = 2 then fprintf fmt "[rule] TR-Sat-Decide@.";
-	if vsid then update_activity dep;
 	unsat_rec
 	  (assume {env with delta=l} (b, Ex.union d dep'))
 	  ({a with f=F.mk_not f},dep') stop max_size
