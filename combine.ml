@@ -85,6 +85,17 @@ struct
     | Ac x   -> AC.type_info x
     | Term t -> let {Term.ty = ty} = Term.view t in ty
 
+  (* Xi < Term < Ac *)
+  let theory_num x = match x with  
+    | Ac _    -> -1
+    | Term  _ -> -2
+    | X1 _    -> -3
+    | X2 _    -> -4
+    | X3 _    -> -5
+    | X4 _    -> -6
+    | X5 _    -> -7
+          
+  let compare_tag a b = theory_num a - theory_num b
 
   let compare a b = 
     let c = Ty.compare (type_info a) (type_info b) in
@@ -99,19 +110,8 @@ struct
       | X3 _, (Term _ | Ac _ | X3 _) | (Term _ | Ac _ ), X3 _ -> X3.compare a b
       | X4 _, (Term _ | Ac _ | X4 _) | (Term _ | Ac _ ), X4 _ -> X4.compare a b
       | X5 _, (Term _ | Ac _ | X5 _) | (Term _ | Ac _ ), X5 _ -> X5.compare a b
-      | _                 -> assert false
+      | _                 -> compare_tag a b
           
-  (* Xi < Term < Ac *)
-  let theory_num x = match x with  
-    | Ac _    -> -1
-    | Term  _ -> -2
-    | X1 _    -> -3
-    | X2 _    -> -4
-    | X3 _    -> -5
-    | X4 _    -> -6
-    | X5 _    -> -7
-          
-  let compare_tag a b = theory_num a - theory_num b
     
   (* ancienne version 
      let rec compare a b = 

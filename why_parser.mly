@@ -83,6 +83,7 @@
 
 /* Precedences */
 
+%nonassoc WITH
 %nonassoc IN
 %nonassoc prec_forall prec_exists
 %right ARROW LRARROW
