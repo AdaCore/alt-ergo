@@ -230,6 +230,8 @@ module Make ( R : Sig.X ) = struct
 	     try 
 	       let ex2 = MapL.find l1 mapl in
 	       let ex = Ex.union (Ex.union ex1 ex2) dep in (* VERIF *)
+	       if rules = 3 then
+		 fprintf fmt "[rule] TR-CCX-Congruence-Conflict@.";
 	       raise (Inconsistent ex)
 	     with Not_found -> 
 	       MapL.add l1 (Ex.union ex1 dep) mapl) 
@@ -490,6 +492,7 @@ module Make ( R : Sig.X ) = struct
   end
     
   let add env t = 
+    if rules = 3 then fprintf fmt "[rule] TR-UFX-Add@.";
     if MapT.mem t env.make then env, [] else Env.init_term env t
 
   let ac_solve eqs dep (env, tch) (p, v) = 
@@ -509,12 +512,17 @@ module Make ( R : Sig.X ) = struct
     if debug_uf then 
       printf "[uf] x-solve: %a = %a %a@."
 	R.print rr1 R.print rr2 Ex.print dep;
-    if R.equal rr1 rr2 then [] (* Remove rule *)
+    if R.equal rr1 rr2 then begin
+      if rules = 3 then fprintf fmt "[rule] TR-CCX-Remove@.";
+      [] (* Remove rule *)
+    end
     else 
       begin
 	ignore (Env.update_neqs rr1 rr2 dep env);
         try R.solve rr1 rr2 
-	with Unsolvable -> raise (Inconsistent dep)
+	with Unsolvable ->
+	  if rules = 3 then fprintf fmt "[rule] TR-CCX-Congruence-Conflict@.";
+	  raise (Inconsistent dep)
       end
         
   let rec ac_x eqs env tch = 
@@ -530,6 +538,7 @@ module Make ( R : Sig.X ) = struct
       ac_x eqs env tch
       
   let union env r1 r2 dep =
+    if rules = 3 then fprintf fmt "[rule] TR-UFX-Union@.";
     let equations = Queue.create () in 
     Queue.push (r1,r2, dep) equations;
     ac_x equations env []
@@ -542,8 +551,10 @@ module Make ( R : Sig.X ) = struct
       List.fold_left
 	(fun (env, mapr, newds) r -> 
 	   let rr, ex = Env.find_or_normal_form env r in 
-	   try 
-	     raise (Inconsistent (Ex.union ex (MapR.find rr mapr)))
+	   try
+	     let exr = MapR.find rr mapr in
+	     if rules = 3 then fprintf fmt "[rule] TR-CCX-Distinct-Conflict@.";
+	     raise (Inconsistent (Ex.union ex exr))
 	   with Not_found ->
 	     let uex = Ex.union ex dep in
 	     let mdis = 
@@ -571,7 +582,10 @@ module Make ( R : Sig.X ) = struct
 			      (R.equal a r2 && R.equal b r1) then env
 			    else
 			      distinct env [a; b] ex
-			| []  -> raise (Inconsistent ex) 
+			| []  -> 
+			  if rules = 3 then
+			    fprintf fmt "[rule] TR-CCX-Distinct-Conflict@.";
+			  raise (Inconsistent ex) 
 			| _   -> env
 		      with Unsolvable -> env) mapr env)
       env newds
@@ -608,9 +622,13 @@ module Make ( R : Sig.X ) = struct
       SetT.elements (MapR.find rt env.classes)
     with Not_found -> [t]
       
-  let find env t = Env.lookup_by_t t env
+  let find env t = 
+    if rules = 3 then fprintf fmt "[rule] TR-UFX-Find@.";
+    Env.lookup_by_t t env
 
-  let find_r = Env.find_or_normal_form
+  let find_r = 
+    if rules = 3 then fprintf fmt "[rule] TR-UFX-Find@.";
+    Env.find_or_normal_form
 
   let print = Print.all 
 

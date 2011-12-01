@@ -126,9 +126,9 @@ module Make (X : X) = struct
   let deja_vu lem1 = 
     function None -> false | Some lem2 -> F.compare lem1 lem2=0
 
-  let all_terms f ty env pinfo {sbt=(s_t,s_ty); gen=g; goal=b} = 
+  let all_terms f ty env pinfo {sbt=(s_t,s_ty); gen=g; goal=b} lsbt_acc = 
     SubstT.fold 
-      (fun k s l-> 
+      (fun k s l -> 
 	 MT.fold 
 	   (fun t _ l -> 
 	      try
@@ -142,9 +142,8 @@ module Make (X : X) = struct
 		in
 		{sbt=(SubstT.add f t s_t, s_ty);gen=ng; goal=but}::l
 	      with Ty.TypeClash _ | Deja_vu-> l
-	   )
-	   s l)
-      env.fils []
+	   ) s l
+      )env.fils lsbt_acc
 
   let add_msymb uf f t ({sbt=(s_t,s_ty)} as sg)= 
     try 
@@ -197,38 +196,42 @@ module Make (X : X) = struct
 	    (fun m {T.xs=xs} -> matchterms env uf m pats xs) 
 	    { sg with sbt = (s_t,s_ty)} l
 	  
-
   and matchterms env uf sg pats xs = 
     try 
       List.fold_left2 
         (fun sb_l pat arg -> 
-           let sb_ll = List.map (fun sg -> matchterm env uf sg pat arg) sb_l in
-           List.flatten sb_ll)
-	[sg] pats xs 
+           List.fold_left 
+             (fun acc sg -> 
+                let aux = matchterm env uf sg pat arg in
+                List.rev_append aux acc) [] sb_l
+        ) [sg] pats xs 
     with Invalid_argument _ -> raise Echec
 
-  let matchpat env uf pat_info lsubst ({sbt=st,sty; gen=g; goal=b} as sg, pat) = 
+  let matchpat env uf pat_info lsbt_acc ({sbt=st,sty;gen=g;goal=b} as sg, pat) = 
     let {T.f=f;xs=pats;ty=ty} = T.view pat in
     match f with
-      |	Symbols.Var _ -> all_terms f ty env pat_info sg
+      |	Symbols.Var _ -> all_terms f ty env pat_info sg lsbt_acc
       | _ -> 
 	  try  
 	    MT.fold 
-	      (fun t xs lsubst ->
+	      (fun t xs lsbt ->
 		try
-		  let s_ty = Ty.matching sty ty (T.view t).T.ty in
+		  let s_ty = 
+		    try Ty.matching sty ty (T.view t).T.ty 
+		    with Ty.TypeClash _ -> sty in
 		  let gen, but = infos max (||) t g b env in
-		  (matchterms env uf
-		     {sbt=st,s_ty; gen=gen ; goal=but } pats xs) @ lsubst
-		with Echec -> lsubst)
-	      (SubstT.find f env.fils) lsubst
-	  with Not_found -> lsubst
+		  let aux = 
+                    matchterms env uf {sbt=st,s_ty; gen=gen; goal=but} pats xs in
+                  List.rev_append aux lsbt
+		with Echec -> lsbt
+              ) (SubstT.find f env.fils) lsbt_acc
+	  with Not_found -> lsbt_acc
 	    
   let matchpats env uf pat_info lsubsts pat = 
-    let lpats = 
-      List.map (fun sg -> (sg,T.apply_subst sg.sbt pat)) lsubsts in
-    List.flatten (List.map (matchpat env uf pat_info []) lpats)
-
+    List.fold_left
+      (fun acc sg -> 
+         matchpat env uf pat_info acc (sg, T.apply_subst sg.sbt pat)) [] lsubsts
+      
   let matching (pat_info, pats) env uf = 
     let egs = {sbt=(SubstT.empty,Ty.esubst) ; gen = 0; goal = false} in
     List.fold_left (matchpats env uf pat_info) [egs] pats

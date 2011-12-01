@@ -40,9 +40,8 @@ module rec CX : sig
 end =
 struct
 
-  (* Xi < Term < Ac *)
   type r =
-    | Term  of Term.t (* XXX changement de l'ordre pour Arrays *)
+    | Term  of Term.t
     | Ac    of AC.t
     | X1    of X1.t 
     | X2    of X2.t 
@@ -77,26 +76,65 @@ struct
     in 
     ty = Ty.Tint
       
-  let rec compare a b = 
-    let c = compare_tag a b in 
-    if c = 0 then comparei a b else c
+  let type_info = function
+    | X1 t   -> X1.type_info t
+    | X2 t   -> X2.type_info t
+    | X3 t   -> X3.type_info t
+    | X4 t   -> X4.type_info t
+    | X5 t   -> X5.type_info t
+    | Ac x   -> AC.type_info x
+    | Term t -> let {Term.ty = ty} = Term.view t in ty
 
-  and compare_tag a b = 
-    Pervasives.compare (theory_num a) (theory_num b)
-      
-  and comparei a b = 
-    match a, b with
-      | X1 x, X1 y -> X1.compare x y
-      | X2 x, X2 y -> X2.compare x y
-      | X3 x, X3 y -> X3.compare x y
-      | X4 x, X4 y -> X4.compare x y
-      | X5 x, X5 y -> X5.compare x y
+
+  let compare a b = 
+    let c = Ty.compare (type_info a) (type_info b) in
+    if c <> 0 then c
+    else match a, b with
       | Term x  , Term y  -> Term.compare x y
       | Ac x    , Ac    y -> AC.compare x y
+      | Ac _    , Term _  -> 1
+      | Term _  , Ac _    -> -1
+      | X1 _, (Term _ | Ac _ | X1 _) | (Term _ | Ac _ ), X1 _ -> X1.compare a b
+      | X2 _, (Term _ | Ac _ | X2 _) | (Term _ | Ac _ ), X2 _ -> X2.compare a b
+      | X3 _, (Term _ | Ac _ | X3 _) | (Term _ | Ac _ ), X3 _ -> X3.compare a b
+      | X4 _, (Term _ | Ac _ | X4 _) | (Term _ | Ac _ ), X4 _ -> X4.compare a b
+      | X5 _, (Term _ | Ac _ | X5 _) | (Term _ | Ac _ ), X5 _ -> X5.compare a b
       | _                 -> assert false
-
-  and theory_num x = Obj.tag (Obj.repr x)
-
+          
+  (* Xi < Term < Ac *)
+  let theory_num x = match x with  
+    | Ac _    -> -1
+    | Term  _ -> -2
+    | X1 _    -> -3
+    | X2 _    -> -4
+    | X3 _    -> -5
+    | X4 _    -> -6
+    | X5 _    -> -7
+          
+  let compare_tag a b = theory_num a - theory_num b
+    
+  (* ancienne version 
+     let rec compare a b = 
+     let c = compare_tag a b in 
+     if c = 0 then comparei a b else c
+     
+     and compare_tag a b = 
+     Pervasives.compare (theory_num a) (theory_num b)
+     
+     and comparei a b = 
+     match a, b with
+     | X1 x, X1 y -> X1.compare a b
+     | X2 x, X2 y -> X2.compare a b
+     | X3 x, X3 y -> X3.compare a b
+     | X4 x, X4 y -> X4.compare a b
+     | X5 x, X5 y -> X5.compare a b
+     | Term x  , Term y  -> Term.compare x y
+     | Ac x    , Ac    y -> AC.compare x y
+     | _                 -> assert false
+     
+     and theory_num x = Obj.tag (Obj.repr x)
+  *)
+    
   let equal a b = compare a b = 0
 
   let hash = function
@@ -354,15 +392,6 @@ struct
     sbs
 
 
-  let rec type_info = function
-    | X1 t   -> X1.type_info t
-    | X2 t   -> X2.type_info t
-    | X3 t   -> X3.type_info t
-    | X4 t   -> X4.type_info t
-    | X5 t   -> X5.type_info t
-    | Ac x   -> AC.type_info x
-    | Term t -> let {Term.ty = ty} = Term.view t in ty
-	
   module Rel =
   struct
     type elt = r
@@ -478,7 +507,7 @@ and X4 : Sig.THEORY with type r = CX.r and type t = CX.r Arrays.abstract =
        let embed = embed4
      end)
 
- (* Its signature is not Sig.THEORY because it doen't provide a solver *)
+ (* Its signature is not Sig.THEORY because it does not provide a solver *)
 and AC : Ac.S with type r = CX.r = Ac.Make(CX)
 
 and X5 : Sig.THEORY with type r = CX.r and type t = CX.r Sum.abstract =

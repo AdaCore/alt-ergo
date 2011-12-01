@@ -96,15 +96,28 @@ module Make (X : Sig.X) = struct
     L.fold_left 
       (fun l (x,n) -> let l= ref l in for i=1 to n do l:=x::!l done; !l) []
 
+  let abstract2 sy t r acc = 
+    match X.ac_extract r with
+      | Some ac when Sy.equal sy ac.h -> r, acc
+      | None -> r, acc
+      | Some _ -> match Term.view t with
+          | {Term.f=Sy.Name(hs,Sy.Ac) ;xs=xs;ty=ty} ->
+              let aro_sy = Sy.name ("@" ^ (HS.view hs)) in
+              let aro_t = Term.make aro_sy xs ty  in
+              let eq = Literal.LT.make (Literal.Eq(aro_t,t)) in
+              X.term_embed aro_t, eq::acc
+          | _ -> assert false
 
-  let make t = 
-    match Term.view t with
-      | {Term.f= sy; xs=xs; ty=ty} when Sy.is_ac sy ->
-	  let xs = L.map (fun x -> (x,1)) xs in 
-	  let ctx = ref [] in
-	  let xmake t = let r, l = X.make t in ctx := l@(!ctx); r in
-	  X.ac_embed {h=sy; l=compact (fold_flatten sy xmake xs); t=ty}, !ctx
-      | _ -> assert false  
+  let make t = match Term.view t with
+    | {Term.f= sy; xs=[a;b]; ty=ty} when Sy.is_ac sy ->
+        let ra, ctx1 = X.make a in
+        let rb, ctx2 = X.make b in
+        let ra, ctx = abstract2 sy a ra (ctx1 @ ctx2) in
+        let rb, ctx = abstract2 sy b rb ctx in
+        let rxs = [ ra,1 ; rb,1 ] in
+	X.ac_embed {h=sy; l=compact (fold_flatten sy (fun x -> x) rxs); t=ty},
+        ctx
+    | _ -> assert false  
 
   let is_mine_symb = Sy.is_ac
 
@@ -124,8 +137,7 @@ module Make (X : Sig.X) = struct
 	  if c <> 0 then c 
 	  else mset_cmp(r,s)
 	
-  let size = 
-    L.fold_left (fun z (rx,n) -> z + n * (L.length (X.leaves rx))) 0
+  let size = L.fold_left (fun z (rx,n) -> z + n) 0
       
   (* x et y are sorted in a decreasing order *)
   let compare {h=f ; l=x} {h=g ; l=y} = 

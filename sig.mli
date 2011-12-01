@@ -94,7 +94,7 @@ module type THEORY = sig
   val leaves : t -> r list
   val subst : r -> r -> t -> r
 
-  val compare : t -> t -> int
+  val compare : r -> r -> int
 
   val hash : t -> int
   (** solve r1 r2, solve the equality r1=r2 and return the substitution *)

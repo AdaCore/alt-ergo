@@ -1,0 +1,2170 @@
+$$$arith
+$cobj:La fonctionnalité à vérifier est que Alt-Ergo est capable de prouver des buts d'arithmétique linéaire en utilisant la procédure de décision de Fourier Motzkin ou le solveur Oméga.
+
+$res:Valid
+$
+goal g1: forall x:int. x<=x
+
+$res:Valid
+$
+goal g2: forall x:int. x-x = 0
+
+$res:Valid
+$
+goal g3: forall x:int. 0<=x -> 0=x-x and 0<=x and x<=x
+
+$res:Valid
+$
+goal g4: forall x,y,z:int. x<=y and y+z<=x and 0<=z -> x=y
+
+$res:Valid
+$
+logic P:prop
+goal g5: forall x:int. x=10 and (3<x -> P) -> P
+
+$res:Valid
+$
+logic f: int -> int
+goal g6: forall x,y:int. x+1=y -> f(x+2)=f(y+1)
+
+$res:Valid
+$
+logic Q:int -> prop
+goal g7: forall x,y:int. Q(y) -> (y<=x and x<=y) -> Q(x)
+
+$res:Valid
+$
+logic f: int -> int
+goal g8:
+  forall x,y,u,v,z:int. 
+    u=v and u<=x+y and x+y<=u and v<=z+x+4 and z+x+4<=v -> f(x+y) = f(z+x+4)
+
+$res:Valid
+$
+logic f: int -> int
+goal g9: forall x:int. f(x) = x -> f(2*x - f(x)) = x
+
+$res:Valid
+$
+logic f : int -> 'a
+goal g10:
+  forall x,z:int. 
+  forall u,t:'a.
+   f(x+3)=u and f(z+2)=t and x=z-1 -> u=t
+
+$res:Valid
+$
+logic f : int -> 'a
+goal g11:
+  forall x,y,z:int. 
+  forall u,t:'a.
+  x=y-1 and f(x)=u and z=2 and f(z)=t and y=3 -> u=t
+
+$res:Valid
+$
+goal g12:forall x,z,v,u:int. v<=z+4 and u<=v+2 and z+6<=u -> u+v=z+u+4
+
+$res:Valid
+$
+logic P:prop
+goal g13: 1=2 -> P
+
+$res:Valid
+$
+goal g14: forall x,y:int. x=y-1 and y=2 -> x=1
+
+$res:Valid
+$
+goal g15: forall x:int. x<0 -> -x >=0
+
+$res:Valid
+$
+logic p,q : int -> prop
+goal g16 : 
+  (forall k:int. 0 <= k <= 10 -> p(k)) ->
+  p(11) -> 
+  forall k:int. 0 <= k <= 11 -> p(k)
+
+$res:Valid
+$
+logic p,q : int -> prop
+goal g17 : 
+  (forall k:int. 0 <= k <= 10 -> (p(k) and q(k))) ->
+  p(11) -> q(11) ->
+  forall k:int. 0 <= k <= 11 -> (p(k) and q(k))
+
+$res:Valid
+$
+logic p,q : int -> prop
+goal g18 : 
+  (forall k:int. 0 <= k <= 10 -> p(k) -> q(k)) ->
+  (p(11) -> q(11)) ->
+  forall k:int. 0 <= k <= 11 -> p(k) -> q(k)
+
+$res:Valid
+$
+logic p,q : int -> prop
+logic a,b : int
+
+goal g19 : 
+  (forall k:int. a <= k <= b -> p(k)) ->
+  p(b+1) -> 
+  forall k:int. a <= k <= b+1 -> p(k)
+
+$res:Valid
+$
+logic p,q : int -> prop
+logic a,b : int
+
+goal g20 : 
+  (forall k:int. a <= k <= b -> (p(k) and q(k))) ->
+  p(b+1) -> q(b+1) ->
+  forall k:int. a <= k <= b+1 -> (p(k) and q(k))
+
+$res:Valid
+$
+goal g21:  
+  forall size:int. (0 <= size) -> (size <= size) and (0 = (size - size))
+
+
+$res:Valid
+$
+
+logic f : int -> int
+logic t,u,x,y,z : int
+
+goal g22:t=f(0)   -> u=f(4*x+5*y-3*z-3) ->  8*x+10*y=6*z+6 -> t=u
+
+
+$res:Valid
+$
+goal g23: forall x:int. x*x>=0 -> 1=1
+
+
+$res:Valid
+$
+goal g24: forall x:int. (2+4)*x = (1+1)*x + (2*3)*x -(3-2)*x + (1*x)*(3-4)
+
+$res:Valid
+$
+logic a:int
+
+goal g25: a=0 -> 0<=a-1 -> false
+
+
+$res:Valid
+$
+goal g26: forall i0:int.(i0 <= 7) -> (i0 <> 6) -> (i0 >= 6) -> i0 = 7
+
+
+$res:Valid
+$
+logic f:int ->int
+
+goal g27:
+  forall n:int.
+  forall count:int.
+  forall sum:int.
+  sum = (f(count) * f(count)) ->
+  (sum <= n) ->
+  forall count0:int.
+  (count0 = f(count)) ->
+  (n >= count0 * count0)
+
+$res:Valid
+$
+logic q : int
+logic p : int
+logic b : int
+logic a : int
+
+axiom a1: forall x:int. x*0 = 0
+axiom a2: forall x:int. 0*x = 0
+
+axiom x9 : q = a
+axiom x10 : p = 0
+goal g28 : a = p * b + q
+
+$res:Valid
+$
+
+logic f : int -> int
+logic u,t,x : int
+
+goal g29: u=f(0) -> t=f(x) -> x=0 -> u=t
+
+
+$res:Valid
+$
+
+goal g30: forall x:int. x = 3*x+4 -> x = -2
+
+
+
+$res:Valid
+$
+type 't pointer
+
+type ('t, 'v) memory
+
+logic select : ('a2, 'a1) memory, 'a2 pointer -> 'a1
+
+logic store : ('a1, 'a2) memory, 'a1 pointer, 'a2 -> ('a1, 'a2) memory
+
+axiom select_store_eq:
+  (forall m:('a1, 'a2) memory.
+    (forall p1:'a1 pointer.
+      (forall p2:'a1 pointer.
+        (forall a:'a2 [store(m, p1, a), p2].
+          ((p1 = p2) -> (select(store(m, p1, a), p2) = a))))))
+
+axiom select_store_neq:
+  (forall m:('a1, 'a2) memory.
+    (forall p1:'a1 pointer.
+      (forall p2:'a1 pointer.
+        (forall a:'a2 [store(m, p1, a), p2].
+          ((p1 <> p2) -> (select(store(m, p1, a), p2) = select(m, p2)))))))
+
+type int32
+
+logic f : int32 -> int
+
+type int_P
+
+logic aa:int
+
+goal f_ensures_default_po_1:
+  forall p:int_P pointer.
+  forall m1:(int_P, int32) memory.
+  forall result:int32.
+  f(result) = 1 ->
+  forall m2:(int_P, int32) memory.
+  m2 = store(m1, p, result) ->
+  f(select(m2, p)) = 1
+
+
+$res:Valid
+$
+
+goal g30_1: forall x:int. x<>1 and 1 <= x and  x <= 2  -> x=2 
+
+
+$res:Valid
+$
+
+goal g30_2 : forall x:int. 0 <= x <= 1 -> x=0 or x=1 
+
+
+$res:Valid
+$
+
+goal g30_3 : forall x:int. 0 <= x <= 1 -> (x = 0 or x = 1)
+
+
+$res:Valid
+$
+
+logic p,q : int -> prop
+
+goal g30_4 : 
+  (forall k:int. 0 <= k <= 10 -> p(k)) ->
+  p(11) -> 
+  forall k:int. 0 <= k <= 11 -> p(k)
+
+
+$res:Valid
+$
+
+logic f : int -> int
+
+logic x:int
+
+goal g30_5 : 
+  f(x) <> f(30)  -> 
+  f(x) <> f(31)  -> 
+  2    <= x      -> 
+  f(x) <> f(32)  -> 
+  f(x) <> f(33)  -> 
+  f(x) <> f(100) -> 
+  f(x) <> f(0)   -> 
+  2    <= x  <= 29 
+  or 
+  34   <= x  <= 99
+  or 
+  101 <= x
+
+
+$res:Valid
+$
+
+logic P,Q : int -> prop
+axiom a1: forall x:int. x <= 1 -> Q(x)
+axiom a2: forall x:int. P(x)  -> Q(x)
+axiom a3: forall x:int. x >= 6 -> P(x)
+axiom a4: P(5)
+axiom a6: P(4)
+axiom a7: Q(2)
+axiom a8: Q(3)
+
+goal g31 : forall x:int. 0 <= x <= 7 -> Q(x)
+
+
+$res:Valid
+$
+goal g32: forall x:real. -1. <= x <= 1. -> (x< -1. or x> 1.) -> false
+
+
+
+$$$ac_arith
+$cobj:La fonctionnalité à vérifier est que Alt-Ergo est capable de prouver des buts faisant intervenir des symboles associatifs commutatifs qui sont traités par l'algorithme AC(X) modulo la théorie de l'arithmétique.
+
+
+$res:Valid
+$
+logic ac f : int,int -> int
+goal g1 : forall a,b,c,x:int. c = a + x  -> a = f(c,b) -> x=1 ->  f(c,b)=c-1
+
+
+$res:Valid
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g2 : 
+  a = b -> 
+  f(a+1,a) = f(a,b+1)
+
+
+$res:Valid
+$
+logic a,b,c,x,beta,gamma,d:int
+
+logic ac f : int,int -> int
+
+goal g3 : 
+     f((f(a,b) + x),c) = gamma -> 
+     x = 0 -> 
+     f(a,c) = a -> 
+     f(a,d) = beta -> 
+     f(b,beta) = f(d,gamma)
+     
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+goal g4 : forall a,b,c,x:int. c = a + x  -> a = f(c,b) -> x=0 ->  f(c,b)=c
+
+
+
+$res:Valid
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g5 : 
+  a = b -> 
+  f(a+1,a) = f(a,b+1)
+
+
+
+$res:Valid
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g6 : 
+  a = b -> 
+  f(a+1,a) = f(a+1,b)
+
+
+
+$res:Valid
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g7 : 
+  a + 1 = b -> 
+  f(a+1,a) = f(a,b)
+
+
+
+$res:Valid
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g8 : 
+  a + 1 = b + x -> 
+  x = 1 -> 
+  f(a,a) = f(a,b)
+
+
+
+$res:Valid
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g9 : a = b -> b = a
+
+
+
+$res:Valid
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g10 : 
+  f(a,a) = a ->
+  a = b ->
+  f(a,b) + a =a + b
+
+
+
+$res:Valid
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g11 : 
+  a = b -> 
+  f(a+1,a+2) = f(a+1,b+2)
+
+
+
+$res:Valid
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g12 : 
+  a + 1 = b + 2 -> 
+  f(a,a-1) = f(a,b)
+
+
+
+$res:Valid
+$
+ 
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g13 : 
+  2 * a = 3 * b -> 
+  f(x,2 * a) = f(3 * b,x)
+ 
+
+
+$res:Valid
+$
+
+logic a,b,c,x:real
+logic ac f : real,real -> real
+goal g14 : 
+  2. * a = 3. * b -> 
+  f(x,2./3. * a) = f(b,x)
+
+
+
+$res:Valid
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g15 : 
+  f(a,a) = a ->
+  a = b ->
+  f(a,b) + a =a + b
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,x,y:int
+
+goal g16: 
+  f(a,b) + x = b -> 
+  x = 0 -> 
+  f(a,f(b,y)) = f(b,y)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g17:
+  f(a,b) = gamma ->
+  x = 0 -> 
+  f(a,c) = beta + x -> 
+  f(c,gamma) = f(b,beta)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g18:
+  f(a,b) = gamma + x ->
+  x = 0 -> 
+  f(a,c) = beta + x -> 
+  f(c,gamma) = f(b,beta)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g19:
+  f(a,b) = gamma ->
+  f(a,c) = beta + x -> 
+  x = 0 -> 
+  f(c,gamma) = f(b,beta)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g20:
+  f(a,b) = gamma + x ->
+  f(a,c) = beta + x -> 
+  x = 0 -> 
+  f(c,gamma) = f(b,beta)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g21:
+  f(a,b) = gamma + x ->
+  f(a,c) = beta -> 
+  x = 0 -> 
+  f(c,gamma) = f(b,beta)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g22:
+  f(a,b) = gamma ->
+  f(a,c) = beta -> 
+  x = 0 -> 
+  f(c,x + gamma) = f(b,beta)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+(* axiome special pour corriger le pb de matching AC *)
+axiom neutre : forall u,v:int. f(u,f(v,0))= f(u,v)
+
+goal g23:
+  f(a,b) = gamma ->
+  f(a,c) = beta -> 
+  x = 0 -> 
+  f(c,gamma) = f(f(b,x),beta)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g24:
+  f(a,b) = gamma ->
+  f(a,c) = beta -> 
+  x = 0 -> 
+  f(c,gamma) = f(b + x,beta)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g25:
+  x = 0 -> 
+  f(a,b) = gamma ->
+  f(a,c) = beta -> 
+  f(c,x + gamma) = f(b,beta)
+
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma,x : int
+logic ac f : int,int -> int
+
+goal g26 : 
+  f(a,b+x) = gamma ->  
+  f(a,c) = beta  -> 
+  x = 1 ->
+  f(b + 1,beta) = f(c,gamma) 
+
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma,x : int
+logic ac f : int,int -> int
+
+goal g27 : 
+  f(a,b+x) = gamma ->  
+  f(a,c) = beta  -> 
+  x = 0 ->
+  f(b,beta) = f(c,gamma) 
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,u,v,w,x:int
+
+goal g28 :
+  x = 0 -> 
+  f(a,b) + x = u -> 
+  f(a,c) = w -> 
+  f(u,c) = f(w,b)
+
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma,x : int
+logic ac f : int,int -> int
+
+goal g29 : 
+  f(b,a) = f(b+x,f(a+x,a+x)) ->  
+  x = 1 ->
+  f(b,c) = beta  -> 
+  f(b+1,f(a+1, f(a+1, c))) = f(a,beta) 
+
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma,x : int
+logic ac f : int,int -> int
+
+goal g30 : 
+  f(b,a) = f(b+x,f(a+x,a+x)) ->  
+  f(b,c) = beta  -> 
+  x = 1 ->
+  f(b + 1,f(a + 1, f(a + 1, c))) = f(a,beta) 
+
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma,x : int
+logic ac f : int,int -> int
+
+goal g31 : 
+  x = 1 ->
+  f(b,a) = f(b+x,f(a+x,a+x)) ->  
+  f(b,c) = beta  -> 
+  f(b + 1,f(a + 1, f(a + 1, c))) = f(a,beta) 
+
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma,x : int
+logic ac f : int,int -> int
+
+goal g32 : 
+  x = 2 ->
+  f(a,b) = f(a,f(b,c)) ->
+  f(a,f(b,gamma)) = f(a,f(b,f(c,gamma)))
+
+
+
+$res:Valid
+$
+
+logic a,b,c, beta,gamma,x : int
+logic ac f : int,int -> int
+
+goal g33 : 
+  x = 1 ->
+  f(a,b) = f(b+x,f(a+x,a+x)) ->  
+  f(b + 1,f(a + 1, f(a + 1, c))) = f(b,f(a,c)) 
+  
+$  
+
+logic a,b,c, beta,gamma,x : int
+logic ac f : int,int -> int
+
+goal g34 : 
+  x = 1 ->
+  f(a,b+x) = gamma ->  
+  f(a,c) = beta  -> 
+  f(gamma,c) = f(beta, b + 1) 
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,u,v,w,x,y:int
+
+goal g35 : 
+  x = 0 ->
+  f(a,b) = u -> 
+  f(a,b) + x = v + y ->
+  f(a,c)=w -> 
+  f(v+y,c) = f(w,b)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,u,v,w,x:int
+
+goal g36 : 
+  x = 0 ->
+  f(a,b) = u -> 
+  f(a,b) + x = v ->
+  f(a,c)=w -> 
+  f(v,c) = f(w,b)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,u,v,w,x:int
+
+goal g37: 
+  f(a,c) = w -> 
+  f(a,b) + x = v -> 
+  x = 0 -> 
+  f(v,c) = f(w,b)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,u,v,w,x:int
+
+goal g38: 
+  f(a,b) = u -> (* ne sert pas! juste une pollution*)
+  f(a,b) + x = v -> 
+  x = 0 -> 
+  f(a,c) = w -> 
+  f(v,c) = f(w,b)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,u,v,w,x:int
+
+goal g39: 
+  f(a,b) = u -> 
+  x = 0 -> 
+  f(a,b) + x = v -> 
+  f(a,c) = w -> 
+  f(v,c) = f(w,b)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g40:
+  x = 0 -> 
+  f(a,b) = gamma ->
+  f(a,c) = beta -> 
+  f(c,gamma) = f(b + x,beta)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g41:
+  x = 0 -> 
+  f(a,b) = gamma + x ->
+  f(a,c) = beta + x -> 
+  f(c,gamma) = f(b,beta)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,gamma,beta,x:int
+
+goal g42:
+  f(a,b) = gamma + x ->
+  x = 0 -> 
+  f(a,c) = beta -> 
+  f(c,gamma) = f(b,beta)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,u,v,w,x:int
+
+goal g43: 
+  f(a,c) = w -> 
+  f(a,b) + x = b -> 
+  x = 0 -> 
+  f(b,c) = f(w,b)
+
+
+
+$res:Valid
+$
+
+logic ac f : int,int -> int
+logic a,b,c,u,v,w,x:int
+
+goal g44: 
+  b = v -> 
+  f(a,c) = w -> 
+  f(a,b) + x = v -> 
+  x = 0 -> 
+  f(v,c) = f(w,b)
+
+
+
+$res:Valid
+$
+
+logic a,b,c,d,e,gamma,beta,x,y,t:int
+logic ac f,g : int,int -> int
+
+goal g45 :
+  f(a+1,b) = gamma ->
+  f(a+t,c) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduit *)
+  g(f(gamma,c),d) = x ->
+  g(f(beta,b),e) = y ->
+  t = 1 -> 
+  g(x,e) = g(y,d)
+
+
+
+$res:Valid
+$
+
+logic a,b,c,d,e,gamma,beta,x,y,t:int
+logic ac f,g : int,int -> int
+
+goal g46 :
+  f(a+1,b) = gamma ->
+  f(a+t,c) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduit *)
+  g(f(gamma,c),d) = x ->
+  t = 1 -> 
+  g(f(beta,b),e) = y ->
+  g(x,e) = g(y,d)
+
+
+
+$res:Valid
+$
+
+logic a,b,c,d,e,gamma,beta,x,y,t:int
+logic ac f,g : int,int -> int
+
+goal g47 :
+  f(a+t,b) = gamma ->
+  f(a+t,c) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduit *)
+  g(f(gamma,c),d) = x ->
+  t = 1 -> 
+  g(f(beta,b),e) = y ->
+  g(x,e) = g(y,d)
+
+
+
+$res:Valid
+$
+
+logic a,b,c,d,e,gamma,beta,x,y,t:int
+logic ac f,g : int,int -> int
+
+goal g48 :
+  f(a,b) = gamma ->
+  f(a+t,c) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduit *)
+  t = 0 -> 
+  g(f(gamma,c),d) = x ->
+  g(f(beta,b),e) = y ->
+  g(x,e) = g(y,d)
+
+
+
+
+$res:Valid
+$
+
+logic a,b,c,d,e,gamma,beta,x,y,t:int
+logic ac f,g : int,int -> int
+
+goal g49 :
+  f(a,b) = gamma ->
+  f(a,c+t) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduit *)
+  g(f(gamma,c+t),d) = x ->
+  g(f(beta,b),e) = y ->
+  g(x,e) = g(y,d)
+
+
+
+$res:Valid
+$
+
+logic a,b,c,d,e,gamma,beta,x,y,t:int
+logic ac f,g : int,int -> int
+
+goal g50 :
+  f(a,b) = gamma ->
+  f(a,c+t) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduit *)
+  g(f(gamma,c+1),d) = x ->
+  g(f(beta,b),e) = y ->
+  t = 1 -> 
+  g(x,e) = g(y,d)
+
+
+
+$res:Valid
+$
+
+logic a,b,c,d,e,gamma,beta,x,y,t:int
+logic ac f,g : int,int -> int
+
+goal g51 :
+  f(a,b) = gamma ->
+  f(a,c+t) = beta ->
+  (* f(gamma,c) = f(beta,b) est déduit *)
+  t = 1 -> 
+  g(f(gamma,c+t),d) = x ->
+  g(f(beta,b),e) = y ->
+  g(x,e) = g(y,d)
+
+
+
+$res:Valid
+$
+
+logic a,b,c,gamma,beta,t2,t4:int
+logic ac f,g : int,int -> int
+
+goal g52 :
+  f(g(a,b+t2),c+t4) = gamma ->
+  g(a,b+t2) = beta ->
+  1 = t2 ->
+  t4 = 2 * t2->
+  f(beta,c+2)= gamma
+  
+
+
+$res:Valid
+$
+
+logic a,b,c,gamma,beta,t3,t1:int
+logic ac f,g : int,int -> int
+
+goal g53 :
+  f(g(a,b+1)+t1,c+2) + t3 = gamma ->
+  g(a+t3,b+1) = beta ->
+  t3 = t1 ->
+  t1 = 0 ->
+  f(beta,c+2)= gamma
+  
+
+
+$res:Valid
+$
+
+logic a,b,c,gamma,beta,t3,t2,t4:int
+logic ac f : int,int -> int
+
+goal g54 :
+  a = beta ->
+  f(a,5) + t3 = gamma ->
+  t3 = 0 ->
+  f(a,5)= gamma
+
+
+
+$res:Valid
+$
+logic ac f : int,int -> int
+logic a,b,c,x : int
+  
+goal g55 :
+  f(a,b) = f(a,x + f(c,f(b,a))) ->
+  x = 0 -> 
+  f(a,b) = f(a,f(c,f(a,b)))
+
+
+
+$res:Valid
+$
+logic ac f,h : int,int -> int
+logic a,b,c,d,x,y,z,beta,gamma : int
+
+goal g56 : 
+  y = 1 ->
+  f(a,b) = gamma ->
+  f(a,c+y) = beta  ->
+  h(f(f(a,b),c+1),d) = f(gamma,beta) ->
+  h(f(gamma,c+y),d) = f(gamma,beta) 
+
+
+
+$res:Valid
+$
+logic ac f,g,h : int,int -> int
+logic a,b,c,d,e,x,y,z,t,m,n,alpha,beta,gamma,delta : int
+
+goal g57 : 
+  f(a+x+y, b+z) = gamma ->
+  f(a+x+1, c+y) = beta  ->
+  h(f(f(a+x+1,b),c+1),d+z) = f(beta,f(a+x+y, b+z)) ->
+  h(f(beta,b+y-1),g(h(z,x),y)) = h(delta,h(delta,beta)) ->
+  x + y = x + 1 ->
+  z + 1 = y ->
+  x = 100 ->
+  h(d+z,h(delta,h(delta,beta))) = h(f(f(a+x+y, b+z),f(a+x+1, c+y)),g(h(x,z),y))
+
+
+$res:Valid
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g58 : (forall v,w:int[v,w]. f(v,w) = w) -> a = b
+
+
+
+
+
+
+$$$modulo
+$cobj:La fonctionnalité à vérifier est que Alt-Ergo est capable de prouver des buts d'arithmérique linéaire avec comme seul symbole d'arithmétique linéaire le \texttt{modulo}.
+Le test vérifie que les contraintes relatives au \texttt{make} du \texttt{mod} sont bien crées.
+
+
+$res:Valid
+$
+goal g1: forall a:int. a % 2 = 1 -> (a + 1) % 2 = 1 -> false
+
+
+$res:Valid
+$
+goal g2: forall a:int. a % 2 = 1 -> (a + 1) % 2 = 0
+
+
+$res:Valid
+$
+goal g3: forall a,b:int. a % 2 = 1 -> a = b  -> b % 2 = 1 
+
+
+$res:Valid
+$
+goal g4: forall a:int. a % 2 = (a + 0)% (1+1)
+
+
+$res:Valid
+$
+goal g5: forall a:int. a % 8 = 6 -> a % 4 = 2 and a % 2 = 0
+
+
+$res:Valid
+$
+goal g6: forall a:int. a % 10 = 12 -> false
+
+
+$res:Valid
+$
+goal g7: forall a,m:int. a%10 = m -> 0 <= m < 10
+
+
+$res:Valid
+$
+goal g9: forall a,m,n,k:int. k = m + n -> a % k = a % (m+n)
+
+
+$res:Valid
+$
+goal g10: forall a:int. a % 4 = 1 -> a % 4 <> 0 and a % 4 <> 2 and a % 4 <> 3
+
+
+$res:Valid
+$
+goal g11: forall a,b:int. a % b = 1 -> b = 10 -> a % 10 = 1
+
+
+$res:Valid
+$
+goal g12: forall a:int. a % 2 = (a + 2) % 2
+
+
+$res:Valid
+$
+goal g12: forall a,b:int. a % 2 = (a + 2*b) % 2
+
+
+
+
+$$$non_lineaire
+$cobj:La fonctionnalité à vérifier est que Alt-Ergo est capable de prouver des buts d'arithmérique non linéaire.
+Le test vérifie que les axiomes sur l'arithmétique non linéaires d'intervalle sont correctement implémentés et que la coopération avec l'algorithme AC(X) est correcte et termine.
+
+
+
+$res:Valid
+$
+goal sum_po_7:
+  forall n,i,s:int.
+  n >= 0 -> 2*s = i*(i + 1) and i <= n -> i >= n -> 2 * s = n*(n + 1)
+
+
+
+$res:Valid
+$
+goal sum_po_3:
+  forall n,i,s:int.
+  n >= 0 -> 2 * s = i * (i + 1) and i <= n ->
+  i < n -> 2 * (s + i + 1) = (i + 1) * (i + 2)
+
+
+logic x,y,z,t1,t2,t3,t4 :int
+goal g1:
+  x * y = t1 * t2 ->
+  x * z = t3 * t4 ->
+  z * t1 * t2 = y * t3 * t4
+
+
+
+$res:Valid
+$
+
+logic x,y,z,t1,t2,t3,t4 :int
+goal g2:
+  x * y = t1 * t2 ->
+  x * z = t3 * t4 ->
+  z * (t1 * t2) = (y * t3) * t4
+
+
+
+$res:Valid
+$
+
+logic x,y,z:int
+
+goal g3:
+  x * y  * z = 12 ->
+  x = 2 -> 
+  y = 3 -> 
+  z = 2
+
+
+
+$res:Valid
+$
+
+goal g4: forall x,y,z:int.
+  x*x*x * y*y * z = 23040 ->
+  x = 4 ->
+  y = 6 ->
+  z = 10
+
+
+$res:Valid
+$
+goal g5: forall x,y,z:int.
+  y = 6 ->
+  x = 4 ->
+  x*x*x * y*y * z = 23040 ->
+  z = 10
+
+
+
+$res:Valid
+$
+goal g6: forall x,y,z:int.
+  y = 6 -> 
+  x = 4 ->
+  x*x*x * y*y * z = 23040 ->
+  4 * y * y * z * z =  360 * z * x
+
+
+$res:Valid
+$
+goal g7: forall x,y,z:int.
+  5*x + x*y = 4*z + 20 ->
+  x = 4 ->
+  y = z
+
+
+$res:Valid
+$
+goal g8: forall x,y,z:int.
+  x * (5 + y) = 4* (z + 5) ->
+  x = 4 ->
+  y = z
+
+
+
+$res:Valid
+$
+goal g9 : forall x:int. x*x = 0 -> x = 0
+
+
+
+$res:Valid
+$
+goal g10 : forall x:int. x*x*x = 1 -> x = 1
+
+
+
+$res:Valid
+$
+logic x,z : int
+
+goal g11 : x*x <= 0 ->  x + z <= 3 -> z <= 3
+
+
+
+$res:Valid
+$
+logic x,z : int
+
+goal g12 : x*x = 0 ->  x + z = 3 -> z = 3
+
+
+
+$res:Valid
+$
+
+logic x,y,z:int
+
+goal g13 : 
+  z * y * x = 20 ->
+  x * y = 4 ->
+  z = 5
+
+
+$res:Valid
+$
+logic x,y,z:int
+logic ac f : int,int -> int
+goal g14 : 
+  4 * f(2,3) = z * y * x -> 
+  x * y = 4 ->
+  f(2,3) = z
+
+
+$res:Valid
+$
+logic a,b,c,d,x,y,z:int
+logic ac f : int,int -> int
+goal g15 : 
+  4 * a*b*c*d = z * y * x -> 
+  x * y = 4 ->
+  4 * a*b*c*d = 4 * z
+
+
+
+$res:Valid
+$
+
+logic x,y:int
+
+goal g16: x*x <=0 -> x + y = 4 -> y = 4
+
+
+$res:Valid
+$
+
+logic x,y:int
+goal g17: x*x*x = -1 -> x + y = 4 -> y = 5
+
+
+
+$res:Valid
+$
+logic x:int
+goal g18: -1<= x <= 1 -> x*x <> 1 -> x = 0
+
+
+
+$res:Valid
+$
+logic x:int      
+goal g19 : 2 <= x*x <= 9 ->  x= -2 or x = -3 or 2 <= x <= 3  
+
+
+
+$res:Valid
+$
+logic x:int
+goal g20 :  x*x*x*x <= 16 -> -2 <= x <= 2
+
+
+
+$res:Valid
+$
+logic x:int
+goal g21 : x >= 0 -> x*x = 9 -> x = 3
+
+
+
+$res:Valid
+$
+logic x:int
+goal g22 : 10 <= x*x*x <= 27 -> x = 3
+
+
+
+$res:Valid
+$
+logic x:int
+goal g23 : x*x*x = 64 -> x = 4
+
+
+
+$res:Valid
+$
+logic x:int
+goal g24 : x*x*x = -1000 -> x = -10
+
+
+
+$res:Valid
+$
+logic y:real
+goal g25 : y*y = 9. -> -3. = y or  y = 3.
+
+
+
+$res:Valid
+$
+(* prouvé grace à la cooperation des intervalles,
+   de arith (solve et subst) et de AC (collapse) *)
+goal g26:
+  forall x:int. x*x*x = x*x -> x*x = 1 -> x = 1
+
+
+
+$res:Valid
+$
+(* inconsistent *)
+goal g27:
+  forall x:int. x*x*x = x*x -> x*x = 4 -> false
+
+
+
+
+$res:Valid
+$
+goal g28:
+  forall x:int. x >= 0 -> x <= (x + 1) * (x + 1)
+
+
+
+
+
+$$$arith_div
+$cobj:La fonctionnalité à vérifier est que Alt-Ergo est capable de prouver des buts d'arithmérique non linéaire faisant intervenir des divisions (entières ou non).
+Le test vérifie que les contraintes relatives au \texttt{make} du \texttt{div} sont bien crées et que les axiomes de la division d'intervalles sont corrects.
+
+
+
+$res:Valid
+$
+logic x,y:int
+goal g1: 2 <= x / y <= 4 -> y = 2 -> 4 <= x <= 9
+
+
+
+$res:Valid
+$
+logic x,y:int
+goal g2: 4 <= x <= 9 -> 2 <= x / 2 <= 4
+
+
+
+$res:Valid
+$
+logic x,y:int
+goal g3: 4 <= x <= 8 -> -2 <= y <= 2 -> y <> 0 -> -8 <= x / y <= 8
+
+
+
+$res:Valid
+$
+logic x:int
+goal g5 : x <> 0 -> x/x = 1 
+
+
+
+$res:Valid
+$
+logic x,y,z,t:int
+goal g6 : -4*x+2*y-z*t <> 0 ->  (12*x-6*y+3*z*t)/(8*x-4*y+2*z*t) = 1
+
+
+
+$res:Valid
+$
+logic x:int
+goal g7 : 0/0 = 0/0 -> true
+
+
+
+$res:Valid
+$
+logic x:int
+goal g8 : 0/0 = 0/0
+
+
+
+$res:Valid
+$
+
+logic x,y : int
+
+goal g9 : x<>0 -> x = y -> y/y = 1
+
+
+$res:Valid
+$
+logic x,y : int
+ 
+goal g10 : x > 0 -> y > 0 -> x/y >=0
+
+
+$res:Valid
+$
+logic x : int
+ 
+goal g11 : x<>0 -> x/x = 1
+
+
+$res:Valid
+$
+logic x,y,z:int
+
+goal g12: 
+
+x <> 0 -> (-2*x) / x = -2
+
+
+$res:Valid
+$
+logic x,y,z:int
+
+goal g13: 
+
+x <> 0 -> x / (-2*x) = -1
+
+
+$res:Valid
+$
+logic x,y,z:int
+
+goal g14: 
+
+2*x + 2*y <> 0 -> (4*x + 4*y ) / (2*x + 2*y ) = 2
+
+
+$res:Valid
+$
+logic x,y,z:int
+
+goal g15: 
+
+2*x + 2*y +1 <> 0 -> (4*x + 4*y + 2 ) / (2*x + 2*y + 1) = 2
+
+
+$res:Valid
+$
+goal g16 (*sqrt_po_8*):
+  forall x,y:int.
+  x <> 0 ->
+  y = (x + 1) / 2 ->
+  y = ((x / x) + x) / 2
+
+
+$res:Valid
+$
+goal g17 (*sqrt_po_8*):
+  forall x,y:int.
+  x <> 0 ->
+  (x + 1) / 2 = ((x / x) + x) / 2
+
+
+$res:Valid
+$
+goal g18 (*sqrt_po_8*):
+  forall x,y:int.
+  x <> 0 ->
+  y <> 0 ->
+  (x + 1) / y = ((x / x) + x) / y
+
+
+$res:Valid
+$
+goal g19:
+  forall x,y,z:int.
+  x > 3  ->
+  y > 0 ->
+  z > 0  ->
+  y > z  ->
+  z = ((x / y) + y) / 2 -> 
+  z > 1 and y > 2
+
+
+
+$$$arith_modulo_div
+$cobj:La fonctionnalité à vérifier est que Alt-Ergo est capable de prouver des buts d'arithmérique non linéaire faisant intervenir des divisions (entières ou non) et des modulos.
+Le test vérifie que les contraintes relatives au \texttt{make} de \texttt{div} et \texttt{mod} sont bien crées et que les axiomes de la division d'intervalles sont corrects.
+
+
+
+$res:Valid
+$
+goal g0: forall a: int. a > 0 -> a / 2 < a
+
+
+$res:Valid
+$
+goal mult_po_9: forall a,b :int. a % 2 <> 1 -> (a / 2) * 2 * b =  a * b
+
+
+$res:Valid
+$
+goal mult_po_8: forall a:int. a > 0 -> a % 2 <> 1 -> a / 2 >= 0
+
+
+$res:Valid
+$
+goal mult_po_6: forall a:int. a > 0 -> a % 2 = 1 -> a / 2 < a
+
+
+$res:Valid
+$
+goal mult_po_4: forall a,b:int. a > 0  -> a % 2 = 1 -> b + (a / 2) * (2 * b) = a * b 
+
+
+$res:Valid
+$
+goal mult_po_3: forall a:int. a > 0 -> a % 2 = 1 -> a / 2 >= 0
+
+
+$res:Valid
+$
+goal mult_po_11: forall a:int. a > 0 -> a % 2 <> 1 -> a/2 < a
+
+
+
+
+
+$$$polynomes
+$cobj:La fonctionnalité à vérifier est que Alt-Ergo est capable de prouver des buts d'arithmérique non linéaire en utilisant la distributivité de la multiplication sur l'addition effectuée par le \texttt{make} des polynômes.
+
+
+
+$res:Valid
+$
+goal g1 : (*goal sqrt_po_10*)
+  forall x,y:int.
+  x > 3 ->
+  y = (x + 1) / 2 ->
+  x < (y + 1) * (y + 1)
+
+
+
+$res:Valid
+$
+
+goal g2 :
+  forall x,y,z,t:int.
+    0 <= y + z <= 1  -> 
+    x + t + y + z = 1 -> 
+    y + z <> 0 -> 
+    x + t = 0 
+
+
+
+
+$$$arith_false
+$cobj:La fonctionnalité à vérifier est que le raisonnement fait par la coopération du module d'intervalles et l'algorithme Fourier-Motzkin est correct et que Alt-Ergo ne prouve pas des buts faux faisant intervenir de l'arithmétique linéaire.
+
+
+$res:I don't know
+$
+goal g1: 1=2
+
+
+$res:I don't know
+$
+logic a:int
+goal g2: a+0 = a+1
+
+
+$res:I don't know
+$
+logic Q,P: prop
+
+goal g3:
+  forall c,v:int. (Q and c<=v and v<=c) ->P 
+
+
+$res:I don't know
+$
+logic f: int -> int
+goal g4: 
+  forall x,y:int. f(x-1) = x + 2 and f(y) = y - 2 and y + 1 = x
+
+
+$res:I don't know
+$
+logic f: int -> int
+goal g5: 
+  forall u,v,x,y:int.
+  u<=v and v<=u and 2*x +1 <= 2*y and x=f(u) and y=f(v)
+
+
+$res:I don't know
+$
+logic P: prop
+goal g6: 
+  forall x:int. x=1 and (3<x -> P) -> P
+
+
+$res:I don't know
+$
+logic Q,P: prop
+goal g7: 
+  forall x:int. x=3 and (3<x -> P) -> P
+
+
+$res:I don't know
+$
+logic b,a,c: int
+
+goal g8:   b<=c -> (b<>a)-> a+1<=b  -> false
+
+
+$res:I don't know
+$
+goal g9: forall x:int. 0<=x<=1 -> x=0
+
+
+$res:I don't know
+$
+goal g10: forall x:int. 0<=x<=1 -> x=1
+
+
+$res:I don't know
+$
+
+goal g11:
+forall x,y:int.  9*x + 13*y + 1 = 0 -> false
+
+$res:I don't know
+$
+ goal g12:
+ forall diff:int.
+ forall left:int.
+ forall right:int.
+ diff = right - left ->
+ diff > 0 ->
+ forall r6:int. r6 = diff / 2 ->
+ forall r8:int. r8 = left + r6 ->
+ right - r8 < diff 
+
+
+$res:I don't know
+$
+
+logic a, b, c :int
+
+goal g13:
+ 3*c -2 = 8*a and
+ c  <= 0 and 
+ - b - c  <= 0 and 
+ 2*b + c - 2  <= 0
+ -> false
+
+
+
+$res:I don't know
+$
+goal g14 :
+   forall x,y,z,t:int.  30*x = 15*y + 10*z + t ->
+     t = 5 -> false 
+
+
+
+$res:I don't know
+$
+goal g15:
+  forall a,min, max,k : int.
+  min = a ->
+  min <= k <= max ->
+  max - min <= 10 ->
+  max - min = 0 ->
+  false 
+
+
+
+$res:I don't know
+$
+goal g16 : forall x:real. x < 3.0 -> x <= 2.0
+
+
+
+$res:I don't know
+$
+logic p:int
+
+goal g17: 
+(* 1 *) p <> 0 and p <> 1 and p <= 9 and
+(* 2 *) p >= 4 and p <= 10 and p <> 5 and
+(* 3 *) p >= 1 and p <= 4 
+   -> false
+
+
+
+$$$ac_arith_mult_false
+$cobj:La fonctionnalité à vérifier est que le raisonnement fait par la coopération du module d'intervalles et de l'algorithme AC(X) est correct et que Alt-Ergo ne prouve pas des buts faux faisant intervenir de l'arithmétique non linéaire.
+
+
+
+$res:I don't know
+$
+logic y:real
+goal g1 : y*y = 9.1 -> -3. = y or  y = 3.
+
+
+
+$res:I don't know
+$
+logic x:int
+goal g2 : 4 <= x*x <= 9 -> 2 <= x <= 3
+
+
+
+$res:I don't know
+$
+
+logic f : int -> int
+
+goal g3 :
+  forall a,b,x,y,z,t:int.
+  x * x  = f(z) + 2 ->
+  x * y = f(t) + 2 ->
+  false
+
+
+
+$res:I don't know
+$
+logic x:int
+goal g4 : 0 <= x*x <= 4 -> 0 <= x <= 2
+
+
+
+$res:I don't know
+$
+logic x:int
+goal g5 : x*x = 25 -> x = 5
+
+
+
+
+$$$div_false
+$cobj:La fonctionnalité à vérifier est que les contraintes du \texttt{make} de la divisions sont bien crées, que le raisonnement fait par le module d'intervalles sur la division est correct et que Alt-Ergo ne prouve pas des buts faux faisant intervenir des divisions non linéaires.
+
+
+
+$res:I don't know
+$
+logic x,y:int
+goal g1: 2 <= x / y <= 4 -> y = 2 -> 4 <= x <= 8
+
+
+
+$res:I don't know
+$
+logic x,y:int
+goal g2: 4 <= x <= 8 -> -2 <= y <= 2 -> -8 <= x / y <= 8
+
+
+
+$res:I don't know
+$
+logic x,y:int
+goal g3: 0 / 0 = 0
+
+
+
+$res:I don't know
+$
+logic x,y:int
+goal g4: -1 <= x <= 1 -> 0 / x = 0
+
+
+
+$res:I don't know
+$
+logic x:int
+goal g5 : x/x = 1 
+
+
+
+
+$res:I don't know
+$
+logic x:int
+goal g6 : 0/0 = 1 
+
+
+
+$res:I don't know
+$
+logic x:int
+goal g7 : 0/0 = 0/0 -> false
+
+
+
+$res:I don't know
+$
+logic x:int
+goal g8 : 0/0 <> 0/0
+
+
+
+$res:I don't know
+$
+logic x:int
+logic P,Q: int -> prop
+goal g9 : P(0/x) -> P(0)
+
+
+
+$res:I don't know
+$
+logic x:int
+logic P,Q: int -> prop
+goal g10 : P(0) -> P(x)
+
+
+
+$res:I don't know
+$
+logic x,y:int
+goal g11 : y >= 1 -> (x/y)*y = x
+
+
+
+$res:I don't know
+$
+logic P : int -> prop
+
+logic x,y : int
+ 
+goal g12 : y = 0 -> P(x/y) -> false
+
+
+
+$res:I don't know
+$
+logic x,y : int
+ 
+goal g13 : -1 < x/y <1 -> false
+
+
+
+$res:I don't know
+$
+logic x,y : int
+ 
+goal g14 : x > 0 -> y > 0 -> x/y >0
+
+
+
+$res:I don't know
+$
+logic x,y,z : int
+ 
+goal g15 : x>=0 -> y >=0 -> x/y>=0
+
+
+
+$res:I don't know
+$
+
+logic x,y,z : int
+ 
+goal g16 : x>=0 -> y >=0 -> x/y = z -> y = 0 -> x/y>=0
+
+
+
+
+$$$ac_arith_false
+$cobj:La fonctionnalité à vérifier est que le raisonnement fait par l'algorithme AC(X) modulo la théorie de l'arithmétique est correct et que Alt-Ergo ne prouve pas des buts faux faisant intervenir de l'arithmétique linéaire et des symboles associatifs commutatifs.
+
+
+
+
+$res:I don't know
+$
+logic a,b,c,x,beta,gamma,d:int
+
+logic ac f : int,int -> int
+
+goal g1 : 
+     f((f(a,b) + x),c) = gamma -> 
+     x = 1 -> 
+     f(a,c) = a -> 
+     f(a,d) = beta -> 
+     f(b,beta) = f(d,gamma)
+     
+
+
+$res:I don't know
+$
+
+logic a,b,c,gamma,beta,x : int
+logic ac f : int , int -> int
+
+goal g2 : 
+  f(a,b) = f(x,gamma) ->
+  f(a,c) = f(x,beta) ->
+  f(gamma,c) = f(beta,b)
+
+
+
+$res:I don't know
+$
+
+logic a,b,c,gamma,beta,x,u,v : int
+logic f : int , int -> int
+
+goal g3 : 
+  f(a,b)     = u ->
+  f(a,c)     = v ->
+  f(x,gamma) = u ->
+  f(x,beta)  = v ->
+  f(gamma,c) = f(beta,b)
+
+
+
+$res:I don't know
+$
+
+logic a,b,c,gamma,beta,x,y: int
+logic ac f : int , int -> int
+
+goal g4 : 
+  f(a,b) = f(x,gamma) ->
+  f(a,c) = f(x,beta) ->
+  f(x,f(gamma,c)) = f(y,f(beta,b))
+
+
+
+$res:I don't know
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g5 : 
+  f(a+1,a) = f(a,b+1)
+
+
+
+$res:I don't know
+$
+logic a,b,c,x,beta,gamma,d:int
+
+logic ac f : int,int -> int
+
+goal g6 : 
+     f((f(a,b) + x),c) = gamma -> 
+     f(a,c) = a -> 
+     f(a,d) = beta -> 
+     f(b,beta) = f(d,gamma)
+
+
+
+$res:I don't know
+$
+
+logic ac f : int,int -> int
+goal g7 : forall a,b,c,x:int. c = a + x  -> a = f(c,b) -> a=0 ->  f(c,b)=c
+
+
+
+$res:I don't know
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g8 : 
+  f(a+1,a) = f(a+1,b)
+
+
+
+$res:I don't know
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g9 : 
+  a  = b -> 
+  f(a+1,a) = f(a,b)
+
+
+
+$res:I don't know
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g10 : 
+  a + 1 = b + x -> 
+  x = b -> 
+  f(a,a) = f(a,b)
+
+
+
+$res:I don't know
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g11 : 
+  f(a,a) = a ->
+  f(a,b) + a =a + b->
+  a = b 
+
+
+
+$res:I don't know
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g12 : 
+  a + 1 = b + 1 -> 
+  f(a,a-1) = f(a,b)
+
+
+
+$res:I don't know
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+goal g13 : 
+  2 * a = 3 * b -> 
+  f(x,(2/3) * a) = f(b,x)
+
+
+
+$res:I don't know
+$
+
+logic a,b,c,x:int
+logic ac f : int,int -> int
+
+goal g15 : 
+  f(b,a) = a ->
+  f(a,b) + a = a + b
+
+
+
+$res:I don't know
+$
+
+logic ac f : int,int -> int
+
+goal g16 : (forall v,w:int[v,w]. f(v,w) = w) -> (exists v,w:int. v <> w)

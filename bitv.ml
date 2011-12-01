@@ -608,7 +608,7 @@ module Make(X : ALIEN) = struct
 
   end
 
-  let compare b1 b2 = 
+  let compare_mine b1 b2 = 
     let rec comp l1 l2 = match l1,l2 with
 	[] , [] -> 0
       | [] , _ -> -1
@@ -617,6 +617,8 @@ module Make(X : ALIEN) = struct
 	  let c = compare_simple_term st1 st2 in
 	  if c<>0 then c else comp l1 l2
     in comp b1 b2
+
+  let compare x y = compare (embed x) (embed y)
 
   let hash_xterm = function
     | Var {var = i; sorte = A} -> 11 * i
@@ -750,13 +752,13 @@ module Make(X : ALIEN) = struct
   module Map = Map.Make 
     (struct 
        type t = (X.r simple_term) list
-       let compare = compare 
+       let compare = compare_mine
      end)
     
   module Set = Set.Make (
     struct 
       type t = (X.r simple_term) list
-      let compare = compare
+      let compare = compare_mine
     end)
 
   let fully_interpreted sb = true

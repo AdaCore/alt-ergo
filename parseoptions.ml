@@ -81,12 +81,13 @@ let spec = [
    " instantiate lemmas only with the terms from the goal";
   "-bouclage", Arg.Set_int bouclage,
   " number of instantiations at each matching round";
-  "-qualif", Arg.Set qualif, "output rules used on stderr";
+  "-rules", Arg.String set_rules, "<parsing|typing|sat|cc|arith> output rules used on stderr";
   "-vsid", Arg.Set vsid, "use VSID heuristic in SAT";
   "-max-split", Arg.String set_max_split,
   (Format.sprintf " maximum size of case-split (default value : %s)" 
      (Num.string_of_num !max_split));
-
+  "-restricted", Arg.Set restricted, 
+  " restrict set of decision procedures (equality, arithmetic and AC)";
 ]
 
 let _ =
