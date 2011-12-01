@@ -181,11 +181,11 @@ $exi:TR-Lexical-identifier,TR-Lexical-decl
 $res:Correct
 $
 type a
-$
 
 $obj:Le test vérifie que \verb|type a0'b'__'_8| est bien reconnu par la règle \textlangle decl\textrangle .
 $exi:TR-Lexical-identifier,TR-Lexical-decl
 $res:Correct
+$
 type a0'b'__'_8
 
 $obj:Le test vérifie que \verb|type 'a t| est bien reconnu par la règle \textlangle decl\textrangle .
@@ -237,7 +237,7 @@ $obj:Le test vérifie que la déclaration est bien reconnu par la règle \textla
 $exi:TR-Lexical-keywords,TR-Lexical-primitive-type,TR-Lexical-decl
 $res:Correct
 $
-logic ca_va_rater3 : (int, bool, 'a, b, real, bitv[125]) t -> m
+logic ca_va_rater3 : (int, bool, 'a, b, real, 'beta) t -> m
 
 $obj:Le test vérifie que la déclaration est bien reconnu par la règle \textlangle decl\textrangle .
 $exi:TR-Lexical-keywords,TR-Lexical-primitive-type,TR-Lexical-decl
@@ -262,14 +262,17 @@ $obj:Le test vérifie que la déclaration est bien reconnu par la règle \textla
 $exi:TR-Lexical-keywords,TR-Lexical-primitive-type,TR-Lexical-decl
 $res:Correct
 $
-logic ac qui_marche7 : (int, bool, unit, real, bitv[0002598], asppro'p_, 'i''', 'primident identifier, (bool, 'a, b) id, (int, ('a) t) x) truc_'_alafin -> prop
+logic ac qui_marche7 : 
+      (int, bool, unit, real, u_u, asppro'p_, 'i''', 'primident identifier,
+       (bool, 'a, b) id, (int, ('a) t) x) truc_'_alafin -> prop
 
 $obj:Le test vérifie que la déclaration est bien reconnu par la règle \textlangle decl\textrangle .
 $exi:TR-Lexical-keywords,TR-Lexical-primitive-type,TR-Lexical-decl
 $res:Correct
 $
-logic brouillon, sale, moche, bea__8'k : ((real, bool) t, 'a truc, bitv[0] , ((x) x, y, 'y') x) s, int, 'abool, bool, x x 
-
+logic brouillon, sale, moche, bea__8'k : 
+      ((real, bool) t, 'a truc, x , ((x) x, y, 'y') x) s,
+       int, 'abool, bool, x x 
         ->    ('q , unit, bool ,s) machin
 
 $obj:Le test vérifie que la déclaration est bien reconnu par la règle \textlangle decl\textrangle .
@@ -361,7 +364,7 @@ goal g11:      0= 1 = 2 =3
 $exi:TR-Lexical-integer,TR-Lexical-real,TR-Lexical-operator,TR-Lexical-identifier,TR-Lexical-expr
 $res:Correct
 $
-goal g12 : r_y <> 8 + 0 /1 < x @ 12.12
+goal g12 : r_y <> 8 + 0 /1 < x - 12.12
 
 $exi:TR-Lexical-integer,TR-Lexical-operator,TR-Lexical-identifier,TR-Lexical-expr
 $res:Correct
@@ -371,7 +374,7 @@ goal g13 : f <= u = 4 > 6
 $exi:TR-Lexical-integer,TR-Lexical-real,TR-Lexical-operator,TR-Lexical-identifier,TR-Lexical-expr
 $res:Correct
 $
-goal g14 : g >= p * (3) - (125@0%0) and  0x125.AB8p-98+1-2
+goal g14 : g >= p * (3) - (125 - 0%0) and  0x125.AB8p-98+1-2
 
 $exi:TR-Lexical-identifier,TR-Lexical-expr
 $res:Correct
@@ -433,10 +436,10 @@ $
 goal g3 : forall x,y,z : ('a) t [1+2, if a then b else c] . x
 
 $obj:Le test vérifie que les déclencheurs écrits par l'utilisateur sont bien reconnu par la règle \textlangle triggers\textrangle .
-$exi:TR-Lexical-identifier,TR-Lexical-bitv,TR-Lexical-triggers,TR-Lexical-primitive-type,TR-Lexical-expr
+$exi:TR-Lexical-identifier,TR-Lexical-triggers,TR-Lexical-primitive-type,TR-Lexical-expr
 $res:Correct
 $
-goal g4 : forall x,y : a a [0|1,-1@cc | void ].(if 0 then 1^{1,1} else -1)
+goal g4 : forall x,y : a a [0|1,-1 | void ].(if 0 then 1 else -1)
 
 $obj:Le test vérifie que les déclencheurs écrits par l'utilisateur sont bien reconnu par la règle \textlangle triggers\textrangle .
 $exi:TR-Lexical-identifier,TR-Lexical-triggers,TR-Lexical-primitive-type,TR-Lexical-expr
@@ -466,10 +469,10 @@ $res:Correct
 $
 goal g3 : exists x : ('a) t  . x
 
-$exi:TR-Lexical-identifier,TR-Lexical-bitv,TR-Lexical-primitive-type,TR-Lexical-keywords,TR-Lexical-expr
+$exi:TR-Lexical-identifier,TR-Lexical-primitive-type,TR-Lexical-keywords,TR-Lexical-expr
 $res:Correct
 $
-goal g4 : exists x : a a .(if 0 then 1^{1,1} else -1)
+goal g4 : exists x : a a .(if 0 then 1 else -1)
 
 $exi:TR-Lexical-identifier,TR-Lexical-primitive-type,TR-Lexical-keywords,TR-Lexical-expr
 $res:Correct
@@ -489,17 +492,17 @@ $res:Correct
 $
 function f1 () : unit = 0
 
-$exi:TR-Lexical-identifier,TR-Lexical-logic-binder,TR-Lexical-primitive-type,TR-Lexical-keywords,TR-Lexical-bitv,TR-Lexical-string,TR-Lexical-expr,TR-Lexical-decl
+$exi:TR-Lexical-identifier,TR-Lexical-logic-binder,TR-Lexical-primitive-type,TR-Lexical-keywords,TR-Lexical-string,TR-Lexical-expr,TR-Lexical-decl
 $res:Correct
 $
-function bidule2 (x : int) : bitv[5] =
-	 ( not ( id (x,u, "string" : [|001011|]) ) )
+function bidule2 (x : int) : bool =
+	 ( not ( id (x,u, "string" : 2) ) )
 
-$exi:TR-Lexical-identifier,TR-Lexical-logic-binder,TR-Lexical-primitive-type,TR-Lexical-keywords,TR-Lexical-bitv,TR-Lexical-expr,TR-Lexical-decl
+$exi:TR-Lexical-identifier,TR-Lexical-logic-binder,TR-Lexical-primitive-type,TR-Lexical-keywords,TR-Lexical-expr,TR-Lexical-decl
 $res:Correct
 $
 function f3 ( y: 'a t,s':s) : ((r,u)w,p,unit) x =
-	 (y <> s) % ([|1111|]^{45,3})
+	 (y <> s) % (1 + y)
 
 $exi:TR-Lexical-identifier,TR-Lexical-logic-binder,TR-Lexical-primitive-type,TR-Lexical-keywords,TR-Lexical-expr,TR-Lexical-decl
 $res:Correct
@@ -528,17 +531,17 @@ $res:Correct
 $
 predicate p3 = a+b = 2 =-1
 
-$exi:TR-Lexical-identifier,TR-Lexical-logic-binder,TR-Lexical-primitive-type,TR-Lexical-keywords,TR-Lexical-bitv,TR-Lexical-string,TR-Lexical-expr,TR-Lexical-decl
+$exi:TR-Lexical-identifier,TR-Lexical-logic-binder,TR-Lexical-primitive-type,TR-Lexical-keywords,TR-Lexical-string,TR-Lexical-expr,TR-Lexical-decl
 $res:Correct
 $
 predicate p4 (x : int)  =
-	 ( not ( id (x,u, "string" : [|001011|]) ) )
+	 ( not ( id (x,u, "string" : 0) ) )
 
-$exi:TR-Lexical-identifier,TR-Lexical-logic-binder,TR-Lexical-primitive-type,TR-Lexical-keywords,TR-Lexical-bitv,TR-Lexical-expr,TR-Lexical-decl
+$exi:TR-Lexical-identifier,TR-Lexical-logic-binder,TR-Lexical-primitive-type,TR-Lexical-keywords,TR-Lexical-expr,TR-Lexical-decl
 $res:Correct
 $
 predicate p5 ( y: 'a t,s':s)  =
-	 (y <> s) % ([|1111|]^{45,3})
+	 (y <> s) % (2 * y)
 
 $exi:TR-Lexical-identifier,TR-Lexical-logic-binder,TR-Lexical-primitive-type,TR-Lexical-keywords,TR-Lexical-expr,TR-Lexical-decl
 $res:Correct
@@ -564,8 +567,8 @@ $exi:TR-Lexical-identifier,TR-Lexical-logic-binder,TR-Lexical-var-type,TR-Lexica
 $res:Correct
 $
 axiom a2 : forall x,y : ('a ,'b) t [true|false]. x+y = y-x
-function fff'f (x: ('a,a,s) t, y:unit) : bitv[100] vector =
-	 forall x,y : a a [0|1,-1@cc | void ].
+function fff'f (x: ('a,a,s) t, y:unit) : 'a vector =
+	 forall x,y : a a [0|1,-1 | void ].
 	 if (if a then b else c) 
 	    then "guillemets":u or g 
 	    else 
@@ -574,12 +577,12 @@ function fff'f (x: ('a,a,s) t, y:unit) : bitv[100] vector =
 		    else not aaaargh''
 predicate p6_'__ (x:('a,'b) t, y:t)  = 
 	  forall a,b,c : int . a+B+C
-logic ac qui_marche7 : (int, bool, unit, real, bitv[0002598], 
+logic ac qui_marche7 : (int, bool, unit, real, w, 
       asppro'p_, 'i''', 'primident identifier, 
       (bool, 'a, b) id, (int, ('a) t) x) truc_'_alafin -> 
       (unit) u
 goal g : exists x : a a a a a a a .
-       	   (forall o:int [s,u|f].if 0 then 1^{1,1} else -1)
+       	   (forall o:int [s,u|f].if 0 then 1 else -1)
 
 
 

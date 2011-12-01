@@ -74,11 +74,22 @@ let all_models = ref false
 let goal_directed = ref false
 let proof = ref false
 let debug_proof = ref false
-let qualif = ref false
+let rules = ref (-1)
 let vsid = ref false
 let max_split = ref (Num.Int 1000000)
+let restricted = ref false
 
 let show_version () = Format.printf "%s@." Version.version; exit 0
 let show_libdir () = Format.printf "%s@." Version.libdir; exit 0
 
 let set_max_split s = max_split := Num.num_of_string s
+
+let set_proof b = proof := b
+
+let set_rules = function
+  | "parsing" -> rules := 0
+  | "typing" -> rules := 1
+  | "sat" -> rules := 2
+  | "cc" -> rules := 3
+  | "arith" -> rules := 4
+  | _ -> rules := -1

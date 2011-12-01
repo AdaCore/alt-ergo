@@ -19,6 +19,14 @@
   open Format
 
 
+
+  module SS = Set.Make(struct
+    include String 
+    let compare s1 s2 = if compare s1 s2 = 0 then 0 else -1
+  end)
+
+  module MS = Map.Make(String)
+
   let string_buf = Buffer.create 1024
 
   let preftab = Hashtbl.create 17 
@@ -36,7 +44,7 @@
   let ares = ref "Valid"
 
   let results_table = ref []
-  let exi_tests = ref []
+  let exi_tests = ref MS.empty
   
   let green s =
     sprintf "[1;32m%s[1;0m" s
@@ -97,7 +105,7 @@
 	(String.sub str 1 (String.length str - 1))
     else str
 
-  let rec remove_trailing_whitespaces str =
+  let remove_trailing_whitespaces str =
     remove_trailing_whitespaces_end (remove_trailing_whitespaces_begin str)
 
   let write str = 
@@ -110,48 +118,117 @@
     close_out chan;
     fname
       
-  let out_tex =
-      open_out_gen [Open_creat; Open_trunc; Open_append] 0o666 !tex_file
-  let fmt_tex = formatter_of_out_channel out_tex
 
 
-  let init_sec n =
+  (* Captures the output and exit status of a unix command : aux func*)
+  let syscall cmd =
+    (* fprintf std_formatter "syscall: %s@." cmd; *)
+    let inc, outc, errc = Unix.open_process_full cmd (Unix.environment ()) in  
+    let buf = Buffer.create 16 in
+    let buferr = Buffer.create 16 in
+    (try
+       while true do
+	 Buffer.add_channel buf inc 1
+       done
+     with End_of_file -> ());
+    (try
+       while true do
+	 Buffer.add_channel buferr errc 1
+       done
+     with End_of_file -> ());
+    let status = Unix.close_process_full (inc, outc, errc) in
+    let s =  Buffer.contents buferr in
+    let l = String.length s in
+    let serr = if l > 0 then String.sub s 0 ((String.length s) - 1) else s in
+    (Buffer.contents buf, status, serr)
+
+  let is_zero_status = function
+    | Unix.WEXITED n | Unix.WSIGNALED n | Unix.WSTOPPED n -> n = 0
+
+  let scan_rules s =
+    let rules = split_char '\n' s in
+    List.fold_left 
+      (fun ((rules, stderr) as acc) r ->
+	 try 
+	   Scanf.sscanf r "[rule] %s %s@\n" 
+	     (fun r info ->
+		if List.mem (r,info) rules then acc 
+		else (r,info)::rules, stderr)
+	     
+	 with 
+	   | Scanf.Scan_failure _ -> rules, r::stderr
+	   | End_of_file -> acc)
+      ([],[]) rules
+
+
+  let init_sec n fmt_tex =
     fprintf fmt_tex "\\subsection{%s}\n@." (escu n)
     
-  let sec_command fname =
-    fprintf fmt_tex "\\subsubsection{Commande exécutée}\n\n";
+  let sec_command fname fmt_tex =
+    fprintf fmt_tex "\\subsubsection*{Commande exécutée}\n\n";
     fprintf fmt_tex "\\begin{verbatim}\n";
     fprintf fmt_tex "%s %s\n" !name fname;
     fprintf fmt_tex "\\end{verbatim}\n@."
     
-  let sec_exigence s fname =
-    let refs = split_char ',' s in
+  let sec_exigence refs fname fmt_tex =
     fprintf fmt_tex 
-      "\\subsubsection{Référence de l\'exigence fonctionnelle}\n\n";
+      "\\subsubsection*{Référence de l\'exigence fonctionnelle}\n\n";
     fprintf fmt_tex "\\begin{itemize}\n";
-    List.iter (fun r ->
-      fprintf fmt_tex "\\item \\textsc{%s} \n" r;
-      exi_tests := (r, fname)::!exi_tests
+    List.iter (fun (r,info) ->
+      fprintf fmt_tex "\\item \\textsc{%s} \\verb|%s|\n" r info;
+      let oldfs = try MS.find r !exi_tests with Not_found -> [] in
+      exi_tests := MS.add r (fname::oldfs) !exi_tests;
     ) refs;
     fprintf fmt_tex "\\end{itemize}\n@."
 
-  let sec_obj obj =
-    fprintf fmt_tex "\\subsubsection{Objectif(s) du test}\n\n";
+  let sec_obj obj fmt_tex =
+    fprintf fmt_tex "\\subsubsection*{Objectif(s) du test}\n\n";
     fprintf fmt_tex "%s\n\n" !cobj;
     fprintf fmt_tex "%s\n" obj
 
-  let sec_desc code =
-    fprintf fmt_tex "\\subsubsection{Description du test}\n\n";
+  let sec_desc code fmt_tex =
+    fprintf fmt_tex "\\subsubsection*{Description du test}\n\n";
     fprintf fmt_tex "\\begin{verbatimgray}\n";
     fprintf fmt_tex "%s\n" code;
     fprintf fmt_tex "\\end{verbatimgray}\n@."
     
 
-  let sec_res ares ok =
-    fprintf fmt_tex "\\subsubsection{Résultat attendu}\n\n";
-    fprintf fmt_tex "%s.\n" ares;
+  let sec_res_attendu ares fmt_tex =
+    fprintf fmt_tex "\\subsubsection*{Résultat attendu}\n\n";
+    fprintf fmt_tex "\\begin{itemize}\n";
+    (match ares with
+      | "Correct" -> 
+	  fprintf fmt_tex "\\item Sortie standard : \n";
+	  fprintf fmt_tex "\\item Code de sortie : \\texttt{0}\n"
+      | "Incorrect" -> 
+	  fprintf fmt_tex "\\item Sortie standard : \n";
+	  fprintf fmt_tex "\\item Code de sortie : différent de \\texttt{0}\n"
+      | "Valid" ->
+	  fprintf fmt_tex "\\item Sortie standard : \\texttt{Valid} \n";
+	  fprintf fmt_tex "\\item Code de sortie : \\texttt{0}\n"
+      | "I don't know" ->
+	  fprintf fmt_tex "\\item Sortie standard : \\texttt{I don't know} \n";
+	  fprintf fmt_tex "\\item Code de sortie : \\texttt{0}\n"
+      | _ -> assert false);
+    fprintf fmt_tex "\\end{itemize}\n\n"
+
+  let sec_res_test ares ok std stderr code fmt_tex =
+    let stderr = 
+      List.map (fun s -> remove_trailing_whitespaces (escu s)) stderr in
+    let std = remove_trailing_whitespaces (escu std) in
+    fprintf fmt_tex "\\subsubsection*{Résultat du test}\n\n";
+    fprintf fmt_tex "\\begin{itemize}\n";
+    fprintf fmt_tex "\\item Sortie standard : \\texttt{%s}\n" std;
+    fprintf fmt_tex "\\item Sortie erreur :";
+    List.iter (fprintf fmt_tex " \\texttt{%s}\n") stderr;
+    let n = 
+      match code with 
+	| Unix.WEXITED n | Unix.WSIGNALED n | Unix.WSTOPPED n -> n
+    in
+    fprintf fmt_tex "\\item Code de sortie : \\texttt{%d}" n;
+    fprintf fmt_tex "\\end{itemize}\n\n";
     fprintf fmt_tex "\n\\bigskip\n\n";
-    fprintf fmt_tex "Résultat du test : \\textbf{%s}\n@." 
+    fprintf fmt_tex "Succès du test : \\textbf{%s}\n@." 
       (if ok then "OK" else "KO")
   
   let dump_exi_tests file =
@@ -160,10 +237,13 @@
     let fmt = formatter_of_out_channel out in
     fprintf fmt "\\subsection{Éxigences fonctionnelles et tests}\n@.";
     fprintf fmt "\\begin{center}\\begin{longtable}{|p{0.5\\textwidth}|p{0.5\\textwidth}|}\n\\hline\n@.";
-    List.iter (fun (ex, fname) ->
-      fprintf fmt "\\textsc{%s} & %s \\\\\\hline\n" ex (escu fname)
-    ) (List.stable_sort (fun (e1, _) (e2, _) -> String.compare e1 e2) 
-	 (List.rev !exi_tests));
+    MS.iter (fun ex fnames ->
+      fprintf fmt "\\textsc{%s}\n" ex;
+      List.iter (fun fname ->
+	fprintf fmt "& %s \\\\\n" (escu fname)
+      ) (List.rev fnames);
+      fprintf fmt "\\hline\n";
+    ) !exi_tests;
     fprintf fmt "\\end{longtable}\\end{center}\n@.";
     close_out out
     
@@ -193,7 +273,7 @@ let comment = "$$" [^'\n']* ( '\n' | eof )
 let alpha= [ 'a'-'z' 'A'-'Z' ]
 let ident= (alpha | '_' | '-')+
 
-rule split = parse
+rule split fmt_tex = parse
     pref (ident as newpref) ' '* '\n' { new_prefix newpref; true }
   | exi (file as f) { exi := f; true }
   | obj  (file as f) { obj := f; true }
@@ -202,20 +282,21 @@ rule split = parse
   | file {
     let code = remove_trailing_whitespaces (Lexing.lexeme lexbuf) in
     let fname = write code in
+    let answ, status, rules = syscall (sprintf "%s %s" !name fname) in
     let ok =
-      if !ares = "Incorrect" then 
-	Sys.command(sprintf "%s %s" !name fname) <> 0
-      else if !ares = "Correct" then 
-	Sys.command(sprintf "%s %s" !name fname) = 0
-      else
-	Sys.command(sprintf "%s %s | grep -q -w \"%s\"" !name fname !ares) = 0
+      if !ares = "Incorrect" then not (is_zero_status status)
+      else if !ares = "Correct" then is_zero_status status
+      else is_zero_status status && 
+	Sys.command (sprintf "echo \"%s\" | grep -q -w \"%s\"" answ !ares) = 0
     in
-    init_sec fname;
-    sec_command fname;
-    sec_exigence !exi fname;
-    sec_obj !obj;
-    sec_desc code;
-    sec_res !ares ok;
+    init_sec fname fmt_tex;
+    sec_command fname fmt_tex;
+    let traces, stderr = scan_rules rules in
+    sec_exigence traces fname fmt_tex;
+    sec_obj !obj fmt_tex;
+    sec_desc code fmt_tex;
+    sec_res_attendu !ares fmt_tex;
+    sec_res_test !ares ok answ stderr status fmt_tex;
     if ok then print_endline (sprintf "%s  %s" fname ok_str)
     else print_endline (sprintf "%s %s" (red fname) ko_str);
     results_table := (fname, ok)::!results_table;
@@ -234,8 +315,11 @@ rule split = parse
     let chan=open_in file in
     Sys.chdir (Filename.dirname file);
     ignore (Sys.command("rm -f testfile-*.mlw"));
+    let out_tex =
+      open_out_gen [Open_creat; Open_trunc; Open_append] 0o666 !tex_file in
+    let fmt_tex = formatter_of_out_channel out_tex in
     let buf=Lexing.from_channel chan in
-    while split buf do () done;
+    while split fmt_tex buf do () done;
     let fres = Filename.chop_extension !tex_file in
     dump_exi_tests (fres ^ "_exi.tex");
     dump_results_table (fres ^ "_table.tex");

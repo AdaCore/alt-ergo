@@ -7,7 +7,7 @@ split.ml: split.mll
 	ocamllex split.mll
 
 test: test.ml
-	ocamlopt test.ml -o test
+	ocamlopt unix.cmxa test.ml -o test
   
 test.ml: test.mll
 	ocamllex test.mll

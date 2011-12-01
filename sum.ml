@@ -74,7 +74,7 @@ module Make(X : ALIEN) = struct
     | Alien r -> r
     | Cons(hs,ty) as c -> X.embed c
         
-  let compare c1 c2 = 
+  let compare_mine c1 c2 = 
     match c1 , c2 with
       | Cons (h1,ty1) , Cons (h2,ty2)  -> 
           let n = Hs.compare h1 h2 in
@@ -83,6 +83,8 @@ module Make(X : ALIEN) = struct
       | Alien _ , Cons _   -> 1
       | Cons _  , Alien _  -> -1
     
+  let compare x y = compare (embed x) (embed y)
+
   let hash = function
     | Cons (h, ty) -> Hstring.hash h + 19 * Ty.hash ty
     | Alien r -> X.hash r

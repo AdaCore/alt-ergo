@@ -633,6 +633,7 @@ module Make
 *)
 
   let fm env eqs expl = 
+    if rules = 4 then fprintf fmt "[rule] TR-Arith-Fm@.";
     fourier (env, eqs) (List.map snd env.inequations) expl
 
   let is_num r = 
@@ -930,6 +931,7 @@ module Make
 	  []
    
   let case_split env = 
+    if rules = 4 then fprintf fmt "[rule] TR-Arith-CaseSplit@.";
     match case_split_polynomes env with
       | []     -> case_split_monomes env
       | choices -> choices
