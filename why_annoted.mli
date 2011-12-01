@@ -44,6 +44,8 @@ and at_desc =
   | ATextract of aterm * aterm * aterm
   | ATconcat of aterm * aterm
   | ATlet of Symbols.t * aterm * aterm
+  | ATdot of aterm * Hstring.t
+  | ATrecord of (Hstring.t * aterm) list
       
 
 type aatom = 
@@ -83,7 +85,7 @@ type atyped_decl =
   | APredicate_def of loc * string * (string * ppure_type) list * aform
   | AFunction_def 
       of loc * string * (string * ppure_type) list * ppure_type * aform
-  | ATypeDecl of loc * string list * string * string list
+  | ATypeDecl of loc * string list * string * body_type_decl
 
 
 type annoted_node =

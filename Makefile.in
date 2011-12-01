@@ -147,7 +147,7 @@ $(NAME).opt: $(PRECMX) $(OPTIONSCMX) $(MAINCMX)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLOPT) $(OFLAGS) -o $@ $(BIBOPT) $^
 
-gui: $(GUICMX)
+gui: $(PRECMX) $(OPTIONSCMX) $(GUICMX)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLOPT) $(OFLAGS) -o altgr-ergo.opt $(BIBOPT) $(BIBGUIOPT) $^
 
