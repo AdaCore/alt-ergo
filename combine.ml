@@ -219,10 +219,10 @@ struct
     let {Term.f=sb} = Term.view t in
     match 
       X1.is_mine_symb sb,
-      X2.is_mine_symb sb,
-      X3.is_mine_symb sb,
-      X4.is_mine_symb sb,
-      X5.is_mine_symb sb,
+      not restricted && X2.is_mine_symb sb,
+      not restricted && X3.is_mine_symb sb,
+      not restricted && X4.is_mine_symb sb,
+      not restricted && X5.is_mine_symb sb,
       AC.is_mine_symb sb 
     with
       | true  , false , false, false, false, false -> X1.make t
@@ -237,10 +237,10 @@ struct
   let fully_interpreted sb =
     match 
       X1.is_mine_symb sb,
-      X2.is_mine_symb sb,
-      X3.is_mine_symb sb,
-      X4.is_mine_symb sb,
-      X5.is_mine_symb sb,
+      not restricted && X2.is_mine_symb sb,
+      not restricted && X3.is_mine_symb sb,
+      not restricted && X4.is_mine_symb sb,
+      not restricted && X5.is_mine_symb sb,
       AC.is_mine_symb sb 
     with
       | true  , false , false, false, false, false -> X1.fully_interpreted sb
@@ -413,36 +413,34 @@ struct
       r5=X5.Rel.empty ();
     }
 	
-    let assume env sa ~are_eq ~are_neq ~class_of ~find = 
+    let assume env sa ~are_eq ~are_neq ~class_of = 
       let env1, { assume = a1; remove = rm1} = 
-	X1.Rel.assume env.r1 sa ~are_eq ~are_neq ~class_of ~find in
+	X1.Rel.assume env.r1 sa ~are_eq ~are_neq ~class_of in
       let env2, { assume = a2; remove = rm2} = 
-	X2.Rel.assume env.r2 sa ~are_eq ~are_neq ~class_of ~find in
+	X2.Rel.assume env.r2 sa ~are_eq ~are_neq ~class_of in
       let env3, { assume = a3; remove = rm3} = 
-	X3.Rel.assume env.r3 sa ~are_eq ~are_neq ~class_of ~find in
+	X3.Rel.assume env.r3 sa ~are_eq ~are_neq ~class_of in
       let env4, { assume = a4; remove = rm4} = 
-	X4.Rel.assume env.r4 sa ~are_eq ~are_neq ~class_of ~find in
+	X4.Rel.assume env.r4 sa ~are_eq ~are_neq ~class_of in
       let env5, { assume = a5; remove = rm5} = 
-	X5.Rel.assume env.r5 sa ~are_eq ~are_neq ~class_of ~find in
+	X5.Rel.assume env.r5 sa ~are_eq ~are_neq ~class_of in
       {r1=env1; r2=env2; r3=env3; r4=env4; r5=env5}, 
       { assume = a1@a2@a3@a4@a5;
 	remove = rm1@rm2@rm3@rm4@rm5;}
 	
-    let query env a ~are_eq ~are_neq ~class_of ~find = 
-      match X1.Rel.query env.r1 a ~are_eq ~are_neq ~class_of ~find with
+    let query env a ~are_eq ~are_neq ~class_of = 
+      match X1.Rel.query env.r1 a ~are_eq ~are_neq ~class_of with
 	| Yes _ as ans -> ans
 	| No -> 
-	  match X2.Rel.query env.r2 a ~are_eq ~are_neq ~class_of ~find with
+	  match X2.Rel.query env.r2 a ~are_eq ~are_neq ~class_of with
 	    | Yes _ as ans -> ans
 	    | No ->
-	      match X3.Rel.query env.r3 a ~are_eq ~are_neq ~class_of ~find with
+	      match X3.Rel.query env.r3 a ~are_eq ~are_neq ~class_of with
 		| Yes _ as ans -> ans
 		| No -> 
-		    match X4.Rel.query env.r4 a ~are_eq ~are_neq ~class_of
-		      ~find with
+		    match X4.Rel.query env.r4 a ~are_eq ~are_neq ~class_of with
 		      | Yes _ as ans -> ans
 		      | No -> X5.Rel.query env.r5 a ~are_eq ~are_neq ~class_of
-			~find
 		      
     let case_split env = 
       let seq1 = X1.Rel.case_split env.r1 in
@@ -473,15 +471,6 @@ and X1 : Sig.THEORY  with type t = TX1.t and type r = CX.r =
        let extract = CX.extract1
        let embed =  CX.embed1
      end)
-
-(*and X2 : Sig.THEORY with type r = CX.r and type t = CX.r Pairs.abstract =
-  Pairs.Make
-    (struct
-       include CX
-       let extract = extract2
-       let embed = embed2
-     end)
-*)
 
 and X2 : Sig.THEORY with type r = CX.r and type t = CX.r Records.abstract =
   Records.Make

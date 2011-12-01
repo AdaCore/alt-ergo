@@ -72,6 +72,5 @@ let rewriting = !rewriting
 let proof = !proof
 let debug_proof = !debug_proof && proof
 let rules = !rules
-let vsid = !vsid
 let debug_split = !debug_split
 let restricted = !restricted

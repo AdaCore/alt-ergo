@@ -218,7 +218,7 @@ module Make(X : ALIEN) = struct
 
         |  _ -> env, eqs
 
-    let assume env la ~are_eq ~are_neq ~class_of ~find = 
+    let assume env la ~are_eq ~are_neq ~class_of = 
       let aux bol r1 r2 dep env eqs = function
         | None     -> env, eqs
         | Some hss -> 
@@ -268,8 +268,8 @@ module Make(X : ALIEN) = struct
 	    []
       
 
-    let query env a_ex ~are_eq ~are_neq ~class_of ~find =
-      try ignore(assume env [a_ex] ~are_eq ~are_neq ~class_of ~find); Sig.No
+    let query env a_ex ~are_eq ~are_neq ~class_of =
+      try ignore(assume env [a_ex] ~are_eq ~are_neq ~class_of); Sig.No
       with Inconsistent expl -> Sig.Yes expl          
 
     let add env r = match embed r, values_of r with

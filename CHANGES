@@ -2,9 +2,16 @@
 version 0.94, December 2nd, 2011
 =================================
 
-  o theory of records
-  o bug fixes
-  
+  o the theory of records replaces the theory of pairs
+  o bug fixes 
+    (intervals, term data-structure, stack-overflows, matching, 
+     existentials, distincts, CC, GUI)
+  o improvements 
+     (SMT-Lib2 front-end, intervals, case-splits,
+      triggers, lets)
+  o multiset ordering for AC(X) 
+  o manual lemma instantiation in the GUI
+
 
 version 0.93.1, May 9th, 2011
 =================================

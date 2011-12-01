@@ -69,7 +69,6 @@ val rewriting : bool ref
 val proof : bool ref
 val debug_proof : bool ref
 val rules : int ref
-val vsid : bool ref
 val debug_split : bool ref
 
 val show_version : unit -> unit

@@ -82,7 +82,6 @@ let spec = [
   "-bouclage", Arg.Set_int bouclage,
   " number of instantiations at each matching round";
   "-rules", Arg.String set_rules, "<parsing|typing|sat|cc|arith> output rules used on stderr";
-  "-vsid", Arg.Set vsid, "use VSID heuristic in SAT";
   "-max-split", Arg.String set_max_split,
   (Format.sprintf " maximum size of case-split (default value : %s)" 
      (Num.string_of_num !max_split));
