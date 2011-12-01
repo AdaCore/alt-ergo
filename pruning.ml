@@ -72,7 +72,7 @@ let print_graph g =
   let name , cout = Filename.open_temp_file "tmp_graph" ".dot" in
   let ps = name^".ps" in
   PrintG.output_graph cout g;
-  ignore(Sys.command ("dot -Tps "^name^" > "^ps^" && evince "^ps))
+  ignore(Sys.command ("dot -Tps "^name^" > "^ps^" && open "^ps))
 
 module Polarite = struct
   type t = Plus | Moins | Neutre
@@ -128,10 +128,11 @@ module PInfo = struct
       | Polarite.Moins -> v.neg <- SetH.add s v.neg
       | Polarite.Neutre -> v.pos <- SetH.add s v.pos; v.neg <- SetH.add s v.neg
 
-  let add p pol concl s = try
-    let v = HtblHS.find defs p in
-    update_spn (if concl then v.conclusion else v.all_symbs) pol s
-  with Not_found -> assert false
+  let add p pol concl s = 
+    try
+      let v = HtblHS.find defs p in
+      update_spn (if concl then v.conclusion else v.all_symbs) pol s
+    with Not_found -> assert false
     
   let set p pol concl x = try
     let {args=args} =  HtblHS.find defs p in
@@ -252,18 +253,22 @@ let analyze_formula s g f =
 	  
 let analyze_deps decl_list =
   List.fold_left
-    (fun (g,gls) d -> match d.c with
-       | TAxiom (_,s,f) ->
+    (fun (g, gls) d -> match d.c with
+       | TAxiom (_, s, f) ->
 	   analyze_formula s g f, gls
-       | TPredicate_def 
-	   (_,s,_, {c = TFforall {qf_form = {c=TFop(OPiff,[f1;f2])}; 
-				  qf_bvars = lvars}}) ->
-	   let l , _ = List.split lvars in
-	   let s = Hstring.make s in
-	   PInfo.init s l;
-	   symbs_in_formula (PInfo.add s) (PInfo.set s) f2;
-	   (g, gls)
-       | TPredicate_def _ -> assert false
+       | TPredicate_def (_, s, _, 
+			 {c = TFforall {qf_form = ff; qf_bvars = lvars}}) 
+
+       | TFunction_def (_, s, _, _, 
+			{c = TFforall {qf_form = ff; qf_bvars = lvars}}) ->
+
+	   let l, _ = List.split lvars in
+	   (*let s = Hstring.make s in*)
+	   PInfo.init (Hstring.make s) l;
+	   (*symbs_in_formula (PInfo.add s) (PInfo.set s) ff;*)
+	   analyze_formula s g ff, gls
+(*	   (g, gls)*)
+
        | TGoal (l,s,f) -> (g, (s,f)::gls)
        | _ -> (g,gls))
     (GF.empty, []) decl_list

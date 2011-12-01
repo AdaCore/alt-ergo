@@ -42,6 +42,46 @@ exception TypeClash of t*t
 exception Shorten of t
 
 
+
+(*** pretty print ***)
+let print fmt ty = 
+  let h = Hashtbl.create 17 in
+  let rec print fmt = function
+    | Tint -> fprintf fmt "int"
+    | Treal -> fprintf fmt "real"
+    | Tbool -> fprintf fmt "bool"
+    | Tunit -> fprintf fmt "unit"
+    | Tbitv n -> fprintf fmt "bitv[%d]" n
+    | Tvar{v=v ; value = None} -> fprintf fmt "'a_%d" v
+    | Tvar{v=v ; value = Some (Trecord {args=l; name=n} as t) } -> 
+	if Hashtbl.mem h v then
+	  fprintf fmt "%a%s" printl l (Hstring.view n)
+	else
+	  (Hashtbl.add h v (); 
+	   (*fprintf fmt "('a_%d->%a)" v print t *)
+	   print fmt t)
+    | Tvar{v=v ; value = Some t} -> 
+	    (*fprintf fmt "('a_%d->%a)" v print t *)
+	    print fmt t
+    | Text(l, s) -> fprintf fmt "%a%s" printl l (Hstring.view s)
+    | Tfarray (t1, t2) -> fprintf fmt "(%a,%a) farray" print t1 print t2
+    | Tnext t -> fprintf fmt "%a next" print t
+    | Tsum(s, _) -> fprintf fmt "%s" (Hstring.view s)
+    | Trecord {args=lv; name=n; lbs=lbls} -> 
+	fprintf fmt "%a%s = {" printl lv (Hstring.view n);
+	List.iter 
+	  (fun (s, t) -> 
+	     fprintf fmt "%s : %a; " (Hstring.view s) print t) lbls;
+	fprintf fmt "}"
+	  
+  and printl fmt = function
+      [] -> ()
+    | [t] -> fprintf fmt "%a " print t
+    | t::l -> fprintf fmt "%a,%a" print t printl l
+  in 
+  print fmt ty
+
+
 (* smart constructors *)
 
 let tunit = Text ([],Hstring.make "unit")
@@ -244,7 +284,8 @@ let matching s pat t =
       | Tsum (s1, _), Tsum (s2, _) when Hstring.equal s1 s2 -> s
       | Tint , Tint | Tbool , Tbool | Treal , Treal | Tunit, Tunit -> s
       | Tbitv n , Tbitv m when n=m -> s
-      | _ , _ -> raise (TypeClash(pat,t))
+      | _ , _ -> 
+	  raise (TypeClash(pat,t))
   and matching_m s pat t = 
     try Hashtbl.find h (s, pat, t)
     with Not_found -> 
@@ -352,45 +393,7 @@ let monomorphize =
 	 | Tvar ({value=Some ty1} as r) -> 
 	     Tvar { r with value = Some (monomorphize ty1)})
 
-(*** pretty print ***)
-let print fmt ty = 
-  let h = Hashtbl.create 17 in
-  let rec print fmt = function
-    | Tint -> fprintf fmt "int"
-    | Treal -> fprintf fmt "real"
-    | Tbool -> fprintf fmt "bool"
-    | Tunit -> fprintf fmt "unit"
-    | Tbitv n -> fprintf fmt "bitv[%d]" n
-    | Tvar{v=v ; value = None} -> fprintf fmt "'a_%d" v
-    | Tvar{v=v ; value = Some (Trecord {args=l; name=n} as t) } -> 
-	if Hashtbl.mem h v then
-	  fprintf fmt "%a%s" printl l (Hstring.view n)
-	else
-	  (Hashtbl.add h v (); 
-	   (*fprintf fmt "('a_%d->%a)" v print t *)
-	   print fmt t)
-    | Tvar{v=v ; value = Some t} -> 
-	    (*fprintf fmt "('a_%d->%a)" v print t *)
-	    print fmt t
-    | Text(l, s) -> fprintf fmt "%a%s" printl l (Hstring.view s)
-    | Tfarray (t1, t2) -> fprintf fmt "(%a,%a) farray" print t1 print t2
-    | Tnext t -> fprintf fmt "%a next" print t
-    | Tsum(s, _) -> fprintf fmt "%s" (Hstring.view s)
-    | Trecord {args=lv; name=n; lbs=lbls} -> 
-	fprintf fmt "%a%s = {" printl lv (Hstring.view n);
-	List.iter 
-	  (fun (s, t) -> 
-	     fprintf fmt "%s : %a; " (Hstring.view s) print t) lbls;
-	fprintf fmt "}"
-	  
-  and printl fmt = function
-      [] -> ()
-    | [t] -> fprintf fmt "%a " print t
-    | t::l -> fprintf fmt "%a,%a" print t printl l
-  in 
-  print fmt ty
-
 
 let print_subst fmt sbt = 
   M.iter (fun n ty -> fprintf fmt "%d -> %a" n print ty) sbt;
-  fprintf fmt "@?";
+  fprintf fmt "@?"

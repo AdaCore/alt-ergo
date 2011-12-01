@@ -374,7 +374,7 @@ module Make ( R : Sig.X ) = struct
 
 
     let head_cp eqs env (({h=h} as ac), v, dep) = 
-      if RS.mem h env.ac_rs then
+      try (*if RS.mem h env.ac_rs then*)
         SetRL.iter
 	  (fun (g, d, dep_rl) ->
 	     match disjoint_union ac.l g.l with
@@ -386,9 +386,9 @@ module Make ( R : Sig.X ) = struct
                      fprintf fmt "[uf] critical pair: %a = %a@." 
                        R.print rx R.print ry;
                    if not (R.equal rx ry) then 
-                     Queue.push (rx, ry, Ex.union dep dep_rl) eqs
-	  )(RS.find h env.ac_rs)
-
+                     Queue.push (rx, ry, Ex.union dep dep_rl) eqs)
+	  (RS.find h env.ac_rs)
+      with Not_found -> assert false
 	
     let comp_collapse eqs env (p, v, dep) = 
       RS.fold
