@@ -86,7 +86,7 @@ let hash = function
 	
 let to_string =  function
   | Name (n,_) -> Hstring.view n
-  | Var x -> "*var* "^(Hstring.view x)
+  | Var x -> (Hstring.view x)
   | Int n -> Hstring.view n
   | Real n -> Hstring.view n
   | Bitv s -> "[|"^s^"|]"

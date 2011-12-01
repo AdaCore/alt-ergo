@@ -79,7 +79,7 @@ let update_status image label buttonclean env d s steps =
   match s with
     | Frontend.Unsat dep ->
 	let time = Frontend.Time.get () in
-	if not satmode then Loc.report d.st_loc;
+	if not satmode then Loc.report std_formatter d.st_loc;
 	if satmode then printf "@{<C.F_Red>unsat@}@."
 	else printf "@{<C.F_Green>Valid@} (%2.4f) (%Ld)@." time steps;
 	if proof then begin 
@@ -94,7 +94,7 @@ let update_status image label buttonclean env d s steps =
 	  
     | Frontend.Inconsistent ->
 	if not satmode then 
-	  (Loc.report d.st_loc; 
+	  (Loc.report std_formatter d.st_loc; 
 	   fprintf fmt "Inconsistent assumption@.")
 	else printf "unsat@.";
 	image#set_stock `EXECUTE;
@@ -102,13 +102,13 @@ let update_status image label buttonclean env d s steps =
 	  
     | Frontend.Unknown ->
 	if not satmode then
-	  (Loc.report d.st_loc; printf "I don't know.@.")
+	  (Loc.report std_formatter d.st_loc; printf "I don't know.@.")
 	else printf "unknown@.";
 	image#set_stock `NO;
 	label#set_text (sprintf "  I don't know (%2.4f)" (Frontend.Time.get()))
 	  
     | Frontend.Sat  ->
-	if not satmode then Loc.report d.st_loc;
+	if not satmode then Loc.report std_formatter d.st_loc;
 	if satmode then printf "unknown (sat)@." 
 	else printf "I don't know@.";
 	image#set_stock `NO;
@@ -220,7 +220,8 @@ let remove_context env () =
        match td.c with
 	 | APredicate_def (_, _, _, _) ->
 	     toggle_prune_nodep td td.tag
-	 | AAxiom (_, s, _) when String.length s = 0 || s.[0] <> '_' ->
+	 | AAxiom (_, s, _) 
+	     when String.length s = 0 || (s.[0] <> '_'  && s.[0] <> '@') ->
 	     toggle_prune_nodep td td.tag
 	 | _ -> ()
     ) env.ast
@@ -246,16 +247,16 @@ let _ =
     try Frontend.open_file !file lb
     with
       | Why_lexer.Lexical_error s -> 
-	  Loc.report (lexeme_start_p lb, lexeme_end_p lb);
+	  Loc.report err_formatter (lexeme_start_p lb, lexeme_end_p lb);
 	  printf "lexical error: %s\n@." s;
 	  exit 1
       | Parsing.Parse_error ->
 	  let  loc = (lexeme_start_p lb, lexeme_end_p lb) in
-	  Loc.report loc;
+	  Loc.report err_formatter loc;
           printf "syntax error\n@.";
 	exit 1
       | Common.Error(e,l) -> 
-	  Loc.report l; 
+	  Loc.report err_formatter l; 
 	  printf "typing error: %a\n@." Common.report e;
 	  exit 1
   in
