@@ -69,17 +69,15 @@ C. And that all these constructors are distinct.
 
 
 .TP
-.B \-pairs
-Theory of pairs. In order to use this theory, you should add the
-following prelude in your files:
+A theory of polymorphic records.
 
-type 'a pair
+For instance a polymorphic record type 'a t with two labels a and b of
+type 'a and int respectively is defined as follows:
 
-logic pair : 'a, 'a -> 'a pair
+type 'a t = { a : 'a; b : int }
 
-logic fst: 'a pair -> 'a
-
-logic snd: 'a pair -> 'a
+The expressions { a = 4; b = 5 } and { r with b = 3} denote records,
+while the dot notation r.a is used to access to labels.
 
 
 .SH ENVIRONMENT VARIABLES
