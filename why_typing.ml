@@ -598,7 +598,7 @@ let rec type_form env f =
 	  match Env.fresh_type env p f.pp_loc with
 	    | s, { Env.args = []; result = Ty.Tbool} -> 
 		(try 
-		   TFatom {c = TAbuilt(Builtin.is_builtin p,[]);
+		   TFatom {c = TAbuilt(Hstring.make p,[]);
 			   annot = new_id() }
 		 with Not_found -> 
 		   let t2 = {c = {tt_desc=TTconst Ttrue;tt_ty=Ty.Tbool};
@@ -621,7 +621,7 @@ let rec type_form env f =
 		    try
 		      List.iter2 Ty.unify lt lt_args;
 		      (try 
-			 TFatom { c = TAbuilt(Builtin.is_builtin p,te_args);
+			 TFatom { c = TAbuilt(Hstring.make p,te_args);
 				  annot=new_id ()}
 		       with Not_found -> 
 			 let t1 = { 
