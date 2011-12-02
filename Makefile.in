@@ -151,12 +151,6 @@ gui: $(PRECMX) $(OPTIONSCMX) $(GUICMX)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLOPT) $(OFLAGS) -o altgr-ergo.opt $(BIBOPT) $(BIBGUIOPT) $^
 
-
-run: $(MAINCMX)
-	$(OCAMLOPT) -ccopt -static $(OFLAGS) -o $@ $(BIBOPT) $^
-	strip $@
-	tar -czvf alt-ergo.tgz run smt_prelude.mlw
-
 test: $(OPT)
 	./$(OPT) test.mlw
 
@@ -199,7 +193,7 @@ headers:
 # installation
 ##############
 
-install-indep: install-man install-prelude install-pack
+install-indep: install-man install-pack
 
 install: install-indep 
 	mkdir -p $(BINDIR)
@@ -216,10 +210,6 @@ install-opt: install-indep
 install-man:
 	mkdir -p $(MANDIR)/man1
 	cp -f doc/*.1 $(MANDIR)/man1
-
-install-prelude: smt_prelude.mlw
-	mkdir -p $(LIBDIR)
-	cp -f $^ $(LIBDIR)
 
 install-gui: install-indep
 	mkdir -p $(BINDIR)
@@ -292,8 +282,7 @@ FILES = version.sh.in version.ml exception.mli exception.ml \
 	gui.ml\
 	main.ml \
 	Makefile.in configure configure.in   \
-	.depend README INSTALL COPYING CeCILL-C CHANGES \
-	smt_prelude.mlw
+	.depend README INSTALL COPYING CeCILL-C CHANGES
 
 export: source binary
 	cp README COPYING CeCILL-C CHANGES doc/*.1 $(HTTP)
