@@ -233,11 +233,12 @@ TAR=$(EXPORTDIR).tar
 HTTP = $$HOME/WWW/ergo/http
 ERGOWEB = $$HOME/WWW/ergo/
 
-FILES = version.ml exception.mli exception.ml \
+FILES = exception.mli exception.ml \
 	print_color.mli print_color.ml \
-	options.mli options.ml \
+	preoptions.ml preoptions.mli \
+	parseoptions.ml parseoptions.mli options.mli options.ml \
 	loc.ml sig.mli \
-	heap.mli heap.ml hashcons.mli hashcons.ml \
+	hashcons.mli hashcons.ml \
 	builtin.mli builtin.ml \
 	hstring.mli hstring.ml	\
 	symbols.ml symbols.mli \
