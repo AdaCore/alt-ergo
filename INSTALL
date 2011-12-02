@@ -1,12 +1,14 @@
 **************************************************************************
 *                                                                        *
-*     The Alt-ergo theorem prover                                        *
-*     Copyright (C) 2006-2010                                            *
+*     The Alt-Ergo theorem prover                                        *
+*     Copyright (C) 2006-2011                                            *
 *                                                                        *
 *     Sylvain Conchon                                                    *
 *     Evelyne Contejean                                                  *
-*     Stephane Lescuyer                                                  *
+*                                                                        *
+*     Francois Bobot                                                     *
 *     Mohamed Iguernelala                                                *
+*     Stephane Lescuyer                                                  *
 *     Alain Mebsout                                                      *
 *                                                                        *
 *     CNRS - INRIA - Universite Paris Sud                                *
@@ -19,10 +21,15 @@ INSTALLATION
 ============
 
   You need Objective Caml >= 3.08 and ocamlgraph to compile the sources.
+  You need LablGtk2 and the widget GSourceView2 to compile the GUI.
  
   1. Configure with "./configure"
 
   2. Compile with "make".  
 
-  2. Install with "make install".  You may need superuser permissions.
+  3. Install with "make install". 
+
+  4. Compile the GUI with "make gui" and install it with "make install-gui"
+ 
+ You may need superuser permissions to perform the installation.
 

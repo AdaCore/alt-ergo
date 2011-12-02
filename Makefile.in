@@ -1,14 +1,14 @@
 ##########################################################################
 #                                                                        #
-#     The Alt-ergo theorem prover                                        #
+#     The Alt-Ergo theorem prover                                        #
 #     Copyright (C) 2006-2011                                            #
 #                                                                        #
 #     Sylvain Conchon                                                    #
 #     Evelyne Contejean                                                  #
 #                                                                        #
 #     Francois Bobot                                                     #
-#     Stephane Lescuyer                                                  #
 #     Mohamed Iguernelala                                                #
+#     Stephane Lescuyer                                                  #
 #     Alain Mebsout                                                      #
 #                                                                        #
 #     CNRS - INRIA - Universite Paris Sud                                #
@@ -185,7 +185,7 @@ version.ml: config.status
 # file headers
 ##############
 headers:
-	headache -c doc/headache_config.txt -h doc/alt-ergoheader.txt \
+	headache -c doc/headache_config.txt -h doc/ergoheader.txt \
 		Makefile.in configure.in README INSTALL \
 		*.ml *.ml[ily]
 
@@ -239,7 +239,7 @@ TAR=$(EXPORTDIR).tar
 HTTP = $$HOME/WWW/ergo/http
 ERGOWEB = $$HOME/WWW/ergo/
 
-FILES = version.sh.in version.ml exception.mli exception.ml \
+FILES = version.ml exception.mli exception.ml \
 	print_color.mli print_color.ml \
 	options.mli options.ml \
 	loc.ml sig.mli \
@@ -286,7 +286,6 @@ FILES = version.sh.in version.ml exception.mli exception.ml \
 
 export: source binary
 	cp README COPYING CeCILL-C CHANGES doc/*.1 $(HTTP)
-#	cp index.html $(ERGOWEB)
 
 source: 
 	mkdir -p export/$(EXPORTDIR)
@@ -347,27 +346,6 @@ $(NAME).tex: $(SOURCES)
 .mly.mli:
 	$(if $(QUIET),@echo 'Compiling $<' &&) $(OCAMLYACC) -v $< 
 
-.tex.dvi:
-	latex $< && latex $<
-
-.dvi.ps:
-	dvips $< -o $@ 
-
-.tex.html:
-	hevea $<
-
-# Emacs tags
-############
-
-tags:
-	find . -name "*.ml*" | sort -r | xargs \
-	etags "--regex=/let[ \t]+\([^ \t]+\)/\1/" \
-	      "--regex=/let[ \t]+rec[ \t]+\([^ \t]+\)/\1/" \
-	      "--regex=/and[ \t]+\([^ \t]+\)/\1/" \
-	      "--regex=/type[ \t]+\([^ \t]+\)/\1/" \
-              "--regex=/exception[ \t]+\([^ \t]+\)/\1/" \
-	      "--regex=/val[ \t]+\([^ \t]+\)/\1/" \
-	      "--regex=/module[ \t]+\([^ \t]+\)/\1/"
 
 # Makefile is rebuilt whenever Makefile.in or configure.in is modified
 ######################################################################
