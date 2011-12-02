@@ -82,7 +82,7 @@ PRECMO = version.cmo print_color.cmo preoptions.cmo
 OPTIONSCMO = parseoptions.cmo
 
 CMO = options.cmo exception.cmo loc.cmo \
-      hashcons.cmo hstring.cmo builtin.cmo symbols.cmo \
+      hashcons.cmo hstring.cmo symbols.cmo \
       subst.cmo ty.cmo common.cmo term.cmo literal.cmo formula.cmo \
       explanation.cmo \
       why_parser.cmo why_lexer.cmo pretty.cmo \
@@ -239,7 +239,6 @@ FILES = exception.mli exception.ml \
 	parseoptions.ml parseoptions.mli options.mli options.ml \
 	loc.ml sig.mli \
 	hashcons.mli hashcons.ml \
-	builtin.mli builtin.ml \
 	hstring.mli hstring.ml	\
 	symbols.ml symbols.mli \
 	subst.mli subst.ml \
@@ -291,7 +290,6 @@ source:
 	cp doc/$(NAME).1 export/$(EXPORTDIR)/doc
 	cp util/gtk-lang/alt-ergo.lang export/$(EXPORTDIR)/util/gtk-lang/
 	cd export ; tar cf $(TAR) $(EXPORTDIR) ; gzip -f --best $(TAR)
-	cp export/$(TAR).gz $(HTTP)
 
 
 BINARY = $(EXPORTDIR)-$$OSTYPE
@@ -301,7 +299,7 @@ BINARYFILES = README INSTALL COPYING CeCILL-C doc/$(NAME).1
 
 binary: $(OPT)
 	strip $(OPT)
-	cp $(OPT) $(HTTP)/alt-ergo-$(VERSION)-$(ARCH)
+	cp $(OPT) export/alt-ergo-$(VERSION)-$(ARCH)
 
 # generic rules
 ###############
