@@ -1,14 +1,14 @@
 (**************************************************************************)
 (*                                                                        *)
-(*     The Alt-ergo theorem prover                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
 (*     Copyright (C) 2006-2011                                            *)
 (*                                                                        *)
 (*     Sylvain Conchon                                                    *)
 (*     Evelyne Contejean                                                  *)
 (*                                                                        *)
 (*     Francois Bobot                                                     *)
-(*     Stephane Lescuyer                                                  *)
 (*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
@@ -99,20 +99,9 @@ let process_decl print_status (env, consistent, dep) d =
 	print_status d Unknown (Sat.stop ());
 	env , consistent, dep
 
-let get_smt_prelude () =
-  let libdir =
-    try Sys.getenv "ERGOLIB"
-    with Not_found -> Version.libdir
-  in
-  let f = Filename.concat libdir "smt_prelude.mlw"
-  in
-  from_channel (open_in f)
-
 let open_file file lb =
   let d ,status =
     if !smtfile then begin
-      let _ = get_smt_prelude () in 
-      (*let lp = Why_parser.file Why_lexer.token lb_prelude in*)
       let bname,l,status = Smt_parser.benchmark Smt_lex.token lb in
       if verbose then printf "converting smt file : ";
       let l = List.flatten (List.map Smt_to_why.bench_to_why l) in
