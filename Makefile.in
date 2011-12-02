@@ -48,9 +48,8 @@ OCAMLDEP = @OCAMLDEP@
 OCAMLLEX = @OCAMLLEX@
 OCAMLYACC= @OCAMLYACC@
 OCAMLLIB = @OCAMLLIB@
-OCAMLBEST= @OCAMLBEST@
+OCAMLBEST = @OCAMLBEST@
 OCAMLVERSION = @OCAMLVERSION@
-OCAMLWEB = @OCAMLWEB@
 OCAMLWIN32 = @OCAMLWIN32@
 EXE = @EXE@
 
@@ -59,11 +58,11 @@ INCLUDES = @OCAMLGRAPHLIB@ @LABLGTK2LIB@
 BFLAGS = -dtypes -g $(INCLUDES) -annot
 OFLAGS = -dtypes $(INCLUDES) -annot -for-pack AltErgo
 
-BIBBYTE=nums.cma graph.cma unix.cma
+BIBBYTE = nums.cma graph.cma unix.cma
 
-BIBOPT=$(BIBBYTE:.cma=.cmxa)
+BIBOPT = $(BIBBYTE:.cma=.cmxa)
 
-BIBGUIOPT=threads.cmxa lablgtk.cmxa lablgtksourceview2.cmxa gtkThread.cmx 
+BIBGUIOPT = threads.cmxa lablgtk.cmxa lablgtksourceview2.cmxa gtkThread.cmx 
 
 # main target
 #############
@@ -77,11 +76,6 @@ all: pack xpack $(OCAMLBEST) pack xpack
 
 # bytecode and native-code compilation
 ######################################
-
-#      printproof.cmo unionfind.cmo \
-#      pa.cmo \
-#      puf.cmo \
-#      satbj.cmo  
 
 PRECMO = version.cmo print_color.cmo preoptions.cmo
 
@@ -99,7 +93,7 @@ CMO = options.cmo exception.cmo loc.cmo \
       uf.cmo use.cmo intervals.cmo fm.cmo arith.cmo \
       records.cmo bitv.cmo arrays.cmo sum.cmo \
       combine.cmo cc.cmo \
-      heap.cmo existantial.cmo \
+      existantial.cmo \
       triggers.cmo cnf.cmo why_typing.cmo matching.cmo \
       sat.cmo 
 
@@ -307,14 +301,6 @@ BINARYFILES = README INSTALL COPYING CeCILL-C doc/$(NAME).1
 binary: $(OPT)
 	strip $(OPT)
 	cp $(OPT) $(HTTP)/alt-ergo-$(VERSION)-$(ARCH)
-
-# literate programming
-######################
-
-SOURCES = 
-
-$(NAME).tex: $(SOURCES)
-	$(OCAMLWEB) -o $@ $^
 
 # generic rules
 ###############
