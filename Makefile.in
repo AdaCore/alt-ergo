@@ -236,7 +236,7 @@ ERGOWEB = $$HOME/WWW/ergo/
 FILES = exception.mli exception.ml \
 	print_color.mli print_color.ml \
 	preoptions.ml preoptions.mli \
-	parseoptions.ml parseoptions.mli options.mli options.ml \
+	parseoptions.ml options.mli options.ml \
 	loc.ml sig.mli \
 	hashcons.mli hashcons.ml \
 	hstring.mli hstring.ml	\
