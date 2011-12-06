@@ -179,7 +179,5 @@ let union_subst (s_t1, s_ty1) ((s_t2, s_ty2) as subst) =
   let s_ty = Ty.union_subst s_ty1 s_ty2 in
   s_t, s_ty
 
-
-
 let rec subterms acc t = 
   let {xs=xs} = view t in List.fold_left subterms (Set.add t acc) xs
