@@ -597,15 +597,11 @@ let rec type_form env f =
 	let r = begin
 	  match Env.fresh_type env p f.pp_loc with
 	    | s, { Env.args = []; result = Ty.Tbool} -> 
-		(try 
-		   TFatom {c = TAbuilt(Hstring.make p,[]);
-			   annot = new_id() }
-		 with Not_found -> 
-		   let t2 = {c = {tt_desc=TTconst Ttrue;tt_ty=Ty.Tbool};
-			     annot = new_id ()} in
-		   let t1 = {c = {tt_desc=TTvar s; tt_ty=Ty.Tbool};
-			     annot = new_id ()} in
-		   TFatom {c = TAeq [t1;t2]; annot=new_id ()})
+		let t2 = {c = {tt_desc=TTconst Ttrue;tt_ty=Ty.Tbool};
+			  annot = new_id ()} in
+		let t1 = {c = {tt_desc=TTvar s; tt_ty=Ty.Tbool};
+			  annot = new_id ()} in
+		TFatom {c = TAeq [t1;t2]; annot=new_id ()}
 	    | _ -> error (NotAPropVar p) f.pp_loc
 	end in r, freevars_form r
 	  
@@ -620,15 +616,15 @@ let rec type_form env f =
 		  begin
 		    try
 		      List.iter2 Ty.unify lt lt_args;
-		      (try 
-			 TFatom { c = TAbuilt(Hstring.make p,te_args);
-				  annot=new_id ()}
-		       with Not_found -> 
-			 let t1 = { 
-			   c = {tt_desc=TTapp(s,te_args); tt_ty=Ty.Tbool};
-			   annot=new_id (); } 
-			 in
-			 TFatom { c = TApred t1; annot=new_id () })
+		      if p = "<=" || p = "<" then 
+			TFatom { c = TAbuilt(Hstring.make p,te_args);
+				 annot=new_id ()}
+		      else
+			let t1 = { 
+			  c = {tt_desc=TTapp(s,te_args); tt_ty=Ty.Tbool};
+			  annot=new_id (); } 
+			in
+			TFatom { c = TApred t1; annot=new_id () }
 		    with 
 		      | Ty.TypeClash(t1,t2) -> 
 			  error (Unification(t1,t2)) f.pp_loc

@@ -369,7 +369,7 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		bcp { env with lemmas=MF.add f (age,dep) env.lemmas }
 
 	    | F.Literal a ->
-	      if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-Lit@.";
+		if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-Lit@.";
 		let env = 
 		  if mf && size < size_formula then 
 		    add_terms env (A.LT.terms_of a) gf age lem
