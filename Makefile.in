@@ -176,7 +176,7 @@ version.ml: config.status
 
 .PHONY: adacore-patch
 
-BASETAG=0.93
+BASETAG=0.94
 PATCHRELEVANT= $(filter-out tests util, $(wildcard *))
 adacore-patch:
 	git add -N configure
