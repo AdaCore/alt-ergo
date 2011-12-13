@@ -1,12 +1,14 @@
 (**************************************************************************)
 (*                                                                        *)
-(*     The Alt-ergo theorem prover                                        *)
-(*     Copyright (C) 2006-2010                                            *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
 (*                                                                        *)
 (*     Sylvain Conchon                                                    *)
 (*     Evelyne Contejean                                                  *)
-(*     Stephane Lescuyer                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
 (*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
@@ -19,8 +21,8 @@ open Format
 open Lexing
 open Options
 
-let report (b,e) =
+let report fmt (b,e) =
   let l = b.pos_lnum in
   let fc = b.pos_cnum - b.pos_bol + 1 in
   let lc = e.pos_cnum - b.pos_bol + 1 in
-  printf "File \"%s\", line %d, characters %d-%d:" !file l fc lc
+  fprintf fmt "File \"%s\", line %d, characters %d-%d:" !file l fc lc

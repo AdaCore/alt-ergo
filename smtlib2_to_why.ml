@@ -1,3 +1,22 @@
+(**************************************************************************)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
+(*                                                                        *)
+(*     Sylvain Conchon                                                    *)
+(*     Evelyne Contejean                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
+(*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
+(*     Alain Mebsout                                                      *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*   This file is distributed under the terms of the CeCILL-C licence     *)
+(*                                                                        *)
+(**************************************************************************)
+
 open Why_ptree
 open Smtlib2_ast
 open Format
@@ -33,14 +52,21 @@ let decnumber s =
 (*   done; *)
 (*     !r *)
 
-module M = Map.Make(String)
-
-module MString = 
-  Map.Make(struct type t = string let compare = Pervasives.compare end)
 
 module S = Set.Make(String)
 
 let predicates = S.empty
+
+module HS = Hstring 
+
+module H = Hashtbl.Make(HS)
+
+let tbl = H.create 10001
+
+let register_binding (s,t) = H.add tbl (HS.make s) t.pp_desc
+
+let unregister_binding (s,t) = 
+  try H.remove tbl (HS.make s) with Not_found -> assert false
 
 let const_of_specconstant = function 
   | SpecConstString (_, s) -> assert false
@@ -236,7 +262,7 @@ and triggers_of_attributelist = function
 and ppinfix_alist predicates pos ppi tl tfunc =
   (* let tl = if ppi = PPneq && List.length tl >= 3 then tl@[List.hd tl] else tl in *)
   let rec aux predicates pos ppi = function
-    | [] -> Loc.report pos; raise Not_Implemented
+    | [] -> Loc.report std_formatter pos; raise Not_Implemented
     | [a] -> 
       if ppi = PPsub then PPprefix (PPneg, (tfunc a))
       else raise Not_Implemented
@@ -277,7 +303,7 @@ and ppinfix_blist predicates pos ppi tl tfunc =
   (* FIXME = ppinfix_alist predicates pos ppi tl tfunc *)
   (* let tl = if ppi = PPneq && List.length tl >= 3 then tl@[List.hd tl] else tl in *)
   let rec aux predicates pos ppi = function
-    | [] -> Loc.report pos; raise Not_Implemented
+    | [] -> Loc.report std_formatter pos; raise Not_Implemented
     | [a] -> 
       if ppi = PPsub then PPprefix (PPneg, (tfunc a))
       else raise Not_Implemented
@@ -314,27 +340,15 @@ and ppinfix_sexprlist pos ppi sel =
   ppinfix_blist S.empty pos ppi sel lexpr_of_sexpr
 
 
-and let_of_varbindinglist predicates pos t = function
-  | [] -> raise Not_Implemented
-  | [vb] -> 
-    let (s, le) = stringlexpr_of_varbinding predicates vb in
-    let are_prop = is_prop predicates [] le in
-    let predicates = if are_prop then (S.add s predicates) else predicates in
-    if (* true ||  *)are_prop then 
-      let { pp_desc = ppd } = 
-	inline_lexpr s le [] (lexpr_of_term predicates t) in
-      ppd
-    else PPlet (s, le, lexpr_of_term predicates t)
-  | vb::l -> 
-    let (s, le) = stringlexpr_of_varbinding predicates vb in
-    let are_prop = is_prop predicates [] le in
-    let predicates = if are_prop then (S.add s predicates) else predicates in
-    let le2 = 
-      { pp_loc = pos; pp_desc = let_of_varbindinglist predicates pos t l } in
-    if (* true ||  *)are_prop then
-      let { pp_desc = ppd } = inline_lexpr s le [] le2 in
-      ppd
-    else PPlet (s, le, le2)
+and let_of_varbindinglist predicates pos t lets = 
+  match lets with
+    | [] -> raise Not_Implemented
+    | l ->
+        let l = List.map (stringlexpr_of_varbinding predicates) l in
+        List.iter register_binding l;
+        let res = (lexpr_of_term predicates t).pp_desc in
+        List.iter unregister_binding l;
+        res
 
 and forall_of_sortedvarlist pos t triggers = function
   | [] -> raise Not_Implemented
@@ -390,7 +404,8 @@ and ppapp_of_string pos s tl predicates =
 and ppconstvar_of_string = function
   | "true" -> PPconst ConstTrue
   | "false" -> PPconst ConstFalse
-  | s -> PPvar s
+  | s -> try H.find tbl (HS.make s) with Not_found -> PPvar s
+
 
 and ppdesc_of_term predicates = function
   | TermSpecConst (_,sc) -> PPconst (const_of_specconstant sc)

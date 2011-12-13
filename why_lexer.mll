@@ -1,12 +1,14 @@
 (**************************************************************************)
 (*                                                                        *)
-(*     The Alt-ergo theorem prover                                        *)
-(*     Copyright (C) 2006-2010                                            *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
 (*                                                                        *)
 (*     Sylvain Conchon                                                    *)
 (*     Evelyne Contejean                                                  *)
-(*     Stephane Lescuyer                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
 (*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
@@ -133,13 +135,13 @@ rule token = parse
   | ident as id (* identifiers *)      
       { try 
 	  let k = Hashtbl.find keywords id in
-	  if qualif = 0 then fprintf fmt "[rule] TR-Lexical-keyword@.";
+	  if rules = 0 then fprintf fmt "[rule] TR-Lexical-keyword@.";
 	  k
 	with Not_found -> 
-	  if qualif = 0 then fprintf fmt "[rule] TR-Lexical-identifier@.";
+	  if rules = 0 then fprintf fmt "[rule] TR-Lexical-identifier@.";
 	  IDENT id }
   | digit+ as s (* integers *)
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-integer@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-integer@.";
 	INTEGER s }
   | (digit+ as i) ("" as f) ['e' 'E'] (['-' '+']? as sign (digit+ as exp))
   | (digit+ as i) '.' (digit* as f) 
@@ -151,7 +153,7 @@ rule token = parse
           Format.eprintf "decimal real literal found: i=%s f=%s sign=%a exp=%a" 
           i f so sign so exp;
 	*)
-	if qualif = 0 then fprintf fmt "[rule] TR-Lexical-real@.";
+	if rules = 0 then fprintf fmt "[rule] TR-Lexical-real@.";
         let v =
 	  match exp,sign with
 	    | Some exp,Some "-" ->
@@ -174,8 +176,8 @@ rule token = parse
   | "0x" (hexdigit+ as e) ('.' (hexdigit* as f))?
       ['p''P'] (['+''-']? as sign) (digit+ as exp) 
       { (* Format.eprintf "hex num found: %s" (lexeme lexbuf); *)
-	if qualif = 0 then fprintf fmt "[rule] TR-Lexical-hexponent@.";
-	if qualif = 0 then fprintf fmt "[rule] TR-Lexical-hexa@.";
+	if rules = 0 then fprintf fmt "[rule] TR-Lexical-hexponent@.";
+	if rules = 0 then fprintf fmt "[rule] TR-Lexical-hexa@.";
 	let f = match f with None -> "" | Some f -> f in
 	let v =
 	  match sign with
@@ -208,49 +210,49 @@ rule token = parse
   | ":"
       { COLON }
   | "->"
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
 	ARROW }
   | "<-"
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
 	LEFTARROW }
   | "<->"
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
 	LRARROW }
   | "="
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
 	EQUAL }
   | "<"
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
 	LT }
   | "<="
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
 	LE }
   | ">"
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
 	GT }
   | ">="
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
 	GE }
   | "<>"
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
 	NOTEQ }
   | "+"
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
 	PLUS }
   | "-"
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
 	MINUS }
   | "*"
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
 	TIMES }
   | "/"
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
 	SLASH }
   | "%"
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
 	PERCENT }
   | "@"
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-operator@.";
 	AT }
   | "."
       { DOT }
@@ -287,7 +289,7 @@ and comment = parse
 
 and string = parse
   | "\""
-      { if qualif = 0 then fprintf fmt "[rule] TR-Lexical-string@.";
+      { if rules = 0 then fprintf fmt "[rule] TR-Lexical-string@.";
 	STRING (Buffer.contents string_buf) }
   | "\\" (_ as c)
       { Buffer.add_char string_buf (char_for_backslash c); string lexbuf }

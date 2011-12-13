@@ -147,12 +147,18 @@
 
   let scan_rules s =
     let rules = split_char '\n' s in
-    List.fold_left (fun acc r ->
-      try Scanf.sscanf r "[rule] %s %s@\n" 
-	    (fun r info ->
-	      if List.mem (r,info) acc then acc else (r,info)::acc)
-      with Scanf.Scan_failure _ | End_of_file -> acc)
-      [] rules
+    List.fold_left 
+      (fun ((rules, stderr) as acc) r ->
+	 try 
+	   Scanf.sscanf r "[rule] %s %s@\n" 
+	     (fun r info ->
+		if List.mem (r,info) rules then acc 
+		else (r,info)::rules, stderr)
+	     
+	 with 
+	   | Scanf.Scan_failure _ -> rules, r::stderr
+	   | End_of_file -> acc)
+      ([],[]) rules
 
 
   let init_sec n fmt_tex =
@@ -187,11 +193,42 @@
     fprintf fmt_tex "\\end{verbatimgray}\n@."
     
 
-  let sec_res ares ok fmt_tex =
+  let sec_res_attendu ares fmt_tex =
     fprintf fmt_tex "\\subsubsection*{Résultat attendu}\n\n";
-    fprintf fmt_tex "%s.\n" ares;
+    fprintf fmt_tex "\\begin{itemize}\n";
+    (match ares with
+      | "Correct" -> 
+	  fprintf fmt_tex "\\item Sortie standard : \n";
+	  fprintf fmt_tex "\\item Code de sortie : \\texttt{0}\n"
+      | "Incorrect" -> 
+	  fprintf fmt_tex "\\item Sortie standard : \n";
+	  fprintf fmt_tex "\\item Code de sortie : différent de \\texttt{0}\n"
+      | "Valid" ->
+	  fprintf fmt_tex "\\item Sortie standard : \\texttt{Valid} \n";
+	  fprintf fmt_tex "\\item Code de sortie : \\texttt{0}\n"
+      | "I don't know" ->
+	  fprintf fmt_tex "\\item Sortie standard : \\texttt{I don't know} \n";
+	  fprintf fmt_tex "\\item Code de sortie : \\texttt{0}\n"
+      | _ -> assert false);
+    fprintf fmt_tex "\\end{itemize}\n\n"
+
+  let sec_res_test ares ok std stderr code fmt_tex =
+    let stderr = 
+      List.map (fun s -> remove_trailing_whitespaces (escu s)) stderr in
+    let std = remove_trailing_whitespaces (escu std) in
+    fprintf fmt_tex "\\subsubsection*{Résultat du test}\n\n";
+    fprintf fmt_tex "\\begin{itemize}\n";
+    fprintf fmt_tex "\\item Sortie standard : \\texttt{%s}\n" std;
+    fprintf fmt_tex "\\item Sortie erreur :";
+    List.iter (fprintf fmt_tex " \\texttt{%s}\n") stderr;
+    let n = 
+      match code with 
+	| Unix.WEXITED n | Unix.WSIGNALED n | Unix.WSTOPPED n -> n
+    in
+    fprintf fmt_tex "\\item Code de sortie : \\texttt{%d}" n;
+    fprintf fmt_tex "\\end{itemize}\n\n";
     fprintf fmt_tex "\n\\bigskip\n\n";
-    fprintf fmt_tex "Résultat du test : \\textbf{%s}\n@." 
+    fprintf fmt_tex "Succès du test : \\textbf{%s}\n@." 
       (if ok then "OK" else "KO")
   
   let dump_exi_tests file =
@@ -254,10 +291,12 @@ rule split fmt_tex = parse
     in
     init_sec fname fmt_tex;
     sec_command fname fmt_tex;
-    sec_exigence (scan_rules rules) fname fmt_tex;
+    let traces, stderr = scan_rules rules in
+    sec_exigence traces fname fmt_tex;
     sec_obj !obj fmt_tex;
     sec_desc code fmt_tex;
-    sec_res !ares ok fmt_tex;
+    sec_res_attendu !ares fmt_tex;
+    sec_res_test !ares ok answ stderr status fmt_tex;
     if ok then print_endline (sprintf "%s  %s" fname ok_str)
     else print_endline (sprintf "%s %s" (red fname) ko_str);
     results_table := (fname, ok)::!results_table;

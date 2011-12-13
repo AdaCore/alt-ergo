@@ -1,12 +1,14 @@
 (**************************************************************************)
 (*                                                                        *)
-(*     The Alt-ergo theorem prover                                        *)
-(*     Copyright (C) 2006-2010                                            *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
 (*                                                                        *)
 (*     Sylvain Conchon                                                    *)
 (*     Evelyne Contejean                                                  *)
-(*     Stephane Lescuyer                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
 (*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
@@ -309,9 +311,8 @@ module Make (X : ALIEN) = struct
     type t = unit
     exception Inconsistent    
     let empty _ = ()
-    let assume _ _ ~are_eq ~are_neq ~class_of ~find =
-      (), { assume = []; remove = []}
-    let query _ _ ~are_eq ~are_neq ~class_of ~find = Sig.No
+    let assume _ _ ~are_eq ~are_neq ~class_of = (), { assume = []; remove = []}
+    let query _ _ ~are_eq ~are_neq ~class_of = Sig.No
     let case_split env = []
     let add env _ = env
   end

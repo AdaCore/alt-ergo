@@ -1,12 +1,14 @@
 (**************************************************************************)
 (*                                                                        *)
-(*     The Alt-ergo theorem prover                                        *)
-(*     Copyright (C) 2006-2010                                            *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
 (*                                                                        *)
 (*     Sylvain Conchon                                                    *)
 (*     Evelyne Contejean                                                  *)
-(*     Stephane Lescuyer                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
 (*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
@@ -73,9 +75,9 @@ let max_split = !max_split
 let rewriting = !rewriting
 let proof = !proof
 let debug_proof = !debug_proof && proof
-let qualif = !qualif
-let vsid = !vsid
+let rules = !rules
 let debug_split = !debug_split
+let restricted = !restricted
 
 let scale_steps steps = Int64.div steps (Int64.of_int 50)
 

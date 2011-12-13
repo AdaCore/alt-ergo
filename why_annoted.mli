@@ -1,3 +1,22 @@
+(**************************************************************************)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
+(*                                                                        *)
+(*     Sylvain Conchon                                                    *)
+(*     Evelyne Contejean                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
+(*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
+(*     Alain Mebsout                                                      *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*   This file is distributed under the terms of the CeCILL-C licence     *)
+(*                                                                        *)
+(**************************************************************************)
+
 open Why_ptree
 
 type sbuffer = GSourceView2.source_buffer
@@ -25,6 +44,8 @@ and at_desc =
   | ATextract of aterm * aterm * aterm
   | ATconcat of aterm * aterm
   | ATlet of Symbols.t * aterm * aterm
+  | ATdot of aterm * Hstring.t
+  | ATrecord of (Hstring.t * aterm) list
       
 
 type aatom = 
@@ -64,7 +85,7 @@ type atyped_decl =
   | APredicate_def of loc * string * (string * ppure_type) list * aform
   | AFunction_def 
       of loc * string * (string * ppure_type) list * ppure_type * aform
-  | ATypeDecl of loc * string list * string * string list
+  | ATypeDecl of loc * string list * string * body_type_decl
 
 
 type annoted_node =

@@ -1,12 +1,14 @@
 (**************************************************************************)
 (*                                                                        *)
-(*     The Alt-ergo theorem prover                                        *)
-(*     Copyright (C) 2006-2010                                            *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
 (*                                                                        *)
 (*     Sylvain Conchon                                                    *)
 (*     Evelyne Contejean                                                  *)
-(*     Stephane Lescuyer                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
 (*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
@@ -771,11 +773,11 @@ module Make(X : ALIEN) = struct
     type t =  unit
 
     let empty () = ()
-    let assume _ _ ~are_eq ~are_neq ~class_of ~find =
+    let assume _ _ ~are_eq ~are_neq ~class_of =
       (), { assume = []; remove = [] }
     let add _ _ = ()
     let case_split _ = []    
-    let query _ _ ~are_eq ~are_neq ~class_of ~find = Sig.No
+    let query _ _ ~are_eq ~are_neq ~class_of = Sig.No
   end
 
 end

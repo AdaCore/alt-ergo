@@ -1,12 +1,14 @@
 ##########################################################################
 #                                                                        #
-#     The Alt-ergo theorem prover                                        #
-#     Copyright (C) 2006-2010                                            #
+#     The Alt-Ergo theorem prover                                        #
+#     Copyright (C) 2006-2011                                            #
 #                                                                        #
 #     Sylvain Conchon                                                    #
 #     Evelyne Contejean                                                  #
-#     Stephane Lescuyer                                                  #
+#                                                                        #
+#     Francois Bobot                                                     #
 #     Mohamed Iguernelala                                                #
+#     Stephane Lescuyer                                                  #
 #     Alain Mebsout                                                      #
 #                                                                        #
 #     CNRS - INRIA - Universite Paris Sud                                #
@@ -46,9 +48,8 @@ OCAMLDEP = @OCAMLDEP@
 OCAMLLEX = @OCAMLLEX@
 OCAMLYACC= @OCAMLYACC@
 OCAMLLIB = @OCAMLLIB@
-OCAMLBEST= @OCAMLBEST@
+OCAMLBEST = @OCAMLBEST@
 OCAMLVERSION = @OCAMLVERSION@
-OCAMLWEB = @OCAMLWEB@
 OCAMLWIN32 = @OCAMLWIN32@
 EXE = @EXE@
 
@@ -57,11 +58,11 @@ INCLUDES = @OCAMLGRAPHLIB@ @LABLGTK2LIB@
 BFLAGS = -dtypes -g $(INCLUDES) -annot
 OFLAGS = -dtypes $(INCLUDES) -annot -for-pack AltErgo
 
-BIBBYTE=nums.cma graph.cma unix.cma
+BIBBYTE = nums.cma graph.cma unix.cma
 
-BIBOPT=$(BIBBYTE:.cma=.cmxa)
+BIBOPT = $(BIBBYTE:.cma=.cmxa)
 
-BIBGUIOPT=threads.cmxa lablgtk.cmxa lablgtksourceview2.cmxa gtkThread.cmx 
+BIBGUIOPT = threads.cmxa lablgtk.cmxa lablgtksourceview2.cmxa gtkThread.cmx 
 
 # main target
 #############
@@ -76,17 +77,12 @@ all: pack xpack $(OCAMLBEST) pack xpack
 # bytecode and native-code compilation
 ######################################
 
-#      printproof.cmo unionfind.cmo \
-#      pa.cmo \
-#      puf.cmo \
-#      satbj.cmo  
-
 PRECMO = version.cmo print_color.cmo preoptions.cmo
 
 OPTIONSCMO = parseoptions.cmo
 
 CMO = options.cmo exception.cmo loc.cmo \
-      hashcons.cmo hstring.cmo builtin.cmo symbols.cmo \
+      hashcons.cmo hstring.cmo symbols.cmo \
       subst.cmo ty.cmo common.cmo term.cmo literal.cmo formula.cmo \
       explanation.cmo \
       why_parser.cmo why_lexer.cmo pretty.cmo \
@@ -95,9 +91,9 @@ CMO = options.cmo exception.cmo loc.cmo \
       smtlib2_parse.cmo smtlib2_lex.cmo smtlib2_to_why.cmo \
       polynome.cmo ac.cmo \
       uf.cmo use.cmo intervals.cmo fm.cmo arith.cmo \
-      records.cmo bitv.cmo reachability.cmo arrays.cmo sum.cmo \
+      records.cmo bitv.cmo arrays.cmo sum.cmo \
       combine.cmo cc.cmo \
-      heap.cmo existantial.cmo \
+      existantial.cmo \
       triggers.cmo cnf.cmo why_typing.cmo matching.cmo \
       sat.cmo 
 
@@ -145,15 +141,9 @@ $(NAME).opt: $(PRECMX) $(OPTIONSCMX) $(MAINCMX)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLOPT) $(OFLAGS) -o $@ $(BIBOPT) $^
 
-gui: $(GUICMX)
+gui: $(PRECMX) $(OPTIONSCMX) $(GUICMX)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLOPT) $(OFLAGS) -o altgr-ergo.opt $(BIBOPT) $(BIBGUIOPT) $^
-
-
-run: $(MAINCMX)
-	$(OCAMLOPT) -ccopt -static $(OFLAGS) -o $@ $(BIBOPT) $^
-	strip $@
-	tar -czvf alt-ergo.tgz run smt_prelude.mlw
 
 test: $(OPT)
 	./$(OPT) test.mlw
@@ -177,7 +167,7 @@ challenge:$(OPT)
 testoptsel:$(OPT)
 	tests/test.sh "./$(OPT) -select 2 -glouton -triggers-var "
 
-VERSION=0.93.1
+VERSION=0.94
 
 version.ml: config.status
 	@echo "let version = \""$(VERSION)"\"" > version.ml
@@ -197,7 +187,7 @@ adacore-patch:
 # file headers
 ##############
 headers:
-	headache -c doc/headache_config.txt -h doc/alt-ergoheader.txt \
+	headache -c doc/headache_config.txt -h doc/ergoheader.txt \
 		Makefile.in configure.in README INSTALL \
 		*.ml *.ml[ily]
 
@@ -205,7 +195,7 @@ headers:
 # installation
 ##############
 
-install-indep: install-man install-prelude install-pack
+install-indep: install-man install-pack
 
 install: install-indep 
 	mkdir -p $(BINDIR)
@@ -222,10 +212,6 @@ install-opt: install-indep
 install-man:
 	mkdir -p $(MANDIR)/man1
 	cp -f doc/*.1 $(MANDIR)/man1
-
-install-prelude: smt_prelude.mlw
-	mkdir -p $(LIBDIR)
-	cp -f $^ $(LIBDIR)
 
 install-gui: install-indep
 	mkdir -p $(BINDIR)
@@ -255,12 +241,12 @@ TAR=$(EXPORTDIR).tar
 HTTP = $$HOME/WWW/ergo/http
 ERGOWEB = $$HOME/WWW/ergo/
 
-FILES = version.sh.in version.ml exception.mli exception.ml \
+FILES = exception.mli exception.ml \
 	print_color.mli print_color.ml \
-	options.mli options.ml \
+	preoptions.ml preoptions.mli \
+	parseoptions.ml options.mli options.ml \
 	loc.ml sig.mli \
-	heap.mli heap.ml hashcons.mli hashcons.ml \
-	builtin.mli builtin.ml \
+	hashcons.mli hashcons.ml \
 	hstring.mli hstring.ml	\
 	symbols.ml symbols.mli \
 	subst.mli subst.ml \
@@ -298,12 +284,10 @@ FILES = version.sh.in version.ml exception.mli exception.ml \
 	gui.ml\
 	main.ml \
 	Makefile.in configure configure.in   \
-	.depend README INSTALL COPYING CeCILL-C CHANGES \
-	smt_prelude.mlw
+	.depend README INSTALL COPYING CeCILL-C CHANGES
 
 export: source binary
 	cp README COPYING CeCILL-C CHANGES doc/*.1 $(HTTP)
-#	cp index.html $(ERGOWEB)
 
 source: 
 	mkdir -p export/$(EXPORTDIR)
@@ -314,7 +298,6 @@ source:
 	cp doc/$(NAME).1 export/$(EXPORTDIR)/doc
 	cp util/gtk-lang/alt-ergo.lang export/$(EXPORTDIR)/util/gtk-lang/
 	cd export ; tar cf $(TAR) $(EXPORTDIR) ; gzip -f --best $(TAR)
-	cp export/$(TAR).gz $(HTTP)
 
 
 BINARY = $(EXPORTDIR)-$$OSTYPE
@@ -324,15 +307,7 @@ BINARYFILES = README INSTALL COPYING CeCILL-C doc/$(NAME).1
 
 binary: $(OPT)
 	strip $(OPT)
-	cp $(OPT) $(HTTP)/alt-ergo-$(VERSION)-$(ARCH)
-
-# literate programming
-######################
-
-SOURCES = 
-
-$(NAME).tex: $(SOURCES)
-	$(OCAMLWEB) -o $@ $^
+	cp $(OPT) export/alt-ergo-$(VERSION)-$(ARCH)
 
 # generic rules
 ###############
@@ -364,27 +339,6 @@ $(NAME).tex: $(SOURCES)
 .mly.mli:
 	$(if $(QUIET),@echo 'Compiling $<' &&) $(OCAMLYACC) -v $< 
 
-.tex.dvi:
-	latex $< && latex $<
-
-.dvi.ps:
-	dvips $< -o $@ 
-
-.tex.html:
-	hevea $<
-
-# Emacs tags
-############
-
-tags:
-	find . -name "*.ml*" | sort -r | xargs \
-	etags "--regex=/let[ \t]+\([^ \t]+\)/\1/" \
-	      "--regex=/let[ \t]+rec[ \t]+\([^ \t]+\)/\1/" \
-	      "--regex=/and[ \t]+\([^ \t]+\)/\1/" \
-	      "--regex=/type[ \t]+\([^ \t]+\)/\1/" \
-              "--regex=/exception[ \t]+\([^ \t]+\)/\1/" \
-	      "--regex=/val[ \t]+\([^ \t]+\)/\1/" \
-	      "--regex=/module[ \t]+\([^ \t]+\)/\1/"
 
 # Makefile is rebuilt whenever Makefile.in or configure.in is modified
 ######################################################################

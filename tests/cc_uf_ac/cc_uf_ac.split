@@ -882,7 +882,7 @@ goal g58:
   g(b,g(x,z)) = g(c,g(x,y)) 
  
 
-$res:Valid 
+$res:Valid
 $
 
 logic x,y,z,t,b : int

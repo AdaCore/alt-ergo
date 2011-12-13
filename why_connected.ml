@@ -1,3 +1,22 @@
+(**************************************************************************)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
+(*                                                                        *)
+(*     Sylvain Conchon                                                    *)
+(*     Evelyne Contejean                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
+(*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
+(*     Alain Mebsout                                                      *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*   This file is distributed under the terms of the CeCILL-C licence     *)
+(*                                                                        *)
+(**************************************************************************)
+
 open Why_annoted
 
 open Lexing
@@ -203,7 +222,7 @@ let rec is_quantified_term vars at =
   | ATinfix (at1, _, at2) ->
       is_quantified_term vars at1
       || is_quantified_term vars at2
-  | ATprefix (_, at) ->
+  | ATdot (at, _) | ATprefix (_, at) ->
       is_quantified_term vars at
   | ATextract (at1, at2, at3)
   | ATset (at1, at2, at3) ->
@@ -215,6 +234,9 @@ let rec is_quantified_term vars at =
 	List.filter (fun (s'',_) -> not (Symbols.equal s' s'')) vars in
       is_quantified_term vars at1
       || is_quantified_term nvars at2
+  | ATrecord r ->
+      List.fold_left
+	(fun b (_, at) -> b || is_quantified_term vars at) false r
 
 let unquantify_aaterm (buffer:sbuffer) at =
   new_annot buffer at.c (Why_typing.new_id ()) (tag buffer)
@@ -239,13 +261,16 @@ let rec aterm_used_vars goal_vars at =
 	 with Not_found ->  [])
     | ATapp (_, atl) ->
 	List.fold_left (fun l at -> aterm_used_vars goal_vars at @ l) [] atl
-    | ATprefix (_, at) | ATlet (_, _, at) -> aterm_used_vars goal_vars at
+    | ATdot (at, _) | ATprefix (_, at) | ATlet (_, _, at) ->
+	aterm_used_vars goal_vars at
     | ATinfix (at1, _, at2) | ATget (at1, at2) | ATconcat (at1, at2) ->
 	(aterm_used_vars goal_vars at1)@(aterm_used_vars goal_vars at2)
     | ATset (at1, at2, at3) | ATextract (at1, at2, at3) ->
 	(aterm_used_vars goal_vars at1)@
 	  (aterm_used_vars goal_vars at2)@
 	  (aterm_used_vars goal_vars at3)
+    | ATrecord r ->
+	List.fold_left (fun l (_, at) -> aterm_used_vars goal_vars at @ l) [] r
 
 
 let rec unquantify_aform (buffer:sbuffer) tyenv vars_entries 
@@ -737,11 +762,14 @@ and connect_at_desc env sbuf = function
     | ATconcat (t1, t2) | ATlet (_, t1, t2) ->
 	connect_aterm env sbuf t1;
 	connect_aterm env sbuf t2
-    | ATprefix (_, t) -> connect_aterm env sbuf t
+    | ATdot (t, _) | ATprefix (_, t) -> connect_aterm env sbuf t
     | ATset (t1,t2,t3) | ATextract (t1,t2,t3) ->
 	connect_aterm env sbuf t1;
 	connect_aterm env sbuf t2;
 	connect_aterm env sbuf t3
+    | ATrecord r -> 
+	let atl = List.map snd r in
+	connect_aterm_list env sbuf atl
 	
 and connect_aatom env sbuf aa =
   match aa with

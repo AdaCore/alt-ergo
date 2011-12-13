@@ -1,12 +1,14 @@
 (**************************************************************************)
 (*                                                                        *)
-(*     The Alt-ergo theorem prover                                        *)
-(*     Copyright (C) 2006-2010                                            *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
 (*                                                                        *)
 (*     Sylvain Conchon                                                    *)
 (*     Evelyne Contejean                                                  *)
-(*     Stephane Lescuyer                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
 (*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
@@ -68,11 +70,13 @@ val max_split : Num.num ref
 val rewriting : bool ref
 val proof : bool ref
 val debug_proof : bool ref
-val qualif : int ref
-val vsid : bool ref
+val rules : int ref
 val debug_split : bool ref
 
 val show_version : unit -> unit
 val show_libdir : unit -> unit
 val set_max_split : string -> unit
 val set_proof : bool -> unit
+val set_rules : string -> unit
+
+val restricted : bool ref

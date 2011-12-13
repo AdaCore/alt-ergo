@@ -1,12 +1,14 @@
 (**************************************************************************)
 (*                                                                        *)
-(*     The Alt-ergo theorem prover                                        *)
-(*     Copyright (C) 2006-2010                                            *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
 (*                                                                        *)
 (*     Sylvain Conchon                                                    *)
 (*     Evelyne Contejean                                                  *)
-(*     Stephane Lescuyer                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
 (*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
@@ -60,7 +62,7 @@ let satmode = ref false
 let bjmode = ref false
 let glouton = ref false
 let triggers_var = ref false
-let redondance = ref 4
+let redondance = ref 2
 let astuce = ref false
 let select = ref 0
 let no_rm_eq_existential = ref false
@@ -74,9 +76,9 @@ let all_models = ref false
 let goal_directed = ref false
 let proof = ref false
 let debug_proof = ref false
-let qualif = ref (-1)
-let vsid = ref false
+let rules = ref (-1)
 let max_split = ref (Num.Int 1000000)
+let restricted = ref false
 
 let show_version () = Format.printf "%s@." Version.version; exit 0
 let show_libdir () = Format.printf "%s@." Version.libdir; exit 0
@@ -84,3 +86,11 @@ let show_libdir () = Format.printf "%s@." Version.libdir; exit 0
 let set_max_split s = max_split := Num.num_of_string s
 
 let set_proof b = proof := b
+
+let set_rules = function
+  | "parsing" -> rules := 0
+  | "typing" -> rules := 1
+  | "sat" -> rules := 2
+  | "cc" -> rules := 3
+  | "arith" -> rules := 4
+  | _ -> rules := -1

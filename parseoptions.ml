@@ -1,12 +1,14 @@
 (**************************************************************************)
 (*                                                                        *)
-(*     The Alt-ergo theorem prover                                        *)
-(*     Copyright (C) 2006-2010                                            *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
 (*                                                                        *)
 (*     Sylvain Conchon                                                    *)
 (*     Evelyne Contejean                                                  *)
-(*     Stephane Lescuyer                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
 (*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
@@ -81,12 +83,12 @@ let spec = [
    " instantiate lemmas only with the terms from the goal";
   "-bouclage", Arg.Set_int bouclage,
   " number of instantiations at each matching round";
-  "-qualif", Arg.Set_int qualif, "<n> output rules used on stderr";
-  "-vsid", Arg.Set vsid, "use VSID heuristic in SAT";
+  "-rules", Arg.String set_rules, "<parsing|typing|sat|cc|arith> output rules used on stderr";
   "-max-split", Arg.String set_max_split,
   (Format.sprintf " maximum size of case-split (default value : %s)" 
      (Num.string_of_num !max_split));
-
+  "-restricted", Arg.Set restricted, 
+  " restrict set of decision procedures (equality, arithmetic and AC)";
 ]
 
 let _ =

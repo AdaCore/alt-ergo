@@ -1,12 +1,14 @@
 (**************************************************************************)
 (*                                                                        *)
-(*     The Alt-ergo theorem prover                                        *)
-(*     Copyright (C) 2006-2010                                            *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
 (*                                                                        *)
 (*     Sylvain Conchon                                                    *)
 (*     Evelyne Contejean                                                  *)
-(*     Stephane Lescuyer                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
 (*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
@@ -175,7 +177,7 @@ module Make (X : Sig.X) = struct
     SetT.fold (equal_only_by_congruence env ex t1) s acc
 
   let rec add_term ex (env, l) t =
-    if qualif = 3 then fprintf fmt "[rule] TR-CCX-AddTerm@.";
+    if rules = 3 then fprintf fmt "[rule] TR-CCX-AddTerm@.";
     Print.add_to_use t;
     (* nothing to do if the term already exists *)
     if Uf.mem env.uf t then env, l
@@ -335,9 +337,8 @@ module Make (X : Sig.X) = struct
     let are_eq = Uf.are_equal env.uf in
     let are_neq = Uf.are_distinct env.uf in
     let class_of = Uf.class_of env.uf in
-    let find = Uf.find env.uf in
     let relation, result = 
-      X.Rel.assume env.relation sa are_eq are_neq class_of find in
+      X.Rel.assume env.relation sa are_eq are_neq class_of in
     let env = { env with relation = relation } in
     let env = clean_use env result.remove in
     env, result.assume
@@ -373,7 +374,7 @@ module Make (X : Sig.X) = struct
 	    Print.assume_literal sa;
 	    match sa with
 	      | A.Eq(r1, r2) ->
-		if qualif = 3 then fprintf fmt "[rule] TR-CCX-Congruence@.";
+		if rules = 3 then fprintf fmt "[rule] TR-CCX-Congruence@.";
 		let env, l = congruence_closure env r1 r2 ex in
 		let env, lt = assume_literal lt env l in
 		if Options.nocontracongru then env, lt
@@ -383,13 +384,13 @@ module Make (X : Sig.X) = struct
 		  in
 		  assume_literal lt env (contra_congruence env r2 ex)
 	      | A.Distinct (false, lr) ->
-		if qualif = 3 then fprintf fmt "[rule] TR-CCX-Distinct@.";
+		if rules = 3 then fprintf fmt "[rule] TR-CCX-Distinct@.";
 		if Uf.already_distinct env.uf lr then env, lt
 		else 
 		  {env with uf = Uf.distinct env.uf lr ex}, lt
 	      | A.Distinct (true, _) -> assert false
 	      | A.Builtin _ ->
-		if qualif = 3 then fprintf fmt "[rule] TR-CCX-Builtin@.";
+		if rules = 3 then fprintf fmt "[rule] TR-CCX-Builtin@.";
 		env, lt)
 	  (env, lt) lsa
       in
@@ -402,7 +403,7 @@ module Make (X : Sig.X) = struct
     let rec aux lt bad_last dl base_env li = match li, bad_last with
       | [], _ -> 
 	begin
-	  if qualif = 3 then
+	  if rules = 3 then
 	    fprintf fmt "[rule] TR-CCX-CS-Case-Split@.";
           match X.Rel.case_split base_env.relation with
 	    | [] -> 
@@ -439,7 +440,7 @@ module Make (X : Sig.X) = struct
 	  try
             Print.split_assume (LR.make c) ex_c_exp;
 	    let base_env, lt = assume_literal lt base_env [LSem c, ex_c_exp] in
-	    if qualif = 3 then
+	    if rules = 3 then
 	      fprintf fmt "[rule] TR-CCX-CS-Normal-Run@.";
 	    aux lt bad_last (a::dl) base_env l
 	  with Exception.Inconsistent dep ->
@@ -447,11 +448,11 @@ module Make (X : Sig.X) = struct
               | None ->
                 (* The choice doesn't participate to the inconsistency *)
                 Print.split_backjump (LR.make c) dep;
-		if qualif = 3 then
+		if rules = 3 then
 		  fprintf fmt "[rule] TR-CCX-CS-Case-Split-Conflict@.";
                 raise (Exception.Inconsistent dep)
               | Some dep ->
-		if qualif = 3 then
+		if rules = 3 then
 		  fprintf fmt "[rule] TR-CCX-CS-Case-Split-Progress@.";
                 (* The choice participates to the inconsistency *)
                 let neg_c = LR.neg (LR.make c) in
@@ -472,7 +473,7 @@ module Make (X : Sig.X) = struct
 	  with Exception.Inconsistent dep -> 
             if debug_split then
               fprintf fmt "[case-split] I replay choices@.";
-	    if qualif = 3 then
+	    if rules = 3 then
 	      fprintf fmt "[rule] TR-CCX-CS-Case-Split-Erase-Choices@.";
 	    (* we replay the conflict in look_for_sat, so we can
 	       safely ignore the explanation which is not useful *)
@@ -480,7 +481,7 @@ module Make (X : Sig.X) = struct
 	      [] { t with choices = []} t.gamma t.choices
       with Exception.Inconsistent d ->
 	Print.end_case_split ();
-	if qualif = 3 then
+	if rules = 3 then
 	  fprintf fmt "[rule] TR-CCX-CS-Conflict@.";
 	raise (Exception.Inconsistent d)
     in
@@ -555,10 +556,9 @@ module Make (X : Sig.X) = struct
 	  let are_eq = Uf.are_equal env.uf in
 	  let are_neq = Uf.are_distinct env.uf in
 	  let class_of = Uf.class_of env.uf in
-	  let find = Uf.find env.uf in
 	  let rna, ex_rna = term_canonical_view env na Ex.empty in
           X.Rel.query env.relation (rna, Some na, ex_rna) 
-	    are_eq are_neq class_of find
+	    are_eq are_neq class_of
     with Exception.Inconsistent d -> Yes d
 
   let empty () = 

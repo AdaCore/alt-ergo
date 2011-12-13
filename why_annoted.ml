@@ -1,3 +1,22 @@
+(**************************************************************************)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
+(*                                                                        *)
+(*     Sylvain Conchon                                                    *)
+(*     Evelyne Contejean                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
+(*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
+(*     Alain Mebsout                                                      *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*   This file is distributed under the terms of the CeCILL-C licence     *)
+(*                                                                        *)
+(**************************************************************************)
+
 open Why_ptree
 
 open Lexing
@@ -33,6 +52,10 @@ and at_desc =
   | ATextract of aterm * aterm * aterm
   | ATconcat of aterm * aterm
   | ATlet of Symbols.t * aterm * aterm
+  | ATdot of aterm * Hstring.t
+  | ATrecord of (Hstring.t * aterm) list
+
+      
       
 
 type aatom = 
@@ -72,7 +95,7 @@ type atyped_decl =
   | APredicate_def of loc * string * (string * ppure_type) list * aform
   | AFunction_def 
       of loc * string * (string * ppure_type) list * ppure_type * aform
-  | ATypeDecl of loc * string list * string * string list
+  | ATypeDecl of loc * string list * string * body_type_decl
 
 
 type annoted_node =
@@ -160,7 +183,7 @@ and findin_at_desc tag buffer = function
 	let r = findin_aterm tag buffer t1 in
 	if r = None then findin_aterm tag buffer t2
 	else r
-    | ATprefix (_,t) -> findin_aterm tag buffer t
+    | ATdot (t, _) | ATprefix (_,t) -> findin_aterm tag buffer t
     | ATset (t1, t2, t3) | ATextract (t1, t2, t3)  ->
 	let r = findin_aterm tag buffer t1 in
 	if r = None then
@@ -168,6 +191,7 @@ and findin_at_desc tag buffer = function
 	  if r = None then findin_aterm tag buffer t3
 	  else r
 	else r
+    | ATrecord r -> let atl = List.map snd r in findin_aterm_list tag buffer atl
 	
 let findin_aatom tag buffer aa =
   match aa with
@@ -373,6 +397,14 @@ and print_tterm_list se fmt = function
   | [t] -> print_tterm fmt t
   | t::r -> fprintf fmt "%a%s%a" print_tterm t se (print_tterm_list se) r
 
+and print_record se fmt = function
+  | [] -> ()
+  | [c,t] -> fprintf fmt "%s = %a" (Hstring.view c) print_tterm t
+  | (c,t)::r -> 
+      fprintf fmt "%s = %a%s%a" (Hstring.view c) 
+	print_tterm t se (print_record se) r
+
+
 and print_tt_desc fmt = function
   | TTconst c -> print_tconstant fmt c
   | TTvar s -> Symbols.print fmt s
@@ -393,6 +425,9 @@ and print_tt_desc fmt = function
       fprintf fmt "%a[%a<-%a]" print_tterm t print_tterm t1 print_tterm t2
   | TTget (t, t1) ->
       fprintf fmt "%a[%a]" print_tterm t print_tterm t1
+  | TTdot (t, c) ->
+      fprintf fmt "%a.%s" print_tterm t (Hstring.view c)
+  | TTrecord r -> fprintf fmt "{ %a }" (print_record ";") r
 
 let print_tatom fmt a = match a.Why_ptree.c with
   | TAtrue -> fprintf fmt "true" 
@@ -452,6 +487,12 @@ and print_tform_list op fmt = function
   | tf::l -> fprintf fmt "%a %a %a"
       print_tform tf print_oplogic op (print_tform_list op) l
 
+let rec print_record_type fmt = function
+  | [] -> ()
+  | [c, ty] -> fprintf fmt "%s : %a" c print_ppure_type ty
+  | (c, ty)::l -> 
+      fprintf fmt "%s : %a; %a" c print_ppure_type ty print_record_type l
+
 let print_typed_decl fmt td = match td.Why_ptree.c with
   | TAxiom (_, s, tf) -> fprintf fmt "axiom %s : %a" s print_tform tf
   | TRewriting (_, s, rwtl) -> 
@@ -465,10 +506,13 @@ let print_typed_decl fmt td = match td.Why_ptree.c with
   | TFunction_def (_, f, spptl, ty, tf) ->
       fprintf fmt "function %s (%a) : %a = %a" f
 	print_string_ppure_type_list spptl print_ppure_type ty print_tform tf
-  | TTypeDecl (_, ls, s, []) -> fprintf fmt "type %a %s" print_astring_list ls s
-  | TTypeDecl (_, ls, s, lc) -> 
+  | TTypeDecl (_, ls, s, Abstract) ->
+      fprintf fmt "type %a %s" print_astring_list ls s
+  | TTypeDecl (_, ls, s, Enum lc) -> 
     fprintf fmt "type %a %s = %a" print_astring_list ls s 
       (print_string_sep " | ") lc
+  | TTypeDecl (_, ls, s, Record rt) -> 
+    fprintf fmt "type %a %s = %a" print_astring_list ls s print_record_type rt 
 
 let print_typed_decl_list fmt = List.iter (fprintf fmt "%a@." print_typed_decl)
 
@@ -554,6 +598,15 @@ and make_dep_at_desc d ex dep = function
 	let dep = make_dep_string d ex dep (Symbols.to_string s) in
 	let dep = make_dep_aterm d ex dep t1 in
 	make_dep_aterm d ex dep t2	
+    | ATdot (t, c) ->
+	let dep = make_dep_string d ex dep (Hstring.view c) in
+	make_dep_aterm d ex dep t
+    | ATrecord r ->
+	List.fold_left 
+	  (fun dep (c, t) ->
+	     let dep = make_dep_string d ex dep (Hstring.view c) in
+	     make_dep_aterm d ex dep t)
+	  dep r
 
 let make_dep_aatom d ex dep = function
   | AAtrue | AAfalse -> dep
@@ -641,6 +694,8 @@ and of_tt_desc (buffer:sbuffer) = function
       ATextract (of_tterm buffer t, of_tterm buffer t1, of_tterm buffer t2)
   | TTconcat (t1, t2) -> ATconcat (of_tterm buffer t1, of_tterm buffer t2)
   | TTlet (s, t1, t2) -> ATlet (s, of_tterm buffer t1, of_tterm buffer t2)
+  | TTdot (t, c) -> ATdot (of_tterm buffer t, c)
+  | TTrecord r -> ATrecord (List.map (fun (c,t) -> (c, of_tterm buffer t)) r)
 
 let of_tatom (buffer:sbuffer) a = match a.Why_ptree.c with
   | TAtrue -> AAtrue
@@ -758,6 +813,8 @@ and to_tt_desc = function
 	TTextract (to_tterm 0 t1, to_tterm 0 t2, to_tterm 0 t3)
     | ATconcat (t1, t2) -> TTconcat (to_tterm 0 t1, to_tterm 0 t2)
     | ATlet (s, t1, t2) -> TTlet (s, to_tterm 0 t1, to_tterm 0 t2)
+    | ATdot (t, c) -> TTdot (to_tterm 0 t, c)
+    | ATrecord r -> TTrecord (List.map (fun (c, t) -> (c, to_tterm 0 t)) r)
 
 let to_tatom aa id = 
   let c = match aa with 
@@ -896,6 +953,18 @@ and add_aaterm_list_at (buffer:sbuffer) tags iter sep =
 and add_aaterm_list (buffer:sbuffer) tags sep atl =
   add_aaterm_list_at buffer tags buffer#end_iter sep atl
 
+and add_arecord_at (buffer:sbuffer) tags iter =
+  function
+    | [] -> ()
+    | [c, at] ->
+	buffer#insert ~iter ~tags (sprintf "%s = " (Hstring.view c));
+	add_aterm_at buffer tags iter at;
+    | (c, at)::l ->
+	buffer#insert ~iter ~tags (sprintf "%s = " (Hstring.view c));
+	add_aterm_at buffer tags iter at;
+	buffer#insert ~iter ~tags "; ";
+	add_arecord_at buffer tags iter l
+
 and add_at_desc_at (buffer:sbuffer) tags iter at =
   (* let off1 = iter#offset in *)
   (* let off = off1 - (buffer#get_iter (`OFFSET off1))#line_offset in *)
@@ -950,6 +1019,13 @@ and add_at_desc_at (buffer:sbuffer) tags iter at =
 	add_aterm_at buffer tags iter t1;
 	buffer#insert ~iter ~tags " in ";
 	add_aterm_at buffer tags iter t2
+    | ATdot (t, c) ->
+	add_aterm_at buffer tags iter t;
+	buffer#insert ~iter ~tags (sprintf ".%s" (Hstring.view c))
+    | ATrecord r ->
+	buffer#insert ~iter ~tags "{ ";
+	add_arecord_at buffer tags iter r;
+	buffer#insert ~iter ~tags " }"
 
 	
 	
@@ -1084,7 +1160,7 @@ let add_atyped_decl (buffer:sbuffer) d =
   match d.c with
   | AAxiom (loc, s, af) ->
       let keyword = 
-	if String.length s > 0 && s.[0] = '_' 
+	if String.length s > 0 && (s.[0] = '_'  || s.[0] = '@') 
 	then "hypothesis" else "axiom" in
       buffer#insert ~tags:[d.tag;d.ptag] (sprintf "%s %s :" keyword s);
       buffer#insert "\n";
@@ -1128,17 +1204,22 @@ let add_atyped_decl (buffer:sbuffer) d =
       add_aform buffer 1 [d.tag;d.ptag] af;
       buffer#insert "\n\n"
       
-  | ATypeDecl (loc, ls, s, []) -> 
+  | ATypeDecl (loc, ls, s, Abstract) -> 
       fprintf str_formatter "type %a %s" print_astring_list ls s;
       buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
       buffer#insert "\n\n"
       
-  | ATypeDecl (loc, ls, s, lc) -> 
+  | ATypeDecl (loc, ls, s, Enum lc) -> 
       fprintf str_formatter "type %a %s = %a"
 	print_astring_list ls s (print_string_sep " | ") lc;
       buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
       buffer#insert "\n\n"
 
+  | ATypeDecl (loc, ls, s, Record rt) -> 
+      fprintf str_formatter "type %a %s = { %a }"
+	print_astring_list ls s	print_record_type rt;
+      buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
+      buffer#insert "\n\n"
 
 
 let add_to_buffer (buffer:sbuffer) annoted_ast =
@@ -1161,9 +1242,10 @@ let rec isin_aterm sl { at_desc = at_desc } =
     | ATinfix (t1, _, t2) | ATget (t1,t2)
     | ATconcat (t1, t2) | ATlet (_, t1, t2) ->
       isin_aterm sl t1 || isin_aterm sl t2
-    | ATprefix (_,t) -> isin_aterm sl t
+    | ATdot (t, _ ) | ATprefix (_,t) -> isin_aterm sl t
     | ATset (t1, t2, t3) | ATextract (t1, t2, t3)  ->
       isin_aterm sl t1 || isin_aterm sl t2 || isin_aterm sl t3 
+    | ATrecord rt -> let atl = List.map snd rt in isin_aterm_list sl atl
 
 and isin_aterm_list sl atl =
   List.fold_left
@@ -1174,17 +1256,21 @@ and findtags_aaterm sl aat acc =
   match aat.c.at_desc with
     | ATconst _ -> acc
     | ATvar sy -> 
-      if List.mem (Symbols.to_string sy) sl then aat.tag::acc else acc
+	if List.mem (Symbols.to_string sy) sl then aat.tag::acc else acc
     | ATapp (sy, atl) -> 
-      if List.mem (Symbols.to_string sy) sl || isin_aterm_list sl atl
-      then aat.tag::acc else acc
+	if List.mem (Symbols.to_string sy) sl || isin_aterm_list sl atl
+	then aat.tag::acc else acc
     | ATinfix (t1, _, t2) | ATget (t1,t2)
     | ATconcat (t1, t2) | ATlet (_, t1, t2) ->
-      if isin_aterm sl t1 || isin_aterm sl t2 then aat.tag::acc else acc
-    | ATprefix (_,t) -> if isin_aterm sl t then aat.tag::acc else acc
+	if isin_aterm sl t1 || isin_aterm sl t2 then aat.tag::acc else acc
+    | ATdot (t, _) | ATprefix (_,t) ->
+	if isin_aterm sl t then aat.tag::acc else acc
     | ATset (t1, t2, t3) | ATextract (t1, t2, t3)  ->
-      if isin_aterm sl t1 || isin_aterm sl t2 || isin_aterm sl t3 
-      then aat.tag::acc else acc
+	if isin_aterm sl t1 || isin_aterm sl t2 || isin_aterm sl t3 
+	then aat.tag::acc else acc
+    | ATrecord r ->
+	let atl = List.map snd r in
+	if isin_aterm_list sl atl then aat.tag::acc else acc
 
 and findtags_aaterm_list sl aatl acc =
   List.fold_left
@@ -1275,14 +1361,17 @@ let rec listsymbols at acc =
     | ATconst _ -> acc
     | ATvar sy -> (Symbols.to_string sy)::acc
     | ATapp (sy, atl) ->
-      List.fold_left (fun acc at -> listsymbols at acc) 
-	((Symbols.to_string sy)::acc) atl
+	List.fold_left (fun acc at -> listsymbols at acc) 
+	  ((Symbols.to_string sy)::acc) atl
     | ATinfix (t1, _, t2) | ATget (t1,t2)
     | ATconcat (t1, t2) | ATlet (_, t1, t2) ->
-      listsymbols t1 (listsymbols t2 acc)
-    | ATprefix (_,t) -> listsymbols t acc
+	listsymbols t1 (listsymbols t2 acc)
+    | ATdot (t, _) | ATprefix (_,t) -> listsymbols t acc
     | ATset (t1, t2, t3) | ATextract (t1, t2, t3)  ->
-      listsymbols t1 (listsymbols t2 (listsymbols t3 acc))
+	listsymbols t1 (listsymbols t2 (listsymbols t3 acc))
+    | ATrecord r ->
+	List.fold_left (fun acc (_, at) -> listsymbols at acc) acc r 
+      
 
 let findtags_atyped_delc_dep sl td acc =
   match td.c with

@@ -1,12 +1,14 @@
 (**************************************************************************)
 (*                                                                        *)
-(*     The Alt-ergo theorem prover                                        *)
-(*     Copyright (C) 2006-2010                                            *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
 (*                                                                        *)
 (*     Sylvain Conchon                                                    *)
 (*     Evelyne Contejean                                                  *)
-(*     Stephane Lescuyer                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
 (*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
@@ -41,7 +43,6 @@ module type RELATION = sig
     are_eq : (Term.t -> Term.t -> answer) -> 
     are_neq : (Term.t -> Term.t -> answer) -> 
     class_of : (Term.t -> Term.t list) -> 
-    find : (Term.t -> r * Explanation.t) ->
     t * r result
 
   val query : 
@@ -50,7 +51,6 @@ module type RELATION = sig
     are_eq : (Term.t -> Term.t -> answer) -> 
     are_neq : (Term.t -> Term.t -> answer) -> 
     class_of : (Term.t -> Term.t list) -> 
-    find : (Term.t -> r * Explanation.t) ->
     answer
 
   val case_split : t -> (r Literal.view * Explanation.t * Num.num) list

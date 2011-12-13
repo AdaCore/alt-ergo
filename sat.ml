@@ -1,12 +1,14 @@
 (**************************************************************************)
 (*                                                                        *)
-(*     The Alt-ergo theorem prover                                        *)
-(*     Copyright (C) 2006-2010                                            *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
 (*                                                                        *)
 (*     Sylvain Conchon                                                    *)
 (*     Evelyne Contejean                                                  *)
-(*     Stephane Lescuyer                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
 (*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
@@ -218,7 +220,7 @@ let new_facts mode env =
 
 
 let mround predicate mode env max_size =
-  if qualif = 2 then fprintf fmt "[rule] TR-Sat-Mround@.";
+  if rules = 2 then fprintf fmt "[rule] TR-Sat-Mround@.";
   let round mode =
     Print.mround max_size;
     let axioms = if predicate then env.definitions else env.lemmas in
@@ -254,35 +256,12 @@ let extract_model t =
 
 let print_model fmt s = 
   SF.iter (fprintf fmt "%a\n" F.print) s
-
-
-
-(* *)
-
-let activities = if vsid then H.create 1017 else H.create 0
-
-let weight = 0.1
-let current_weight = ref 0.1
-
-let incr_weight () = current_weight := !current_weight +. weight
-
-let incr_activity l = 
-  let v = try H.find activities l with Not_found -> 0. in
-  H.replace activities l (v +. !current_weight)
-
-let update_activity dep = 
-  F.Set.iter incr_activity (Ex.formulas_of dep)
-
-let max_formula a b = 
-  let c1 = try H.find activities a.f with Not_found -> 0. in
-  let c2 = try H.find activities b.f with Not_found -> 0. in
-  if c2 < c1 then a, b else b, a
   
 (* sat-solver *)
 
 let elim {f=f} env = 
   if MF.mem f env.gamma then
-    (if qualif = 2 then fprintf fmt "[rule] TR-Sat-Bcp-Elim-1@.";
+    (if rules = 2 then fprintf fmt "[rule] TR-Sat-Bcp-Elim-1@.";
      true)
   else
     let el = match F.view f with 
@@ -290,7 +269,7 @@ let elim {f=f} env =
       | _ -> false
     in
     if el then 
-      if qualif = 2 then fprintf fmt "[rule] TR-Sat-Assume-Let@.";
+      if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-Let@.";
     el
 
 let size_formula = 1_000_000
@@ -299,7 +278,7 @@ let red {f=f} env =
   let nf = F.mk_not f in
   try 
     let r = Yes (MF.find nf env.gamma) in
-    if qualif = 2 then fprintf fmt "[rule] TR-Sat-Bcp-Red-1@.";
+    if rules = 2 then fprintf fmt "[rule] TR-Sat-Bcp-Red-1@.";
     r
   with Not_found -> 
     let r = match F.view nf with
@@ -307,7 +286,7 @@ let red {f=f} env =
       | _ -> No
     in
     (match r with 
-      |	Yes _ -> if qualif = 2 then fprintf fmt "[rule] TR-Sat-Bcp-Red-2@."
+      |	Yes _ -> if rules = 2 then fprintf fmt "[rule] TR-Sat-Bcp-Red-2@."
       | No -> ());
     r
 	
@@ -346,12 +325,12 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 	 (* fprintf fmt "ass:%a %a @." 
 	    F.print (F.mk_not f) Ex.print dep_gamma; *)
        let ex_nf = MF.find (F.mk_not f) env.gamma in
-       if qualif = 2 then fprintf fmt "[rule] TR-Sat-Conflict-1@.";
+       if rules = 2 then fprintf fmt "[rule] TR-Sat-Conflict-1@.";
        raise (IUnsat (Ex.union dep_gamma ex_nf))
      with Not_found -> ());
     if MF.mem f env.gamma then
       begin
-	if qualif = 2 then fprintf fmt "[rule] TR-Sat-Remove@.";
+	if rules = 2 then fprintf fmt "[rule] TR-Sat-Remove@.";
 	env
       end
     else 
@@ -366,19 +345,19 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 	  Print.assume ff dep;
 	  match F.view f with
 	    | F.Unit (f1, f2) ->
-	      if qualif = 2 then fprintf fmt "[rule] TR-Sat-Assume-U@.";
+	      if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-U@.";
 	      let env = assume env 
 		({ f = f1; age = age; name = lem; mf = mf; gf = gf }, dep) in
 	      assume env 
 		({ f = f2; age = age; name = lem; mf = mf; gf = gf }, dep) 
 	    | F.Clause(f1,f2) -> 
-	      if qualif = 2 then fprintf fmt "[rule] TR-Sat-Assume-C@.";
+	      if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-C@.";
 		let p1 = {f=f1;age=age;name=lem;mf=mf;gf=gf} in
 		let p2 = {f=f2;age=age;name=lem;mf=mf;gf=gf} in
 		bcp { env with delta = (p1,p2,dep)::env.delta }
 
 	    | F.Lemma _ ->
-	      if qualif = 2 then fprintf fmt "[rule] TR-Sat-Assume-Ax@.";
+	      if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-Ax@.";
 		let age , dep = 
 		  try 
 		    let age' , dep' = MF.find f env.lemmas in
@@ -388,8 +367,7 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		bcp { env with lemmas=MF.add f (age,dep) env.lemmas }
 
 	    | F.Literal a ->
-	      if qualif = 2 then fprintf fmt "[rule] TR-Sat-Assume-Lit@.";
-		if vsid then incr_weight ();
+		if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-Lit@.";
 		let env = 
 		  if mf && size < size_formula then 
 		    add_terms env (A.LT.terms_of a) gf age lem
@@ -401,12 +379,12 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		bcp env
 
 	    | F.Skolem{F.sko_subst=sigma; sko_f=f} -> 
-	      if qualif = 2 then fprintf fmt "[rule] TR-Sat-Assume-Sko@.";
+	      if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-Sko@.";
 		let f' = F.apply_subst sigma f in
 		assume env ({f=f';age=age;name=lem;mf=mf;gf=gf},dep)
 
             | F.Let {F.let_var=lvar; let_term=lterm; let_subst=s; let_f=lf} ->
-	      if qualif = 2 then fprintf fmt "[rule] TR-Sat-Assume-Let@.";
+	      if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-Let@.";
                 let f' = F.apply_subst s lf in
 		let id = F.id f' in
                 let v = Symbols.Map.find lvar (fst s) in
@@ -418,7 +396,7 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
       end
   with Exception.Inconsistent expl -> 
     if debug_sat then fprintf fmt "inconsistent %a@." Ex.print expl;
-    if qualif = 2 then fprintf fmt "[rule] TR-Sat-Conflict-2@."; 
+    if rules = 2 then fprintf fmt "[rule] TR-Sat-Conflict-2@."; 
     raise (IUnsat expl)
     
 and bcp env =
@@ -482,7 +460,6 @@ and back_tracking env stop max_size =  match env.delta with
   | [] -> 
       raise I_dont_know
   | (a,b,d)::l ->
-      let a,b = if vsid then max_formula a b else a,b in
       let {f=f;age=g;name=lem;mf=mf} = a in
       Print.decide f;
       let dep = unsat_rec {env with delta=l} (a,Ex.singleton f) stop max_size in
@@ -490,14 +467,13 @@ and back_tracking env stop max_size =  match env.delta with
       try
 	let dep' = Ex.remove f dep in
 	Print.backtracking (F.mk_not f);
-	if qualif = 2 then fprintf fmt "[rule] TR-Sat-Decide@.";
-	if vsid then update_activity dep;
+	if rules = 2 then fprintf fmt "[rule] TR-Sat-Decide@.";
 	unsat_rec
 	  (assume {env with delta=l} (b, Ex.union d dep'))
 	  ({a with f=F.mk_not f},dep') stop max_size
       with Not_found -> 
 	Print.backjumping (F.mk_not f);
-	if qualif = 2 then fprintf fmt "[rule] TR-Sat-Backjumping@.";
+	if rules = 2 then fprintf fmt "[rule] TR-Sat-Backjumping@.";
 	dep 
 	
 let unsat env fg = 

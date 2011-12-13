@@ -1,12 +1,14 @@
 (**************************************************************************)
 (*                                                                        *)
-(*     The Alt-ergo theorem prover                                        *)
-(*     Copyright (C) 2006-2010                                            *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
 (*                                                                        *)
 (*     Sylvain Conchon                                                    *)
 (*     Evelyne Contejean                                                  *)
-(*     Stephane Lescuyer                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
 (*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
@@ -22,6 +24,9 @@ open Why_ptree
 module T = Term
 module F = Formula
 module A = Literal
+
+let ale = Hstring.make "<="
+let alt = Hstring.make "<" 
 
 let queue = Queue.create ()
 
@@ -102,7 +107,6 @@ let make_trigger = function
       when Symbols.equal s Common.fake_le ->
       let trs = List.filter (fun t -> not (List.mem t l)) [t1; t2] in
       let trs = List.map make_term trs in
-      let ale = Builtin.is_builtin "<=" in
       let lit = 
 	A.LT.make (A.Builtin(true, ale , [make_term t1; make_term t2])) 
       in
@@ -112,7 +116,7 @@ let make_trigger = function
       when Symbols.equal s Common.fake_lt -> 
       let trs = List.filter (fun t -> not (List.mem t l)) [t1; t2] in
       let trs = List.map make_term trs in
-      let alt = Builtin.is_builtin "<" in
+
       let lit = 
 	A.LT.make (A.Builtin(true, alt, [make_term t1; make_term t2])) 
       in
@@ -139,7 +143,6 @@ let make_form name f =
 	      let lit = A.LT.make (A.Distinct (false, lt)) in
 	      lit , lit::acc
 	  | TAle [t1;t2] -> 
-	      let ale = Builtin.is_builtin "<=" in
 	      let lit = 
 		A.LT.make (A.Builtin(true,ale,[make_term t1;make_term t2]))
 	      in lit , lit::acc
@@ -152,12 +155,10 @@ let make_form name f =
 		    let tt2 = 
 		      T.make (Symbols.Op Symbols.Minus) 
 			[make_term t2; make_term one] Ty.Tint in
-		    let ale = Builtin.is_builtin "<=" in
 		    let lit = 
 		      A.LT.make (A.Builtin(true,ale,[make_term t1; tt2]))
 		    in lit , lit::acc
 		| _ -> 
-		    let alt = Builtin.is_builtin "<" in
 		    let lit = 
 		      A.LT.make 
 			(A.Builtin(true, alt, [make_term t1; make_term t2])) 
