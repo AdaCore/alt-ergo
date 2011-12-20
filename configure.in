@@ -176,7 +176,7 @@ AC_CHECK_PROG(OCAMLWEB,ocamlweb,ocamlweb,true)
 
 # platform
 AC_MSG_CHECKING(platform)
-if echo "let _ = Sys.os_type" | ocaml | grep -q Win32; then
+if echo "let _ = Sys.os_type;;" | ocaml | grep -q Win32; then
     AC_MSG_RESULT(Win32)
     OCAMLWIN32=yes
     EXE=.exe
