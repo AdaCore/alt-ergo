@@ -184,11 +184,14 @@ module Make(X : ALIEN) = struct
        contenus dans les atomes de la *)
     let new_terms env la =
       let fct acc r =
-        match X.term_extract r with
-          | Some t -> 
-              let {T.xs=xs} = T.view t in
-              update_gets_sets (t::xs) acc
-          | None   -> acc
+        List.fold_left
+          (fun acc x -> 
+            match X.term_extract x with
+              | Some t -> 
+                let {T.xs=xs} = T.view t in
+                update_gets_sets (t::xs) acc
+              | None   -> acc
+          )acc (X.leaves r)
       in 
       let gets, tbset = 
         L.fold_left
