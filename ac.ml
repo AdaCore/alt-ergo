@@ -108,6 +108,11 @@ module Make (X : Sig.X) = struct
               let aro_t = Term.make aro_sy xs ty  in
               let eq = Literal.LT.make (Literal.Eq(aro_t,t)) in
               X.term_embed aro_t, eq::acc
+          | {Term.f=Sy.Op Sy.Mult ;xs=xs;ty=ty} ->
+            let aro_sy = Sy.name "@*" in
+            let aro_t = Term.make aro_sy xs ty  in
+            let eq = Literal.LT.make (Literal.Eq(aro_t,t)) in
+            X.term_embed aro_t, eq::acc
           | _ -> assert false
 
   let make t = match Term.view t with
