@@ -1,0 +1,228 @@
+(* this is a prelude for Alt-Ergo*)
+(* this is a prelude for Alt-Ergo integer arithmetic *)
+axiom tuple0_inversion : (forall u:unit. (u = void))
+
+type unit1
+
+type qtmark
+
+logic at : 'a, qtmark -> 'a
+
+logic old : 'a -> 'a
+
+logic match_bool : bool, 'a, 'a -> 'a
+
+axiom match_bool_True :
+  (forall z:'a. forall z1:'a. (match_bool(true, z, z1) = z))
+
+axiom match_bool_False :
+  (forall z:'a. forall z1:'a. (match_bool(false, z, z1) = z1))
+
+logic index_bool : bool -> int
+
+axiom index_bool_True : (index_bool(true) = 0)
+
+axiom index_bool_False : (index_bool(false) = 1)
+
+axiom bool_inversion : (forall u:bool. ((u = true) or (u = false)))
+
+function andb(x: bool, y: bool) : bool = match_bool(y, match_bool(x, true,
+  false), false)
+
+function orb(x: bool, y: bool) : bool = match_bool(y, true, match_bool(x,
+  true, false))
+
+function xorb(x: bool, y: bool) : bool = match_bool(y, match_bool(x, false,
+  true), match_bool(x, true, false))
+
+function notb(x: bool) : bool = match_bool(x, false, true)
+
+function implb(x: bool, y: bool) : bool = match_bool(y, true, match_bool(x,
+  false, true))
+
+axiom CompatOrderMult :
+  (forall x:int. forall y:int. forall z:int. ((x <= y) -> ((0 <= z) ->
+  ((x * z) <= (y * z)))))
+
+type 'a ref
+
+logic mk_ref : 'a -> 'a ref
+
+logic mk_ref_proj_1 : 'a ref -> 'a
+
+axiom mk_ref_proj_1_def : (forall u:'a. (mk_ref_proj_1(mk_ref(u)) = u))
+
+axiom ref_inversion : (forall u:'a ref. (u = mk_ref(mk_ref_proj_1(u))))
+
+function contents(u: 'a ref) : 'a = mk_ref_proj_1(u)
+
+logic const : 'b -> ('a,'b) farray
+
+axiom Const : (forall b:'b. forall a:'a. ((const(b)[a]) = b))
+
+type 'a array1
+
+logic mk_array : int, (int,'a) farray -> 'a array1
+
+logic mk_array_proj_1 : 'a array1 -> int
+
+axiom mk_array_proj_1_def :
+  (forall u:int. forall u1:(int,'a) farray. (mk_array_proj_1(mk_array(u,
+  u1)) = u))
+
+logic mk_array_proj_2 : 'a array1 -> (int,'a) farray
+
+axiom mk_array_proj_2_def :
+  (forall u:int. forall u1:(int,'a) farray. (mk_array_proj_2(mk_array(u,
+  u1)) = u1))
+
+axiom array_inversion :
+  (forall u:'a array1. (u = mk_array(mk_array_proj_1(u),
+  mk_array_proj_2(u))))
+
+function elts(u: 'a array1) : (int,'a) farray = mk_array_proj_2(u)
+
+function length(u: 'a array1) : int = mk_array_proj_1(u)
+
+function get(a: 'a array1, i: int) : 'a = (elts(a)[i])
+
+function set(a: 'a array1, i: int, v: 'a) : 'a array1 =
+  mk_array(mk_array_proj_1(a), (elts(a)[i <- v]))
+
+type char
+
+predicate matches(a1: char array1, i1: int, a2: char array1, i2: int,
+  n: int) = (((0 <= i1) and (i1 <= (length(a1) - n))) and (((0 <= i2) and
+  (i2 <= (length(a2) - n))) and
+  (forall i:int. (((0 <= i) and (i <  n)) -> (get(a1, (i1 + i)) = get(a2,
+  (i2 + i)))))))
+
+axiom matches_empty :
+  (forall a1:char array1. forall a2:char array1. forall i1:int.
+  forall i2:int. (((0 <= i1) and (i1 <= length(a1))) -> (((0 <= i2) and
+  (i2 <= length(a2))) -> matches(a1, i1, a2, i2, 0))))
+
+axiom matches_right_extension :
+  (forall a1:char array1. forall a2:char array1. forall i1:int.
+  forall i2:int. forall n:int. (matches(a1, i1, a2, i2, n) ->
+  ((i1 <= ((length(a1) - n) - 1)) -> ((i2 <= ((length(a2) - n) - 1)) ->
+  ((get(a1, (i1 + n)) = get(a2, (i2 + n))) -> matches(a1, i1, a2, i2,
+  (n + 1)))))))
+
+axiom matches_contradiction_at_first :
+  (forall a1:char array1. forall a2:char array1. forall i1:int.
+  forall i2:int. forall n:int. ((0 <  n) -> ((not (get(a1, i1) = get(a2,
+  i2))) -> (not matches(a1, i1, a2, i2, n)))))
+
+axiom matches_contradiction_at_i :
+  (forall a1:char array1. forall a2:char array1. forall i1:int.
+  forall i2:int. forall i:int. forall n:int. ((0 <  n) -> (((0 <= i) and
+  (i <  n)) -> ((not (get(a1, (i1 + i)) = get(a2, (i2 + i)))) ->
+  (not matches(a1, i1, a2, i2, n))))))
+
+axiom matches_right_weakening :
+  (forall a1:char array1. forall a2:char array1. forall i1:int.
+  forall i2:int. forall n:int. forall nqt:int. (matches(a1, i1, a2, i2, n) ->
+  ((nqt <  n) -> matches(a1, i1, a2, i2, nqt))))
+
+axiom matches_left_weakening :
+  (forall a1:char array1. forall a2:char array1. forall i1:int.
+  forall i2:int. forall n:int. forall nqt:int. (matches(a1, (i1 - (n - nqt)),
+  a2, (i2 - (n - nqt)), n) -> ((nqt <  n) -> matches(a1, i1, a2, i2, nqt))))
+
+axiom matches_sym :
+  (forall a1:char array1. forall a2:char array1. forall i1:int.
+  forall i2:int. forall n:int. (matches(a1, i1, a2, i2, n) -> matches(a2, i2,
+  a1, i1, n)))
+
+axiom matches_trans :
+  (forall a1:char array1. forall a2:char array1. forall a3:char array1.
+  forall i1:int. forall i2:int. forall i3:int. forall n:int. (matches(a1, i1,
+  a2, i2, n) -> (matches(a2, i2, a3, i3, n) -> matches(a1, i1, a3, i3, n))))
+
+predicate is_next(p: char array1, j: int, n: int) = (((0 <= n) and
+  (n <  j)) and (matches(p, (j - n), p, 0, n) and
+  (forall z:int. (((n <  z) and (z <  j)) -> (not matches(p, (j - z), p, 0,
+  z))))))
+
+axiom next_iteration :
+  (forall p:char array1. forall a:char array1. forall i:int. forall j:int.
+  forall n:int. (((0 <  j) and (j <  length(p))) -> (((j <= i) and
+  (i <= length(a))) -> (matches(a, (i - j), p, 0, j) -> (is_next(p, j, n) ->
+  matches(a, (i - n), p, 0, n))))))
+
+axiom next_is_maximal :
+  (forall p:char array1. forall a:char array1. forall i:int. forall j:int.
+  forall n:int. forall k:int. (((0 <  j) and (j <  length(p))) ->
+  (((j <= i) and (i <= length(a))) -> ((((i - j) <  k) and (k <  (i - n))) ->
+  (matches(a, (i - j), p, 0, j) -> (is_next(p, j, n) -> (not matches(a, k, p,
+  0, length(p)))))))))
+
+axiom next_1_0 :
+  (forall p:char array1. ((1 <= length(p)) -> is_next(p, 1, 0)))
+
+predicate lt_nat(x: int, y: int) = ((0 <= y) and (x <  y))
+
+type ('a,
+'a1) tuple2
+
+logic Tuple2 : 'a, 'a1 -> ('a, 'a1) tuple2
+
+logic Tuple2_proj_1 : ('a, 'a1) tuple2 -> 'a
+
+axiom Tuple2_proj_1_def :
+  (forall u:'a. forall u1:'a1. (Tuple2_proj_1(Tuple2(u, u1)) = u))
+
+logic Tuple2_proj_2 : ('a, 'a1) tuple2 -> 'a1
+
+axiom Tuple2_proj_2_def :
+  (forall u:'a. forall u1:'a1. (Tuple2_proj_2(Tuple2(u, u1)) = u1))
+
+axiom tuple2_inversion :
+  (forall u:('a, 'a1) tuple2. (u = Tuple2(Tuple2_proj_1(u),
+  Tuple2_proj_2(u))))
+
+logic lex : (int, int) tuple2, (int, int) tuple2 -> prop
+
+axiom Lex_1 :
+  (forall x1:int. forall x2:int. forall y1:int. forall y2:int. (lt_nat(x1,
+  x2) -> lex(Tuple2(x1, y1), Tuple2(x2, y2))))
+
+axiom Lex_2 :
+  (forall x:int. forall y1:int. forall y2:int. (lt_nat(y1, y2) ->
+  lex(Tuple2(x, y1), Tuple2(x, y2))))
+
+axiom lex_inversion :
+  (forall z:(int, int) tuple2. forall z1:(int, int) tuple2. (lex(z, z1) ->
+  ((exists x1:int. exists x2:int. exists y1:int. exists y2:int. (lt_nat(x1,
+   x2) and ((z = Tuple2(x1, y1)) and (z1 = Tuple2(x2, y2))))) or
+  (exists x:int. exists y1:int. exists y2:int. (lt_nat(y1, y2) and
+  ((z = Tuple2(x, y1)) and (z1 = Tuple2(x, y2))))))))
+
+logic p : char array1
+
+logic next : int array1
+
+goal WP_parameter_initnext :
+  (forall next1:int.
+  (forall p1:int.
+  (forall next2:(int,int) farray.
+  (forall p2:(int,char) farray. (((1 <= next1) and (next1 = p1)) ->
+  ((1 <  p1) -> (((0 <= 1) and (1 <  next1)) ->
+  (forall next3:(int,int) farray. ((next3 = (next2[1 <- 0])) ->
+  (forall j:int.
+  (forall i:int.
+  (forall next4:(int,int) farray. (((((0 <= j) and (j <  i)) and
+  (i <= p1)) and (matches(mk_array(p1, p2), (i - j), mk_array(p1, p2), 0,
+  j) and
+  ((forall z:int. ((((j + 1) <  z) and (z <  (i + 1))) ->
+   (not matches(mk_array(p1, p2), ((i + 1) - z), mk_array(p1, p2), 0, z)))) and
+  (forall k:int. (((0 <  k) and (k <= i)) -> is_next(mk_array(p1, p2), k,
+  (next4[k]))))))) -> ((i <  (p1 - 1)) -> (((0 <= i) and (i <  p1)) ->
+  (((0 <= j) and (j <  p1)) -> (((p2[i]) = (p2[j])) ->
+  (forall i1:int. ((i1 = (i + 1)) ->
+  (forall j1:int. ((j1 = (j + 1)) -> (((0 <= i1) and (i1 <  next1)) ->
+  (forall next5:(int,int) farray. ((next5 = (next4[i1 <- j1])) ->
+  (forall k:int. (((0 <  k) and (k <= i1)) -> is_next(mk_array(p1, p2), k,
+  (next5[k]))))))))))))))))))))))))))))
+
