@@ -3137,6 +3137,12 @@ logic x,y : int
 
 goal g9 : x<>0 -> x = y -> y/y = 1
 
+$
+logic x,y:int
+goal g12 :
+     x = 5 -> y - (x / 10) = y
+
+
 $$$arith_modulo_div
 
 goal g0: forall a: int. a > 0 -> a / 2 < a

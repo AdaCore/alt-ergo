@@ -76,7 +76,10 @@ $
 logic x,y:int
 goal g11 : y >= 1 -> (x/y)*y = x
 
-
+$
+logic x,y:int
+goal g12 :
+     x = 5 -> y - (x / 10) = y - 1
 
 
 $$$arith

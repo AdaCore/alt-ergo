@@ -88,7 +88,7 @@ module Make
     | Some p -> p
     | _ -> P.create [Int 1, r] (Int 0) (X.type_info r)  
 
-  let check_int exn p =  
+  let check_int exn p =
     if P.type_info p = Ty.Tint then
       let _, c = P.to_list p in
       let ppmc = P.ppmc_denominators p in
@@ -131,7 +131,7 @@ module Make
 	  P.add p (P.mult p1 p2), ctx
 
       | Sy.Op Sy.Div, [t1;t2] -> 
-	  let p1, ctx = mke coef (empty_polynome ty) t1 ctx in
+	  let p1, ctx = mke (Int 1) (empty_polynome ty) t1 ctx in
 	  let p2, ctx = mke (Int 1) (empty_polynome ty) t2 ctx in
 	  let p3, ctx = 
 	    try 
@@ -141,7 +141,7 @@ module Make
 	    with Division_by_zero | Polynome.Maybe_zero -> 
               P.create [coef, X.term_embed t] (Int 0) ty, ctx
 	  in
-	  P.add p p3, ctx
+	  P.add p (P.mult (P.create [] coef ty) p3), ctx
 		
       | Sy.Op Sy.Plus , [t1;t2] -> 
 	  let p2, ctx = mke coef p t2 ctx in
@@ -152,7 +152,7 @@ module Make
 	  mke coef p2 t1 ctx
 
       | Sy.Op Sy.Modulo , [t1;t2] -> 
-	  let p1, ctx = mke coef (empty_polynome ty) t1 ctx in
+	  let p1, ctx = mke (Int 1) (empty_polynome ty) t1 ctx in
 	  let p2, ctx = mke (Int 1) (empty_polynome ty) t2 ctx in
           let p3, ctx = 
             try P.modulo p1 p2, ctx
@@ -165,7 +165,7 @@ module Make
               in 
               P.create [coef, X.term_embed t] (Int 0) ty, ctx 
 	  in         
-	  P.add p p3, ctx
+	  P.add p (P.mult (P.create [] coef ty) p3), ctx
 	    
       | _ ->
 	let a, ctx' = X.make t in
