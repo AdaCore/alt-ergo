@@ -58,7 +58,6 @@ let astuce = !astuce
 let select = !select
 let no_rm_eq_existential = !no_rm_eq_existential
 let nocontracongru = !nocontracongru
-let omega = !omega
 let arrays = !arrays
 let pairs = !pairs
 let term_like_pp = !term_like_pp

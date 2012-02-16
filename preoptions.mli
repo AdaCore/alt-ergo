@@ -57,7 +57,6 @@ val select : int ref
 val cin : in_channel ref
 val no_rm_eq_existential : bool ref
 val nocontracongru : bool ref
-val omega : bool ref
 val arrays : bool ref
 val pairs : bool ref
 val term_like_pp : bool ref

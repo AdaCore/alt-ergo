@@ -72,7 +72,6 @@ let spec = [
   Arg.Unit (fun () -> Print_color.set_margin_with_term_width fmt;
               Print_color.disable false), "Set ainsi color in output";
   "-nocontracongru", Arg.Set nocontracongru, "";
-  "-omega", Arg.Set omega, "Use omega for arithmetic equalities";
   "-arrays", Arg.Set arrays, "experimental support for the theory of arrays";
   "-pairs", Arg.Set pairs, "experimental support for the theory of pairs";
   "-term-like-pp", Arg.Set term_like_pp, "Output semantic values as terms";

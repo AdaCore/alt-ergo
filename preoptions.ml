@@ -67,7 +67,6 @@ let astuce = ref false
 let select = ref 0
 let no_rm_eq_existential = ref false
 let nocontracongru = ref false
-let omega = ref false
 let arrays = ref false
 let pairs = ref false
 let term_like_pp = ref true

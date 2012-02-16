@@ -57,7 +57,6 @@ val select : int
 val cin : in_channel
 val no_rm_eq_existential : bool
 val nocontracongru : bool
-val omega : bool
 val arrays : bool
 val pairs : bool
 val term_like_pp : bool
