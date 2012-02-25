@@ -135,6 +135,8 @@ type env = {
   mutable search_tags : GText.tag list;
   mutable proof_tags : GText.tag list;
   mutable proof_toptags : GText.tag list;
+  mutable start_select : int option;
+  mutable stop_select : int option;
   dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t
 }
 
@@ -153,6 +155,8 @@ let create_env buf1 (buf2:sbuffer) errors st_ctx ast dep  =
     search_tags = [];
     proof_tags = [];
     proof_toptags = [];
+    start_select = None;
+    stop_select = None;
   }
 
 

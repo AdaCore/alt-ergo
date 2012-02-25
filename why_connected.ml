@@ -80,7 +80,19 @@ let search_using t sbuf env =
     
 (* let arrow_cursor () = Gdk.Cursor.create `ARROW *)
 
+let set_select env sbuf = 
+  match env.start_select, env.stop_select with
+    | Some b, Some e ->
+	  sbuf#select_range 
+	    (sbuf#get_iter (`OFFSET b)) (sbuf#get_iter (`OFFSET e))
+    (* | None, Some e -> *)
+    (* 	if sbuf#has_selection then *)
+    (* 	  let ib, _ = sbuf#selection_bounds in *)
+    (* 	  sbuf#select_range ib (sbuf#get_iter (`OFFSET e)) *)
+    | _ -> ()
+
 let tag_callback t env sbuf ~origin:y z i =
+  let ofs = (new GText.iter i)#offset in
   match GdkEvent.get_type z with
     | `MOTION_NOTIFY ->
         if List.mem env.last_tag env.search_tags then 
@@ -105,6 +117,8 @@ let tag_callback t env sbuf ~origin:y z i =
 	    t#set_property (`BACKGROUND "light blue")
 	  end;                         
 	env.last_tag <- t;
+	env.stop_select <- Some ofs;
+	set_select env sbuf;
 	true
     | `TWO_BUTTON_PRESS ->
 	begin
@@ -130,7 +144,8 @@ let tag_callback t env sbuf ~origin:y z i =
 	true
     | `BUTTON_PRESS ->
 	let z = GdkEvent.Button.cast z in
-	if GdkEvent.Button.button z = 1 then
+	let captured = 
+	  if GdkEvent.Button.button z = 1 then
 	  if env.ctrl then
 	    (search_using t sbuf env;
 	     true)
@@ -153,7 +168,18 @@ let tag_callback t env sbuf ~origin:y z i =
 	    ignore(env.st_ctx#push tyt);
 	    true
 	  end
-	else false
+	  else false
+	in
+	env.start_select <- Some ofs;
+	set_select env sbuf;
+	captured
+
+    | `BUTTON_RELEASE ->
+	env.start_select <- None;
+	env.stop_select <- None;
+	set_select env sbuf;
+	false
+	
     | _ -> false
 
 
@@ -578,7 +604,7 @@ and popup_axiom t env offset () =
 and axiom_callback t env ~origin:y z i =
   let ni = new GText.iter i in
   let offset = ni#offset in
-  if tag_callback t env env.buffer ~origin:y z i = true then true
+  if tag_callback t env env.buffer ~origin:y z i then true
   else
     begin
       match GdkEvent.get_type z with
