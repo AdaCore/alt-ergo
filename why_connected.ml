@@ -158,7 +158,7 @@ let tag_callback t env sbuf ~origin:y z i =
 
 
 let term_callback t env sbuf ~origin:y z i =
-  if tag_callback t env sbuf ~origin:y z i = true then true
+  if tag_callback t env sbuf ~origin:y z i then true
   else
     match GdkEvent.get_type z with
       | `BUTTON_PRESS ->
@@ -463,7 +463,7 @@ let rec add_instance env vars entries af aname =
     env.ast <- List.rev rev_ast;
     connect_tag env env.inst_buffer ahy.tag;
     connect_aaform env env.inst_buffer instance;
-    add_to_buffer env.inst_buffer [ahy, tyenv] 
+    add_to_buffer env.errors env.inst_buffer [ahy, tyenv] 
   end
   else begin
     let instance = new_annot env.inst_buffer instance.c instance.id ptag in
@@ -482,7 +482,7 @@ let rec add_instance env vars entries af aname =
     env.inst_buffer#insert ~tags:[instance.tag] ("instance "^aname^": \n");
     connect_aaform env env.inst_buffer instance;
     env.inst_buffer#insert (String.make indent_size ' ');
-    add_aaform env.inst_buffer 1 [] instance;
+    add_aaform env.errors env.inst_buffer 1 [] instance;
     env.inst_buffer#insert "\n\n";
   end
     

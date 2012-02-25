@@ -21,6 +21,16 @@ open Why_ptree
 
 type sbuffer = GSourceView2.source_buffer
 
+type error_model = {
+  rcols : GTree.column_list;
+  rcol_icon : GtkStock.id GTree.column;
+  rcol_desc : String.t GTree.column;
+  rcol_line : int GTree.column;
+  rcol_type : int GTree.column;
+  rcol_color : String.t GTree.column;
+  rstore : GTree.list_store;
+}
+
 type 'a annoted =
     { mutable c : 'a; 
       mutable pruned : bool;
@@ -28,7 +38,8 @@ type 'a annoted =
       tag : GText.tag;
       ptag : GText.tag;
       id : int;
-      buf : sbuffer }
+      buf : sbuffer;
+ }
 
 type aterm = 
     { at_ty : Ty.t; at_desc : at_desc }
@@ -102,6 +113,7 @@ module MDep : (Map.S with type key = atyped_decl annoted)
 type env = {
   buffer : sbuffer;
   inst_buffer : sbuffer;
+  errors : error_model;
   st_ctx : GMisc.statusbar_context;
   mutable ast : (atyped_decl annoted * Why_typing.env)list;
   mutable ctrl : bool;
@@ -119,6 +131,7 @@ val general_font : Pango.font_description
 val create_env :
   sbuffer -> 
   sbuffer ->
+  error_model ->
   GMisc.statusbar_context ->
   (atyped_decl annoted * Why_typing.env) list -> 
   (atyped_decl annoted list * atyped_decl annoted list) MDep.t ->
@@ -158,7 +171,7 @@ val annot_of_tterm :
 val add_aaterm_list_at : sbuffer ->
   GText.tag list -> GText.iter -> string -> aterm annoted list -> unit
 
-val add_aaform : sbuffer -> int -> GText.tag list ->
+val add_aaform : error_model -> sbuffer -> int -> GText.tag list ->
   aform annoted -> unit
 
 val to_ast : 
@@ -166,7 +179,7 @@ val to_ast :
   (int tdecl, int) Why_ptree.annoted list
 
 val add_to_buffer : 
-  sbuffer -> (atyped_decl annoted * Why_typing.env) list -> unit
+  error_model -> sbuffer -> (atyped_decl annoted * Why_typing.env) list -> unit
 
 val print_typed_decl_list  :
   Format.formatter -> (int tdecl, int) Why_ptree.annoted list -> unit

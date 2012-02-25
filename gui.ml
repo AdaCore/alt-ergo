@@ -233,6 +233,64 @@ let toggle_ctrl env key =
   else false
 
 
+let empty_error_model () = 
+  let rcols = new GTree.column_list in
+  let rcol_icon = rcols#add GtkStock.conv in
+  let rcol_desc = rcols#add Gobject.Data.string in
+  let rcol_line = rcols#add Gobject.Data.int in
+  let rcol_type = rcols#add Gobject.Data.int in
+  let rcol_color = rcols#add Gobject.Data.string in
+  {
+    rcols = rcols;
+    rcol_icon = rcol_icon;
+    rcol_desc = rcol_desc;
+    rcol_line = rcol_line;
+    rcol_type = rcol_type;
+    rcol_color = rcol_color;
+    rstore = GTree.list_store rcols;
+  }
+
+
+let goto_error (view:GTree.view) error_model buffer 
+    (sv:GSourceView2.source_view)  path column =
+  let model = view#model in
+  let row = model#get_iter path in
+  let line = model#get ~row ~column:error_model.rcol_line in
+  let iter_line = buffer#get_iter (`LINE (line-1)) in
+  buffer#place_cursor ~where:iter_line;
+  ignore(sv#scroll_to_iter iter_line)
+  
+
+let create_error_view error_model buffer sv ~packing () =
+  let view = GTree.view ~model:error_model.rstore ~packing () in
+
+  let renderer = GTree.cell_renderer_pixbuf [] in
+  let col = GTree.view_column ~title:""  
+    ~renderer:(renderer, ["stock_id", error_model.rcol_icon]) () in
+  ignore (view#append_column col);
+  (* col#set_cell_data_func renderer  *)
+  (*   (set_background error_model.rcol_color renderer); *)
+  col#set_sort_column_id error_model.rcol_icon.GTree.index;
+
+  let renderer = GTree.cell_renderer_text [] in
+  let col = GTree.view_column ~title:"Description"  
+    ~renderer:(renderer, ["text", error_model.rcol_desc]) () in
+  ignore (view#append_column col);
+  col#set_resizable true;
+  col#set_sort_column_id error_model.rcol_desc.GTree.index;
+
+  let renderer = GTree.cell_renderer_text [] in
+  let col = GTree.view_column ~title:"Line"  
+    ~renderer:(renderer, ["text", error_model.rcol_line]) () in
+  ignore (view#append_column col);
+  col#set_resizable true;
+  col#set_sort_column_id error_model.rcol_line.GTree.index;
+
+  ignore(view#connect#row_activated 
+	   ~callback:(goto_error view error_model buffer sv));
+  view
+
+
 let _ =
   ignore(w#connect#destroy ~callback:quit);
 
@@ -317,16 +375,25 @@ let _ =
        let hb = GPack.paned `HORIZONTAL 
 	 ~border_width:3 ~packing:rbox#add () in
 
+       let vb = GPack.paned `VERTICAL 
+	 ~border_width:3 ~packing:(hb#pack1 ~shrink:true ~resize:true) () in
+
        let fr1 = GBin.frame ~shadow_type:`ETCHED_OUT
-	 ~width:(60 * window_width / 100) ~packing:hb#add1 () in
+	 ~width:(60 * window_width / 100)
+	 ~height:(80 * window_height / 100)
+	 ~packing:(vb#pack1 ~shrink:true ~resize:true) () in
        let fr2 = GBin.frame ~shadow_type:`ETCHED_OUT
-	 ~packing:hb#add2 () in
+	 ~packing:(hb#pack2 ~shrink:true ~resize:true) () in
+       let fr3 = GBin.frame ~shadow_type:`ETCHED_OUT
+	 ~packing:(vb#pack2 ~shrink:true ~resize:true) () in
 
        let st = GMisc.statusbar ~has_resize_grip:false ~border_width:0 
 	 ~packing:vbox#pack () in  
        let st_ctx = st#new_context ~name:"Type" in
 
-       let env = create_env buf1 buf2 st_ctx annoted_ast dep in
+       let error_model = empty_error_model () in
+
+       let env = create_env buf1 buf2 error_model st_ctx annoted_ast dep in
        connect env;
 
        ignore (toolbar#insert_toggle_button
@@ -340,10 +407,11 @@ let _ =
 	    ~packing:fr1#add () 
        in
        let tv1 = GSourceView2.source_view ~source_buffer:buf1 ~packing:(sw1#add)
-	 ~show_line_numbers:true ~wrap_mode:`NONE() in
+	 ~show_line_numbers:true ~wrap_mode:`NONE 
+	 ~highlight_current_line:true ()
+       in
        let _ = tv1#misc#modify_font monospace_font in
        let _ = tv1#set_editable false in
-       add_to_buffer env.buffer env.ast;
 
        let sw2 = GBin.scrolled_window
 	    ~vpolicy:`AUTOMATIC 
@@ -351,7 +419,9 @@ let _ =
 	    ~packing:fr2#add () 
        in
        let tv2 = GSourceView2.source_view ~source_buffer:buf2 ~packing:(sw2#add)
-	 ~show_line_numbers:false ~wrap_mode:`NONE() in
+	 ~show_line_numbers:false ~wrap_mode:`NONE 
+	 ~highlight_current_line:true ()
+       in
        let _ = tv2#misc#modify_font monospace_font in
        let _ = tv2#set_editable false in
 
@@ -383,6 +453,18 @@ let _ =
 	buttonclean#misc#hide ();
 
 
+       let sw3 = GBin.scrolled_window
+	    ~vpolicy:`AUTOMATIC 
+	    ~hpolicy:`AUTOMATIC
+	    ~packing:fr3#add () 
+       in
+
+       ignore(create_error_view error_model env.buffer tv1 
+	 ~packing:sw3#add ());
+
+       add_to_buffer error_model env.buffer env.ast;
+
+
        let thread = ref None in
        
        ignore(buttonrun#connect#clicked 
@@ -397,7 +479,7 @@ let _ =
 		~callback:(toggle_ctrl env));
 
        ignore(eventBox#event#connect#key_release
-		~callback:(toggle_ctrl env))
+		~callback:(toggle_ctrl env));
        
     ) typed_ast;
 

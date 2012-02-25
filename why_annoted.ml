@@ -29,6 +29,16 @@ let general_font = Pango.Font.from_string "sans"
 
 type sbuffer = GSourceView2.source_buffer
 
+type error_model = {
+  rcols : GTree.column_list;
+  rcol_icon : GtkStock.id GTree.column;
+  rcol_desc : String.t GTree.column;
+  rcol_line : int GTree.column;
+  rcol_type : int GTree.column;
+  rcol_color : String.t GTree.column;
+  rstore : GTree.list_store;
+}
+
 type 'a annoted =
     { mutable c : 'a; 
       mutable pruned : bool;
@@ -36,7 +46,8 @@ type 'a annoted =
       tag : GText.tag;
       ptag : GText.tag;
       id : int;
-      buf : sbuffer }
+      buf : sbuffer;
+    }
 
 type aterm = 
     { at_ty : Ty.t; at_desc : at_desc }
@@ -116,6 +127,7 @@ module MDep = Map.Make (
 type env = {
   buffer : sbuffer;
   inst_buffer : sbuffer;
+  errors : error_model;
   st_ctx : GMisc.statusbar_context;
   mutable ast : (atyped_decl annoted * Why_typing.env) list;
   mutable ctrl : bool;
@@ -126,12 +138,13 @@ type env = {
   dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t
 }
 
-let create_env buf1 (buf2:sbuffer) st_ctx ast dep  =
+let create_env buf1 (buf2:sbuffer) errors st_ctx ast dep  =
   let titag = buf2#create_tag [`WEIGHT `BOLD; `UNDERLINE `SINGLE] in
   buf2#insert ~tags:[titag] "User instantiated axioms:\n\n";
   {
     buffer = buf1;
     inst_buffer = buf2;
+    errors = errors;
     st_ctx = st_ctx;
     ast = ast;
     dep = dep;
@@ -1079,38 +1092,53 @@ let rec add_rwt_list (buffer:sbuffer) indent tags = function
     buffer#insert "\n";
     add_rwt_list buffer indent tags l
 
-let rec add_quant_form (buffer:sbuffer) indent tags qf =
+
+let add_empty_triggers_error ({rstore = rstore} as errors) (buffer:sbuffer) =
+  let row = rstore#append () in
+  rstore#set ~row ~column:errors.rcol_icon `DIALOG_WARNING;
+  rstore#set ~row ~column:errors.rcol_desc "Warning : Empty trigger";
+  rstore#set ~row ~column:errors.rcol_color "red";
+  rstore#set ~row ~column:errors.rcol_type 1;
+  rstore#set ~row ~column:errors.rcol_line buffer#line_count  
+  
+
+let rec add_quant_form errors (buffer:sbuffer) indent tags qf =
   let {aqf_bvars = bv; aqf_upvars = uv; aqf_triggers = trs; aqf_form = aaf } =
     qf.c in
   fprintf str_formatter "%a " print_var_list bv;
   buffer#insert ~tags (flush_str_formatter ());
   let ntags = qf.tag::qf.ptag::tags in
   buffer#insert ~tags:ntags "[";
-  add_triggers buffer ntags trs;
+  add_triggers errors buffer ntags trs;
   buffer#insert ~tags:ntags "].";
   ignore(buffer#create_source_mark ~category:"trigger" buffer#end_iter);
   buffer#insert "\n";
   buffer#insert (String.make ((indent + 1)* indent_size) ' ');
-  add_aaform buffer (indent+1) tags aaf
+  add_aaform errors buffer (indent+1) tags aaf
 
-and add_triggers (buffer:sbuffer) tags = function
-  | [] -> ()
-  | [atl] -> add_aaterm_list buffer tags "," atl
-  | atl::l -> 
-      add_aaterm_list buffer tags "," atl;
-      buffer#insert ~tags " | ";
-      add_triggers buffer tags l
+and add_triggers errors (buffer:sbuffer) tags triggers =
+  let rec add_triggers_aux  = function
+    | [] -> ()
+    | [atl] -> add_aaterm_list buffer tags "," atl
+    | atl::l -> 
+	add_aaterm_list buffer tags "," atl;
+	buffer#insert ~tags " | ";
+	add_triggers_aux l
+  in
+  if triggers = [] then add_empty_triggers_error errors buffer
+  else add_triggers_aux triggers
+
       
-and add_aform (buffer:sbuffer) indent tags aform =
+and add_aform errors (buffer:sbuffer) indent tags aform =
   match aform with
   | AFatom a -> add_aatom buffer 0 tags a
-  | AFop (op, afl) -> add_aaform_list buffer indent tags op afl
+  | AFop (op, afl) -> add_aaform_list errors buffer indent tags op afl
   | AFforall qf ->
       buffer#insert ~tags "forall ";
-      add_quant_form buffer indent tags qf
+      add_quant_form errors buffer indent tags qf
   | AFexists qf ->
       buffer#insert ~tags "exists ";
-      add_quant_form buffer indent tags qf
+      add_quant_form errors buffer indent tags qf
   | AFlet (vs, s, t, aaf) ->
       buffer#insert ~tags 
 	(sprintf "let %s = " (Symbols.to_string s));
@@ -1118,32 +1146,32 @@ and add_aform (buffer:sbuffer) indent tags aform =
       buffer#insert ~tags " in";
       buffer#insert "\n";
       buffer#insert (String.make (indent * indent_size) ' ');
-      add_aaform buffer (indent) tags aaf
+      add_aaform errors buffer (indent) tags aaf
   | AFnamed (n, aaf) ->
       buffer#insert ~tags (sprintf "%s: " (Hstring.view n));
-      add_aform buffer indent tags aaf.c
+      add_aform errors buffer indent tags aaf.c
       
 
-and add_aaform_list (buffer:sbuffer) indent tags op l =
+and add_aaform_list errors (buffer:sbuffer) indent tags op l =
   if l = [] then ()
   else begin
     (* add_aaform buffer indent tags (List.hd l); *)
-    add_aaform_list_aux buffer indent tags op l
+    add_aaform_list_aux errors buffer indent tags op l
   end
    
-and add_aaform_list_aux (buffer:sbuffer) indent tags op =
+and add_aaform_list_aux errors (buffer:sbuffer) indent tags op =
   function
   | [] -> ()
   | [af] ->
       add_oplogic buffer indent tags op;
-      add_aaform buffer indent tags af
+      add_aaform errors buffer indent tags af
   | af1::af2::l ->
-      add_aaform buffer indent tags af1;
+      add_aaform errors buffer indent tags af1;
       buffer#insert "\n";
       buffer#insert (String.make (indent * indent_size) ' ');
       add_oplogic buffer indent tags op;
-      add_aaform buffer (indent+1) tags af2;
-      add_aaform_list buffer (indent+1) tags op l      
+      add_aaform errors buffer (indent+1) tags af2;
+      add_aaform_list errors buffer (indent+1) tags op l      
   (* | af::l -> *)
   (*     buffer#insert "\n"; *)
   (*     buffer#insert (String.make (indent * indent_size) ' '); *)
@@ -1152,11 +1180,11 @@ and add_aaform_list_aux (buffer:sbuffer) indent tags op =
   (*     add_aaform_list buffer (indent+1) tags op l *)
 
 
-and add_aaform (buffer:sbuffer) indent tags
+and add_aaform errors (buffer:sbuffer) indent tags
     {c = af; tag = tag; ptag = ptag} =
-  add_aform buffer indent (tag::ptag::tags) af
+  add_aform errors buffer indent (tag::ptag::tags) af
 
-let add_atyped_decl (buffer:sbuffer) d =
+let add_atyped_decl errors (buffer:sbuffer) d =
   match d.c with
   | AAxiom (loc, s, af) ->
       let keyword = 
@@ -1165,7 +1193,7 @@ let add_atyped_decl (buffer:sbuffer) d =
       buffer#insert ~tags:[d.tag;d.ptag] (sprintf "%s %s :" keyword s);
       buffer#insert "\n";
       buffer#insert (String.make indent_size ' ');
-      add_aform buffer 1 [d.tag;d.ptag] af;
+      add_aform errors buffer 1 [d.tag;d.ptag] af;
       buffer#insert "\n\n"
 
   | ARewriting (loc, s, arwtl) ->
@@ -1178,7 +1206,7 @@ let add_atyped_decl (buffer:sbuffer) d =
       buffer#insert ~tags:[d.tag;d.ptag] (sprintf "goal %s :" s);
       buffer#insert "\n";
       buffer#insert (String.make indent_size ' ');
-      add_aform buffer 1 [d.tag;d.ptag] aaf.c;
+      add_aform errors buffer 1 [d.tag;d.ptag] aaf.c;
       buffer#insert "\n\n"
 
   | ALogic (loc, ls, ty) ->
@@ -1192,7 +1220,7 @@ let add_atyped_decl (buffer:sbuffer) d =
       buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
       buffer#insert "\n";
       buffer#insert (String.make indent_size ' ');
-      add_aform buffer 1 [d.tag;d.ptag] af;
+      add_aform errors buffer 1 [d.tag;d.ptag] af;
       buffer#insert "\n\n"
 
   | AFunction_def (loc, f, spptl, ty, af) ->
@@ -1201,7 +1229,7 @@ let add_atyped_decl (buffer:sbuffer) d =
       buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
       buffer#insert "\n";
       buffer#insert (String.make indent_size ' ');
-      add_aform buffer 1 [d.tag;d.ptag] af;
+      add_aform errors buffer 1 [d.tag;d.ptag] af;
       buffer#insert "\n\n"
       
   | ATypeDecl (loc, ls, s, Abstract) -> 
@@ -1222,8 +1250,8 @@ let add_atyped_decl (buffer:sbuffer) d =
       buffer#insert "\n\n"
 
 
-let add_to_buffer (buffer:sbuffer) annoted_ast =
-  List.iter (fun (t, _) -> add_atyped_decl buffer t) annoted_ast
+let add_to_buffer errors (buffer:sbuffer) annoted_ast =
+  List.iter (fun (t, _) -> add_atyped_decl errors buffer t) annoted_ast
 
 
 
