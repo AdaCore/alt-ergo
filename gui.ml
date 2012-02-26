@@ -341,7 +341,26 @@ let create_error_view error_model buffer sv ~packing () =
   view
 
 
-let create_inst_view inst_model ~packing () =
+
+let goto_lemma (view:GTree.view) inst_model buffer 
+    (sv:GSourceView2.source_view) env path column =
+  let model = view#model in
+  let row = model#get_iter path in
+  let id = model#get ~row ~column:inst_model.icol_tag in
+  try
+    let line, t = find_line id env.ast in
+    let iter_line = buffer#get_iter (`LINE (line-1)) in
+    let prev_line = buffer#get_iter (`LINE (line-2)) in
+    buffer#place_cursor ~where:iter_line;
+    ignore(sv#scroll_to_iter prev_line);
+    env.last_tag#set_properties 
+      [`BACKGROUND_SET false; `UNDERLINE_SET false];
+    t#set_property (`BACKGROUND "light blue");                         
+    env.last_tag <- t;
+  with Not_found -> ()
+  
+
+let create_inst_view inst_model env buffer sv ~packing () =
   let view = GTree.view ~model:inst_model.istore ~packing () in
 
   let renderer = GTree.cell_renderer_pixbuf [] in
@@ -353,7 +372,7 @@ let create_inst_view inst_model ~packing () =
   col#set_sort_column_id inst_model.icol_icon.GTree.index;
 
   let renderer = GTree.cell_renderer_text [] in
-  let col = GTree.view_column ~title:"# instances"  
+  let col = GTree.view_column ~title:"#"  
     ~renderer:(renderer, ["text", inst_model.icol_number]) () in
   ignore (view#append_column col);
   col#set_resizable true;
@@ -365,6 +384,10 @@ let create_inst_view inst_model ~packing () =
   ignore (view#append_column col);
   col#set_resizable true;
   col#set_sort_column_id inst_model.icol_desc.GTree.index;
+
+
+  ignore(view#connect#row_activated 
+	   ~callback:(goto_lemma view inst_model buffer sv env));  
   view
 
 
@@ -553,7 +576,8 @@ let _ =
 	    ~packing:fr4#add () 
        in
 
-       ignore(create_inst_view inst_model ~packing:sw4#add ());
+       ignore(create_inst_view inst_model env env.buffer tv1 
+		~packing:sw4#add ());
 
 
 

@@ -57,6 +57,7 @@ type 'a annoted =
       ptag : GText.tag;
       id : int;
       buf : sbuffer;
+      mutable line : int;
     }
 
 type aterm = 
@@ -174,7 +175,8 @@ let tag (buffer:sbuffer) = buffer#create_tag []
 
 let new_annot (buffer:sbuffer) c id ptag =
   { c = c; pruned = false; tag = (tag buffer); 
-    ptag = ptag;id = id; polarity = true; buf = buffer }
+    ptag = ptag; id = id; polarity = true; buf = buffer;
+    line = buffer#line_count }
 
 
 let rec findin_aterm tag buffer { at_desc = at_desc } =
@@ -963,9 +965,11 @@ and add_aterm_list_at (buffer:sbuffer) tags iter sep =
 	add_aterm_list_at buffer tags iter sep l
 
 and add_aaterm_at (buffer:sbuffer) tags iter at =
+  at.line <- iter#line;
   add_aterm_at buffer (at.tag::at.ptag::tags) iter at.c
 
 and add_aaterm (buffer:sbuffer) tags at =
+  at.line <- buffer#line_count;
   add_aaterm_at buffer tags buffer#end_iter at
 
 and add_aaterm_list_at (buffer:sbuffer) tags iter sep =
@@ -1195,7 +1199,8 @@ and add_aaform_list_aux errors (buffer:sbuffer) indent tags op =
 
 
 and add_aaform errors (buffer:sbuffer) indent tags
-    {c = af; tag = tag; ptag = ptag} =
+    ({c = af; tag = tag; ptag = ptag} as aaf) =
+  aaf.line <- buffer#line_count;
   add_aform errors buffer indent (tag::ptag::tags) af
 
 let add_atyped_decl errors (buffer:sbuffer) d =
@@ -1206,6 +1211,7 @@ let add_atyped_decl errors (buffer:sbuffer) d =
 	then "hypothesis" else "axiom" in
       buffer#insert ~tags:[d.tag;d.ptag] (sprintf "%s %s :" keyword s);
       buffer#insert "\n";
+      d.line <- buffer#line_count;
       buffer#insert (String.make indent_size ' ');
       add_aform errors buffer 1 [d.tag;d.ptag] af;
       buffer#insert "\n\n"
@@ -1213,12 +1219,14 @@ let add_atyped_decl errors (buffer:sbuffer) d =
   | ARewriting (loc, s, arwtl) ->
       buffer#insert ~tags:[d.tag;d.ptag] (sprintf "rewriting %s :" s);
       buffer#insert "\n";
+      d.line <- buffer#line_count;
       add_rwt_list buffer 1 [d.tag;d.ptag] arwtl;
       buffer#insert "\n\n"
 
   | AGoal (loc, s, aaf) -> 
       buffer#insert ~tags:[d.tag;d.ptag] (sprintf "goal %s :" s);
       buffer#insert "\n";
+      d.line <- buffer#line_count;
       buffer#insert (String.make indent_size ' ');
       add_aform errors buffer 1 [d.tag;d.ptag] aaf.c;
       buffer#insert "\n\n"
@@ -1226,6 +1234,7 @@ let add_atyped_decl errors (buffer:sbuffer) d =
   | ALogic (loc, ls, ty) ->
       fprintf str_formatter 
 	"logic %a : %a" print_string_list ls print_plogic_type ty;
+      d.line <- buffer#line_count;
       buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
       buffer#insert "\n\n"
 
@@ -1233,6 +1242,7 @@ let add_atyped_decl errors (buffer:sbuffer) d =
       fprintf str_formatter "predicate %s %a =" p print_pred_type_list spptl;
       buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
       buffer#insert "\n";
+      d.line <- buffer#line_count;
       buffer#insert (String.make indent_size ' ');
       add_aform errors buffer 1 [d.tag;d.ptag] af;
       buffer#insert "\n\n"
@@ -1242,32 +1252,34 @@ let add_atyped_decl errors (buffer:sbuffer) d =
 	print_string_ppure_type_list spptl print_ppure_type ty;
       buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
       buffer#insert "\n";
+      d.line <- buffer#line_count;
       buffer#insert (String.make indent_size ' ');
       add_aform errors buffer 1 [d.tag;d.ptag] af;
       buffer#insert "\n\n"
       
   | ATypeDecl (loc, ls, s, Abstract) -> 
       fprintf str_formatter "type %a %s" print_astring_list ls s;
+      d.line <- buffer#line_count;
       buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
       buffer#insert "\n\n"
       
   | ATypeDecl (loc, ls, s, Enum lc) -> 
       fprintf str_formatter "type %a %s = %a"
 	print_astring_list ls s (print_string_sep " | ") lc;
+      d.line <- buffer#line_count;
       buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
       buffer#insert "\n\n"
 
   | ATypeDecl (loc, ls, s, Record rt) -> 
       fprintf str_formatter "type %a %s = { %a }"
 	print_astring_list ls s	print_record_type rt;
+      d.line <- buffer#line_count;
       buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
       buffer#insert "\n\n"
 
 
 let add_to_buffer errors (buffer:sbuffer) annoted_ast =
   List.iter (fun (t, _) -> add_atyped_decl errors buffer t) annoted_ast
-
-
 
 
 
@@ -1472,3 +1484,42 @@ let findtags_proof expl l =
     | Some ids -> 
       List.fold_left (fun acc (td, _) ->
 	findproof_atyped_decl ids td acc) ([],[]) l
+
+
+exception FoundLine of int * GText.tag
+
+let rec find_id_aform id af =
+  match af with    
+    | AFatom at -> ()
+    | AFop (_, aafl) ->
+      List.iter (find_id_aaform id) aafl
+    | AFforall aaqf | AFexists aaqf ->
+	if aaqf.id = id then raise (FoundLine (aaqf.line, aaqf.tag))
+	else find_id_aaform id aaqf.c.aqf_form
+    | AFlet (_,_,_, aaf) | AFnamed (_, aaf) ->
+      find_id_aaform id aaf
+
+and find_id_aaform id aaf =
+  if aaf.id = id then raise (FoundLine (aaf.line, aaf.tag))
+  else find_id_aform id aaf.c
+
+let find_id_atyped_decl id td =
+  if td.id < id then ()
+  else if td.id = id then raise (FoundLine (td.line, td.tag))
+  else match td.c with
+    | ARewriting (_,_, _) 
+    | ALogic _ | ATypeDecl _  -> ()
+
+    | APredicate_def (_,_,_, af) 
+    | AFunction_def (_,_,_,_, af) 
+    | AAxiom (_, _, af) ->
+	find_id_aform id af
+
+    | AGoal (_,_, aaf) ->
+	find_id_aaform id aaf
+
+let find_line id l =
+  try
+    List.iter (fun (d, _) -> find_id_atyped_decl id d) l;
+    raise Not_found
+  with FoundLine (line, tag) -> line, tag

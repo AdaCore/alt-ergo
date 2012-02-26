@@ -49,6 +49,7 @@ type 'a annoted =
       ptag : GText.tag;
       id : int;
       buf : sbuffer;
+      mutable line : int;
  }
 
 type aterm = 
@@ -205,3 +206,6 @@ val findtags_dep :
 val findtags_proof : 
   Explanation.t -> (atyped_decl annoted * Why_typing.env) list ->
   GText.tag list * GText.tag list 
+
+val find_line : 
+  int -> (atyped_decl annoted * 'a) list -> int * GText.tag
