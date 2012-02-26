@@ -31,6 +31,16 @@ type error_model = {
   rstore : GTree.list_store;
 }
 
+type inst_model = {
+  h : (int, Gtk.tree_iter) Hashtbl.t;
+  icols : GTree.column_list;
+  icol_icon : GtkStock.id GTree.column;
+  icol_desc : String.t GTree.column;
+  icol_number : int GTree.column;
+  icol_tag : int GTree.column;
+  istore : GTree.list_store;
+}
+
 type 'a annoted =
     { mutable c : 'a; 
       mutable pruned : bool;

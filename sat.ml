@@ -47,7 +47,8 @@ type t = {
     tbox : CcX.t;
     lemmas : (int * Ex.t) MF.t;
     definitions : (int * Ex.t) MF.t;
-    matching : MM.t
+    matching : MM.t;
+    add_inst: Formula.t -> unit;
 }
 
 exception Sat of t
@@ -196,10 +197,15 @@ let mtriggers env formulas max_size =
       formulas (env, max_size)
   with EnoughLemmasAlready(env, max_size) -> env, max_size
 
+let add_instance_info env orig = 
+  match F.view orig with
+    | F.Lemma _ -> env.add_inst orig
+    | _ -> ()
+
 let new_facts mode env = 
   List.fold_left
     (fun acc ({Matching.trigger_formula=f; trigger_query = guard; 
-	       trigger_age=age; trigger_dep=dep }, subst_list) ->
+	       trigger_age=age; trigger_dep=dep; trigger_orig=orig }, subst_list) ->
        List.fold_left
 	 (fun acc {Matching.sbt=s;gen=g;goal=b} ->
 	    match guard with
@@ -213,6 +219,7 @@ let new_facts mode env =
 		      if MF.mem nf env.gamma then acc else
 			let p = 
 			  {f=nf;age=1+(max g age);name=Some f;mf=true;gf=b} in
+			add_instance_info env orig;
 			(p,dep)::acc
 		    end
 	 ) 
@@ -508,8 +515,12 @@ let empty = {
   tbox = CcX.empty (); 
   lemmas = MF.empty ; 
   matching = MM.empty;
-  definitions = MF.empty
+  definitions = MF.empty;
+  add_inst = fun _ -> ();
 } 
+
+let empty_with_inst add_inst =
+  { empty with add_inst = add_inst }
 
 let start () = steps := 0L
 let stop () = !steps

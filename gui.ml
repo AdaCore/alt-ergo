@@ -32,7 +32,7 @@ let () =
 (* GTK *)
 
 let window_width = 950
-let window_height = 800
+let window_height = 700
 let show_discharged = ref false
 
 
@@ -73,6 +73,55 @@ let pop_error ?(error=false) ~message () =
   pop_w#show ()
 
 
+
+let empty_inst_model () = 
+  let icols = new GTree.column_list in
+  let icol_icon = icols#add GtkStock.conv in
+  let icol_desc = icols#add Gobject.Data.string in
+  let icol_number = icols#add Gobject.Data.int in
+  let icol_tag = icols#add Gobject.Data.int in
+  {
+    h = Hashtbl.create 17;
+    icols = icols;
+    icol_icon = icol_icon;
+    icol_desc = icol_desc;
+    icol_number = icol_number;
+    icol_tag = icol_tag;
+    istore = GTree.list_store icols;
+  }
+
+
+
+let add_inst ({istore=istore} as inst_model) orig =
+  let id = Formula.id orig in
+  let name = 
+    match Formula.view orig with 
+      | Formula.Lemma {Formula.name=n} when n <> "" -> n
+      | _ -> string_of_int id
+  in
+  let row, nb, upd_info =
+    try 
+      let row = Hashtbl.find inst_model.h id in
+      let nb = istore#get ~row ~column:inst_model.icol_number in
+      row, nb + 1, false
+    with Not_found ->
+      let row = istore#append () in
+      Hashtbl.add inst_model.h id row;
+      row, 1, true
+  in
+  if upd_info then begin
+    istore#set ~row ~column:inst_model.icol_icon `INFO;
+    istore#set ~row ~column:inst_model.icol_desc name;
+  end;
+  istore#set ~row ~column:inst_model.icol_number nb;
+  istore#set ~row ~column:inst_model.icol_tag id;
+  Thread.yield ()
+  
+
+let empty_sat_inst inst_model =
+  Hashtbl.clear inst_model.h;
+  inst_model.istore#clear ();
+  Sat.empty_with_inst (add_inst inst_model)
 
 let update_status image label buttonclean env d s steps =
   let satmode = !smtfile or !smt2file or !satmode in 
@@ -134,7 +183,8 @@ let force_interrupt old_action_ref n =
     | _ -> fprintf fmt "Not in threaded mode@."
 
 
-let rec run buttonrun buttonstop buttonclean image label thread env () =
+let rec run buttonrun buttonstop buttonclean inst_model 
+    image label thread env () =
   (* Install the signal handler: *)
   let old_action_ref = ref Sys.Signal_ignore in
   let old_action = 
@@ -181,7 +231,7 @@ let rec run buttonrun buttonstop buttonclean image label thread env () =
 	       ignore (Queue.fold
 			 (Frontend.process_decl 
 			    (update_status image label buttonclean env))
-			 (Sat.empty,true, Explanation.empty) cnf)
+			 (empty_sat_inst inst_model, true, Explanation.empty) cnf)
 	    ) ast_pruned
 	with 
 	  | Abort_thread ->
@@ -291,6 +341,33 @@ let create_error_view error_model buffer sv ~packing () =
   view
 
 
+let create_inst_view inst_model ~packing () =
+  let view = GTree.view ~model:inst_model.istore ~packing () in
+
+  let renderer = GTree.cell_renderer_pixbuf [] in
+  let col = GTree.view_column ~title:""  
+    ~renderer:(renderer, ["stock_id", inst_model.icol_icon]) () in
+  ignore (view#append_column col);
+  (* col#set_cell_data_func renderer  *)
+  (*   (set_background error_model.rcol_color renderer); *)
+  col#set_sort_column_id inst_model.icol_icon.GTree.index;
+
+  let renderer = GTree.cell_renderer_text [] in
+  let col = GTree.view_column ~title:"# instances"  
+    ~renderer:(renderer, ["text", inst_model.icol_number]) () in
+  ignore (view#append_column col);
+  col#set_resizable true;
+  col#set_sort_column_id inst_model.icol_number.GTree.index;
+
+  let renderer = GTree.cell_renderer_text [] in
+  let col = GTree.view_column ~title:"Lemma"  
+    ~renderer:(renderer, ["text", inst_model.icol_desc]) () in
+  ignore (view#append_column col);
+  col#set_resizable true;
+  col#set_sort_column_id inst_model.icol_desc.GTree.index;
+  view
+
+
 let _ =
   ignore(w#connect#destroy ~callback:quit);
 
@@ -375,23 +452,28 @@ let _ =
        let hb = GPack.paned `HORIZONTAL 
 	 ~border_width:3 ~packing:rbox#add () in
 
-       let vb = GPack.paned `VERTICAL 
+       let vb1 = GPack.paned `VERTICAL 
 	 ~border_width:3 ~packing:(hb#pack1 ~shrink:true ~resize:true) () in
+       let vb2 = GPack.paned `VERTICAL 
+	 ~border_width:3 ~packing:(hb#pack2 ~shrink:true ~resize:true) () in
 
        let fr1 = GBin.frame ~shadow_type:`ETCHED_OUT
-	 ~width:(60 * window_width / 100)
+	 ~width:(20 * window_width / 100)
 	 ~height:(80 * window_height / 100)
-	 ~packing:(vb#pack1 ~shrink:true ~resize:true) () in
+	 ~packing:(vb1#pack1 ~shrink:true ~resize:true) () in
        let fr2 = GBin.frame ~shadow_type:`ETCHED_OUT
-	 ~packing:(hb#pack2 ~shrink:true ~resize:true) () in
+	 ~packing:(vb2#pack1 ~shrink:true ~resize:true) () in
        let fr3 = GBin.frame ~shadow_type:`ETCHED_OUT
-	 ~packing:(vb#pack2 ~shrink:true ~resize:true) () in
+	 ~packing:(vb1#pack2 ~shrink:true ~resize:true) () in
+       let fr4 = GBin.frame ~shadow_type:`ETCHED_OUT
+	 ~packing:(vb2#pack2 ~shrink:true ~resize:true) () in
 
        let st = GMisc.statusbar ~has_resize_grip:false ~border_width:0 
 	 ~packing:vbox#pack () in  
        let st_ctx = st#new_context ~name:"Type" in
 
        let error_model = empty_error_model () in
+       let inst_model = empty_inst_model () in
 
        let env = create_env buf1 buf2 error_model st_ctx annoted_ast dep in
        connect env;
@@ -465,10 +547,20 @@ let _ =
        add_to_buffer error_model env.buffer env.ast;
 
 
+       let sw4 = GBin.scrolled_window
+	    ~vpolicy:`AUTOMATIC 
+	    ~hpolicy:`AUTOMATIC
+	    ~packing:fr4#add () 
+       in
+
+       ignore(create_inst_view inst_model ~packing:sw4#add ());
+
+
+
        let thread = ref None in
        
        ignore(buttonrun#connect#clicked 
-	 ~callback:(run buttonrun buttonstop buttonclean
+	 ~callback:(run buttonrun buttonstop buttonclean inst_model
 		      result_image result_label thread env));
 
        ignore(buttonstop#connect#clicked 

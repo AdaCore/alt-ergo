@@ -33,6 +33,7 @@ exception I_dont_know
 
 (* the empty sat-solver context *)
 val empty : t
+val empty_with_inst : (Formula.t -> unit) -> t
 
 (* [assume env f] assume a new formula [f] in [env]. Raises Unsat if
    [f] is unsatisfiable in [env] *)
