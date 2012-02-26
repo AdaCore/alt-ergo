@@ -74,12 +74,21 @@ let pop_error ?(error=false) ~message () =
 
 
 
+let compare_rows icol_number (model:#GTree.model) row1 row2 =
+  let t1 = model#get ~row:row1 ~column:icol_number in
+  let t2 = model#get ~row:row2 ~column:icol_number in
+  compare t1 t2
+
 let empty_inst_model () = 
   let icols = new GTree.column_list in
   let icol_icon = icols#add GtkStock.conv in
   let icol_desc = icols#add Gobject.Data.string in
   let icol_number = icols#add Gobject.Data.int in
   let icol_tag = icols#add Gobject.Data.int in
+  let istore = GTree.list_store icols in
+  istore#set_sort_func icol_number.GTree.index (compare_rows icol_number);
+  istore#set_sort_func icol_desc.GTree.index (compare_rows icol_desc);
+  istore#set_sort_column_id icol_number.GTree.index `DESCENDING;
   {
     h = Hashtbl.create 17;
     icols = icols;
@@ -87,7 +96,7 @@ let empty_inst_model () =
     icol_desc = icol_desc;
     icol_number = icol_number;
     icol_tag = icol_tag;
-    istore = GTree.list_store icols;
+    istore = istore;
   }
 
 
