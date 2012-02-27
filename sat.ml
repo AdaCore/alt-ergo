@@ -214,14 +214,14 @@ let new_facts mode env =
 	      | _ ->
 		  if mode && not b then acc
 		  else
-		    begin
+		    try
 		      let nf = F.apply_subst s f in
 		      if MF.mem nf env.gamma then acc else
 			let p = 
 			  {f=nf;age=1+(max g age);name=Some f;mf=true;gf=b} in
 			add_instance_info env orig;
 			(p,dep)::acc
-		    end
+		    with Exit -> acc
 	 ) 
 	 acc subst_list
     )

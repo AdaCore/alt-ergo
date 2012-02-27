@@ -45,6 +45,7 @@ type inst_model = {
   icol_icon : GtkStock.id GTree.column;
   icol_desc : String.t GTree.column;
   icol_number : int GTree.column;
+  icol_limit : int GTree.column;
   icol_tag : int GTree.column;
   istore : GTree.list_store;
 }
@@ -1114,7 +1115,7 @@ let rec add_rwt_list (buffer:sbuffer) indent tags = function
 let add_empty_triggers_error ({rstore = rstore} as errors) (buffer:sbuffer) =
   let row = rstore#append () in
   rstore#set ~row ~column:errors.rcol_icon `DIALOG_WARNING;
-  rstore#set ~row ~column:errors.rcol_desc "Warning : Empty trigger";
+  rstore#set ~row ~column:errors.rcol_desc "Warning : Empty trigger, this lemma won't be instantiated.";
   rstore#set ~row ~column:errors.rcol_color "red";
   rstore#set ~row ~column:errors.rcol_type 1;
   rstore#set ~row ~column:errors.rcol_line buffer#line_count  

@@ -84,6 +84,7 @@ let empty_inst_model () =
   let icol_icon = icols#add GtkStock.conv in
   let icol_desc = icols#add Gobject.Data.string in
   let icol_number = icols#add Gobject.Data.int in
+  let icol_limit = icols#add Gobject.Data.int in
   let icol_tag = icols#add Gobject.Data.int in
   let istore = GTree.list_store icols in
   istore#set_sort_func icol_number.GTree.index (compare_rows icol_number);
@@ -95,6 +96,7 @@ let empty_inst_model () =
     icol_icon = icol_icon;
     icol_desc = icol_desc;
     icol_number = icol_number;
+    icol_limit = icol_limit;
     icol_tag = icol_tag;
     istore = istore;
   }
@@ -108,28 +110,38 @@ let add_inst ({istore=istore} as inst_model) orig =
       | Formula.Lemma {Formula.name=n} when n <> "" -> n
       | _ -> string_of_int id
   in
-  let row, nb, upd_info =
+  let row, nb, limit, upd_info =
     try 
       let row = Hashtbl.find inst_model.h id in
       let nb = istore#get ~row ~column:inst_model.icol_number in
-      row, nb + 1, false
+      let limit = istore#get ~row ~column:inst_model.icol_limit in
+      row, nb + 1, limit, false
     with Not_found ->
       let row = istore#append () in
       Hashtbl.add inst_model.h id row;
-      row, 1, true
+      row, 1, -1, true
   in
+  if limit <> -1 && limit < nb then raise Exit;
   if upd_info then begin
     istore#set ~row ~column:inst_model.icol_icon `INFO;
     istore#set ~row ~column:inst_model.icol_desc name;
+    istore#set ~row ~column:inst_model.icol_limit limit;
   end;
   istore#set ~row ~column:inst_model.icol_number nb;
   istore#set ~row ~column:inst_model.icol_tag id;
   Thread.yield ()
   
 
+let reset_inst inst_model =
+  let istore = inst_model.istore in
+  Hashtbl.iter (fun _ row ->
+    istore#set ~row ~column:inst_model.icol_number 0)
+    inst_model.h
+
 let empty_sat_inst inst_model =
-  Hashtbl.clear inst_model.h;
-  inst_model.istore#clear ();
+  (* Hashtbl.clear inst_model.h; *)
+  (* inst_model.istore#clear (); *)
+  reset_inst inst_model;
   Sat.empty_with_inst (add_inst inst_model)
 
 let update_status image label buttonclean env d s steps =
@@ -316,7 +328,8 @@ let goto_error (view:GTree.view) error_model buffer
   let row = model#get_iter path in
   let line = model#get ~row ~column:error_model.rcol_line in
   let iter_line = buffer#get_iter (`LINE (line-1)) in
-  buffer#place_cursor ~where:iter_line;
+  let iter_endline = iter_line#forward_line#backward_char in
+  buffer#select_range iter_endline iter_line;
   ignore(sv#scroll_to_iter iter_line)
   
 
@@ -332,18 +345,18 @@ let create_error_view error_model buffer sv ~packing () =
   col#set_sort_column_id error_model.rcol_icon.GTree.index;
 
   let renderer = GTree.cell_renderer_text [] in
-  let col = GTree.view_column ~title:"Description"  
-    ~renderer:(renderer, ["text", error_model.rcol_desc]) () in
-  ignore (view#append_column col);
-  col#set_resizable true;
-  col#set_sort_column_id error_model.rcol_desc.GTree.index;
-
-  let renderer = GTree.cell_renderer_text [] in
   let col = GTree.view_column ~title:"Line"  
     ~renderer:(renderer, ["text", error_model.rcol_line]) () in
   ignore (view#append_column col);
   col#set_resizable true;
   col#set_sort_column_id error_model.rcol_line.GTree.index;
+
+  let renderer = GTree.cell_renderer_text [] in
+  let col = GTree.view_column ~title:"Description"  
+    ~renderer:(renderer, ["text", error_model.rcol_desc]) () in
+  ignore (view#append_column col);
+  col#set_resizable true;
+  col#set_sort_column_id error_model.rcol_desc.GTree.index;
 
   ignore(view#connect#row_activated 
 	   ~callback:(goto_error view error_model buffer sv));
@@ -386,6 +399,20 @@ let create_inst_view inst_model env buffer sv ~packing () =
   ignore (view#append_column col);
   col#set_resizable true;
   col#set_sort_column_id inst_model.icol_number.GTree.index;
+
+  let renderer = GTree.cell_renderer_text [`EDITABLE true] in
+  ignore (renderer#connect#edited (fun path s ->
+    try 
+      let row = inst_model.istore#get_iter path in
+      let limit = int_of_string s in
+      inst_model.istore#set ~row ~column:inst_model.icol_limit limit
+    with Failure _ -> ()
+  ));
+  let col = GTree.view_column ~title:"limit"  
+    ~renderer:(renderer, ["text", inst_model.icol_limit]) () in
+  ignore (view#append_column col);
+  col#set_resizable true;
+  col#set_sort_column_id inst_model.icol_limit.GTree.index;
 
   let renderer = GTree.cell_renderer_text [] in
   let col = GTree.view_column ~title:"Lemma"  
