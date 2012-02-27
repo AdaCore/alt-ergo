@@ -77,7 +77,8 @@ let pop_error ?(error=false) ~message () =
 let compare_rows icol_number (model:#GTree.model) row1 row2 =
   let t1 = model#get ~row:row1 ~column:icol_number in
   let t2 = model#get ~row:row2 ~column:icol_number in
-  compare t1 t2
+  let c = compare t1 t2 in 
+  if c = 0 then -1 else c
 
 let empty_inst_model () = 
   let icols = new GTree.column_list in
@@ -92,6 +93,7 @@ let empty_inst_model () =
   istore#set_sort_column_id icol_number.GTree.index `DESCENDING;
   {
     h = Hashtbl.create 17;
+    max = 0;
     icols = icols;
     icol_icon = icol_icon;
     icol_desc = icol_desc;
@@ -122,6 +124,7 @@ let add_inst ({istore=istore} as inst_model) orig =
       row, 1, -1, true
   in
   if limit <> -1 && limit < nb then raise Exit;
+  inst_model.max <- max inst_model.max nb;
   if upd_info then begin
     istore#set ~row ~column:inst_model.icol_icon `INFO;
     istore#set ~row ~column:inst_model.icol_desc name;
@@ -141,6 +144,7 @@ let reset_inst inst_model =
 let empty_sat_inst inst_model =
   (* Hashtbl.clear inst_model.h; *)
   (* inst_model.istore#clear (); *)
+  inst_model.max <- 0;
   reset_inst inst_model;
   Sat.empty_with_inst (add_inst inst_model)
 
@@ -312,6 +316,7 @@ let empty_error_model () =
   let rcol_type = rcols#add Gobject.Data.int in
   let rcol_color = rcols#add Gobject.Data.string in
   {
+    some = false;
     rcols = rcols;
     rcol_icon = rcol_icon;
     rcol_desc = rcol_desc;
@@ -330,7 +335,7 @@ let goto_error (view:GTree.view) error_model buffer
   let iter_line = buffer#get_iter (`LINE (line-1)) in
   let iter_endline = iter_line#forward_line#backward_char in
   buffer#select_range iter_endline iter_line;
-  ignore(sv#scroll_to_iter iter_line)
+  ignore(sv#scroll_to_iter  ~use_align:true ~yalign:0.1 iter_line)
   
 
 let create_error_view error_model buffer sv ~packing () =
@@ -374,12 +379,29 @@ let goto_lemma (view:GTree.view) inst_model buffer
     let iter_line = buffer#get_iter (`LINE (line-1)) in
     let prev_line = buffer#get_iter (`LINE (line-2)) in
     buffer#place_cursor ~where:iter_line;
-    ignore(sv#scroll_to_iter prev_line);
+    ignore(sv#scroll_to_iter ~use_align:true ~yalign:0.1 prev_line);
     env.last_tag#set_properties 
       [`BACKGROUND_SET false; `UNDERLINE_SET false];
     t#set_property (`BACKGROUND "light blue");                         
     env.last_tag <- t;
   with Not_found -> ()
+
+
+let colormap = Gdk.Color.get_system_colormap ()
+
+let set_color_inst inst_model renderer (istore:GTree.model) row =
+  let nb_inst = istore#get ~row ~column:inst_model.icol_number in
+  let limit = istore#get ~row ~column:inst_model.icol_limit in
+  if nb_inst = limit then
+    renderer#set_properties [`FOREGROUND "blue"]
+  else if inst_model.max <> 0 then
+    let perc = (nb_inst * 65535) / inst_model.max in
+    let red_n =
+      Gdk.Color.alloc colormap (`RGB (perc, 0, 0)) in
+    renderer#set_properties [`FOREGROUND_GDK red_n]
+  else 
+    renderer#set_properties [`FOREGROUND_SET false];
+  Thread.yield ()
   
 
 let create_inst_view inst_model env buffer sv ~packing () =
@@ -389,14 +411,14 @@ let create_inst_view inst_model env buffer sv ~packing () =
   let col = GTree.view_column ~title:""  
     ~renderer:(renderer, ["stock_id", inst_model.icol_icon]) () in
   ignore (view#append_column col);
-  (* col#set_cell_data_func renderer  *)
-  (*   (set_background error_model.rcol_color renderer); *)
   col#set_sort_column_id inst_model.icol_icon.GTree.index;
 
   let renderer = GTree.cell_renderer_text [] in
   let col = GTree.view_column ~title:"#"  
     ~renderer:(renderer, ["text", inst_model.icol_number]) () in
   ignore (view#append_column col);
+  col#set_cell_data_func renderer
+    (set_color_inst inst_model renderer);
   col#set_resizable true;
   col#set_sort_column_id inst_model.icol_number.GTree.index;
 
@@ -418,6 +440,8 @@ let create_inst_view inst_model env buffer sv ~packing () =
   let col = GTree.view_column ~title:"Lemma"  
     ~renderer:(renderer, ["text", inst_model.icol_desc]) () in
   ignore (view#append_column col);
+  col#set_cell_data_func renderer
+    (set_color_inst inst_model renderer);
   col#set_resizable true;
   col#set_sort_column_id inst_model.icol_desc.GTree.index;
 
@@ -522,7 +546,8 @@ let _ =
 	 ~packing:(vb1#pack1 ~shrink:true ~resize:true) () in
        let fr2 = GBin.frame ~shadow_type:`ETCHED_OUT
 	 ~packing:(vb2#pack1 ~shrink:true ~resize:true) () in
-       let fr3 = GBin.frame ~shadow_type:`ETCHED_OUT
+
+       let fr3 = GBin.frame ~shadow_type:`ETCHED_OUT ~show:false
 	 ~packing:(vb1#pack2 ~shrink:true ~resize:true) () in
        let fr4 = GBin.frame ~shadow_type:`ETCHED_OUT
 	 ~packing:(vb2#pack2 ~shrink:true ~resize:true) () in
@@ -599,12 +624,12 @@ let _ =
 	    ~hpolicy:`AUTOMATIC
 	    ~packing:fr3#add () 
        in
-
        ignore(create_error_view error_model env.buffer tv1 
 	 ~packing:sw3#add ());
 
        add_to_buffer error_model env.buffer env.ast;
 
+       if error_model.some then fr3#misc#show ();
 
        let sw4 = GBin.scrolled_window
 	    ~vpolicy:`AUTOMATIC 
@@ -636,4 +661,5 @@ let _ =
     ) typed_ast;
 
   w#show ();
+
   GtkThread.main ();

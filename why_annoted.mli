@@ -22,6 +22,7 @@ open Why_ptree
 type sbuffer = GSourceView2.source_buffer
 
 type error_model = {
+  mutable some : bool;
   rcols : GTree.column_list;
   rcol_icon : GtkStock.id GTree.column;
   rcol_desc : String.t GTree.column;
@@ -33,6 +34,7 @@ type error_model = {
 
 type inst_model = {
   h : (int, Gtk.tree_iter) Hashtbl.t;
+  mutable max : int;
   icols : GTree.column_list;
   icol_icon : GtkStock.id GTree.column;
   icol_desc : String.t GTree.column;

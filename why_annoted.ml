@@ -30,6 +30,7 @@ let general_font = Pango.Font.from_string "sans"
 type sbuffer = GSourceView2.source_buffer
 
 type error_model = {
+  mutable some : bool;
   rcols : GTree.column_list;
   rcol_icon : GtkStock.id GTree.column;
   rcol_desc : String.t GTree.column;
@@ -41,6 +42,7 @@ type error_model = {
 
 type inst_model = {
   h : (int, Gtk.tree_iter) Hashtbl.t;
+  mutable max : int;
   icols : GTree.column_list;
   icol_icon : GtkStock.id GTree.column;
   icol_desc : String.t GTree.column;
@@ -1118,7 +1120,8 @@ let add_empty_triggers_error ({rstore = rstore} as errors) (buffer:sbuffer) =
   rstore#set ~row ~column:errors.rcol_desc "Warning : Empty trigger, this lemma won't be instantiated.";
   rstore#set ~row ~column:errors.rcol_color "red";
   rstore#set ~row ~column:errors.rcol_type 1;
-  rstore#set ~row ~column:errors.rcol_line buffer#line_count  
+  rstore#set ~row ~column:errors.rcol_line buffer#line_count;
+  errors.some <- true
   
 
 let rec add_quant_form errors (buffer:sbuffer) indent tags qf =
