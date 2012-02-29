@@ -57,6 +57,8 @@ let init () =
   Hashtbl.add h Time_Ac { u = 0.0; cpt = 0.0 };
   h
 
+let reset = 
+  Hashtbl.iter (fun _ t -> t.u <- 0.0; t.cpt <- 0.0;)
 
 
 let pause h t = pause_t (Hashtbl.find h t)

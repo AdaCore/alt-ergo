@@ -33,6 +33,8 @@ type t
 
 val init : unit -> t
 
+val reset : t -> unit
+
 val pause : t -> timer -> unit
 
 val pause_all : t -> unit
