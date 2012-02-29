@@ -180,6 +180,7 @@ module Make (X : Sig.X) = struct
 
 
   let subst p v ({h=h;l=l;t=t} as tm)  =
+    !Options.thread_yield ();
     if debug_ac then
       F.fprintf fmt "[ac] subst %a by %a in %a@." 
 	X.print p X.print v X.print (X.ac_embed tm);

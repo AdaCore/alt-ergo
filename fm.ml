@@ -561,7 +561,9 @@ module Make
     with Failure "big_int_of_ratio" -> a, b
 
   let cross x cpos cneg = 
-    let rec cross_rec acc = function 
+    let rec cross_rec acc l =
+      !Options.thread_yield ();
+      match l with
       | [] -> acc
       | { Inequation.ple0 = p1; is_le = k1; dep = d1; expl = ex1 } :: l ->
 	  let n1 = abs_num (P.find x p1) in
@@ -569,6 +571,7 @@ module Make
 	  let acc = 
 	    List.fold_left 
 	      (fun acc {Inequation.ple0 = p2; is_le = k2; dep=d2; expl = ex2} ->
+		!Options.thread_yield ();
 		 let n2 = abs_num (P.find x p2) in
 		 (* let n1, n2 =  div_by_pgcd (n1, n2) ty in *)
 		 let p = P.add
@@ -613,6 +616,7 @@ module Make
       | None -> raise Not_found
 
   let rec fourier ( (env, eqs) as acc) l expl =
+    !Options.thread_yield ();
      match l with
       | [] -> acc
       | ineq :: l' ->

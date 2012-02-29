@@ -153,7 +153,6 @@ let tag_callback t env sbuf ~origin:y z i =
 	  begin
 	    let tyt = match find t sbuf env.ast with
 	      | Some (AT at) ->
-		    eprintf "line: %d@." at.line;
 		  fprintf str_formatter ": %a" Ty.print at.c.at_ty;
 		  flush_str_formatter ()
 	      | Some (AF _) -> ": formula"

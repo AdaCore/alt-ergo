@@ -35,8 +35,10 @@ type elt = ST.t * SA.t
   
 module Make (X : Sig.X) = struct
 
-  let inter_tpl (x1,y1) (x2,y2) = ST.inter x1 x2, SA.inter y1 y2
-  let union_tpl (x1,y1) (x2,y2) = ST.union x1 x2, SA.union y1 y2
+  let inter_tpl (x1,y1) (x2,y2) = 
+    !Options.thread_yield (); ST.inter x1 x2, SA.inter y1 y2
+  let union_tpl (x1,y1) (x2,y2) = 
+    !Options.thread_yield (); ST.union x1 x2, SA.union y1 y2
   let leaves r = 
     let one, _ = X.make (T.make (Symbols.name "@bottom") [] Ty.Tint) in
     match X.leaves r with [] -> [one] | l -> l

@@ -33,7 +33,7 @@ type error_model = {
 }
 
 type inst_model = {
-  h : (int, Gtk.tree_iter) Hashtbl.t;
+  h : (int, Gtk.tree_iter option ref * int ref * string * int ref) Hashtbl.t;
   mutable max : int;
   icols : GTree.column_list;
   icol_icon : GtkStock.id GTree.column;

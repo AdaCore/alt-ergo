@@ -415,7 +415,8 @@ struct
       r5=X5.Rel.empty ();
     }
 	
-    let assume env sa ~are_eq ~are_neq ~class_of = 
+    let assume env sa ~are_eq ~are_neq ~class_of =
+      !Options.thread_yield ();
       let env1, { assume = a1; remove = rm1} = 
 	X1.Rel.assume env.r1 sa ~are_eq ~are_neq ~class_of in
       let env2, { assume = a2; remove = rm2} = 
@@ -431,6 +432,7 @@ struct
 	remove = rm1@rm2@rm3@rm4@rm5;}
 	
     let query env a ~are_eq ~are_neq ~class_of = 
+      !Options.thread_yield ();
       match X1.Rel.query env.r1 a ~are_eq ~are_neq ~class_of with
 	| Yes _ as ans -> ans
 	| No -> 
@@ -445,6 +447,7 @@ struct
 		      | No -> X5.Rel.query env.r5 a ~are_eq ~are_neq ~class_of
 		      
     let case_split env = 
+      !Options.thread_yield ();
       let seq1 = X1.Rel.case_split env.r1 in
       let seq2 = X2.Rel.case_split env.r2 in
       let seq3 = X3.Rel.case_split env.r3 in
@@ -453,6 +456,7 @@ struct
       seq1 @ seq2 @ seq3 @ seq4 @ seq5
 
     let add env r =
+      !Options.thread_yield ();
       {r1=X1.Rel.add env.r1 r;
        r2=X2.Rel.add env.r2 r;
        r3=X3.Rel.add env.r3 r;

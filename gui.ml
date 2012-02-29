@@ -26,7 +26,11 @@ open Format
 open Options
 
 let () = 
-  try let _ = GMain.init () in ()
+  try 
+    let _ = GMain.init () in
+
+    Options.thread_yield := Thread.yield
+      
   with Gtk.Error s -> eprintf "%s@." s
 
 (* GTK *)
@@ -77,8 +81,8 @@ let pop_error ?(error=false) ~message () =
 let compare_rows icol_number (model:#GTree.model) row1 row2 =
   let t1 = model#get ~row:row1 ~column:icol_number in
   let t2 = model#get ~row:row2 ~column:icol_number in
-  let c = compare t1 t2 in 
-  if c = 0 then -1 else c
+  compare t1 t2
+
 
 let empty_inst_model () = 
   let icols = new GTree.column_list in
@@ -105,45 +109,57 @@ let empty_inst_model () =
 
 
 
-let add_inst ({istore=istore} as inst_model) orig =
+let refresh_instances ({istore=istore} as inst_model) () =
+  (* eprintf "refresh@."; *)
+  Hashtbl.iter (fun id (r, n, name, limit) -> 
+    let row, upd_info = 
+      match !r with
+	| Some row -> row, false
+	| None ->
+	  let row = istore#append () in
+	  r := Some row;
+	  row, true in
+    let nb = !n in
+    (* eprintf "refresh: %s %d@." name nb; *)
+    inst_model.max <- max inst_model.max nb;
+    if upd_info then begin
+      istore#set ~row ~column:inst_model.icol_icon `INFO;
+      istore#set ~row ~column:inst_model.icol_desc name;
+      istore#set ~row ~column:inst_model.icol_limit !limit;
+    end;
+    istore#set ~row ~column:inst_model.icol_number nb;
+    istore#set ~row ~column:inst_model.icol_tag id
+  ) inst_model.h;
+  true
+    
+
+let add_inst ({h=h} as inst_model) orig =
+  (* eprintf "guisafe:%b@." (GtkThread.gui_safe ()); *)
   let id = Formula.id orig in
   let name = 
     match Formula.view orig with 
       | Formula.Lemma {Formula.name=n} when n <> "" -> n
       | _ -> string_of_int id
   in
-  let row, nb, limit, upd_info =
-    try 
-      let row = Hashtbl.find inst_model.h id in
-      let nb = istore#get ~row ~column:inst_model.icol_number in
-      let limit = istore#get ~row ~column:inst_model.icol_limit in
-      row, nb + 1, limit, false
-    with Not_found ->
-      let row = istore#append () in
-      Hashtbl.add inst_model.h id row;
-      row, 1, -1, true
+  let r, n, limit, to_add =
+  try
+    let r, n, _, limit = Hashtbl.find h id in
+    r, n, limit, false
+  with Not_found -> ref None, ref 0, ref (-1), true
   in
-  if limit <> -1 && limit < nb then raise Exit;
-  inst_model.max <- max inst_model.max nb;
-  if upd_info then begin
-    istore#set ~row ~column:inst_model.icol_icon `INFO;
-    istore#set ~row ~column:inst_model.icol_desc name;
-    istore#set ~row ~column:inst_model.icol_limit limit;
-  end;
-  istore#set ~row ~column:inst_model.icol_number nb;
-  istore#set ~row ~column:inst_model.icol_tag id;
+  if !limit <> -1 && !limit < !n + 1 then raise Exit;
+  incr n;
+  if to_add then Hashtbl.add h id (r, n, name, limit);
+  inst_model.max <- max inst_model.max !n;
   Thread.yield ()
-  
+
 
 let reset_inst inst_model =
-  let istore = inst_model.istore in
-  Hashtbl.iter (fun _ row ->
-    istore#set ~row ~column:inst_model.icol_number 0)
-    inst_model.h
+  Hashtbl.iter (fun _ (_, n, _, _) -> n := 0) inst_model.h;
+  ignore (refresh_instances inst_model ())
+
 
 let empty_sat_inst inst_model =
-  (* Hashtbl.clear inst_model.h; *)
-  (* inst_model.istore#clear (); *)
   inst_model.max <- 0;
   reset_inst inst_model;
   Sat.empty_with_inst (add_inst inst_model)
@@ -210,6 +226,7 @@ let force_interrupt old_action_ref n =
 
 let rec run buttonrun buttonstop buttonclean inst_model 
     image label thread env () =
+  
   (* Install the signal handler: *)
   let old_action_ref = ref Sys.Signal_ignore in
   let old_action = 
@@ -226,23 +243,27 @@ let rec run buttonrun buttonstop buttonclean inst_model
   let ast = to_ast env.ast in
   if debug then fprintf fmt "AST : \n-----\n%a@." print_typed_decl_list ast;
 
-  (*List.iter (fprintf err_formatter "%a@." print_typed_decl) ast;*)
   let ast_pruned =
     if select > 0 then Pruning.split_and_prune select ast
     else [List.map (fun f -> f,true) ast] in
 
-  let chan = Event.new_channel () in
+  (* let chan = Event.new_channel () in *)
   
-  ignore (Thread.create
-    (fun () ->
-       (* Thread.yield (); *)
-       ignore (Event.sync (Event.receive chan));
-       if debug then fprintf fmt "Waiting thread : signal recieved@.";
-       buttonstop#misc#hide ();
-       buttonrun#misc#show ()
-    ) ());
+  (* ignore (Thread.create *)
+  (*   (fun () -> *)
+  (*      (\* Thread.yield (); *\) *)
+  (*      ignore (Event.sync (Event.receive chan)); *)
+  (*      if debug then fprintf fmt "Waiting thread : signal recieved@."; *)
+  (*      buttonstop#misc#hide (); *)
+  (*      buttonrun#misc#show () *)
+  (*   ) ()); *)
 
-  let runth = (Thread.create
+  (* refresh instances *)
+  let to_id = 
+    GMain.Timeout.add ~ms:300 ~callback:(refresh_instances inst_model)
+  in
+
+   thread := Some (Thread.create
     (fun () ->
        (try
 	  (* Thread.yield (); *)
@@ -250,8 +271,6 @@ let rec run buttonrun buttonstop buttonclean inst_model
 	  Frontend.Time.start ();
 	  List.iter 
 	    (fun dcl ->
-	       (* Thread.yield (); *)
-	      (* if debug then fprintf fmt "AST2 : \n-----\n%a@." print_typed_decl_list (let a::_ =  ast_pruned in (List.map (fun (f,_) -> f) a)); *)
 	       let cnf = Cnf.make dcl in
 	       ignore (Queue.fold
 			 (Frontend.process_decl 
@@ -276,9 +295,17 @@ let rec run buttonrun buttonstop buttonclean inst_model
 	      pop_error ~error:true ~message ()
        );
        if debug then fprintf fmt "Send done signal to waiting thread@.";
-       Event.sync (Event.send chan true)
-    ) ()) in
-  thread := Some runth
+       buttonstop#misc#hide ();
+       buttonrun#misc#show ();
+       (* Event.sync (Event.send chan true) *)
+       Thread.delay 0.001;
+       GMain.Timeout.remove to_id;
+       ignore (refresh_instances inst_model ())
+    ) ());
+
+  Thread.yield ()
+  (* ignore (Thread.create (fun () ->  *)
+  (* match !thread with Some s -> Thread.join s | _ -> assert false) ()) *)
 
 
 let rec kill_thread buttonrun buttonstop image label thread () =
@@ -345,8 +372,6 @@ let create_error_view error_model buffer sv ~packing () =
   let col = GTree.view_column ~title:""  
     ~renderer:(renderer, ["stock_id", error_model.rcol_icon]) () in
   ignore (view#append_column col);
-  (* col#set_cell_data_func renderer  *)
-  (*   (set_background error_model.rcol_color renderer); *)
   col#set_sort_column_id error_model.rcol_icon.GTree.index;
 
   let renderer = GTree.cell_renderer_text [] in
@@ -424,9 +449,12 @@ let create_inst_view inst_model env buffer sv ~packing () =
 
   let renderer = GTree.cell_renderer_text [`EDITABLE true] in
   ignore (renderer#connect#edited (fun path s ->
-    try 
+    try
       let row = inst_model.istore#get_iter path in
+      let id = inst_model.istore#get ~row ~column:inst_model.icol_tag in
       let limit = int_of_string s in
+      let _,_,_,l = Hashtbl.find inst_model.h id in
+      l := limit;
       inst_model.istore#set ~row ~column:inst_model.icol_limit limit
     with Failure _ -> ()
   ));
@@ -504,7 +532,7 @@ let _ =
        buf2#set_style_scheme scheme;
 
        let annoted_ast = annot buf1 l in
-       if debug then fprintf fmt "Computing dependancies ... ";
+       if debug then fprintf fmt "Computing dependencies ... ";
        let dep = make_dep annoted_ast in
        if debug then fprintf fmt "Done@.";
 
@@ -662,4 +690,6 @@ let _ =
 
   w#show ();
 
+  (* Thread.join(GtkThread.start ()); *)
   GtkThread.main ();
+

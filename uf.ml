@@ -195,15 +195,18 @@ module Make ( R : Sig.X ) = struct
     let mem env t = MapT.mem t env.make
       
     let lookup_by_t t env =
+      !Options.thread_yield ();
       try MapR.find (MapT.find t env.make) env.repr
       with Not_found -> 
 	if debug_uf then fprintf fmt "Uf: Not_found %a@." Term.print t;
 	assert false (*R.make t, Ex.empty*) (* XXXX *)
 	  
     let lookup_by_r r env = 
+      !Options.thread_yield ();
       try MapR.find r env.repr with Not_found -> r, Ex.empty
 	
     let lookup_for_neqs env r =
+      !Options.thread_yield ();
       try MapR.find r env.neqs with Not_found -> MapL.empty
 	
     let add_to_classes t r classes =  
@@ -216,7 +219,8 @@ module Make ( R : Sig.X ) = struct
       let s2 = try MapR.find nc classes with Not_found -> SetT.empty in
       MapR.remove c (MapR.add nc (SetT.union s1 s2) classes)
 	
-    let add_to_gamma r c gamma = 
+    let add_to_gamma r c gamma =
+      !Options.thread_yield ();
       L.fold_left
 	(fun gamma x -> 
 	  let s = try MapR.find x gamma with Not_found -> SetR.empty in
@@ -243,6 +247,7 @@ module Make ( R : Sig.X ) = struct
 
     let disjoint_union l_1 l_2 = 
       let rec di_un (l1,c,l2) (l_1,l_2)= 
+	!Options.thread_yield ();
         match l_1,l_2 with
 	  | [],[] -> l1, c, l2
 	  | l, [] -> di_un (l @ l1,c,l2) ([],[])
@@ -296,6 +301,7 @@ module Make ( R : Sig.X ) = struct
           with List_minus_exn -> ()
       in
       let rec fixpoint () = 
+	!Options.thread_yield ();
         (try SetRL.iter apply_rule rls with Exit -> ());
 	if !fp then !r, !ex else (fp := true; fixpoint ())
       in fixpoint()
@@ -397,6 +403,7 @@ module Make ( R : Sig.X ) = struct
 	(fun h rls env ->
           SetRL.fold
 	    (fun ((g, d, dep_rl) as rul) env ->
+	      !Options.thread_yield ();
 	      let env = {env with ac_rs = RS.remove_rule rul env.ac_rs} in
 	      let gx = R.color g in
 	      let g2, ex_g2 = normal_form env (Ac.subst p v g) in
@@ -447,7 +454,8 @@ module Make ( R : Sig.X ) = struct
       let use_p = MapR.find p env.gamma in
       try 
 	let env, tch, neqs_to_up = SetR.fold 
-	  (fun r (env, touched, neqs_to_up) -> 
+	  (fun r (env, touched, neqs_to_up) ->
+	    !Options.thread_yield (); 
 	     let rr, ex = MapR.find r env.repr in
 	     let nrr = R.subst p v rr in
 	     if R.equal rr nrr then env, touched, neqs_to_up
@@ -470,6 +478,7 @@ module Make ( R : Sig.X ) = struct
       else
 	let env, tch, neqs_to_up = MapR.fold
 	  (fun r (rr,ex) (env,tch,neqs_to_up) ->
+	    !Options.thread_yield ();
 	     let nrr, ex_nrr = normal_form env rr in
 	     if R.equal nrr rr then env, tch, neqs_to_up
 	     else 
@@ -552,6 +561,7 @@ module Make ( R : Sig.X ) = struct
     let env, _, newds = 
       List.fold_left
 	(fun (env, mapr, newds) r -> 
+	  !Options.thread_yield ();
 	   let rr, ex = Env.find_or_normal_form env r in 
 	   try
 	     let exr = MapR.find rr mapr in

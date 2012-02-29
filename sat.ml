@@ -327,6 +327,7 @@ let rec add_dep_of_formula f dep =
 
 
 let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
+  !Options.thread_yield ();
   try
     let dep = add_dep f dep in
     let dep_gamma = add_dep_of_formula f dep in

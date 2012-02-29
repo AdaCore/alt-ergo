@@ -177,6 +177,7 @@ module Make (X : Sig.X) = struct
     SetT.fold (equal_only_by_congruence env ex t1) s acc
 
   let rec add_term ex (env, l) t =
+    !Options.thread_yield ();
     if rules = 3 then fprintf fmt "[rule] TR-CCX-AddTerm@.";
     Print.add_to_use t;
     (* nothing to do if the term already exists *)
@@ -273,6 +274,7 @@ module Make (X : Sig.X) = struct
 	    | _ -> []
 
   let contra_congruence  = 
+    !Options.thread_yield ();
     let vrai,_ = X.make T.vrai in
     let faux, _ = X.make T.faux in
     fun env r ex -> 
@@ -303,10 +305,12 @@ module Make (X : Sig.X) = struct
 	       end) 
 
   let rec congruence_closure env r1 r2 ex = 
+    !Options.thread_yield ();
     Print.cc r1 r2;
     let uf, res = Uf.union env.uf r1 r2 ex in
     List.fold_left 
       (fun (env, l) (p, touched, v) ->
+	!Options.thread_yield ();
 	 (* we look for use(p) *)
       	 let p_t, p_a = Use.find p env.use in
 	 
@@ -334,6 +338,7 @@ module Make (X : Sig.X) = struct
       ) ({env with uf=uf}, [])  res
 
   let replay_atom env sa = 
+    !Options.thread_yield ();
     let are_eq = Uf.are_equal env.uf in
     let are_neq = Uf.are_distinct env.uf in
     let class_of = Uf.class_of env.uf in
@@ -345,6 +350,7 @@ module Make (X : Sig.X) = struct
 
 
   let semantic_view env la = 
+    !Options.thread_yield ();
     List.fold_left 
       (fun (env, acc, lsa) (a, ex) ->
 	 match a with 
@@ -365,6 +371,7 @@ module Make (X : Sig.X) = struct
     
 
   let rec assume_literal lt env la =
+    !Options.thread_yield ();
     if la = [] then env, lt
     else 
       let env, newc, lsa = semantic_view env la in
@@ -400,7 +407,9 @@ module Make (X : Sig.X) = struct
 
 
   let look_for_sat ?(bad_last=No) lt t base_env l =
-    let rec aux lt bad_last dl base_env li = match li, bad_last with
+    let rec aux lt bad_last dl base_env li = 
+      !Options.thread_yield ();
+      match li, bad_last with
       | [], _ -> 
 	begin
 	  if rules = 3 then
@@ -462,6 +471,7 @@ module Make (X : Sig.X) = struct
     aux lt bad_last (List.rev t.choices) base_env l
 
   let try_it f t =
+    !Options.thread_yield ();
     Print.begin_case_split ();
     let r =
       try 
@@ -514,6 +524,7 @@ module Make (X : Sig.X) = struct
 	   | _ -> acc)
 
   let assume a ex t = 
+    !Options.thread_yield ();
     let a = LTerm a in
     let gamma, lt = assume_literal [] t.gamma [a, ex] in
     let t = { t with gamma = gamma } in
@@ -525,6 +536,7 @@ module Make (X : Sig.X) = struct
   let class_of t term = Uf.class_of t.gamma.uf term
 
   let add_and_process a t =
+    !Options.thread_yield ();
     let aux a ex env = 
       let gamma, l = add a ex env in assume_literal [] gamma l
     in
@@ -534,6 +546,7 @@ module Make (X : Sig.X) = struct
     Use.print t.gamma.use; t    
 
   let query a t =
+    !Options.thread_yield ();
     Print.query a;
     try
         match A.LT.view a with

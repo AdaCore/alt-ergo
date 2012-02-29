@@ -72,3 +72,5 @@ val debug_proof : bool
 val rules : int
 val debug_split : bool
 val restricted : bool
+
+val thread_yield : (unit -> unit) ref
