@@ -348,6 +348,7 @@ module Make ( R : Sig.X ) = struct
 
 
     let find_or_normal_form env r =
+      !Options.thread_yield ();
       try MapR.find r env.repr with Not_found -> normal_form env r
 
     let init_leaf env p = 

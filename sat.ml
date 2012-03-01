@@ -234,7 +234,7 @@ let mround predicate mode env max_size =
     Print.mround max_size;
     let axioms = if predicate then env.definitions else env.lemmas in
     let env, max_size = mtriggers env axioms max_size in
-    let rec bouclage n (env, lf) = 
+    let rec bouclage n (env, lf) =
       if n <=0 then (env, lf)
       else 
         let env = 

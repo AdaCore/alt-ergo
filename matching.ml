@@ -170,6 +170,7 @@ module Make (X : X) = struct
     match l with [] -> raise Echec | l  -> l
 	
   let rec matchterm env uf ( {sbt=(s_t,s_ty);gen=g;goal=b} as sg) pat t =
+    !Options.thread_yield ();
     let {T.f=f_pat;xs=pats;ty=ty_pat} =  T.view pat in
     match f_pat with
 	Symbols.Var _ -> 
@@ -234,12 +235,13 @@ module Make (X : X) = struct
       (fun acc sg -> 
          matchpat env uf pat_info acc (sg, T.apply_subst sg.sbt pat)) [] lsubsts
       
-  let matching (pat_info, pats) env uf = 
+  let matching (pat_info, pats) env uf =
     let egs = {sbt=(SubstT.empty,Ty.esubst) ; gen = 0; goal = false} in
     List.fold_left (matchpats env uf pat_info) [egs] pats
 
   let query env uf = 
     List.fold_left 
-      (fun r ((pat_infos, pats) as v) -> (pat_infos, matching v env uf)::r)
+      (fun r ((pat_infos, pats) as v) -> 
+	(pat_infos, matching v env uf)::r)
       [] env.pats 
 end
