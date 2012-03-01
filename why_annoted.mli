@@ -44,6 +44,37 @@ type inst_model = {
   istore : GTree.list_store;
 }
 
+type timers_model = {
+  timers : Timers.t;
+
+  label_sat : GMisc.label;
+  label_match : GMisc.label;
+  label_cc : GMisc.label;
+  label_arith : GMisc.label;
+  label_arrays : GMisc.label;
+  label_sum : GMisc.label;
+  label_records : GMisc.label;
+  label_ac : GMisc.label;
+
+  tl_sat : GMisc.label;
+  tl_match : GMisc.label;
+  tl_cc : GMisc.label;
+  tl_arith : GMisc.label;
+  tl_arrays : GMisc.label;
+  tl_sum : GMisc.label;
+  tl_records : GMisc.label;
+  tl_ac : GMisc.label;
+
+  pr_sat : GRange.progress_bar;
+  pr_match : GRange.progress_bar;
+  pr_cc : GRange.progress_bar;
+  pr_arith : GRange.progress_bar;
+  pr_arrays : GRange.progress_bar;
+  pr_sum : GRange.progress_bar;
+  pr_records : GRange.progress_bar;
+  pr_ac : GRange.progress_bar;
+}
+
 type 'a annoted =
     { mutable c : 'a; 
       mutable pruned : bool;

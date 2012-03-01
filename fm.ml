@@ -799,6 +799,7 @@ module Make
     equalities_from_monomes env eqs
 
   let assume env la ~are_eq ~are_neq ~class_of =
+    !Options.timer_start Timers.TArith;
     let env = {env with improved = SP.empty} in
     Debug.env env;
     let env, eqs, new_ineqs, expl =
@@ -853,6 +854,7 @@ module Make
       if debug_fm then 
 	fprintf fmt "new explanations %a@." Explanation.print expl; 
     try
+    let er = 
       (* we only call fm when new ineqs are assumed *)
       let env, eqs = if new_ineqs then fm env eqs expl else env, eqs in
       (* let env = oldify_inequations env in *)
@@ -872,11 +874,14 @@ module Make
 	     } ) { assume = []; remove = [] } eqs
       in
       env, result
-
+    in
+    !Options.timer_pause Timers.TArith;
+    er
     with Intervals.NotConsistent expl ->
       if debug_fm then 
 	fprintf fmt "interval inconsistent %a@." 
 	  Explanation.print expl; 
+      !Options.timer_pause Timers.TArith;
       raise (Exception.Inconsistent expl)
       
   let query env a_ex ~are_eq ~are_neq ~class_of =

@@ -114,7 +114,8 @@ module Make(X : ALIEN) = struct
       | Alien r1   , Cons _     -> [r1,b]
       | Alien _    , Alien _    -> assert false
     
-  let solve a b = 
+  let solve a b =
+    !Options.timer_start Timers.TSum;
     if debug_sum then fprintf fmt "[Sum] we solve %a = %a@."  
       X.print a X.print b;
     try
@@ -123,9 +124,11 @@ module Make(X : ALIEN) = struct
           [p,v] -> fprintf fmt "\twe get: %a |-> %a@." X.print p X.print v
         | []    -> fprintf fmt "\tthe equation is trivial@."
         | _ -> assert false);
+      !Options.timer_pause Timers.TSum;
       res
     with Unsolvable -> 
       if debug_sum then fprintf fmt "\tthe equation is unsolvable@.";
+      !Options.timer_pause Timers.TSum;
       raise Unsolvable
 
   let term_extract _ = None
@@ -221,6 +224,7 @@ module Make(X : ALIEN) = struct
         |  _ -> env, eqs
 
     let assume env la ~are_eq ~are_neq ~class_of = 
+      !Options.timer_start Timers.TSum;
       let aux bol r1 r2 dep env eqs = function
         | None     -> env, eqs
         | Some hss -> 
@@ -244,6 +248,7 @@ module Make(X : ALIEN) = struct
 		 
           ) (env,[]) la
       in
+      !Options.timer_pause Timers.TSum;
       env, { assume = eqs; remove = [] }
 
     (* XXXXXX : TODO -> ajouter les explications dans les choix du
@@ -274,12 +279,17 @@ module Make(X : ALIEN) = struct
       try ignore(assume env [a_ex] ~are_eq ~are_neq ~class_of); Sig.No
       with Inconsistent expl -> Sig.Yes expl          
 
-    let add env r = match embed r, values_of r with
-      | Alien r, Some hss -> 
+    let add env r =
+      !Options.timer_start Timers.TSum;
+      let env = match embed r, values_of r with
+	| Alien r, Some hss -> 
           if MX.mem r env then env else 
             MX.add r (hss, Ex.empty) env
-
-      | _ -> env
+	      
+	| _ -> env
+      in
+      !Options.timer_pause Timers.TSum;
+      env
 
     let instantiate env _ _ _ _ = env, []
 

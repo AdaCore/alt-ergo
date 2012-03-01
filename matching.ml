@@ -102,6 +102,7 @@ module Make (X : X) = struct
     with Not_found -> g , b
 
   let add_term { term_age = age; term_from_goal = but; term_orig = lem} t env =
+    !Options.timer_start Timers.TMatch;
     let rec add_rec env t = 
       let {T.f=f;xs=xs} = T.view t in
       let env = 
@@ -120,7 +121,9 @@ module Make (X : X) = struct
       in
       List.fold_left add_rec env xs
     in
-    if age>age_limite then env else add_rec env t
+    let env = if age>age_limite then env else add_rec env t in
+    !Options.timer_pause Timers.TMatch;
+    env
       
   let add_trigger p trs env = { env with pats = (p, trs) ::env.pats }
 
@@ -240,8 +243,13 @@ module Make (X : X) = struct
     List.fold_left (matchpats env uf pat_info) [egs] pats
 
   let query env uf = 
-    List.fold_left 
+    !Options.timer_start Timers.TMatch;
+    let r = List.fold_left 
       (fun r ((pat_infos, pats) as v) -> 
 	(pat_infos, matching v env uf)::r)
       [] env.pats 
+    in
+    !Options.timer_pause Timers.TMatch;
+    r
+
 end

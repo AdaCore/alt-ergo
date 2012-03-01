@@ -350,7 +350,8 @@ module Make(X : ALIEN) = struct
 	if debug_arrays then fprintf fmt "[Arrays.case-split] Nothing@.";
 	[]
           
-    let assume env la ~are_eq ~are_neq ~class_of = 
+    let assume env la ~are_eq ~are_neq ~class_of =
+      !Options.timer_start Timers.TArrays;
       (* instantiation des axiomes des tableaux *)
       Debug.assume fmt la; 
        let env = new_terms env la in
@@ -359,6 +360,7 @@ module Make(X : ALIEN) = struct
       (*Debug.env fmt env;*)
       Debug.new_equalities fmt atoms;
       let l = Conseq.fold (fun (a,ex) l -> ((LTerm a, ex)::l)) atoms [] in
+      !Options.timer_pause Timers.TArrays;
       env, { assume = l; remove = [] }
 	  
     let query _ _ ~are_eq ~are_neq ~class_of = Sig.No

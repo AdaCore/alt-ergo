@@ -18,28 +18,52 @@
 (**************************************************************************)
 
 open Unix
+open Format
 
 type kind =
-  | Time_Sat
-  | Time_Match
-  | Time_CC
-  | Time_Arith
-  | Time_Arrays
-  | Time_Sum
-  | Time_Records
-  | Time_Ac
+  | TSat
+  | TMatch
+  | TCC
+  | TArith
+  | TArrays
+  | TSum
+  | TRecords
+  | TAc
+
+let print fmt = function 
+  | TSat -> fprintf fmt "TSat"
+  | TMatch -> fprintf fmt "TMatch"
+  | TCC -> fprintf fmt "TCC"
+  | TArith -> fprintf fmt "TArith"
+  | TArrays -> fprintf fmt "TArrays"
+  | TSum -> fprintf fmt "TSum"
+  | TRecords -> fprintf fmt "TRecords"
+  | TAc -> fprintf fmt "TAc"
 
 type timer = {
   mutable u : float;
   mutable cpt: float;
+  mutable active: bool;
+  mutable paused: bool;
 }
 
 type t = (kind, timer) Hashtbl.t 
 
 
-let start_t t = t.u <- (times()).tms_utime
+let start_t t cur = 
+  if t.paused then t.u <- cur;
+  t.active <- true;
+  t.paused <- false
 
-let pause_t t = t.cpt <- t.cpt +. ((times()).tms_utime -. t.u)
+let pause_t t cur =
+  if not t.paused then t.cpt <- t.cpt +. (cur -. t.u);
+  t.paused <- true;
+  t.active <- false
+
+let pause_active_t t cur = 
+  if not t.paused then t.cpt <- t.cpt +. (cur -. t.u);
+  t.paused <- true
+
 
 let update_t t =
   let time = (times()).tms_utime in
@@ -52,29 +76,46 @@ let get_t t = t.cpt
 
 let init () =
   let h = Hashtbl.create 8 in
-  Hashtbl.add h Time_Sat { u = 0.0; cpt = 0.0 };
-  Hashtbl.add h Time_Match { u = 0.0; cpt = 0.0 };
-  Hashtbl.add h Time_CC { u = 0.0; cpt = 0.0 };
-  Hashtbl.add h Time_Arith { u = 0.0; cpt = 0.0 };
-  Hashtbl.add h Time_Arrays { u = 0.0; cpt = 0.0 };
-  Hashtbl.add h Time_Sum { u = 0.0; cpt = 0.0 };
-  Hashtbl.add h Time_Records { u = 0.0; cpt = 0.0 };
-  Hashtbl.add h Time_Ac { u = 0.0; cpt = 0.0 };
+  Hashtbl.add h TSat { u = 0.0; cpt = 0.0; active = false ; paused = true};
+  Hashtbl.add h TMatch { u = 0.0; cpt = 0.0; active = false ; paused = true };
+  Hashtbl.add h TCC { u = 0.0; cpt = 0.0; active = false ; paused = true };
+  Hashtbl.add h TArith { u = 0.0; cpt = 0.0; active = false ; paused = true };
+  Hashtbl.add h TArrays { u = 0.0; cpt = 0.0; active = false ; paused = true };
+  Hashtbl.add h TSum { u = 0.0; cpt = 0.0; active = false ; paused = true };
+  Hashtbl.add h TRecords { u = 0.0; cpt = 0.0; active = false ; paused = true };
+  Hashtbl.add h TAc { u = 0.0; cpt = 0.0; active = false ; paused = true };
   h
 
 let reset = 
-  Hashtbl.iter (fun _ t -> t.u <- 0.0; t.cpt <- 0.0;)
+  Hashtbl.iter (fun _ t -> 
+    t.u <- 0.0; 
+    t.cpt <- 0.0; 
+    t.active <- false;
+    t.paused <- true)
 
 
 let pause h t = pause_t (Hashtbl.find h t)
 
+
+let pause h t =
+  let cur = (times()).tms_utime in
+  Hashtbl.iter (fun x it -> 
+    if x = t then pause_t it cur
+    else if it.active then start_t it cur
+  ) h
+
 let update h t = update_t (Hashtbl.find h t)
 
-let pause_all h =  Hashtbl.iter (fun _ it -> pause_t it)
+let pause_all =  
+  let cur = (times()).tms_utime in
+  Hashtbl.iter (fun _ it -> pause_t it cur)
 
 let start h t = 
+  let cur = (times()).tms_utime in
   Hashtbl.iter (fun x it -> 
-    if x = t then start_t it else pause_t it)
+    if x = t then start_t it cur
+    else if it.active then pause_active_t it cur
+  ) h
 
 let pause_and_restart h t f =
   pause h t;

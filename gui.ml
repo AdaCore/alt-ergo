@@ -110,6 +110,159 @@ let empty_inst_model () =
   }
 
 
+let empty_timers_model (table:GPack.table) =
+  let t =
+  {
+    timers = Timers.init ();
+
+    label_sat =
+      GMisc.label ~text:"SAT" ~justify:`LEFT ~xalign:0.
+	~packing:(table#attach ~left:0 ~top:0) ();
+    label_match =
+      GMisc.label ~text:"Matching" ~justify:`LEFT ~xalign:0.
+	~packing:(table#attach ~left:0 ~top:1) ();
+    label_cc = 
+      GMisc.label ~text:"CC(X)" ~justify:`LEFT ~xalign:0.
+	~packing:(table#attach ~left:0 ~top:2) ();
+    label_arith = 
+      GMisc.label ~text:"Arith" ~justify:`LEFT ~xalign:0.
+	~packing:(table#attach ~left:0 ~top:3) ();
+    label_arrays = 
+      GMisc.label ~text:"Arrays" ~justify:`LEFT~xalign:0. 
+	~packing:(table#attach ~left:0 ~top:4) ();
+    label_sum = 
+      GMisc.label ~text:"Sum" ~justify:`LEFT ~xalign:0.
+	~packing:(table#attach ~left:0 ~top:5) ();
+    label_records =
+      GMisc.label ~text:"Records" ~justify:`LEFT ~xalign:0.
+	~packing:(table#attach ~left:0 ~top:6) ();
+    label_ac =
+      GMisc.label ~text:"AC(X)" ~justify:`LEFT ~xalign:0.
+	~packing:(table#attach ~left:0 ~top:7) ();
+
+    tl_sat =
+      GMisc.label ~text:"0.000 s" ~justify:`RIGHT 
+	~packing:(table#attach ~left:1 ~top:0) ();
+    tl_match =
+      GMisc.label ~text:"0.000 s" ~justify:`RIGHT 
+	~packing:(table#attach ~left:1 ~top:1) ();
+    tl_cc = 
+      GMisc.label ~text:"0.000 s" ~justify:`RIGHT 
+	~packing:(table#attach ~left:1 ~top:2) ();
+    tl_arith = 
+      GMisc.label ~text:"0.000 s" ~justify:`RIGHT 
+	~packing:(table#attach ~left:1 ~top:3) ();
+    tl_arrays = 
+      GMisc.label ~text:"0.000 s" ~justify:`RIGHT 
+	~packing:(table#attach ~left:1 ~top:4) ();
+    tl_sum = 
+      GMisc.label ~text:"0.000 s" ~justify:`RIGHT 
+	~packing:(table#attach ~left:1 ~top:5) ();
+    tl_records =
+      GMisc.label ~text:"0.000 s" ~justify:`RIGHT 
+	~packing:(table#attach ~left:1 ~top:6) ();
+    tl_ac =
+      GMisc.label ~text:"0.000 s" ~justify:`RIGHT 
+	~packing:(table#attach ~left:1 ~top:7) ();
+
+    pr_sat =
+      GRange.progress_bar ~packing:(table#attach ~left:2 ~top:0  
+				      ~expand:`X ~shrink:`BOTH) ();
+    pr_match =
+      GRange.progress_bar ~packing:(table#attach ~left:2 ~top:1  
+				      ~expand:`X ~shrink:`BOTH) ();
+    pr_cc = 
+      GRange.progress_bar ~packing:(table#attach ~left:2 ~top:2  
+				      ~expand:`X ~shrink:`BOTH) ();
+    pr_arith = 
+      GRange.progress_bar ~packing:(table#attach ~left:2 ~top:3  
+				      ~expand:`X ~shrink:`BOTH) ();
+    pr_arrays = 
+      GRange.progress_bar ~packing:(table#attach ~left:2 ~top:4  
+				      ~expand:`X ~shrink:`BOTH) ();
+    pr_sum = 
+      GRange.progress_bar ~packing:(table#attach ~left:2 ~top:5  
+				      ~expand:`X ~shrink:`BOTH) ();
+    pr_records =
+      GRange.progress_bar ~packing:(table#attach ~left:2 ~top:6  
+				      ~expand:`X ~shrink:`BOTH) ();
+    pr_ac =
+      GRange.progress_bar ~packing:(table#attach ~left:2 ~top:7  
+				      ~expand:`X ~shrink:`BOTH) ();
+  } in
+  
+  t.pr_sat#set_text " 0 %";
+  t.pr_match#set_text  " 0 %";
+  t.pr_cc#set_text " 0 %";
+  t.pr_arith#set_text  " 0 %";
+  t.pr_arrays#set_text  " 0 %";
+  t.pr_sum#set_text  " 0 %";
+  t.pr_records#set_text " 0 %";
+  t.pr_ac#set_text  " 0 %";
+  t
+  
+
+let pump () =
+    while Glib.Main.iteration false do () done
+
+let refresh_timers t () =
+  let tsat = Timers.get t.timers Timers.TSat in
+  let tmatch = Timers.get t.timers Timers.TMatch in
+  let tcc = Timers.get t.timers Timers.TCC in
+  let tarith = Timers.get t.timers Timers.TArith in
+  let tarrays = Timers.get t.timers Timers.TArrays in
+  let tsum = Timers.get t.timers Timers.TSum in
+  let trecords = Timers.get t.timers Timers.TRecords in
+  let tac = Timers.get t.timers Timers.TAc in
+
+  let total = 
+    tsat +. tmatch +. tcc +. tarith +. tarrays +. tsum +. trecords +. tac in
+
+  let total = if total = 0. then 1. else total in
+  (* eprintf "%f@.%f@.%f@.%f@." *)
+  (*   tsat total (tsat /. total) (tsat *. 100. /. total); *)
+
+  t.tl_sat#set_text (sprintf "%3.2f s" tsat);
+  t.tl_match#set_text (sprintf "%3.2f s" tmatch);
+  t.tl_cc#set_text (sprintf "%3.2f s" tcc);
+  t.tl_arith#set_text (sprintf "%3.2f s" tarith);
+  t.tl_arrays#set_text (sprintf "%3.2f s" tarrays);
+  t.tl_sum#set_text (sprintf "%3.2f s" tsum);
+  t.tl_records#set_text (sprintf "%3.2f s" trecords);
+  t.tl_ac#set_text (sprintf "%3.2f s" tac);
+
+  t.pr_sat#set_fraction (tsat /. total);
+  t.pr_sat#set_text (sprintf "%2.0f %%" (tsat *. 100. /. total));
+
+  t.pr_match#set_fraction (tmatch /. total);
+  t.pr_match#set_text (sprintf "%2.0f %%" (tmatch *. 100. /. total));
+
+  t.pr_cc#set_fraction (tcc /. total);
+  t.pr_cc#set_text (sprintf "%2.0f %%" (tcc *. 100. /. total));
+
+  t.pr_arith#set_fraction (tarith /. total);
+  t.pr_arith#set_text (sprintf "%2.0f %%" (tarith *. 100. /. total));
+
+  t.pr_arrays#set_fraction (tarrays /. total);
+  t.pr_arrays#set_text (sprintf "%2.0f %%" (tarrays *. 100. /. total));
+
+  t.pr_sum#set_fraction (tsum /. total);
+  t.pr_sum#set_text (sprintf "%2.0f %%" (tsum *. 100. /. total));
+
+  t.pr_records#set_fraction (trecords /. total);
+  t.pr_records#set_text (sprintf "%2.0f %%" (trecords *. 100. /. total));
+
+  t.pr_ac#set_fraction (tac /. total);
+  t.pr_ac#set_text (sprintf "%2.0f %%" (tac *. 100. /. total));
+
+  true
+
+
+let reset_timers timers_model =
+  Timers.reset timers_model.timers;
+  ignore (refresh_timers timers_model ())
+
+
 
 let refresh_instances ({istore=istore} as inst_model) () =
   (* eprintf "refresh@."; *)
@@ -182,7 +335,7 @@ let update_status image label buttonclean env d s steps =
 	  show_used_lemmas env dep
 	end;
 	image#set_stock `YES;
-	label#set_text (sprintf "  Valid (%2.4f)" time);
+	label#set_text (sprintf "  Valid (%2.2f s)" time);
 	buttonclean#misc#show ();
 	ignore(buttonclean#connect#clicked 
 		 ~callback:(fun () -> prune_unused env))
@@ -200,7 +353,7 @@ let update_status image label buttonclean env d s steps =
 	  (Loc.report std_formatter d.st_loc; printf "I don't know.@.")
 	else printf "unknown@.";
 	image#set_stock `NO;
-	label#set_text (sprintf "  I don't know (%2.4f)" (Frontend.Time.get()))
+	label#set_text (sprintf "  I don't know (%2.2f s)" (Frontend.Time.get()))
 	  
     | Frontend.Sat  ->
 	if not satmode then Loc.report std_formatter d.st_loc;
@@ -208,7 +361,7 @@ let update_status image label buttonclean env d s steps =
 	else printf "I don't know@.";
 	image#set_stock `NO;
 	label#set_text
-	  (sprintf "  I don't know (sat) (%2.4f)" (Frontend.Time.get()))
+	  (sprintf "  I don't know (sat) (%2.2f s)" (Frontend.Time.get()))
 
 
 exception Abort_thread
@@ -229,7 +382,7 @@ let force_interrupt old_action_ref n =
     | _ -> fprintf fmt "Not in threaded mode@."
 
 
-let rec run buttonrun buttonstop buttonclean inst_model 
+let rec run buttonrun buttonstop buttonclean inst_model timers_model 
     image label thread env () =
   
   (* Install the signal handler: *)
@@ -267,6 +420,11 @@ let rec run buttonrun buttonstop buttonclean inst_model
   let to_id = 
     GMain.Timeout.add ~ms:300 ~callback:(refresh_instances inst_model)
   in
+  let ti_id = 
+    GMain.Timeout.add ~ms:500 ~callback:(refresh_timers timers_model)
+  in
+
+  reset_timers timers_model;
 
    thread := Some (Thread.create
     (fun () ->
@@ -274,6 +432,10 @@ let rec run buttonrun buttonstop buttonclean inst_model
 	  (* Thread.yield (); *)
 	  if debug then fprintf fmt "Starting alt-ergo thread@.";
 	  Frontend.Time.start ();
+
+	  Options.timer_start := Timers.start timers_model.timers;
+	  Options.timer_pause := Timers.pause timers_model.timers;
+
 	  List.iter 
 	    (fun dcl ->
 	       let cnf = Cnf.make dcl in
@@ -305,7 +467,9 @@ let rec run buttonrun buttonstop buttonclean inst_model
        (* Event.sync (Event.send chan true) *)
        Thread.delay 0.001;
        GMain.Timeout.remove to_id;
-       ignore (refresh_instances inst_model ())
+       GMain.Timeout.remove ti_id;
+       ignore (refresh_instances inst_model ());
+       ignore (refresh_timers timers_model ())
     ) ());
 
   Thread.yield ()
@@ -589,16 +753,30 @@ let _ =
 	 ~border_width:3 ~packing:(hb#pack2 ~shrink:true ~resize:true) () in
 
        let fr1 = GBin.frame ~shadow_type:`ETCHED_OUT
-	 ~width:(20 * window_width / 100)
+	 ~width:(60 * window_width / 100)
 	 ~height:(80 * window_height / 100)
 	 ~packing:(vb1#pack1 ~shrink:true ~resize:true) () in
+
        let fr2 = GBin.frame ~shadow_type:`ETCHED_OUT
+	 ~height:(35 * window_height / 100)
 	 ~packing:(vb2#pack1 ~shrink:true ~resize:true) () in
 
        let fr3 = GBin.frame ~shadow_type:`ETCHED_OUT ~show:false
 	 ~packing:(vb1#pack2 ~shrink:true ~resize:true) () in
-       let fr4 = GBin.frame ~shadow_type:`ETCHED_OUT
+
+       let binfo = GPack.vbox ~border_width:0 
 	 ~packing:(vb2#pack2 ~shrink:true ~resize:true) () in
+
+       let fr4 = GBin.frame ~shadow_type:`ETCHED_OUT
+	 ~packing:binfo#add () in
+
+       let fr5 = GBin.frame ~shadow_type:`NONE
+	 ~packing:binfo#pack () in
+
+       let table_timers = GPack.table ~columns:3 ~rows:8
+	 ~row_spacings:1 ~col_spacings:8 ~border_width:4
+	 ~packing:fr5#add () in
+
 
        let st = GMisc.statusbar ~has_resize_grip:false ~border_width:0 
 	 ~packing:vbox#pack () in  
@@ -606,6 +784,7 @@ let _ =
 
        let error_model = empty_error_model () in
        let inst_model = empty_inst_model () in
+       let timers_model = empty_timers_model table_timers in
 
        let env = create_env buf1 buf2 error_model st_ctx annoted_ast dep in
        connect env;
@@ -693,7 +872,7 @@ let _ =
        let thread = ref None in
        
        ignore(buttonrun#connect#clicked 
-	 ~callback:(run buttonrun buttonstop buttonclean inst_model
+	 ~callback:(run buttonrun buttonstop buttonclean inst_model timers_model
 		      result_image result_label thread env));
 
        ignore(buttonstop#connect#clicked 

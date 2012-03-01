@@ -115,8 +115,10 @@ module Make (X : Sig.X) = struct
             X.term_embed aro_t, eq::acc
           | _ -> assert false
 
-  let make t = match Term.view t with
-    | {Term.f= sy; xs=[a;b]; ty=ty} when Sy.is_ac sy ->
+  let make t = 
+    !Options.timer_start Timers.TAc;
+    let x = match Term.view t with
+      | {Term.f= sy; xs=[a;b]; ty=ty} when Sy.is_ac sy ->
         let ra, ctx1 = X.make a in
         let rb, ctx2 = X.make b in
         let ra, ctx = abstract2 sy a ra (ctx1 @ ctx2) in
@@ -124,7 +126,10 @@ module Make (X : Sig.X) = struct
         let rxs = [ ra,1 ; rb,1 ] in
 	X.ac_embed {h=sy; l=compact (fold_flatten sy (fun x -> x) rxs); t=ty},
         ctx
-    | _ -> assert false  
+      | _ -> assert false
+    in
+    !Options.timer_pause Timers.TAc;
+    x
 
   let is_mine_symb = Sy.is_ac
 
@@ -181,13 +186,20 @@ module Make (X : Sig.X) = struct
 
   let subst p v ({h=h;l=l;t=t} as tm)  =
     !Options.thread_yield ();
+    !Options.timer_start Timers.TAc;
     if debug_ac then
       F.fprintf fmt "[ac] subst %a by %a in %a@." 
 	X.print p X.print v X.print (X.ac_embed tm);
-    X.color {tm with l=compact (fold_flatten h (X.subst p v) l)}
+    let t = X.color {tm with l=compact (fold_flatten h (X.subst p v) l)} in
+    !Options.timer_pause Timers.TAc;
+    t
 
       
-  let add h arg arg_l = compact (flatten h arg arg_l)
+  let add h arg arg_l = 
+    !Options.timer_start Timers.TAc;
+    let r = compact (flatten h arg arg_l) in
+    !Options.timer_pause Timers.TAc;
+    r
 
   let fully_interpreted sb = true 
 

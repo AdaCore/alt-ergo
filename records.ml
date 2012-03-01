@@ -140,8 +140,11 @@ module Make (X : ALIEN) = struct
 	    let r, ctx' = X.make t in
 	    Other (r, ty), ctx'@ctx
     in
+    !Options.timer_start Timers.TRecords;
     let r, ctx = make_rec t [] in
-    is_mine r, ctx
+    let is_m = is_mine r in
+    !Options.timer_pause Timers.TRecords;
+    is_m, ctx
 
   let color _ = assert false
     
@@ -160,7 +163,10 @@ module Make (X : ALIEN) = struct
 	| Access (_, x, _) -> leaves x
 	| Other (x, _) -> xs_of_list (X.leaves x)
     in
-    XS.elements (leaves t)
+    !Options.timer_start Timers.TRecords;
+    let l = XS.elements (leaves t) in
+    !Options.timer_pause Timers.TRecords;
+    l
 
   let rec hash  = function
     | Record (lbs, ty) ->
@@ -272,10 +278,13 @@ module Make (X : ALIEN) = struct
     let s, r = split l in
     match r with [] -> s | (u, v) :: l -> resolve (s@(solve_one u v)@l)
 
-  let solve r1 r2 = 
+  let solve r1 r2 =
+    !Options.timer_start Timers.TRecords; 
     let r1 = normalize (embed r1) in
     let r2 = normalize (embed r2) in
-    List.map (fun (x, y) -> is_mine x, is_mine y) (solve_one r1 r2)
+    let s = List.map (fun (x, y) -> is_mine x, is_mine y) (solve_one r1 r2) in
+    !Options.timer_pause Timers.TRecords;
+    s
 
   let fully_interpreted _ = false
 

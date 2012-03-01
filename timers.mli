@@ -18,14 +18,14 @@
 (**************************************************************************)
 
 type kind =
-  | Time_Sat
-  | Time_Match
-  | Time_CC
-  | Time_Arith
-  | Time_Arrays
-  | Time_Sum
-  | Time_Records
-  | Time_Ac
+  | TSat
+  | TMatch
+  | TCC
+  | TArith
+  | TArrays
+  | TSum
+  | TRecords
+  | TAc
 
 type timer 
 
@@ -35,14 +35,14 @@ val init : unit -> t
 
 val reset : t -> unit
 
-val pause : t -> timer -> unit
+val pause : t -> kind -> unit
 
-val update : t -> timer -> unit
+val update : t -> kind -> unit
 
 val pause_all : t -> unit
 
-val start : t -> timer -> unit
+val start : t -> kind -> unit
 
-val pause_and_restart : t -> timer -> (unit -> unit) -> unit
+val pause_and_restart : t -> kind -> (unit -> unit) -> unit
 
-val get : t -> timer -> float
+val get : t -> kind -> float

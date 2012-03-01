@@ -77,3 +77,7 @@ let debug_split = !debug_split
 let restricted = !restricted
 
 let thread_yield = ref (fun () -> ())
+
+let timers = ref (Timers.init ())
+let timer_start = ref (fun _ -> ())
+let timer_pause = ref (fun _ -> ())

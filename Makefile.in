@@ -81,7 +81,7 @@ PRECMO = version.cmo print_color.cmo preoptions.cmo
 
 OPTIONSCMO = parseoptions.cmo
 
-CMO = options.cmo exception.cmo loc.cmo \
+CMO = timers.cmo options.cmo exception.cmo loc.cmo \
       hashcons.cmo hstring.cmo symbols.cmo \
       subst.cmo ty.cmo common.cmo term.cmo literal.cmo formula.cmo \
       explanation.cmo \
@@ -236,6 +236,7 @@ ERGOWEB = $$HOME/WWW/ergo/
 FILES = exception.mli exception.ml \
 	print_color.mli print_color.ml \
 	preoptions.ml preoptions.mli \
+	timers.mli timers.ml \
 	parseoptions.ml options.mli options.ml \
 	loc.ml sig.mli \
 	hashcons.mli hashcons.ml \

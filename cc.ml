@@ -525,15 +525,24 @@ module Make (X : Sig.X) = struct
 
   let assume a ex t = 
     !Options.thread_yield ();
-    let a = LTerm a in
-    let gamma, lt = assume_literal [] t.gamma [a, ex] in
-    let t = { t with gamma = gamma } in
-    let t, lt = try_it (fun env -> assume_literal lt env [a, ex] ) t  in 
-    let choices = extract_terms_from_choices SetT.empty t.choices in
-    let all_terms = extract_terms_from_assumed choices lt in
-    t, all_terms, 1
+    !Options.timer_start Timers.TCC;
+    try
+      let a = LTerm a in
+      let gamma, lt = assume_literal [] t.gamma [a, ex] in
+      let t = { t with gamma = gamma } in
+      let t, lt = try_it (fun env -> assume_literal lt env [a, ex] ) t  in 
+      let choices = extract_terms_from_choices SetT.empty t.choices in
+      let all_terms = extract_terms_from_assumed choices lt in
+      !Options.timer_pause Timers.TCC;
+      t, all_terms, 1
+    with e -> !Options.timer_pause Timers.TCC; raise e
 
-  let class_of t term = Uf.class_of t.gamma.uf term
+  let class_of t term = 
+    !Options.timer_start Timers.TCC;
+    let c = Uf.class_of t.gamma.uf term in
+    !Options.timer_pause Timers.TCC;
+    c
+  
 
   let add_and_process a t =
     !Options.thread_yield ();
@@ -547,8 +556,10 @@ module Make (X : Sig.X) = struct
 
   let query a t =
     !Options.thread_yield ();
+    !Options.timer_start Timers.TCC;
     Print.query a;
-    try
+    let res =
+      try
         match A.LT.view a with
 	| A.Eq (t1, t2)  ->
 	  let t = add_and_process a t in
@@ -572,7 +583,12 @@ module Make (X : Sig.X) = struct
 	  let rna, ex_rna = term_canonical_view env na Ex.empty in
           X.Rel.query env.relation (rna, Some na, ex_rna) 
 	    are_eq are_neq class_of
-    with Exception.Inconsistent d -> Yes d
+    with Exception.Inconsistent d -> 
+      !Options.timer_pause Timers.TCC;
+      Yes d
+    in 
+    !Options.timer_pause Timers.TCC;
+    res
 
   let empty () = 
     let env = { 
