@@ -25,6 +25,8 @@ open Lexing
 open Format
 open Options
 
+let inf = Glib.Utf8.from_unichar 8734
+
 let () = 
   try 
     let _ = GMain.init () in
@@ -89,7 +91,7 @@ let empty_inst_model () =
   let icol_icon = icols#add GtkStock.conv in
   let icol_desc = icols#add Gobject.Data.string in
   let icol_number = icols#add Gobject.Data.int in
-  let icol_limit = icols#add Gobject.Data.int in
+  let icol_limit = icols#add Gobject.Data.string in
   let icol_tag = icols#add Gobject.Data.int in
   let istore = GTree.list_store icols in
   istore#set_sort_func icol_number.GTree.index (compare_rows icol_number);
@@ -125,7 +127,10 @@ let refresh_instances ({istore=istore} as inst_model) () =
     if upd_info then begin
       istore#set ~row ~column:inst_model.icol_icon `INFO;
       istore#set ~row ~column:inst_model.icol_desc name;
-      istore#set ~row ~column:inst_model.icol_limit !limit;
+      let slimit = 
+	if !limit >= 0 then string_of_int !limit 
+	else "∞" in
+      istore#set ~row ~column:inst_model.icol_limit slimit;
     end;
     istore#set ~row ~column:inst_model.icol_number nb;
     istore#set ~row ~column:inst_model.icol_tag id
@@ -415,8 +420,12 @@ let goto_lemma (view:GTree.view) inst_model buffer
 let colormap = Gdk.Color.get_system_colormap ()
 
 let set_color_inst inst_model renderer (istore:GTree.model) row =
-  let nb_inst = istore#get ~row ~column:inst_model.icol_number in
-  let limit = istore#get ~row ~column:inst_model.icol_limit in
+  let id = istore#get ~row ~column:inst_model.icol_tag in
+  let _, nb_inst, _, limit = Hashtbl.find inst_model.h id in
+  (* let nb_inst = istore#get ~row ~column:inst_model.icol_number in *)
+  (* let limit = istore#get ~row ~column:inst_model.icol_limit in *)
+  let nb_inst = !nb_inst in 
+  let limit = !limit in
   if nb_inst = limit then
     renderer#set_properties [`FOREGROUND "blue"]
   else if inst_model.max <> 0 then
@@ -449,14 +458,25 @@ let create_inst_view inst_model env buffer sv ~packing () =
 
   let renderer = GTree.cell_renderer_text [`EDITABLE true] in
   ignore (renderer#connect#edited (fun path s ->
+    let row = inst_model.istore#get_iter path in
+    let id = inst_model.istore#get ~row ~column:inst_model.icol_tag in
+    let _,_,_,l = Hashtbl.find inst_model.h id in
     try
-      let row = inst_model.istore#get_iter path in
-      let id = inst_model.istore#get ~row ~column:inst_model.icol_tag in
       let limit = int_of_string s in
-      let _,_,_,l = Hashtbl.find inst_model.h id in
-      l := limit;
-      inst_model.istore#set ~row ~column:inst_model.icol_limit limit
-    with Failure _ -> ()
+      if limit >= 0 then
+	begin
+	  l := limit;
+	  inst_model.istore#set ~row ~column:inst_model.icol_limit 
+	    (string_of_int limit)
+	end
+      else 
+	begin
+	  l := -1;
+	  inst_model.istore#set ~row ~column:inst_model.icol_limit inf
+	end
+    with Failure _ -> 
+      l := -1;
+      inst_model.istore#set ~row ~column:inst_model.icol_limit inf
   ));
   let col = GTree.view_column ~title:"limit"  
     ~renderer:(renderer, ["text", inst_model.icol_limit]) () in

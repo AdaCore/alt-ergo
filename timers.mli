@@ -37,6 +37,8 @@ val reset : t -> unit
 
 val pause : t -> timer -> unit
 
+val update : t -> timer -> unit
+
 val pause_all : t -> unit
 
 val start : t -> timer -> unit

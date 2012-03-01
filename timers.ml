@@ -41,6 +41,11 @@ let start_t t = t.u <- (times()).tms_utime
 
 let pause_t t = t.cpt <- t.cpt +. ((times()).tms_utime -. t.u)
 
+let update_t t =
+  let time = (times()).tms_utime in
+  t.cpt <- t.cpt +. (time -. t.u);
+  t.u <- time
+
 let get_t t = t.cpt
 
 
@@ -62,6 +67,8 @@ let reset =
 
 
 let pause h t = pause_t (Hashtbl.find h t)
+
+let update h t = update_t (Hashtbl.find h t)
 
 let pause_all h =  Hashtbl.iter (fun _ it -> pause_t it)
 

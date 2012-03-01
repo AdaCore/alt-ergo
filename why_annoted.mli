@@ -39,7 +39,7 @@ type inst_model = {
   icol_icon : GtkStock.id GTree.column;
   icol_desc : String.t GTree.column;
   icol_number : int GTree.column;
-  icol_limit : int GTree.column;
+  icol_limit : String.t GTree.column;
   icol_tag : int GTree.column;
   istore : GTree.list_store;
 }
