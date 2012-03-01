@@ -106,11 +106,11 @@ let pause h t =
 
 let update h t = update_t (Hashtbl.find h t)
 
-let pause_all =  
+let pause_all =
   let cur = (times()).tms_utime in
   Hashtbl.iter (fun _ it -> pause_t it cur)
 
-let start h t = 
+let start h t =
   let cur = (times()).tms_utime in
   Hashtbl.iter (fun x it -> 
     if x = t then start_t it cur
