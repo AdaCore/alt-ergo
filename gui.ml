@@ -30,7 +30,7 @@ let inf = Glib.Utf8.from_unichar 8734
 let () = 
   try 
     let _ = GMain.init () in
-
+    Options.profiling := true;
     Options.thread_yield := Thread.yield
       
   with Gtk.Error s -> eprintf "%s@." s

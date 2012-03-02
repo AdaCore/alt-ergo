@@ -351,7 +351,6 @@ module Make(X : ALIEN) = struct
 	[]
           
     let assume env la ~are_eq ~are_neq ~class_of =
-      !Options.timer_start Timers.TArrays;
       (* instantiation des axiomes des tableaux *)
       Debug.assume fmt la; 
        let env = new_terms env la in
@@ -360,9 +359,22 @@ module Make(X : ALIEN) = struct
       (*Debug.env fmt env;*)
       Debug.new_equalities fmt atoms;
       let l = Conseq.fold (fun (a,ex) l -> ((LTerm a, ex)::l)) atoms [] in
-      !Options.timer_pause Timers.TArrays;
       env, { assume = l; remove = [] }
-	  
+	
+
+    let assume env la ~are_eq ~are_neq ~class_of =
+      if !profiling then
+	try 
+	  !Options.timer_start Timers.TArrays;
+	  let res =assume env la ~are_eq ~are_neq ~class_of in
+	  !Options.timer_pause Timers.TArrays;
+	  res
+	with e -> 
+	  !Options.timer_pause Timers.TArrays;
+	  raise e
+      else assume env la ~are_eq ~are_neq ~class_of
+
+
     let query _ _ ~are_eq ~are_neq ~class_of = Sig.No
     let add env r = env
 

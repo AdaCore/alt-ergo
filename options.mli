@@ -75,6 +75,6 @@ val restricted : bool
 
 val thread_yield : (unit -> unit) ref
 
-val timers : Timers.t ref
+val profiling : bool ref
 val timer_start : (Timers.kind -> unit) ref
 val timer_pause : (Timers.kind -> unit) ref

@@ -335,8 +335,6 @@ let rec add_dep_of_formula f dep =
 
 let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
   !Options.thread_yield ();
-  !Options.timer_start Timers.TSat;
-  let env =
   try
     let dep = add_dep f dep in
     let dep_gamma = add_dep_of_formula f dep in
@@ -345,7 +343,6 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 	    F.print (F.mk_not f) Ex.print dep_gamma; *)
        let ex_nf = MF.find (F.mk_not f) env.gamma in
        if rules = 2 then fprintf fmt "[rule] TR-Sat-Conflict-1@.";
-       !Options.timer_pause Timers.TSat;
        raise (IUnsat (Ex.union dep_gamma ex_nf))
      with Not_found -> ());
     if MF.mem f env.gamma then
@@ -423,12 +420,8 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
       end
   with Exception.Inconsistent expl -> 
     if debug_sat then fprintf fmt "inconsistent %a@." Ex.print expl;
-    if rules = 2 then fprintf fmt "[rule] TR-Sat-Conflict-2@."; 
-    !Options.timer_pause Timers.TSat;
+    if rules = 2 then fprintf fmt "[rule] TR-Sat-Conflict-2@.";
     raise (IUnsat expl)
-  in
-  !Options.timer_pause Timers.TSat;
-  env
     
 and bcp env =
   let cl , u = 
@@ -461,9 +454,7 @@ let rec unsat_rec env fg stop max_size =
   with IUnsat d ->
     Print.unsat (); d
 
-and back_tracking env stop max_size =
-  !Options.timer_start Timers.TSat;
-  let ex = match env.delta with
+and back_tracking env stop max_size = match env.delta with
     | []  when stop >= 0  -> 
       let _ , l2 = mround true false env max_max_size in 
       let env = List.fold_left assume env l2 in
@@ -485,14 +476,12 @@ and back_tracking env stop max_size =
 		 Format.printf "%a@." print_model m;
 		 raise (IUnsat (Ex.make_deps m))
 	       end;
-	     !Options.timer_pause Timers.TSat;
 	     raise (Sat env)
 	 | l1, l2 -> 
 	     back_tracking 
 	       (List.fold_left assume  (List.fold_left assume env l2) l1) 
 	       (stop-1) (max_size + b_max_size))
   | [] ->
-      !Options.timer_pause Timers.TSat; 
       raise I_dont_know
   | (a,b,d)::l ->
       let {f=f;age=g;name=lem;mf=mf} = a in
@@ -510,9 +499,6 @@ and back_tracking env stop max_size =
 	Print.backjumping (F.mk_not f);
 	if rules = 2 then fprintf fmt "[rule] TR-Sat-Backjumping@.";
 	dep
-  in
-  !Options.timer_pause Timers.TSat;
-  ex
 	
 let unsat env fg = 
   try
@@ -526,14 +512,35 @@ let unsat env fg =
     let env = List.fold_left assume env l in
 
     back_tracking env stopb 100
-  with IUnsat dep -> 
-    !Options.timer_pause Timers.TSat;
-    Print.unsat ();dep
+  with IUnsat dep -> Print.unsat ();dep
 
 let assume env fg = 
-  try assume env (fg,Ex.empty) with IUnsat d ->
-    !Options.timer_pause Timers.TSat;
-    raise (Unsat d)
+  try assume env (fg,Ex.empty) with IUnsat d -> raise (Unsat d)
+
+let unsat env fg = 
+  if !profiling then
+    try 
+      !Options.timer_start Timers.TSat;
+      let env = unsat env fg in
+      !Options.timer_pause Timers.TSat;
+      env
+    with e -> 
+      !Options.timer_pause Timers.TSat;
+      raise e
+  else unsat env fg
+
+let assume env fg = 
+  if !profiling then
+    try 
+      !Options.timer_start Timers.TSat;
+      let env = assume env fg in
+      !Options.timer_pause Timers.TSat;
+      env
+    with e -> 
+      !Options.timer_pause Timers.TSat;
+      raise e
+  else assume env fg
+
 
 let empty = { 
   gamma = MF.empty;

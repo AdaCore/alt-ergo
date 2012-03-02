@@ -201,13 +201,10 @@ module Make
         P.create l c ty
 *)
   let make t =
-    !Options.timer_start Timers.TArith;
     if rules = 4 then fprintf fmt "[rule] TR-Arith-Make@.";
     let {T.ty = ty} = T.view t in
     let p, ctx = mke (Int 1) (empty_polynome ty) t [] in
-    let is_m = is_mine (arith_to_ac p) in
-    !Options.timer_pause Timers.TArith;
-    is_m , ctx
+    is_mine (arith_to_ac p), ctx
 
   let rec expand p n acc =
     assert (n >=0);
@@ -271,13 +268,11 @@ module Make
     List.fold_left (fun s x -> XS.add x s) XS.empty
       
   let rec leaves p = 
-    !Options.timer_start Timers.TArith;
     let s = 
       List.fold_left
 	(fun s (_, a) -> XS.union (xs_of_list (X.leaves a)) s)
 	XS.empty (fst (P.to_list p))
     in
-    !Options.timer_pause Timers.TArith;
     XS.elements s
 
   let subst x t p = 
@@ -480,22 +475,55 @@ module Make
     if ty = Ty.Treal then solve_real pp else solve_int pp
 
   let solve r1 r2 =
-    !Options.timer_start Timers.TArith;
-    try
-      if rules = 4 then fprintf fmt "[rule] TR-Arith-Solve@.";
-      let sbs = solve_aux r1 r2 in
-      let sbs = List.fast_sort (fun (a,_) (x,y) -> X.compare x a)sbs in
-      if debug_arith then begin
-	fprintf fmt "[arith] solving %a = %a yields:@." X.print r1 X.print r2;
-	let c = ref 0 in
-	List.iter 
-          (fun (p,v) -> 
-            incr c;
-            fprintf fmt " %d) %a |-> %a@." !c X.print p X.print v) sbs
-      end;
-      !Options.timer_pause Timers.TArith;
-      sbs
-    with e -> !Options.timer_pause Timers.TArith; raise e
+    if rules = 4 then fprintf fmt "[rule] TR-Arith-Solve@.";
+    let sbs = solve_aux r1 r2 in
+    let sbs = List.fast_sort (fun (a,_) (x,y) -> X.compare x a)sbs in
+    if debug_arith then begin
+      fprintf fmt "[arith] solving %a = %a yields:@." X.print r1 X.print r2;
+      let c = ref 0 in
+      List.iter 
+        (fun (p,v) -> 
+          incr c;
+          fprintf fmt " %d) %a |-> %a@." !c X.print p X.print v) sbs
+    end;
+    sbs
+
+
+  let make t =
+    if !profiling then
+      try 
+	!Options.timer_start Timers.TArith;
+	let res = make t in
+	!Options.timer_pause Timers.TArith;
+	res
+      with e -> 
+	!Options.timer_pause Timers.TArith;
+	raise e
+    else make t
+
+  let leaves p =
+    if !profiling then
+      try 
+	!Options.timer_start Timers.TArith;
+	let res = leaves p in
+	!Options.timer_pause Timers.TArith;
+	res
+      with e -> 
+	!Options.timer_pause Timers.TArith;
+	raise e
+    else leaves p
+
+  let solve r1 r2 = 
+    if !profiling then
+      try 
+	!Options.timer_start Timers.TArith;
+	let res = solve r1 r2 in
+	!Options.timer_pause Timers.TArith;
+	res
+      with e -> 
+	!Options.timer_pause Timers.TArith;
+	raise e
+    else solve r1 r2
 
   let print = P.print
 

@@ -78,6 +78,6 @@ let restricted = !restricted
 
 let thread_yield = ref (fun () -> ())
 
-let timers = ref (Timers.init ())
+let profiling = ref false
 let timer_start = ref (fun _ -> ())
 let timer_pause = ref (fun _ -> ())

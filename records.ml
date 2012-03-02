@@ -140,10 +140,8 @@ module Make (X : ALIEN) = struct
 	    let r, ctx' = X.make t in
 	    Other (r, ty), ctx'@ctx
     in
-    !Options.timer_start Timers.TRecords;
     let r, ctx = make_rec t [] in
     let is_m = is_mine r in
-    !Options.timer_pause Timers.TRecords;
     is_m, ctx
 
   let color _ = assert false
@@ -163,10 +161,7 @@ module Make (X : ALIEN) = struct
 	| Access (_, x, _) -> leaves x
 	| Other (x, _) -> xs_of_list (X.leaves x)
     in
-    !Options.timer_start Timers.TRecords;
-    let l = XS.elements (leaves t) in
-    !Options.timer_pause Timers.TRecords;
-    l
+    XS.elements (leaves t)
 
   let rec hash  = function
     | Record (lbs, ty) ->
@@ -279,12 +274,46 @@ module Make (X : ALIEN) = struct
     match r with [] -> s | (u, v) :: l -> resolve (s@(solve_one u v)@l)
 
   let solve r1 r2 =
-    !Options.timer_start Timers.TRecords; 
     let r1 = normalize (embed r1) in
     let r2 = normalize (embed r2) in
-    let s = List.map (fun (x, y) -> is_mine x, is_mine y) (solve_one r1 r2) in
-    !Options.timer_pause Timers.TRecords;
-    s
+    List.map (fun (x, y) -> is_mine x, is_mine y) (solve_one r1 r2)
+
+
+  let leaves t =
+    if !profiling then
+      try 
+	!Options.timer_start Timers.TRecords;
+	let res = leaves t in
+	!Options.timer_pause Timers.TRecords;
+	res
+      with e -> 
+	!Options.timer_pause Timers.TRecords;
+	raise e
+    else leaves t
+
+  let make t =
+    if !profiling then
+      try 
+	!Options.timer_start Timers.TRecords;
+	let res = make t in
+	!Options.timer_pause Timers.TRecords;
+	res
+      with e -> 
+	!Options.timer_pause Timers.TRecords;
+	raise e
+    else make t
+
+  let solve a b =
+    if !profiling then
+      try 
+	!Options.timer_start Timers.TRecords;
+	let res = solve a b in
+	!Options.timer_pause Timers.TRecords;
+	res
+      with e -> 
+	!Options.timer_pause Timers.TRecords;
+	raise e
+    else solve a b
 
   let fully_interpreted _ = false
 

@@ -18,6 +18,7 @@
 (**************************************************************************)
 
 type kind =
+  | TNone
   | TSat
   | TMatch
   | TCC
@@ -26,8 +27,6 @@ type kind =
   | TSum
   | TRecords
   | TAc
-
-type timer 
 
 type t
 
