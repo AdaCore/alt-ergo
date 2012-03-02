@@ -698,8 +698,9 @@ and popup_trigger t env (sbuf:sbuffer) offset () =
 			    at.tag#set_priority (t#priority - 1);
 			    connect_aaterm env sbuf connect_tag at;
 			    at::l
-			 ) lexprs [] in		       
-		       sbuf#insert ~iter ~tags " | ";
+			 ) lexprs [] in
+		       if qf.c.aqf_triggers <> [] then
+			 sbuf#insert ~iter ~tags " | ";
 		       add_aaterm_list_at sbuf tags iter "," atl;
 		       qf.c.aqf_triggers <- qf.c.aqf_triggers@[atl];
 		   | _ -> assert false

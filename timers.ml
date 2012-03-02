@@ -92,7 +92,7 @@ let start h t =
 
 let pause h t =
   let cur = (times()).tms_utime in
-  assert (h.cur_t = t);
+  (* assert (h.cur_t = t); *)
   let cpt = Hashtbl.find h.h t in
   cpt := !cpt +. (cur -. h.cur_u);
   h.cur_u <- cur;
