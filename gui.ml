@@ -446,12 +446,14 @@ let rec run buttonrun buttonstop buttonclean inst_model timers_model
 	    ) ast_pruned
 	with 
 	  | Abort_thread ->
+	      Timers.update timers_model.timers;
 	      if debug then fprintf fmt "alt-ergo thread terminated@.";
 	      image#set_stock `DIALOG_QUESTION;
 	      label#set_text "  Process aborted";
 	      buttonstop#misc#hide ();
 	      buttonrun#misc#show ()
 	  |  e -> 
+	      Timers.update timers_model.timers;
 	      let message = sprintf "Error: %s" (Printexc.to_string e) in
 	      if debug then fprintf fmt "alt-ergo thread terminated@.";
 	      image#set_stock `DIALOG_ERROR;

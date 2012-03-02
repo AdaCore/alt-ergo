@@ -73,9 +73,6 @@ let reset h =
   h.stack <- []
 
 
-let update h t = assert false
-
-
 let pause_all _ = assert false
 
 
@@ -104,6 +101,16 @@ let pause h t =
     | x::st ->
         h.cur_t <- x;
         h.stack <- st
+
+
+
+let update h =
+  let cur = (times()).tms_utime in
+  let t = h.cur_t in
+  if t <> TNone then
+    let cpt = Hashtbl.find h.h t in
+    cpt := !cpt +. (cur -. h.cur_u);
+    h.cur_u <- cur
 
 
 let pause_and_restart h t f = assert false
