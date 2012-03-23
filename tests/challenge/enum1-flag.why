@@ -1,0 +1,228 @@
+(* this is a prelude for Alt-Ergo*)
+(* this is a prelude for Alt-Ergo integer arithmetic *)
+logic infix_eq : 'a, 'a -> prop
+
+type tuple0 =
+Tuple0
+
+type unit1
+
+type qtmark
+
+logic at : 'a, qtmark -> 'a
+
+logic old : 'a1 -> 'a1
+
+type bool1 = True|
+False
+
+logic match_bool : bool, 'a2, 'a2 -> 'a2
+
+axiom match_bool_True :
+  (forall z:'a2. forall z1:'a2. (match_bool(true, z, z1) = z))
+
+axiom match_bool_False :
+  (forall z:'a. forall z1:'a. (match_bool(false, z, z1) = z1))
+
+function andb(x: bool, y: bool) : bool = match_bool(y, match_bool(x, true,
+  false), false)
+
+function orb(x: bool, y: bool) : bool = match_bool(y, true, match_bool(x,
+  true, false))
+
+function xorb(x: bool, y: bool) : bool = match_bool(y, match_bool(x, false,
+  true), match_bool(x, true, false))
+
+function notb(x: bool) : bool = match_bool(x, false, true)
+
+function implb(x: bool, y: bool) : bool = match_bool(y, true, match_bool(x,
+  false, true))
+
+logic infix_ls : int, int -> prop
+
+logic infix_lseq : int, int -> prop
+
+logic ac infix_pl : int, int -> int
+
+logic prefix_mn : int -> int
+
+logic ac infix_as : int, int -> int
+
+logic infix_mn : int, int -> int
+
+axiom CompatOrderMult :
+  (forall x:int. forall y:int. forall z:int. ((x <= y) -> ((0 <= z) ->
+  ((x * z) <= (y * z)))))
+
+type 'a ref = { contents : 'a
+}
+
+logic contents : 'a ref -> 'a
+
+logic get : ('a1,'b) farray, 'a1 -> 'b
+
+logic set : ('a2,'b1) farray, 'a2, 'b1 -> ('a2,'b1) farray
+
+logic const : 'b2 -> ('a3,'b2) farray
+
+axiom Const : (forall b:'b3. forall a:'a4. ((const(b)[a]) = b))
+
+type 'a array1 = { length : int; elts : (int,'a) farray
+}
+
+logic length : 'a array1 -> int
+
+logic elts : 'a array1 -> (int,'a) farray
+
+function get1(a: 'a1 array1, i: int) : 'a1 = ((a).elts[i])
+
+function set1(a: 'a array1, i: int, v: 'a) : 'a array1 = { length =
+  (a).length; elts = ((a).elts[i <- v]) }
+
+predicate map_eq_sub(a1: (int,'a) farray, a2: (int,'a) farray, l: int,
+  u: int) = (forall i:int. (((l <= i) and (i <  u)) -> ((a1[i]) = (a2[i]))))
+
+predicate exchange(a1: (int,'a) farray, a2: (int,'a) farray, i: int,
+  j: int) = (((a1[i]) = (a2[j])) and (((a2[i]) = (a1[j])) and
+  (forall k:int. (((not (k = i)) and (not (k = j))) -> ((a1[k]) = (a2[k]))))))
+
+axiom exchange_set :
+  (forall a:(int,'a) farray.
+  (forall i:int. forall j:int. exchange(a, ((a[i <- (a[j])])[j <- (a[i])]),
+  i, j)))
+
+logic permut_sub : (int,'a) farray, (int,'a) farray, int, int -> prop
+
+axiom permut_refl :
+  (forall a1:(int,'a) farray. forall a2:(int,'a) farray.
+  (forall l:int. forall u:int. (map_eq_sub(a1, a2, l, u) -> permut_sub(a1,
+  a2, l, u))))
+
+axiom permut_sym :
+  (forall a1:(int,'a) farray. forall a2:(int,'a) farray.
+  (forall l:int. forall u:int. (permut_sub(a1, a2, l, u) -> permut_sub(a2,
+  a1, l, u))))
+
+axiom permut_trans :
+  (forall a1:(int,'a) farray. forall a2:(int,'a) farray.
+  forall a3:(int,'a) farray.
+  (forall l:int. forall u:int. (permut_sub(a1, a2, l, u) -> (permut_sub(a2,
+  a3, l, u) -> permut_sub(a1, a3, l, u)))))
+
+axiom permut_exchange :
+  (forall a1:(int,'a) farray. forall a2:(int,'a) farray.
+  (forall l:int. forall u:int. forall i:int. forall j:int. (((l <= i) and
+  (i <  u)) -> (((l <= j) and (j <  u)) -> (exchange(a1, a2, i, j) ->
+  permut_sub(a1, a2, l, u))))))
+
+axiom permut_sub_inversion :
+  (forall z:(int,'a) farray. forall z1:(int,'a) farray. forall z2:int.
+  forall z3:int. (permut_sub(z, z1, z2, z3) ->
+  ((((exists a1:(int,'a) farray. exists a2:(int,'a) farray.
+     (exists l:int. exists u:int. (map_eq_sub(a1, a2, l, u) and
+     ((((z = a1) and (z1 = a2)) and (z2 = l)) and (z3 = u))))) or
+  (exists a1:(int,'a) farray. exists a2:(int,'a) farray.
+  (exists l:int. exists u:int. (permut_sub(a1, a2, l, u) and ((((z = a2) and
+  (z1 = a1)) and (z2 = l)) and (z3 = u)))))) or
+  (exists a1:(int,'a) farray. exists a2:(int,'a) farray.
+  exists a3:(int,'a) farray.
+  (exists l:int. exists u:int. (permut_sub(a1, a2, l, u) and (permut_sub(a2,
+  a3, l, u) and ((((z = a1) and (z1 = a3)) and (z2 = l)) and (z3 = u))))))) or
+  (exists a1:(int,'a) farray. exists a2:(int,'a) farray.
+  (exists l:int. exists u:int. exists i:int. exists j:int. (((l <= i) and
+  (i <  u)) and (((l <= j) and (j <  u)) and (exchange(a1, a2, i, j) and
+  ((((z = a1) and (z1 = a2)) and (z2 = l)) and (z3 = u))))))))))
+
+axiom permut_weakening :
+  (forall a1:(int,'a) farray. forall a2:(int,'a) farray.
+  (forall l1:int. forall r1:int. forall l2:int. forall r2:int.
+  ((((l1 <= l2) and (l2 <= r2)) and (r2 <= r1)) -> (permut_sub(a1, a2, l2,
+  r2) -> permut_sub(a1, a2, l1, r1)))))
+
+axiom permut_eq :
+  (forall a1:(int,'a) farray. forall a2:(int,'a) farray.
+  (forall l:int. forall u:int. (permut_sub(a1, a2, l, u) ->
+  (forall i:int. (((i <  l) or (u <= i)) -> ((a2[i]) = (a1[i])))))))
+
+axiom permut_exists :
+  (forall a1:(int,'a) farray. forall a2:(int,'a) farray.
+  (forall l:int. forall u:int. (permut_sub(a1, a2, l, u) ->
+  (forall i:int. (((l <= i) and (i <  u)) ->
+  (exists j:int. (((l <= j) and (j <  u)) and ((a2[i]) = (a1[j])))))))))
+
+predicate exchange1(a1: 'a array1, a2: 'a array1, i: int, j: int) =
+  exchange((a1).elts, (a2).elts, i, j)
+
+predicate permut_sub1(a1: 'a array1, a2: 'a array1, l: int, u: int) =
+  permut_sub((a1).elts, (a2).elts, l, u)
+
+predicate permut(a1: 'a array1, a2: 'a array1) =
+  (((a1).length = (a2).length) and permut_sub((a1).elts, (a2).elts, 0,
+  (a1).length))
+
+axiom exchange_permut :
+  (forall a1:'a array1. forall a2:'a array1. forall i:int. forall j:int
+  [exchange1(a1, a2, i, j)]. (exchange1(a1, a2, i, j) ->
+  (((a1).length = (a2).length) -> (((0 <= i) and (i <  (a1).length)) ->
+  (((0 <= j) and (j <  (a1).length)) -> permut(a1, a2))))))
+
+axiom permut_sym1 :
+  (forall a1:'a array1. forall a2:'a array1. (permut(a1, a2) -> permut(a2,
+  a1)))
+
+axiom permut_trans1 :
+  (forall a1:'a array1. forall a2:'a array1. forall a3:'a array1. (permut(a1,
+  a2) -> (permut(a2, a3) -> permut(a1, a3))))
+
+predicate array_eq_sub(a1: 'a array1, a2: 'a array1, l: int, u: int) =
+  map_eq_sub((a1).elts, (a2).elts, l, u)
+
+predicate array_eq(a1: 'a array1, a2: 'a array1) =
+  (((a1).length = (a2).length) and array_eq_sub(a1, a2, 0, (a1).length))
+
+axiom array_eq_sub_permut :
+  (forall a1:'a array1. forall a2:'a array1. forall l:int. forall u:int.
+  (array_eq_sub(a1, a2, l, u) -> permut_sub1(a1, a2, l, u)))
+
+axiom array_eq_permut :
+  (forall a1:'a array1. forall a2:'a array1. (array_eq(a1, a2) -> permut(a1,
+  a2)))
+
+type color = Blue| White|
+Red
+
+logic match_color : color, 'a, 'a, 'a -> 'a
+
+axiom match_color_Blue :
+  (forall z:'a. forall z1:'a. forall z2:'a. (match_color(Blue, z, z1,
+  z2) = z))
+
+axiom match_color_White :
+  (forall z:'a. forall z1:'a. forall z2:'a. (match_color(White, z, z1,
+  z2) = z1))
+
+axiom match_color_Red :
+  (forall z:'a. forall z1:'a. forall z2:'a. (match_color(Red, z, z1,
+  z2) = z2))
+
+predicate monochrome(a: color array1, i: int, j: int, c: color) =
+  (forall k:int. (((i <= k) and (k <  j)) -> (get1(a, k) = c)))
+
+goal WP_parameter_dutch_flag :
+  (forall a:int.
+  (forall n:int.
+  (forall a1:(int,color) farray. (((0 <= n) and (a = n)) ->
+  (forall r:int.
+  (forall i:int.
+  (forall b:int.
+  (forall a2:(int,color) farray. ((((((0 <= b) and (b <= i)) and
+  (i <= r)) and (r <= n)) and (monochrome({ length = a; elts = a2 }, 0, b,
+  Blue) and (monochrome({ length = a; elts = a2 }, b, i, White) and
+  (monochrome({ length = a; elts = a2 }, r, n, Red) and ((a = n) and
+  permut_sub(a1, a2, 0, n)))))) -> ((i <  r) -> (((0 <= i) and (i <  a)) ->
+  (((a2[i]) = Red) ->
+  (forall r1:int. ((r1 = (r - 1)) -> ((((0 <= r1) and (r1 <  a)) and
+  ((0 <= i) and (i <  a))) ->
+  (forall a3:(int,color) farray. (exchange(a2, a3, r1, i) -> permut_sub(a1,
+  a3, 0, n))))))))))))))))))
+
