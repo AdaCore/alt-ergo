@@ -570,8 +570,14 @@ let num_of_float x =
 let root_num a n = 
   if a </ (Int 0) then assert false
   else if a =/ (Int 0) then (Int 0)
-  else if n = 2 then num_of_float (sqrt (float_of_num a))
-  else num_of_float ((float_of_num a) ** (1./. (float n)))
+  else
+    let v = float_of_num a in
+    let w = if v < min_float then min_float
+      else if v > max_float then max_float
+      else v
+    in
+    if n = 2 then num_of_float (sqrt w)
+    else num_of_float (w ** (1./. (float n)))
 
 let root_default_num a n =
   let s = root_num a n in
