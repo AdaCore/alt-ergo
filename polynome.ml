@@ -128,7 +128,7 @@ module Make (X : S) = struct
     let s, n = 
       if p.c >/ Int 0 then (if !zero then "" else "+"), string_of_num p.c 
       else if p.c </ Int 0 then "-", string_of_num (minus_num p.c)
-      else "","" in
+      else (if !zero then "","0" else "","") in
     fprintf fmt "%s%s" s n
 
 
