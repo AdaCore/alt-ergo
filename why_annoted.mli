@@ -102,6 +102,7 @@ and at_desc =
   | ATlet of Symbols.t * aterm * aterm
   | ATdot of aterm * Hstring.t
   | ATrecord of (Hstring.t * aterm) list
+  | ATnamed of Hstring.t * aterm
       
 
 type aatom = 

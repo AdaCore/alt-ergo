@@ -248,7 +248,7 @@ let rec is_quantified_term vars at =
   | ATinfix (at1, _, at2) ->
       is_quantified_term vars at1
       || is_quantified_term vars at2
-  | ATdot (at, _) | ATprefix (_, at) ->
+  | ATdot (at, _) | ATprefix (_, at) | ATnamed (_, at) ->
       is_quantified_term vars at
   | ATextract (at1, at2, at3)
   | ATset (at1, at2, at3) ->
@@ -287,7 +287,7 @@ let rec aterm_used_vars goal_vars at =
 	 with Not_found ->  [])
     | ATapp (_, atl) ->
 	List.fold_left (fun l at -> aterm_used_vars goal_vars at @ l) [] atl
-    | ATdot (at, _) | ATprefix (_, at) | ATlet (_, _, at) ->
+    | ATdot (at, _) | ATprefix (_, at) | ATlet (_, _, at) | ATnamed (_, at) ->
 	aterm_used_vars goal_vars at
     | ATinfix (at1, _, at2) | ATget (at1, at2) | ATconcat (at1, at2) ->
 	(aterm_used_vars goal_vars at1)@(aterm_used_vars goal_vars at2)
@@ -789,7 +789,8 @@ and connect_at_desc env sbuf = function
     | ATconcat (t1, t2) | ATlet (_, t1, t2) ->
 	connect_aterm env sbuf t1;
 	connect_aterm env sbuf t2
-    | ATdot (t, _) | ATprefix (_, t) -> connect_aterm env sbuf t
+    | ATdot (t, _) | ATprefix (_, t) | ATnamed (_, t) ->
+	connect_aterm env sbuf t
     | ATset (t1,t2,t3) | ATextract (t1,t2,t3) ->
 	connect_aterm env sbuf t1;
 	connect_aterm env sbuf t2;

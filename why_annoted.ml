@@ -110,6 +110,7 @@ and at_desc =
   | ATlet of Symbols.t * aterm * aterm
   | ATdot of aterm * Hstring.t
   | ATrecord of (Hstring.t * aterm) list
+  | ATnamed of Hstring.t * aterm
 
       
       
@@ -255,6 +256,7 @@ and findin_at_desc tag buffer = function
 	  else r
 	else r
     | ATrecord r -> let atl = List.map snd r in findin_aterm_list tag buffer atl
+    | ATnamed (_, t) -> findin_aterm tag buffer t
 	
 let findin_aatom tag buffer aa =
   match aa with
@@ -491,6 +493,7 @@ and print_tt_desc fmt = function
   | TTdot (t, c) ->
       fprintf fmt "%a.%s" print_tterm t (Hstring.view c)
   | TTrecord r -> fprintf fmt "{ %a }" (print_record ";") r
+  | TTnamed (lbl, t) -> fprintf fmt "%s:%a" (Hstring.view lbl) print_tterm t
 
 let print_tatom fmt a = match a.Why_ptree.c with
   | TAtrue -> fprintf fmt "true" 
@@ -670,6 +673,7 @@ and make_dep_at_desc d ex dep = function
 	     let dep = make_dep_string d ex dep (Hstring.view c) in
 	     make_dep_aterm d ex dep t)
 	  dep r
+    | ATnamed (_, t) -> make_dep_aterm d ex dep t
 
 let make_dep_aatom d ex dep = function
   | AAtrue | AAfalse -> dep
@@ -759,6 +763,7 @@ and of_tt_desc (buffer:sbuffer) = function
   | TTlet (s, t1, t2) -> ATlet (s, of_tterm buffer t1, of_tterm buffer t2)
   | TTdot (t, c) -> ATdot (of_tterm buffer t, c)
   | TTrecord r -> ATrecord (List.map (fun (c,t) -> (c, of_tterm buffer t)) r)
+  | TTnamed (lbl, t) -> ATnamed (lbl, of_tterm buffer t)
 
 let of_tatom (buffer:sbuffer) a = match a.Why_ptree.c with
   | TAtrue -> AAtrue
@@ -878,6 +883,7 @@ and to_tt_desc = function
     | ATlet (s, t1, t2) -> TTlet (s, to_tterm 0 t1, to_tterm 0 t2)
     | ATdot (t, c) -> TTdot (to_tterm 0 t, c)
     | ATrecord r -> TTrecord (List.map (fun (c, t) -> (c, to_tterm 0 t)) r)
+    | ATnamed (lbl, t) -> TTnamed (lbl, to_tterm 0 t)
 
 let to_tatom aa id = 
   let c = match aa with 
@@ -1091,7 +1097,9 @@ and add_at_desc_at (buffer:sbuffer) tags iter at =
 	buffer#insert ~iter ~tags "{ ";
 	add_arecord_at buffer tags iter r;
 	buffer#insert ~iter ~tags " }"
-
+    | ATnamed (n, t) ->
+	buffer#insert ~tags (sprintf "%s: " (Hstring.view n));
+	add_aterm_at buffer tags iter t
 	
 	
 let add_aatom (buffer:sbuffer) indent tags aa =
@@ -1331,7 +1339,7 @@ let rec isin_aterm sl { at_desc = at_desc } =
     | ATinfix (t1, _, t2) | ATget (t1,t2)
     | ATconcat (t1, t2) | ATlet (_, t1, t2) ->
       isin_aterm sl t1 || isin_aterm sl t2
-    | ATdot (t, _ ) | ATprefix (_,t) -> isin_aterm sl t
+    | ATdot (t, _ ) | ATprefix (_,t) | ATnamed (_, t) -> isin_aterm sl t
     | ATset (t1, t2, t3) | ATextract (t1, t2, t3)  ->
       isin_aterm sl t1 || isin_aterm sl t2 || isin_aterm sl t3 
     | ATrecord rt -> let atl = List.map snd rt in isin_aterm_list sl atl
@@ -1352,7 +1360,7 @@ and findtags_aaterm sl aat acc =
     | ATinfix (t1, _, t2) | ATget (t1,t2)
     | ATconcat (t1, t2) | ATlet (_, t1, t2) ->
 	if isin_aterm sl t1 || isin_aterm sl t2 then aat.tag::acc else acc
-    | ATdot (t, _) | ATprefix (_,t) ->
+    | ATdot (t, _) | ATprefix (_,t) | ATnamed (_, t) ->
 	if isin_aterm sl t then aat.tag::acc else acc
     | ATset (t1, t2, t3) | ATextract (t1, t2, t3)  ->
 	if isin_aterm sl t1 || isin_aterm sl t2 || isin_aterm sl t3 
@@ -1455,7 +1463,7 @@ let rec listsymbols at acc =
     | ATinfix (t1, _, t2) | ATget (t1,t2)
     | ATconcat (t1, t2) | ATlet (_, t1, t2) ->
 	listsymbols t1 (listsymbols t2 acc)
-    | ATdot (t, _) | ATprefix (_,t) -> listsymbols t acc
+    | ATdot (t, _) | ATprefix (_,t) | ATnamed (_, t) -> listsymbols t acc
     | ATset (t1, t2, t3) | ATextract (t1, t2, t3)  ->
 	listsymbols t1 (listsymbols t2 (listsymbols t3 acc))
     | ATrecord r ->
