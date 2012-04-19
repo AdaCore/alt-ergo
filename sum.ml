@@ -325,5 +325,7 @@ module Make(X : ALIEN) = struct
 
     let instantiate env _ _ _ _ = env, []
 
+    let print_model _ _ _ = ()
+
   end
 end

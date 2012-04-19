@@ -111,19 +111,24 @@ module Make (X : S) = struct
     abs (Hashtbl.hash p.m + 19*Hashtbl.hash p.c + 17 * Ty.hash p.ty)
  
   let pprint fmt p =
+    let zero = ref true in
     M.iter
       (fun x n ->
          let s, n, op = match n with
-           | Int 1  -> "+", "", ""
+           | Int 1  -> (if !zero then "" else "+"), "", ""
            | Int -1 -> "-", "", ""
            | n ->   
-               if n >/ Int 0 then "+", string_of_num n, "*" 
+               if n >/ Int 0 then 
+		 (if !zero then "" else "+"), string_of_num n, "*" 
                else "-", string_of_num (minus_num n), "*" 
          in
+	 zero := false;
          fprintf fmt "%s%s%s%a" s n op X.print x
-      )p.m;
-    let s, n = if p.c >=/ Int 0 then "+", string_of_num p.c 
-    else "-", string_of_num (minus_num p.c) in
+      ) p.m;
+    let s, n = 
+      if p.c >/ Int 0 then (if !zero then "" else "+"), string_of_num p.c 
+      else if p.c </ Int 0 then "-", string_of_num (minus_num p.c)
+      else "","" in
     fprintf fmt "%s%s" s n
 
 

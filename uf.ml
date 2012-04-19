@@ -44,8 +44,10 @@ module type S = sig
   val are_equal : t -> Term.t -> Term.t -> Sig.answer
   val are_distinct : t -> Term.t -> Term.t -> Sig.answer
   val already_distinct : t -> R.r list -> bool
+  
   val class_of : t -> Term.t -> Term.t list
-
+  val model : t -> (R.r * Term.t list * (Term.t * R.r) list) list
+  
   val print : Format.formatter -> t -> unit
  
 end
@@ -634,7 +636,28 @@ module Make ( R : Sig.X ) = struct
       let rt, _ = MapR.find (MapT.find t env.make) env.repr in
       SetT.elements (MapR.find rt env.classes)
     with Not_found -> [t]
+
+  let model env =
+    MapR.fold (fun r cl acc ->
+      let l, to_rel =
+	List.fold_left (fun (l, to_rel) t ->
+	  let rt = MapT.find t env.make in
+	  if complete_model || T.is_labeled t then
+	    if rt <> r then t::l, (t,rt)::to_rel
+	    else l, (t,rt)::to_rel
+	  else l, to_rel
+	) ([], []) (SetT.elements cl) in
+      (* let l = List.filter  *)
+      (* 	(fun t ->  *)
+      (* 	  (MapT.find t env.make) <> r &&  *)
+      (* 	    (complete_model || T.is_labeled t) *)
+      (* 	)  *)
+      (* 	(SetT.elements cl) in *)
+      (r, l, to_rel)::acc
+    ) env.classes []
       
+
+
   let find env t = 
     if rules = 3 then fprintf fmt "[rule] TR-UFX-Find@.";
     Env.lookup_by_t t env

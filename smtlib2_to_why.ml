@@ -488,7 +488,7 @@ let decls_of_command (acc, predicates) = function
     in
     let s = string_of_symbol sy in
     let predicates = if ppt = PPTbool then S.add s predicates else predicates in
-    (Logic (pos, Symbols.Other, [s], logic_type))::acc, predicates
+    (Logic (pos, Symbols.Other, [s, ""], logic_type))::acc, predicates
   | CDefineFun (pos, sy, (pos2, svl), so, t) ->
     let spl = List.map (fun sv -> 
       let s, ppt = stringppt_of_sortedvar sv in
@@ -497,8 +497,8 @@ let decls_of_command (acc, predicates) = function
     let ppt = ppure_type_of_sort so in
     let le = lexpr_of_term predicates t in
     if ppt = PPTbool then 
-      (Predicate_def (pos, s, spl, le))::acc, S.add s predicates
-    else (Function_def (pos, s, spl, ppt, le))::acc, predicates
+      (Predicate_def (pos, (s, ""), spl, le))::acc, S.add s predicates
+    else (Function_def (pos, (s, ""), spl, ppt, le))::acc, predicates
   | CAssert (pos, t) ->
     (Axiom (pos, "", lexpr_of_term predicates t))::acc, predicates
   | CCheckSat pos -> 

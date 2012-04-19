@@ -60,7 +60,7 @@ let check_produced_proof dep =
     raise (Sat.Sat env)
   with 
     | Sat.Unsat _  -> ()
-    | (Sat.Sat _ | Sat.I_dont_know) as e -> raise e
+    | (Sat.Sat _ | Sat.I_dont_know _) as e -> raise e
 
 
 let process_decl print_status (env, consistent, dep) d =
@@ -87,16 +87,18 @@ let process_decl print_status (env, consistent, dep) d =
 	  print_status d (Unsat dep) (Sat.stop ());
 	  env, consistent, dep
   with 
-    | Sat.Sat _ -> 
+    | Sat.Sat t -> 
 	print_status d Sat (Sat.stop ());
+        if model then Sat.print_model std_formatter t;
 	env , consistent, dep
     | Sat.Unsat dep' -> 
         let dep = Explanation.union dep dep' in
         if debug_proof then check_produced_proof dep;
 	print_status d Inconsistent (Sat.stop ());
 	env , false, dep
-    | Sat.I_dont_know -> 
+    | Sat.I_dont_know t -> 
 	print_status d Unknown (Sat.stop ());
+        if model then Sat.print_model std_formatter t;
 	env , consistent, dep
 
 let open_file file lb =

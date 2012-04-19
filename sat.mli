@@ -29,7 +29,7 @@ type gformula = {
 
 exception Sat of t
 exception Unsat of Explanation.t
-exception I_dont_know
+exception I_dont_know of t
 
 (* the empty sat-solver context *)
 val empty : t
@@ -46,6 +46,8 @@ val pred_def : t -> Formula.t -> t
    [env]. Raises I_dont_know when the proof tree's height reaches
    [size]. Raises Sat if [f] is satisfiable in [env] *)
 val unsat : t -> gformula -> Explanation.t
+
+val print_model : Format.formatter -> t -> unit
 
 val start : unit -> unit
 val stop : unit -> int64

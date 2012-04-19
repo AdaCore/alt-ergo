@@ -59,6 +59,8 @@ module type RELATION = sig
   val add : t -> r -> t
     (** add a representant to take into account *)
 
+  val print_model : Format.formatter -> t -> (Term.t * r) list -> unit
+
 end
 
 module type THEORY = sig

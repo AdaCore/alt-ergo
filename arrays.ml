@@ -377,6 +377,7 @@ module Make(X : ALIEN) = struct
 
     let query _ _ ~are_eq ~are_neq ~class_of = Sig.No
     let add env r = env
+    let print_model _ _ _ = ()
 
   end
 

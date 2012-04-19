@@ -53,7 +53,7 @@ type t = {
 
 exception Sat of t
 exception Unsat of Ex.t
-exception I_dont_know
+exception I_dont_know of t
 exception IUnsat of Ex.t
 
 let max_max_size = 96
@@ -259,20 +259,34 @@ let mround predicate mode env max_size =
   res
   
 
-let extract_model t = 
+let extract_prop_model t = 
   let s = ref SF.empty in
   MF.iter 
     (fun f _ -> 
        let lbl = F.label f in
-       if not (Hstring.equal Hstring.empty lbl) then
+       if complete_model || not (Hstring.equal Hstring.empty lbl) then
 	 s := SF.add f !s
     ) 
     t.gamma;
   !s
 
-let print_model fmt s = 
-  SF.iter (fprintf fmt "%a\n" F.print) s
-  
+let print_prop_model fmt s =
+  SF.iter (fprintf fmt "\n║ %a" F.print) s
+
+let print_model fmt t =
+  fprintf fmt "\n╭───────────────╮ ";
+  fprintf fmt "\n│     Model     │";
+  fprintf fmt "\n╰───────────────╯\n";
+  let pm = extract_prop_model t in
+  if not (SF.is_empty pm) then begin
+    fprintf fmt "\n Propositional:";
+    fprintf fmt "\n╓──────────────";
+    print_prop_model fmt pm;
+    fprintf fmt "\n╙@.";
+  end;
+  CcX.print_model fmt t.tbox
+
+
 (* sat-solver *)
 
 let elim {f=f} env = 
@@ -449,7 +463,7 @@ and bcp env =
     
 let rec unsat_rec env fg stop max_size = 
   try
-    if stop < 0 then raise I_dont_know;
+    if stop < 0 then raise (I_dont_know env);
     back_tracking (assume env fg) stop max_size
   with IUnsat d ->
     Print.unsat (); d
@@ -469,11 +483,11 @@ and back_tracking env stop max_size = match env.delta with
       in
       (match l1, l2 with
 	 | [], [] -> 
-	     let m = extract_model env in
+	     let m = extract_prop_model env in
 	     if all_models then 
 	       begin
 		 Format.printf "--- SAT ---\n";
-		 Format.printf "%a@." print_model m;
+		 Format.printf "%a@." print_prop_model m;
 		 raise (IUnsat (Ex.make_deps m))
 	       end;
 	     raise (Sat env)
@@ -482,7 +496,7 @@ and back_tracking env stop max_size = match env.delta with
 	       (List.fold_left assume  (List.fold_left assume env l2) l1) 
 	       (stop-1) (max_size + b_max_size))
   | [] ->
-      raise I_dont_know
+      raise (I_dont_know env)
   | (a,b,d)::l ->
       let {f=f;age=g;name=lem;mf=mf} = a in
       Print.decide f;

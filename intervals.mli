@@ -54,6 +54,7 @@ val add : t -> t -> t
 
 val scale : num -> t -> t
 
+val pretty_print : Format.formatter -> t -> unit
 val print : Format.formatter -> t -> unit
 
 val finite_size : t -> num option

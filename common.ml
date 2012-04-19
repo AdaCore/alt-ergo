@@ -177,6 +177,8 @@ let rec print_term fmt t = match t.c.tt_desc with
       fprintf fmt " }"
   | TTlet (s, t1, t2) ->
       fprintf fmt "let %a=%a in %a" Symbols.print s print_term t1 print_term t2
+  | TTnamed (lbl, t) ->
+      fprintf fmt "%a" print_term t
 
 and print_term_list fmt = List.iter (fprintf fmt "%a," print_term)
 
@@ -208,7 +210,7 @@ let string_of_op = function
   | _ -> assert false
 
 let print_binder fmt (s, t) =
-  fprintf fmt "%a:%a" Symbols.print s Ty.print t
+  fprintf fmt "%a :%a" Symbols.print s Ty.print t
 
 let print_binders fmt l = 
   List.iter (fun c -> fprintf fmt "%a, " print_binder c) l

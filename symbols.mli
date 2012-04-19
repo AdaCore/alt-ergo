@@ -60,3 +60,5 @@ val is_set : t -> bool
 module Map : Map.S with type key = t
 module Set : Set.S with type elt = t
 
+val add_label : Hstring.t -> t -> unit
+val label : t -> Hstring.t

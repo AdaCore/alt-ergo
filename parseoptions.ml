@@ -75,7 +75,9 @@ let spec = [
   "-arrays", Arg.Set arrays, "experimental support for the theory of arrays";
   "-pairs", Arg.Set pairs, "experimental support for the theory of pairs";
   "-term-like-pp", Arg.Set term_like_pp, "Output semantic values as terms";
-  "-all-models", Arg.Set all_models, "experimental support for model";
+  "-all-models", Arg.Set all_models, "experimental support for all models";
+  "-model", Arg.Set model, "experimental support for model on labeled terms";
+  "-complete-model", Arg.Set complete_model, "experimental support for complete model";
   "-proof", Arg.Set proof, "experimental support for succint proof";
   "-debug-proof", Arg.Set debug_proof, "experimental support for succint proof";
   "-goal-directed", Arg.Set goal_directed,

@@ -60,8 +60,13 @@ val fold_subst_term : (Symbols.t -> t -> 'b -> 'b) -> subst -> 'b -> 'b
 
 val union_subst : subst -> subst -> subst
 
+val add_label : Hstring.t -> t -> unit
+val label : t -> Hstring.t
+val is_labeled : t -> bool
+
 val print : Format.formatter -> t -> unit
 val print_list : Format.formatter -> t list -> unit
+val print_list_sep : string -> Format.formatter -> t list -> unit
 
 val dummy : t 
 

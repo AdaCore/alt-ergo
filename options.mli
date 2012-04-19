@@ -62,6 +62,8 @@ val pairs : bool
 val term_like_pp : bool
 val debug_types : bool
 val all_models : bool
+val model : bool
+val complete_model : bool
 val smt_arrays : bool
 val goal_directed : bool
 val bouclage : int

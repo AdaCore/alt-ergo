@@ -463,6 +463,13 @@ struct
        r4=X4.Rel.add env.r4 r;
        r5=X5.Rel.add env.r5 r;
       }
+
+    let print_model fmt env rs =
+      X1.Rel.print_model fmt env.r1 rs;
+      X2.Rel.print_model fmt env.r2 rs;
+      X3.Rel.print_model fmt env.r3 rs;
+      X4.Rel.print_model fmt env.r4 rs;
+      X5.Rel.print_model fmt env.r5 rs
   end
 
 end

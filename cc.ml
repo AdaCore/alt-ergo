@@ -30,6 +30,7 @@ module type S = sig
   val assume : Literal.LT.t -> Explanation.t -> t -> t * Term.Set.t * int
   val query : Literal.LT.t -> t -> answer
   val class_of : t -> Term.t -> Term.t list
+  val print_model : Format.formatter -> t -> unit
 end
 
 module Make (X : Sig.X) = struct    
@@ -588,43 +589,61 @@ module Make (X : Sig.X) = struct
     in t
 
 
-let assume a ex t = 
-  if !profiling then
-    try 
-      !Options.timer_start Timers.TCC;
-      let res = assume a ex t in
-      !Options.timer_pause Timers.TCC;
-      res
-    with e -> 
-      !Options.timer_pause Timers.TCC;
-      raise e
-  else assume a ex t
+  let print_model fmt t =
+    let zero = ref true in
+    let rs = 
+      List.fold_left (fun acc (r, l, to_rel) ->
+	if l <> [] then begin
+	  if !zero then begin 
+	    fprintf fmt " Theory:";
+	    fprintf fmt "\n╓───────";
+	    zero := false;
+	  end;
+	  fprintf fmt "\n║ %a = %a" (T.print_list_sep " = ") l X.print r;
+	end;
+	to_rel@acc
+      ) [] (Uf.model t.gamma_finite.uf) in
+    if not !zero then fprintf fmt "\n╙@.";
+    X.Rel.print_model fmt t.gamma_finite.relation rs
 
 
-let qyery a t = 
-  if !profiling then
-    try 
-      !Options.timer_start Timers.TCC;
-      let res = query a t in
-      !Options.timer_pause Timers.TCC;
-      res
-    with e -> 
-      !Options.timer_pause Timers.TCC;
-      raise e
-  else query a t
+  let assume a ex t = 
+    if !profiling then
+      try 
+	!Options.timer_start Timers.TCC;
+	let res = assume a ex t in
+	!Options.timer_pause Timers.TCC;
+	res
+      with e -> 
+	!Options.timer_pause Timers.TCC;
+	raise e
+    else assume a ex t
 
 
-let class_of t term = 
-  if !profiling then
-    try 
-      !Options.timer_start Timers.TCC;
-      let res = class_of t term in
-      !Options.timer_pause Timers.TCC;
-      res
-    with e -> 
-      !Options.timer_pause Timers.TCC;
-      raise e
-  else class_of t term
+  let query a t = 
+    if !profiling then
+      try 
+	!Options.timer_start Timers.TCC;
+	let res = query a t in
+	!Options.timer_pause Timers.TCC;
+	res
+      with e -> 
+	!Options.timer_pause Timers.TCC;
+	raise e
+    else query a t
+
+
+  let class_of t term = 
+    if !profiling then
+      try 
+	!Options.timer_start Timers.TCC;
+	let res = class_of t term in
+	!Options.timer_pause Timers.TCC;
+	res
+      with e -> 
+	!Options.timer_pause Timers.TCC;
+	raise e
+    else class_of t term
 
 
 end

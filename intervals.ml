@@ -105,11 +105,19 @@ let print_interval fmt (b1,b2) =
     | _, _ -> ']', '['
   in 	    
   fprintf fmt "%c%a;%a%c" c1 print_borne b1 print_borne b2 c2
-    
-let print fmt {ints = ints; is_int = b; expl = e } = 
-  List.iter (fun i -> fprintf fmt "%a" print_interval i) ints;
+
+let rec print_list_sep sep fmt = function
+  | [] -> ()
+  | [t] -> print_interval fmt t
+  | t::l -> fprintf fmt "%a%s%a" print_interval t sep (print_list_sep sep) l
+
+let pretty_print fmt {ints = ints; is_int = b; expl = e } = 
+  print_list_sep "∪" fmt ints;
   if verbose || proof then fprintf fmt " %a" Ex.print e
   
+let print fmt {ints = ints; is_int = b; expl = e } = 
+  print_list_sep "" fmt ints;
+  if verbose || proof then fprintf fmt " %a" Ex.print e
 
 let undefined ty = {
   ints = [Minfty, Pinfty];

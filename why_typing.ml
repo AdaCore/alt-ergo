@@ -206,6 +206,19 @@ module Env = struct
     let ty = Types.ty_of_pp loc env.types None pp_ty in
     add env lv Symbols.name ty
 
+  let add_names_lbl env lv pp_ty loc = 
+    let env = { env with types = Types.monomorphized env.types pp_ty } in
+    let ty = Types.ty_of_pp loc env.types None pp_ty in
+    let rlv = 
+      List.fold_left (fun acc (x, lbl) ->
+	let lbl = Hstring.make lbl in
+	if not (Hstring.equal lbl Hstring.empty) then
+	  Symbols.add_label lbl (Symbols.name x);
+	x::acc
+      ) [] lv in
+    let lv = List.rev rlv in
+    add env lv Symbols.name ty
+
   let add_logics env ac names pp_profile loc = 
     let profile = 
       match pp_profile with
@@ -224,9 +237,14 @@ module Env = struct
     in
     let logics = 
       List.fold_left 
-	(fun logics n -> 
+	(fun logics (n, lbl) -> 
 	   let sy = Symbols.name n ~kind:ac in
 	   if MString.mem n logics then error (SymbAlreadyDefined n) loc;
+	   
+	   let lbl = Hstring.make lbl in
+	   if not (Hstring.equal lbl Hstring.empty) then
+	     Symbols.add_label lbl sy;
+	   
 	   MString.add n (sy, profile) logics)
 	env.logics names
     in
@@ -298,22 +316,27 @@ let rec type_term env f =
 
 and type_term_desc env loc = function
   | PPconst ConstTrue -> 
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print Ty.Tbool;
+      if rules = 1 then
+	fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print Ty.Tbool;
       TTconst Ttrue, Ty.Tbool
   | PPconst ConstFalse -> 
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print Ty.Tbool;
+      if rules = 1 then
+	fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print Ty.Tbool;
       TTconst Tfalse, Ty.Tbool
   | PPconst ConstVoid -> 
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print Ty.Tunit;
+      if rules = 1 then
+	fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print Ty.Tunit;
       TTconst Tvoid, Ty.Tunit
   | PPconst (ConstInt n) -> 
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print Ty.Tint;
+      if rules = 1 then
+	fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print Ty.Tint;
       TTconst(Tint n), Ty.Tint
   | PPconst (ConstReal n) -> 
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print Ty.Treal;
+      if rules = 1 then
+	fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print Ty.Treal;
       TTconst(Treal n), Ty.Treal
   | PPconst (ConstBitv n) -> 
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print 
+      if rules = 1 then fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print
       (Ty.Tbitv (String.length n));
       TTconst(Tbitv n), Ty.Tbitv (String.length n)
   | PPvar p -> 
@@ -326,7 +349,8 @@ and type_term_desc env loc = function
 	with Not_found -> 
 	  match Env.fresh_type env p loc with
 	    | s, { Env.args = []; result = ty} -> 
-	      if rules = 1 then fprintf fmt "[rule] TR-Typing-Var$_\\Delta$ type %a@." 
+	      if rules = 1 then
+		fprintf fmt "[rule] TR-Typing-Var$_\\Delta$ type %a@." 
 		Ty.print ty;
 	      TTvar s , ty 
 	    | _ -> error (ShouldBeApply p) loc
@@ -338,7 +362,8 @@ and type_term_desc env loc = function
 	let s, {Env.args = lt; result = t} = Env.fresh_type env p loc in
 	try
 	  List.iter2 Ty.unify lt lt_args; 
-	  if rules = 1 then fprintf fmt "[rule] TR-Typing-App type %a@." Ty.print t;
+	  if rules = 1 then
+	    fprintf fmt "[rule] TR-Typing-App type %a@." Ty.print t;
 	  TTapp(s,te_args), t
 	with 
 	  | Ty.TypeClash(t1,t2) -> 
@@ -404,7 +429,8 @@ and type_term_desc env loc = function
 	let ty2 = Ty.shorten te2.c.tt_ty in
 	match ty1, ty2 with
 	  | Ty.Tbitv n , Ty.Tbitv m -> 
-	    if rules = 1 then fprintf fmt "[rule] TR-Typing-OpConcat type %a@." 
+	    if rules = 1 then
+	      fprintf fmt "[rule] TR-Typing-OpConcat type %a@." 
 	      Ty.print (Ty.Tbitv (n+m));
 	    TTconcat(te1, te2), Ty.Tbitv (n+m)
 	  | Ty.Tbitv _ , _ -> error (ShouldHaveTypeBitv ty2) t2.pp_loc
@@ -424,7 +450,8 @@ and type_term_desc env loc = function
 	      if j>=n then error (BitvExtractRange(n,j) ) loc;
 	      let tei = type_term env ei in
 	      let tej = type_term env ej in
-	      if rules = 1 then fprintf fmt "[rule] TR-Typing-OpExtract type %a@." 
+	      if rules = 1 then
+		fprintf fmt "[rule] TR-Typing-OpExtract type %a@." 
 		Ty.print (Ty.Tbitv (j-i+1));
 	      TTextract(te, tei, tej), Ty.Tbitv (j-i+1)
 	  | _ -> error (ShouldHaveType(tye,Ty.Tbitv (j+1))) loc
@@ -439,7 +466,8 @@ and type_term_desc env loc = function
 	  | Ty.Tfarray (tykey,tyval) ->
 	      begin try
 	        Ty.unify tykey tykey2;
-		if rules = 1 then fprintf fmt "[rule] TR-Typing-OpGet type %a@." 
+		if rules = 1 then
+		  fprintf fmt "[rule] TR-Typing-OpGet type %a@." 
 		  Ty.print tyval;
                 TTget(te1, te2), tyval
 	      with
@@ -460,7 +488,8 @@ and type_term_desc env loc = function
 	  match ty1 with
 	    | Ty.Tfarray (tykey,tyval) ->
 		Ty.unify tykey tykey2;Ty.unify tyval tyval2;
-		if rules = 1 then fprintf fmt "[rule] TR-Typing-OpSet type %a@." 
+		if rules = 1 then
+		  fprintf fmt "[rule] TR-Typing-OpSet type %a@." 
 		  Ty.print ty1;
 		TTset(te1, te2, te3), ty1
 	    | _ -> error ShouldHaveTypeArray t1.pp_loc
@@ -480,13 +509,10 @@ and type_term_desc env loc = function
 	let ty3 = Ty.shorten te3.c.tt_ty in
 	if not (Ty.equal ty2 ty3) then
 	  error (ShouldHaveType(ty3,ty2)) t3.pp_loc;
-	if rules = 1 then fprintf fmt "[rule] TR-Typing-Ite type %a@." 
-	  Ty.print ty2;
+	if rules = 1 then
+	  fprintf fmt "[rule] TR-Typing-Ite type %a@." Ty.print ty2;
 	TTapp(Symbols.name "ite",[te1;te2;te3]) , ty2
       end
-  | PPnamed(lbl, t) -> 
-      let te = type_term env t in
-      te.c.tt_desc, te.c.tt_ty
   | PPdot(t, a) -> 
       begin
 	let te = type_term env t in
@@ -564,13 +590,25 @@ and type_term_desc env loc = function
       let te2 = type_term env t2 in
       let ty2 = Ty.shorten te2.c.tt_ty in
       let s, _ = Env.find env x in
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-Let type %a@." 
-	Ty.print ty2;
+      if rules = 1 then
+	fprintf fmt "[rule] TR-Typing-Let type %a@." Ty.print ty2;
       TTlet(s, te1, te2), ty2
+
+  (* | PPnamed(lbl, t) ->  *)
+  (*     let te = type_term env t in *)
+  (*     te.c.tt_desc, te.c.tt_ty *)
+
+  | PPnamed (lbl, t) ->
+      let te = type_term env t in
+      let ty = Ty.shorten te.c.tt_ty in
+      let lbl = Hstring.make lbl in
+      TTnamed (lbl, te), ty
+
   | _ -> error SyntaxError loc
 
+
 let rec join_forall f = match f.pp_desc with
-    PPforall(vs,ty,trs1,f) -> 
+  | PPforall(vs,ty,trs1,f) -> 
       let tyvars,trs2,f = join_forall f in  
       (vs,ty)::tyvars , trs1@trs2 , f
   | PPnamed(lbl, f) -> 
@@ -584,8 +622,8 @@ let rec join_exists f = match f.pp_desc with
   | PPnamed (_, f) -> join_exists f
   | _ -> [] , f
 
-let rec type_form env f = 
-  let form, vars = match f.pp_desc with
+let rec type_form env f =
+  let rec type_pp_desc = function
     | PPconst ConstTrue -> 
         if rules = 1 then fprintf fmt "[rule] TR-Typing-True$_F$@.";
 	TFatom {c=TAtrue; annot=new_id ()}, Sy.empty
@@ -740,7 +778,7 @@ let rec type_form env f =
 	in
 	let env' = 
 	  List.fold_left 
-	    (fun env (lv,pp_ty) -> 
+	    (fun env (lv, pp_ty) -> 
 	       Env.add_var env lv pp_ty f.pp_loc) env ty_vars in
 	let f', fv = type_form env' f' in
 	let ty_triggers = List.map (List.map (type_term env')) triggers in
@@ -775,6 +813,16 @@ let rec type_form env f =
 	     Env.var_map = MString.add var (svar, ttype) env.Env.var_map} in
 	let f,fv = type_form env f in
 	TFlet (up ,svar , tt, f), freevars_term (Sy.remove svar fv) tt
+	  
+	  
+    (* Remove labels : *)
+    | PPforall_named (lx, tys, trs, f) ->
+        let lx = List.map fst lx in
+	type_pp_desc (PPforall (lx, tys, trs, f))
+    | PPexists_named (lx, tys, f)  ->
+        let lx = List.map fst lx in
+	type_pp_desc (PPexists (lx, tys, f))
+
     | _ -> 
 	let te1 = type_term env f in
 	let ty = te1.c.tt_ty in
@@ -787,6 +835,7 @@ let rec type_form env f =
 	      r, freevars_form r
 	  | _ -> error ShouldHaveTypeProp f.pp_loc
   in
+  let form, vars = type_pp_desc f.pp_desc in
   {c = form; annot = new_id ()}, vars
 
 
@@ -852,13 +901,25 @@ and alpha_rec ((up, m) as s) f =
     | PPforall(xs, ty, trs, f1) ->
 	let xs1, xs2 = List.partition (fun x -> S.mem x up) xs in
 	let nv = List.map fresh_var xs1 in
-	let m = List.fold_left2 (fun m x nx -> MString.add x nx m) m xs1 nv in
+	let m = List.fold_left2 
+	  (fun m x nx -> MString.add x nx m) m xs1 nv in
 	let xs = nv@xs2 in
 	let up = List.fold_left (fun up x -> S.add x up) up xs in
 	let s = (up, m) in
 	let ff1 = alpha_renaming s f1 in
 	let trs = List.map (List.map (alpha_renaming s)) trs in
 	PPforall(xs, ty, trs, ff1)
+    | PPforall_named (xs, ty, trs, f1) ->
+	let xs1, xs2 = List.partition (fun (x, _) -> S.mem x up) xs in
+	let nv = List.map (fun (x, lbl) -> fresh_var x, lbl) xs1 in
+	let m = List.fold_left2 
+	  (fun m (x,_) (nx, _) -> MString.add x nx m) m xs1 nv in
+	let xs = nv@xs2 in
+	let up = List.fold_left (fun up (x, _) -> S.add x up) up xs in
+	let s = (up, m) in
+	let ff1 = alpha_renaming s f1 in
+	let trs = List.map (List.map (alpha_renaming s)) trs in
+	PPforall_named (xs, ty, trs, ff1)
     | PPdot(f1, a) ->
 	PPdot(alpha_renaming s f1, a)
     | PPrecord l ->
@@ -895,6 +956,21 @@ and alpha_rec ((up, m) as s) f =
 	in
 	let ff1 = alpha_renaming s f1 in
 	PPexists(lx, ty, ff1)
+    | PPexists_named (lx, ty, f1) ->
+	let s, lx = 
+	  List.fold_left
+	    (fun (s, lx) (x, lbl) ->
+	       if S.mem x up then
+		 let nx = fresh_var x in
+		 let m = MString.add x nx m in
+		 let up = S.add nx up in
+		 (up, m), (nx, lbl) :: lx
+	       else
+		 (S.add x up, m), (x, lbl) :: lx)
+	    (s, []) lx
+	in
+	let ff1 = alpha_renaming s f1 in
+	PPexists_named (lx, ty, ff1)
  
 let alpha_renaming = alpha_renaming (S.empty, MString.empty)
 
@@ -906,6 +982,9 @@ let rec elim_toplevel_forall env bnot f =
   match f.pp_desc with
     | PPforall (lv, pp_ty, _, f) when bnot-> 
 	elim_toplevel_forall (Env.add_names env lv pp_ty f.pp_loc) bnot f
+
+    | PPforall_named (lvb, pp_ty, _, f) when bnot-> 
+	elim_toplevel_forall (Env.add_names_lbl env lvb pp_ty f.pp_loc) bnot f
 
     | PPinfix (f1, PPand, f2) when not bnot -> 
 	let env , f1 = elim_toplevel_forall env false f1 in
@@ -936,10 +1015,14 @@ let rec intro_hypothesis env valid_mode f =
 	let env, f1 = elim_toplevel_forall env (not valid_mode) f1 in
 	let env, axioms , goal = intro_hypothesis env valid_mode f2 in
 	env, f1::axioms , goal
-    | PPforall(lv, pp_ty, _, f) when valid_mode ->  
+    | PPforall (lv, pp_ty, _, f) when valid_mode ->  
 	intro_hypothesis (Env.add_names env lv pp_ty f.pp_loc) valid_mode f
-    | PPexists(lv, pp_ty, f) when not valid_mode-> 
+    | PPexists (lv, pp_ty, f) when not valid_mode-> 
 	intro_hypothesis (Env.add_names env lv pp_ty f.pp_loc) valid_mode f
+    | PPforall_named (lvb, pp_ty, _, f) when valid_mode ->  
+	intro_hypothesis (Env.add_names_lbl env lvb pp_ty f.pp_loc) valid_mode f
+    | PPexists_named (lvb, pp_ty, f) when not valid_mode-> 
+	intro_hypothesis (Env.add_names_lbl env lvb pp_ty f.pp_loc) valid_mode f
     | _ -> 
 	let env , f = elim_toplevel_forall env valid_mode f in
 	env , [] , f
@@ -975,6 +1058,8 @@ let rec max_terms acc f =
 
     | PPforall(_, _, _, _) 
     | PPexists(_, _, _) 
+    | PPforall_named(_, _, _, _) 
+    | PPexists_named(_, _, _) 
     | PPvar _ 
     | PPlet(_, _, _) 
     | PPinfix(_, _, _) -> raise Exit
@@ -1014,6 +1099,8 @@ let rec mono_term {c = {tt_ty=tt_ty; tt_desc=tt_desc}; annot = id} =
 	TTrecord (List.map (fun (x, t) -> x, mono_term t) lbs)
     | TTlet (sy,t1,t2)-> 
         TTlet (sy, mono_term t1, mono_term t2)
+    | TTnamed (lbl, t)-> 
+        TTnamed (lbl, mono_term t)
   in 
   { c = {tt_ty = Ty.monomorphize tt_ty; tt_desc=tt_desc}; annot = id}
  
@@ -1071,6 +1158,7 @@ let type_decl (acc, env) d =
       | Logic (loc, ac, lp, pp_ty) -> 
 	if rules = 1 then fprintf fmt "[rule] TR-Typing-LogicFun$_F$@.";
 	  let env' = Env.add_logics env ac lp pp_ty loc in
+	  let lp = List.map fst lp in
 	  let td = {c = TLogic(loc,lp,pp_ty); annot = new_id () } in
 	  (td, env)::acc, env'
 
@@ -1126,6 +1214,8 @@ let type_decl (acc, env) d =
 
 	  let env = Env.add_logics env Symbols.Other [n] ty loc in (* TODO *)
 
+	  let n = fst n in
+
 	  let lvar = List.map (fun (x,_) -> {pp_desc=PPvar x;pp_loc=loc}) l in
 	  let p = {pp_desc=PPapp(n,lvar) ; pp_loc=loc } in
 	  let infix = match d with Function_def _ -> PPeq | _ -> PPiff in
@@ -1159,8 +1249,9 @@ let type_decl (acc, env) d =
           let tls = List.map (fun s -> PPTvarid (s,loc)) ls in
 	  let ty = PFunction([], PPTexternal(tls, s, loc)) in
 	  match body with
-	    | Enum lc -> 
-		let env2 = Env.add_logics env1 Symbols.Constructor lc ty loc in
+	    | Enum lc ->
+	        let lcl = List.map (fun c -> c, "") lc in (* TODO change this *)
+		let env2 = Env.add_logics env1 Symbols.Constructor lcl ty loc in
 		let td2 = TLogic(loc, lc, ty) in
 		let td2_a = { c = td2; annot=new_id () } in
 		(td1_a, env1)::(td2_a,env2)::acc, env2

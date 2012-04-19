@@ -64,6 +64,10 @@ and pp_desc =
   | PPif of lexpr * lexpr * lexpr
   | PPforall of string list * ppure_type * lexpr list list * lexpr
   | PPexists of string list * ppure_type * lexpr
+  | PPforall_named of 
+      (string * string) list * ppure_type * lexpr list list * lexpr
+  | PPexists_named of
+      (string * string) list * ppure_type * lexpr
   | PPnamed of string * lexpr
   | PPlet of string * lexpr * lexpr
 
@@ -84,10 +88,13 @@ type decl =
   | Axiom of loc * string * lexpr
   | Rewriting of loc * string * lexpr list
   | Goal of loc * string * lexpr
-  | Logic of loc * name_kind * string list * plogic_type
-  | Predicate_def of loc * string * (loc * string * ppure_type) list * lexpr
-  | Function_def 
-      of loc * string * (loc * string * ppure_type) list * ppure_type * lexpr
+  | Logic of loc * name_kind * (string * string) list * plogic_type
+  | Predicate_def of 
+      loc * (string * string) * 
+	(loc * string * ppure_type) list * lexpr
+  | Function_def of 
+      loc * (string * string) * 
+	(loc * string * ppure_type) list * ppure_type * lexpr
   | TypeDecl of loc * string list * string * body_type_decl
 
 type file = decl list
@@ -123,6 +130,7 @@ and 'a tt_desc =
   | TTdot of ('a tterm, 'a) annoted * Hstring.t
   | TTrecord of (Hstring.t * ('a tterm, 'a) annoted) list
   | TTlet of Symbols.t * ('a tterm, 'a) annoted * ('a tterm, 'a) annoted
+  | TTnamed of Hstring.t * ('a tterm, 'a) annoted
 
 type 'a tatom = 
   | TAtrue
@@ -169,10 +177,11 @@ type 'a tdecl =
   | TGoal of loc * string * ('a tform, 'a) annoted
   | TLogic of loc * string list * plogic_type
   | TPredicate_def of 
-      loc * string * (string * ppure_type) list * ('a tform, 'a) annoted
+      loc * string *
+	(string * ppure_type) list * ('a tform, 'a) annoted
   | TFunction_def of 
-      loc * string * (string * ppure_type) list * 
-	ppure_type * ('a tform, 'a) annoted
+      loc * string *
+	(string * ppure_type) list * ppure_type * ('a tform, 'a) annoted
   | TTypeDecl of loc * string list * string * body_type_decl
 
 

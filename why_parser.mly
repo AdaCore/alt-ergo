@@ -138,17 +138,17 @@ decl:
 | TYPE type_vars ident EQUAL record_type
    { if rules = 0 then fprintf fmt "[rule] TR-Lexical-decl@.";
      TypeDecl (loc_i 2, $2, $3, Record $5 ) }
-| LOGIC ac_modifier list1_ident_sep_comma COLON logic_type
+| LOGIC ac_modifier list1_named_ident_sep_comma COLON logic_type
    { if rules = 0 then fprintf fmt "[rule] TR-Lexical-decl@.";
      Logic (loc (), $2, $3, $5) }
-| FUNCTION ident LEFTPAR list0_logic_binder_sep_comma RIGHTPAR COLON 
+| FUNCTION named_ident LEFTPAR list0_logic_binder_sep_comma RIGHTPAR COLON 
   primitive_type EQUAL lexpr
    { if rules = 0 then fprintf fmt "[rule] TR-Lexical-decl@.";
      Function_def (loc (), $2, $4, $7, $9) }
-| PREDICATE ident EQUAL lexpr
+| PREDICATE named_ident EQUAL lexpr
    { if rules = 0 then fprintf fmt "[rule] TR-Lexical-decl@.";
      Predicate_def (loc (), $2, [], $4) }
-| PREDICATE ident LEFTPAR list0_logic_binder_sep_comma RIGHTPAR EQUAL lexpr
+| PREDICATE named_ident LEFTPAR list0_logic_binder_sep_comma RIGHTPAR EQUAL lexpr
    { if rules = 0 then fprintf fmt "[rule] TR-Lexical-decl@.";
      Predicate_def (loc (), $2, $4, $7) }
 | AXIOM ident COLON lexpr
@@ -323,6 +323,15 @@ lexpr:
 | EXISTS list1_ident_sep_comma COLON primitive_type DOT lexpr %prec prec_exists
    { if rules = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
      mk_pp (PPexists ($2, $4, $6)) }
+
+| FORALL list1_named_ident_sep_comma COLON primitive_type triggers 
+  DOT lexpr %prec prec_forall
+   { if rules = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
+     mk_pp (PPforall_named ($2, $4, $5, $7)) }
+
+| EXISTS list1_named_ident_sep_comma COLON primitive_type DOT lexpr %prec prec_exists
+   { if rules = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
+     mk_pp (PPexists_named ($2, $4, $6)) }
 
 | ident_or_string COLON lexpr %prec prec_named
    { if rules = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
@@ -504,8 +513,18 @@ list1_ident_sep_comma:
 | ident COMMA list1_ident_sep_comma { $1 :: $3 }
 ;
 
+list1_named_ident_sep_comma:
+| named_ident                                   { [$1] }
+| named_ident COMMA list1_named_ident_sep_comma { $1 :: $3 }
+;
+
 ident_or_string:
 | IDENT  { $1 }
 | STRING { $1 }
+;
+
+named_ident:
+| IDENT  { $1, "" }
+| IDENT STRING { $1, $2 }
 ;
 

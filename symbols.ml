@@ -35,6 +35,7 @@ type t =
   | Bitv of string
   | Op of operator
   | Var of Hstring.t
+type s = t
 
 let name ?(kind=Other) s = Name (Hstring.make s, kind)
 let var s = Var (Hstring.make s)
@@ -121,3 +122,16 @@ module Map =
 module Set = 
   Set.Make(struct type t' = t type t=t' let compare=compare end)
 
+
+
+module Labels = Hashtbl.Make(struct
+  type t = s
+  let equal = equal
+  let hash = hash
+end)
+  
+let labels = Labels.create 100007
+  
+let add_label lbl t = Labels.replace labels t lbl
+  
+let label t = try Labels.find labels t with Not_found -> Hstring.empty

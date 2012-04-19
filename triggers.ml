@@ -87,6 +87,7 @@ let rec depth_tterm t =
 	max (depth_tterm t1) (max (depth_tterm t2) (depth_tterm t3))
     | TTlet (s, t1, t2) ->
 	max (depth_tterm t1 + 1) (depth_tterm t2)
+    | TTnamed (_, t) -> depth_tterm t
 
 exception Out of int
 
@@ -194,6 +195,9 @@ let rec compare_tterm t1 t2 =
 	if c<>0 then c else
 	  let c = compare_tterm t1 u1 in
 	  if c<>0 then c else compare_tterm u1 u2
+    | TTnamed (_, t), _ -> compare_tterm t t2
+    | _, TTnamed (_, t) -> compare_tterm t1 t
+
 
 let compare_tterm_list tl2 tl1 =
   let l1 = List.map depth_tterm tl1 in

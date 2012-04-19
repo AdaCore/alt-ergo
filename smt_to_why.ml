@@ -45,7 +45,7 @@ let mlexpr f = pexp dloc f
 let make_forall f bl  =
   let f = List.fold_left
            (fun f x -> pexp f.pp_loc
-                        (PPforall ([x.var], 
+                        (PPforall ([x.var],
                          sort_to_type f.pp_loc x.sort, [], f ))) f bl
   in f.pp_desc
 
@@ -234,11 +234,11 @@ and envformula env f = pexp f.floc (form_to_desc env f.formula)
 let formula  = envformula {uterm = StringMap.empty ; uformula = StringMap.empty}
 
 let psig_to_pdef (pos,psig) =
-  Logic (pos, Symbols.Other, [psig.pname],
+  Logic (pos, Symbols.Other, [psig.pname, ""],
 	 PPredicate (List.map curry_sort_to_type psig.pargs))
 
 let fsig_to_fdef (pos,fsig) =
-  Logic (pos, Symbols.Other, [fsig.fname],
+  Logic (pos, Symbols.Other, [fsig.fname, ""],
 	 PFunction ((List.map curry_sort_to_type fsig.fargs),
                     curry_sort_to_type fsig.fres ))
 

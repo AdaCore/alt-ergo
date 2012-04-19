@@ -76,12 +76,12 @@ let rec print fmt t =
         else 
           fprintf fmt "%a(%a)" Sy.print x print_list l
 
-and print_list fmt = function
+and print_list_sep sep fmt = function
   | [] -> ()
   | [t] -> print fmt t
-  | t::l -> Format.fprintf fmt "%a,%a" print t print_list l
+  | t::l -> Format.fprintf fmt "%a%s%a" print t sep (print_list_sep sep) l
 
-
+and print_list fmt = print_list_sep "," fmt
 
 
 (* fresh variables must be smaller than problem's variables.
@@ -181,3 +181,28 @@ let union_subst (s_t1, s_ty1) ((s_t2, s_ty2) as subst) =
 
 let rec subterms acc t = 
   let {xs=xs} = view t in List.fold_left subterms (Set.add t acc) xs
+
+
+module Labels = Hashtbl.Make(H)
+  
+let labels = Labels.create 100007
+  
+let add_label lbl t = Labels.replace labels t lbl
+  
+let label t = try Labels.find labels t with Not_found -> Hstring.empty
+
+
+let rec is_labeled_rec depth { f = f; xs = xs } =
+  let lb = Symbols.label f in
+  (not (Hstring.equal lb Hstring.empty)
+   &&
+     (try
+	let md = int_of_string (Hstring.view lb) in
+	depth <= md
+      with Failure _ -> true))
+  || 
+    List.exists (is_labeled_rec (depth +1)) xs
+
+let is_labeled t =
+  not (Hstring.equal (label t) Hstring.empty) 
+  || is_labeled_rec 0 t

@@ -44,7 +44,7 @@ let rec make_term {c = { tt_ty = ty; tt_desc = tt }} =
 	T.vrai
     | TTconst Tfalse -> 
 	T.faux
-   | TTconst Tvoid -> 
+    | TTconst Tvoid -> 
 	T.void
     | TTconst (Tint i) -> 
 	T.int i
@@ -87,6 +87,10 @@ let rec make_term {c = { tt_ty = ty; tt_desc = tt }} =
 	let subst = Symbols.Map.add s t1 Symbols.Map.empty, Ty.esubst in
 	let t2 = make_term t2 in
 	T.apply_subst subst t2
+    | TTnamed(lbl, t) ->
+	let t = make_term t in
+	T.add_label lbl t;
+	t
 
 let make_trigger = function
   | [{c={ tt_desc = TTapp(s, t1::t2::l)}}] 
