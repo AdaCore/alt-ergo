@@ -23,22 +23,6 @@ open Lexing
 open Format
 open Options
 
-    
-let rec prune r t dep =
-  r.pruned <- true;
-  t#set_property (`FOREGROUND "light gray");
-  let deps = match find_tag_inversedeps dep t  with 
-    | None -> []
-    | Some d -> d in
-  List.iter (fun d -> prune d d.tag dep) deps
-
-let rec unprune r t dep =
-  r.pruned <- false;
-  t#set_property (`FOREGROUND_SET false);
-  let deps = match find_tag_deps dep t  with 
-    | None -> []
-    | Some d -> d in
-  List.iter (fun d -> unprune d d.tag dep) deps
 
 let prune_nodep r t =
   r.pruned <- true;
@@ -51,6 +35,20 @@ let incorrect_prune_nodep r t =
 let unprune_nodep r t =
   r.pruned <- false;
   t#set_property (`FOREGROUND_SET false)
+
+let rec prune r t dep =
+  prune_nodep r t;
+  let deps = match find_tag_inversedeps dep t  with 
+    | None -> []
+    | Some d -> d in
+  List.iter (fun d -> prune d d.tag dep) deps
+
+let rec unprune r t dep =
+  unprune_nodep r t;
+  let deps = match find_tag_deps dep t  with 
+    | None -> []
+    | Some d -> d in
+  List.iter (fun d -> unprune d d.tag dep) deps
 
 let toggle_incorrect_prune r t =
   if r.pruned then unprune_nodep r t

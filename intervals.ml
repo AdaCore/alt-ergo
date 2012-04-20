@@ -89,34 +89,36 @@ exception EmptyInterval of Ex.t
 exception NotConsistent of Ex.t
 exception Not_a_float
 
-let print_borne fmt = function
-  | Minfty -> fprintf fmt "-inf" 
-  | Pinfty -> fprintf fmt "+inf"
+let print_borne pretty fmt = function
+  | Minfty -> fprintf fmt "%s" (if pretty then "-∞" else "-inf")
+  | Pinfty -> fprintf fmt "%s" (if pretty then "+∞" else "+inf")
   | Strict (v, e) | Large (v, e) ->
     if verbose || proof then 
       fprintf fmt "%s %a" (string_of_num v) Ex.print e
     else fprintf fmt "%s" (string_of_num v)
       
-let print_interval fmt (b1,b2) =
+let print_interval pretty fmt (b1,b2) =
   let c1, c2 = match b1, b2 with
     | Large _, Large _ -> '[', ']'
     | Large _, _ -> '[', '['
     | _, Large _ -> ']', ']'
     | _, _ -> ']', '['
   in 	    
-  fprintf fmt "%c%a;%a%c" c1 print_borne b1 print_borne b2 c2
+  fprintf fmt "%c%a;%a%c" c1 (print_borne pretty) b1 (print_borne pretty) b2 c2
 
-let rec print_list_sep sep fmt = function
+let rec print_list pretty fmt = function
   | [] -> ()
-  | [t] -> print_interval fmt t
-  | t::l -> fprintf fmt "%a%s%a" print_interval t sep (print_list_sep sep) l
+  | [t] -> print_interval pretty fmt t
+  | t::l -> fprintf fmt "%a%s%a" 
+    (print_interval pretty) t 
+    (if pretty then "∪" else "") (print_list pretty) l
 
 let pretty_print fmt {ints = ints; is_int = b; expl = e } = 
-  print_list_sep "∪" fmt ints;
+  print_list true fmt ints;
   if verbose || proof then fprintf fmt " %a" Ex.print e
   
 let print fmt {ints = ints; is_int = b; expl = e } = 
-  print_list_sep "" fmt ints;
+  print_list false fmt ints;
   if verbose || proof then fprintf fmt " %a" Ex.print e
 
 let undefined ty = {

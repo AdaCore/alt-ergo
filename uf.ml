@@ -335,8 +335,8 @@ module Make ( R : Sig.X ) = struct
     let rec canon env r ex_r = 
       let se, sac = filter_leaves r in
       let subst, ex_subst = canon_empty se env in
-      let sac, ex_ac = canon_ac sac env in (* explications? *)
-      let r2 = canon_aux (canon_aux r sac) subst in
+      let subst_ac, ex_ac = canon_ac sac env in (* explications? *)
+      let r2 = canon_aux (canon_aux r subst_ac) subst in
       let ex_r2 = Ex.union (Ex.union ex_r ex_subst) ex_ac in
       if R.equal r r2 then r2, ex_r2 else canon env r2 ex_r2
 

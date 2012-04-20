@@ -279,7 +279,7 @@ let print_model fmt t =
   fprintf fmt "\n╰───────────────╯\n";
   let pm = extract_prop_model t in
   if not (SF.is_empty pm) then begin
-    fprintf fmt "\n Propositional:";
+    fprintf fmt " Propositional:";
     fprintf fmt "\n╓──────────────";
     print_prop_model fmt pm;
     fprintf fmt "\n╙@.";
