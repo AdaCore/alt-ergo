@@ -1098,7 +1098,7 @@ and add_at_desc_at (buffer:sbuffer) tags iter at =
 	add_arecord_at buffer tags iter r;
 	buffer#insert ~iter ~tags " }"
     | ATnamed (n, t) ->
-	buffer#insert ~tags (sprintf "%s: " (Hstring.view n));
+	buffer#insert ~iter ~tags (sprintf "%s: " (Hstring.view n));
 	add_aterm_at buffer tags iter t
 	
 	
