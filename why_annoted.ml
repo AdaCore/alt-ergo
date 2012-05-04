@@ -1531,22 +1531,22 @@ let findtags_proof expl l =
 
 exception FoundLine of int * GText.tag
 
-let rec find_id_aform id af =
+let rec find_line_id_aform id af =
   match af with    
     | AFatom at -> ()
     | AFop (_, aafl) ->
-      List.iter (find_id_aaform id) aafl
+      List.iter (find_line_id_aaform id) aafl
     | AFforall aaqf | AFexists aaqf ->
 	if aaqf.id = id then raise (FoundLine (aaqf.line, aaqf.tag))
-	else find_id_aaform id aaqf.c.aqf_form
+	else find_line_id_aaform id aaqf.c.aqf_form
     | AFlet (_,_,_, aaf) | AFnamed (_, aaf) ->
-      find_id_aaform id aaf
+      find_line_id_aaform id aaf
 
-and find_id_aaform id aaf =
+and find_line_id_aaform id aaf =
   if aaf.id = id then raise (FoundLine (aaf.line, aaf.tag))
-  else find_id_aform id aaf.c
+  else find_line_id_aform id aaf.c
 
-let find_id_atyped_decl id td =
+let find_line_id_atyped_decl id td =
   if td.id < id then ()
   else if td.id = id then raise (FoundLine (td.line, td.tag))
   else match td.c with
@@ -1556,13 +1556,141 @@ let find_id_atyped_decl id td =
     | APredicate_def (_,_,_, af) 
     | AFunction_def (_,_,_,_, af) 
     | AAxiom (_, _, af) ->
-	find_id_aform id af
+	find_line_id_aform id af
 
     | AGoal (_,_, aaf) ->
-	find_id_aaform id aaf
+	find_line_id_aaform id aaf
 
 let find_line id l =
   try
-    List.iter (fun (d, _) -> find_id_atyped_decl id d) l;
+    List.iter (fun (d, _) -> find_line_id_atyped_decl id d) l;
     raise Not_found
   with FoundLine (line, tag) -> line, tag
+
+
+
+exception Foundannot of annoted_node
+
+
+
+let findbyid_aaterm id aat =
+  if aat.id = id then raise (Foundannot (AT aat))
+
+(*   else findbyid_atdesc id aat.c.at_desc *)
+
+(* and findbyid_atdesc id = function *)
+(*   | ATconst _ | ATvar _ -> () *)
+(*   | ATapp (s, atl) -> List.iter (findbyid_aaterm id) atl *)
+(*   | ATinfix (t1, _, t2) | ATget (t1,t2) *)
+(*   | ATconcat (t1, t2) | ATlet (_, t1, t2) -> *)
+(*     findbyid_aaterm id t1; *)
+(*     findbyid_aaterm id t2 *)
+(*   | ATdot (t, _) | ATprefix (_,t) | ATnamed (_, t) ->  findbyid_aaterm id t *)
+(*   | ATset (t1, t2, t3) | ATextract (t1, t2, t3)  -> *)
+(*     findbyid_aaterm id t1; *)
+(*     findbyid_aaterm id t2; *)
+(*     findbyid_aaterm id t3 *)
+(*   | ATrecord r ->  *)
+(*     let atl = List.map snd r in List.iter (findbyid_aaterm id) atl     *)
+
+let findbyid_aatom id = function
+  | AAtrue
+  | AAfalse -> ()
+
+  | AAeq atl
+  | AAneq atl
+  | AAdistinct atl
+  | AAle atl
+  | AAlt atl
+  | AAbuilt (_, atl) -> List.iter (findbyid_aaterm id) atl
+
+  | AApred at -> ()
+
+let rec findbyid_aform id af =
+  match af with    
+    | AFatom aat -> findbyid_aatom id aat
+    | AFop (_, aafl) ->
+      List.iter (findbyid_aaform id) aafl
+    | AFforall aaqf | AFexists aaqf ->
+        List.iter (List.iter (findbyid_aaterm id)) aaqf.c.aqf_triggers;
+	if aaqf.id = id then raise (Foundannot (QF aaqf))
+	else findbyid_aaform id aaqf.c.aqf_form
+    | AFlet (_,_,_, aaf) | AFnamed (_, aaf) ->
+      findbyid_aaform id aaf
+
+and findbyid_aaform id aaf =
+  if aaf.id = id then raise (Foundannot (AF (aaf, None)))
+  else findbyid_aform id aaf.c
+
+let findbyid_atyped_decl  stop_decl id (td, tyenv) =
+  if td.id < id then ()
+  else if td.id = id then raise (Foundannot (AD (td, tyenv)))
+  else if stop_decl then raise (Foundannot (AD (td, tyenv)))
+  else match td.c with
+    | ARewriting (_,_, _) 
+    | ALogic _ | ATypeDecl _  -> ()
+
+    | APredicate_def (_,_,_, af) 
+    | AFunction_def (_,_,_,_, af) 
+    | AAxiom (_, _, af) ->
+	findbyid_aform id af
+
+    | AGoal (_,_, aaf) ->
+	findbyid_aaform id aaf
+
+let findbyid_aux stop_decl id l =
+  try
+    List.iter (findbyid_atyped_decl stop_decl id) l;
+    raise Not_found
+  with Foundannot a -> a
+
+let findbyid = findbyid_aux false
+
+let findbyid_decl = findbyid_aux true
+
+
+
+
+
+
+
+
+
+
+
+(* let rec findbyid_aform id af = *)
+(*   match af with     *)
+(*     | AFatom aat -> () *)
+(*     | AFop (_, aafl) -> *)
+(*       List.iter (findbyid_aaform id) aafl *)
+(*     | AFforall aaqf | AFexists aaqf -> *)
+(* 	if aaqf.id = id then raise (Foundannot aaqf) *)
+(* 	else findform_byid_aaform id aaqf.c.aqf_form *)
+(*     | AFlet (_,_,_, aaf) | AFnamed (_, aaf) -> *)
+(*       findform_byid_aaform id aaf *)
+
+(* and findform_byid_aaform id aaf = *)
+(*   if aaf.id = id then raise (Foundannot aaf) *)
+(*   else findform_byid_aform id aaf.c *)
+
+
+(* let findform_byid_atyped_decl id td = *)
+(*   if td.id < id then () *)
+(*   else if td.id = id then rasie (Foundannot td) *)
+(*   else match td.c with *)
+(*     | ARewriting (_,_, _)  *)
+(*     | ALogic _ | ATypeDecl _  -> () *)
+
+(*     | APredicate_def (_,_,_, af)  *)
+(*     | AFunction_def (_,_,_,_, af)  *)
+(*     | AAxiom (_, _, af) -> *)
+(* 	findform_byid_aform id af *)
+
+(*     | AGoal (_,_, aaf) -> *)
+(* 	findform_byid_aaform id aaf *)
+
+(* let findform_byid l = *)
+(*   try *)
+(*     List.iter (findform_byid_atyped_decl id) l; *)
+(*     raise Not_found *)
+(*   with Foundannot a -> a *)

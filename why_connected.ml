@@ -323,10 +323,10 @@ let rec unquantify_aform (buffer:sbuffer) tyenv vars_entries
 	  let ((s, _) as v'), e = List.hd ve in
 	  let cdr_ve = List.tl ve in
 	  assert (v = v');
-	  if e#text = "" then 
+	  if e = "" then 
 	    (v'::nbv, used, goal_used, cdr_ve, v'::uplet, lets)
 	  else
-	    let lb = Lexing.from_string e#text in
+	    let lb = Lexing.from_string e in
 	    let lexpr = Why_parser.lexpr Why_lexer.token lb in
 	    let at, gu =
 	      try 
@@ -411,11 +411,10 @@ let rec unquantify_aform (buffer:sbuffer) tyenv vars_entries
   new_annot buffer c (Why_typing.new_id ()) ptag, ve, goal_used
 
 
-let make_instance (buffer:sbuffer) vars (entries:GEdit.entry list)
-    afc goal_form tyenv =
+let make_instance (buffer:sbuffer) vars entries afc goal_form tyenv =
   let goal_vars = list_vars_in_form goal_form.c in
   if debug then List.iter (fun (v,e) ->
-    eprintf "%a -> %s@." Symbols.print (fst v) e#text)
+    eprintf "%a -> %s@." Symbols.print (fst v) e)
     (List.combine vars (List.rev entries));
   let aform, _, goal_used = 
     unquantify_aform buffer tyenv (List.combine vars (List.rev entries)) [] 
@@ -460,7 +459,7 @@ let rec least_nested_form used_vars af =
     | _, AFnamed (_, af) -> 
 	least_nested_form used_vars af
 
-let rec add_instance env vars entries af aname =
+let rec add_instance_aux af env vars entries aname =
   let ptag =  (tag env.inst_buffer) in
   let goal_form, tyenv, loc =
     let rec find_goal = function
@@ -510,7 +509,15 @@ let rec add_instance env vars entries af aname =
     env.inst_buffer#insert "\n\n";
   end
     
-  
+
+
+and add_instance_entries af env vars (entries:GEdit.entry list) aname =
+  let entries = List.map (fun e -> e#text) entries in
+  add_instance_aux af env vars entries aname
+
+and add_instance af env entries aname =
+  add_instance_aux af env (list_uquant_vars_in_form af) entries aname
+
 
 and popup_axiom t env offset () =
     let pop_w = GWindow.dialog
@@ -579,7 +586,7 @@ and popup_axiom t env offset () =
   ignore(button_ok#connect#clicked ~callback:
 	   (fun () ->
 	      try
-		add_instance env vars entries af aname;
+		add_instance_entries af env vars entries aname;
 		pop_w#destroy ()
 		  
 	      with 
@@ -627,6 +634,43 @@ and axiom_callback t env ~origin:y z i =
 
 
 
+and add_trigger t env str offset (sbuf:sbuffer) =
+  let iter = sbuf#get_iter (`OFFSET offset) in
+  match sbuf#forward_iter_to_source_mark ~category:"trigger" iter with
+    | true ->
+      begin
+	match find_decl t sbuf env.ast, find t sbuf env.ast with
+	  | Some (AD (_, tyenv)), Some (QF qf) ->
+	    let tags = iter#tags in
+	    let iter = sbuf#get_iter (`OFFSET (iter#offset - 2)) in
+	    let lb = Lexing.from_string str in
+	    let lexprs = Why_parser.trigger Why_lexer.token lb in
+	    let atl = List.fold_right
+	      (fun lexpr l->
+		let tt = Why_typing.term tyenv
+		  (qf.c.aqf_upvars@qf.c.aqf_bvars) lexpr in
+		let at = annot_of_tterm sbuf tt in
+		at.tag#set_priority (t#priority - 1);
+		connect_aaterm env sbuf connect_tag at;
+		at::l
+	      ) lexprs [] in
+	    if qf.c.aqf_triggers <> [] then
+	      sbuf#insert ~iter ~tags " | ";
+	    add_aaterm_list_at sbuf tags iter "," atl;
+	    qf.c.aqf_triggers <- qf.c.aqf_triggers@[atl]
+	  | _ -> assert false
+      end
+    | false -> ()
+
+and readd_trigger id env str offset idbuf =
+  try
+    match findbyid id env.ast with
+      | QF qf ->
+	let sbuf = 
+	  if idbuf = 2 then env.inst_buffer else env.buffer in
+	add_trigger qf.tag env str offset sbuf
+      | _ -> assert false
+  with Not_found -> ()      
 
 
 and popup_trigger t env (sbuf:sbuffer) offset () =
@@ -672,51 +716,21 @@ and popup_trigger t env (sbuf:sbuffer) offset () =
   ignore(button_ok#connect#clicked
     ~callback: 
     (fun () ->
-       let iter = sbuf#get_iter (`OFFSET offset) in
-       try begin
-	 match sbuf#forward_iter_to_source_mark ~category:"trigger" iter with
-	   | true ->
-	       begin
-		 match find_decl t sbuf env.ast, find t sbuf env.ast with
-		   | Some (AD (_, tyenv)), Some (QF qf) ->
-		       
-		       (* let iter = sbuf#get_iter_at_marker m in *)
-		       let tags = iter#tags in
-		       let iter = sbuf#get_iter
-			 (`OFFSET (iter#offset - 2)) in
-		       let str = buf1#get_text () in
-		       
-		       let lb = Lexing.from_string str in
-		       let lexprs = Why_parser.trigger Why_lexer.token lb in
-		       let atl = List.fold_right
-			 (fun lexpr l->
-			    let tt = Why_typing.term tyenv
-			      (qf.c.aqf_upvars@qf.c.aqf_bvars) lexpr in
-			    let at = annot_of_tterm sbuf tt in
-			    at.tag#set_priority (t#priority - 1);
-			    connect_aaterm env sbuf connect_tag at;
-			    at::l
-			 ) lexprs [] in
-		       if qf.c.aqf_triggers <> [] then
-			 sbuf#insert ~iter ~tags " | ";
-		       add_aaterm_list_at sbuf tags iter "," atl;
-		       qf.c.aqf_triggers <- qf.c.aqf_triggers@[atl];
-		   | _ -> assert false
-	       end
-	   | false -> ()
-       end;
-	 pop_w#destroy ()
-       with 
-    | Why_lexer.Lexical_error s -> 
-	errors_l#set_text ("Lexical error");
-	errors_l#misc#show ()
-    | Parsing.Parse_error ->
-	errors_l#set_text ("Syntax error");
-	errors_l#misc#show ()
-    | Common.Error (e,_) ->
-	fprintf str_formatter "Typing error : %a" Common.report e;
-	errors_l#set_text (flush_str_formatter ());
-	errors_l#misc#show ()
+      try 
+	let str = buf1#get_text () in
+	add_trigger t env str offset sbuf;
+	pop_w#destroy ()
+      with 
+	| Why_lexer.Lexical_error s -> 
+	  errors_l#set_text ("Lexical error");
+	  errors_l#misc#show ()
+	| Parsing.Parse_error ->
+	  errors_l#set_text ("Syntax error");
+	  errors_l#misc#show ()
+	| Common.Error (e,_) ->
+	  fprintf str_formatter "Typing error : %a" Common.report e;
+	  errors_l#set_text (flush_str_formatter ());
+	  errors_l#misc#show ()
     ));
   ignore(button_cancel#connect#clicked ~callback: pop_w#destroy);
   pop_w#show ()

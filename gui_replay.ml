@@ -3,14 +3,15 @@ open Gui_session
 
 let replay = function
   | Prune id ->
-    prune_nodep ~not_register:true (find_by_id id)
+    prune_nodep ~not_register:true (findbyid id env.ast)
   | IncorrectPrune id -> 
-    incorrect_prune_nodep ~not_register:true (find_by_id id)
+    incorrect_prune_nodep ~not_register:true (findbyid id env.ast)
   | Unprune id ->
-    unprune_nodep ~not_register:true (find_by_id id)
-  | AddInstance of int * string list
-  | AddTrigger of int * string list
-  | LimitLemma of int * string
+    unprune_nodep ~not_register:true (findbyid id env.ast)
+  | AddInstance (id, aname, entries) ->
+    add_instance (findform_byid id env.ast) env entries aname
+  | AddTrigger (id, trs) -> assert false
+  | LimitLemma (id , nbstr) -> assert false
 
 
 let undo_action () =
@@ -18,7 +19,7 @@ let undo_action () =
     | Prune id -> replay (Unprune id)
     | Unprune id -> replay (Prune id)
     | ((AddInstance _ | AddTrigger _ ) as ac) ->
-      replay (Prune Hashtbl.find ac resulting_ids)
+      replay (Prune (Hashtbl.find ac resulting_ids))
     | LimitLemma (id, _) -> 
       try 
 	Stack.iter (function 
@@ -26,3 +27,4 @@ let undo_action () =
 	  | _ -> ()) actions;
 	replay (LimitLemma (id, "inf"))
       with Exit -> ()
+

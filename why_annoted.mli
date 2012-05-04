@@ -244,3 +244,9 @@ val findtags_proof :
 
 val find_line : 
   int -> (atyped_decl annoted * 'a) list -> int * GText.tag
+
+val findbyid : 
+  int -> (atyped_decl annoted * Why_typing.env) list -> annoted_node
+
+val findbyid_decl : 
+  int -> (atyped_decl annoted * Why_typing.env) list -> annoted_node
