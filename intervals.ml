@@ -222,9 +222,9 @@ let doesnt_contain_0 {ints=l} =
 	  raise (Found 
 		   (Sig.Yes 
 		      (Ex.union 
-			 (explain_borne old_u) (explain_borne l))));
+			 (explain_borne old_u) (explain_borne l), [])));
 	u) Minfty l in
-    if neg_borne_strict max then Sig.Yes (explain_borne max)
+    if neg_borne_strict max then Sig.Yes (explain_borne max, [])
     else Sig.No
   with Found ans -> ans
 
@@ -725,7 +725,7 @@ let div i1 i2 =
   if inv_i2.ints = [Minfty, Pinfty] then inv_i2
   else
     let i1 = match doesnt_contain_0 i2 with
-      | Sig.Yes ex -> add_expl_zero i1 ex
+      | Sig.Yes (ex, _) -> add_expl_zero i1 ex
       | Sig.No -> i1
     in
     let ({ints=l; is_int=is_int} as i) = mult i1 inv_i2 in

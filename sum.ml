@@ -153,9 +153,9 @@ module Make(X : ALIEN) = struct
     module MX = Map.Make(struct type t = X.r include X end)
     module HSS = Set.Make (struct type t=Hs.t let compare = Hs.compare end)
 
-    type t = (HSS.t * Ex.t) MX.t
+    type t = { mx : (HSS.t * Ex.t) MX.t; classes : Term.Set.t list }
 
-    let empty () = MX.empty
+    let empty classes = { mx = MX.empty; classes = classes }
 
     module Debug = struct
 
@@ -179,7 +179,7 @@ module Make(X : ALIEN) = struct
                  end;
                  fprintf fmt " : %a@." Ex.print ex;
                        
-              ) env;
+              ) env.mx;
             fprintf fmt "-------------------------------------------@.";
           end
     end
@@ -193,12 +193,12 @@ module Make(X : ALIEN) = struct
       match sm1, sm2 with
         | Alien r , Cons(h,ty) 
         | Cons (h,ty), Alien r  ->
-          let enum, ex = try MX.find r env with Not_found -> hss, Ex.empty in
+          let enum, ex = try MX.find r env.mx with Not_found -> hss, Ex.empty in
           let enum = HSS.remove h enum in
           let ex = Ex.union ex dep in
-          if HSS.is_empty enum then raise (Inconsistent ex)
+          if HSS.is_empty enum then raise (Inconsistent (ex, env.classes))
           else 
-            let env = MX.add r (enum, ex) env in
+            let env = { env with mx = MX.add r (enum, ex) env.mx } in
             if HSS.cardinal enum = 1 then
               let h' = HSS.choose enum in
               env, (LSem (A.Eq(r, is_mine (Cons(h',ty)))), ex)::eqs
@@ -211,20 +211,20 @@ module Make(X : ALIEN) = struct
       match sm1, sm2 with
         | Alien r, Cons(h,ty) | Cons (h,ty), Alien r  ->
 
-          let enum, ex = try MX.find r env with Not_found -> hss, Ex.empty in
+          let enum, ex = try MX.find r env.mx with Not_found -> hss, Ex.empty in
           let ex = Ex.union ex dep in
-          if not (HSS.mem h enum) then raise (Inconsistent ex);
-	  MX.add r (HSS.singleton h, ex) env, eqs
+          if not (HSS.mem h enum) then raise (Inconsistent (ex, env.classes));
+	  {env with mx = MX.add r (HSS.singleton h, ex) env.mx} , eqs
             
         | Alien r1, Alien r2   -> 
 
-          let enum1,ex1 = try MX.find r1 env with Not_found -> hss, Ex.empty in
-          let enum2,ex2 = try MX.find r2 env with Not_found -> hss, Ex.empty in
+          let enum1,ex1 = try MX.find r1 env.mx with Not_found -> hss, Ex.empty in
+          let enum2,ex2 = try MX.find r2 env.mx with Not_found -> hss, Ex.empty in
           let ex = Ex.union dep (Ex.union ex1 ex2) in
           let diff = HSS.inter enum1 enum2 in 
-          if HSS.is_empty diff then raise (Inconsistent ex);
-          let env = MX.add r1 (diff, ex) env in
-          let env = MX.add r2 (diff, ex) env in
+          if HSS.is_empty diff then raise (Inconsistent (ex, env.classes));
+          let mx = MX.add r1 (diff, ex) env.mx in
+          let env = {env with mx = MX.add r2 (diff, ex) mx } in
           if HSS.cardinal diff = 1 then
             let h' = HSS.choose diff in
             let ty = X.type_info r1 in
@@ -233,7 +233,8 @@ module Make(X : ALIEN) = struct
 
         |  _ -> env, eqs
 
-    let assume env la ~are_eq ~are_neq ~class_of = 
+    let assume env la ~are_eq ~are_neq ~class_of ~classes =
+      let env = { env with classes = classes } in
       let aux bol r1 r2 dep env eqs = function
         | None     -> env, eqs
         | Some hss -> 
@@ -270,7 +271,7 @@ module Make(X : ALIEN) = struct
            else match acc with
 	     | Some (n,r,hs) when n <= sz -> acc
 	     | _ -> Some (sz, r, HSS.choose hss)
-        ) env None 
+        ) env.mx None 
       in
       match acc with 
         | Some (n,r,hs) -> 
@@ -283,42 +284,41 @@ module Make(X : ALIEN) = struct
 	    []
       
 
-    let query env a_ex ~are_eq ~are_neq ~class_of =
-      try ignore(assume env [a_ex] ~are_eq ~are_neq ~class_of); Sig.No
-      with Inconsistent expl -> Sig.Yes expl          
+    let query env a_ex ~are_eq ~are_neq ~class_of ~classes =
+      try ignore(assume env [a_ex] ~are_eq ~are_neq ~class_of ~classes); Sig.No
+      with Inconsistent (expl, classes) -> Sig.Yes (expl, classes)
 
     let add env r =
       match embed r, values_of r with
 	| Alien r, Some hss -> 
-          if MX.mem r env then env else 
-            MX.add r (hss, Ex.empty) env
-	      
+          if MX.mem r env.mx then env else 
+            { env with mx = MX.add r (hss, Ex.empty) env.mx }
 	| _ -> env
 
 
-  let assume env la ~are_eq ~are_neq ~class_of =
+  let assume env la ~are_eq ~are_neq ~class_of ~classes =
     if !profiling then
       try 
 	!Options.timer_start Timers.TSum;
-	let res =assume env la ~are_eq ~are_neq ~class_of in
+	let res =assume env la ~are_eq ~are_neq ~class_of ~classes in
 	!Options.timer_pause Timers.TSum;
 	res
       with e -> 
 	!Options.timer_pause Timers.TSum;
 	raise e
-    else assume env la ~are_eq ~are_neq ~class_of
+    else assume env la ~are_eq ~are_neq ~class_of ~classes
 
-  let query env la ~are_eq ~are_neq ~class_of =
+  let query env la ~are_eq ~are_neq ~class_of ~classes =
     if !profiling then
       try 
 	!Options.timer_start Timers.TSum;
-	let res = query env la ~are_eq ~are_neq ~class_of in
+	let res = query env la ~are_eq ~are_neq ~class_of ~classes in
 	!Options.timer_pause Timers.TSum;
 	res
       with e -> 
 	!Options.timer_pause Timers.TSum;
 	raise e
-    else query env la ~are_eq ~are_neq ~class_of
+    else query env la ~are_eq ~are_neq ~class_of ~classes
 
 
 

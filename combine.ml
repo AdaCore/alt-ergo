@@ -407,44 +407,44 @@ struct
       r5: X5.Rel.t; 
     }
 	
-    let empty _ = {
-      r1=X1.Rel.empty (); 
-      r2=X2.Rel.empty (); 
-      r3=X3.Rel.empty ();
-      r4=X4.Rel.empty ();
-      r5=X5.Rel.empty ();
+    let empty classes = {
+      r1=X1.Rel.empty classes; 
+      r2=X2.Rel.empty classes; 
+      r3=X3.Rel.empty classes;
+      r4=X4.Rel.empty classes;
+      r5=X5.Rel.empty classes;
     }
 	
-    let assume env sa ~are_eq ~are_neq ~class_of =
+    let assume env sa ~are_eq ~are_neq ~class_of ~classes =
       !Options.thread_yield ();
       let env1, { assume = a1; remove = rm1} = 
-	X1.Rel.assume env.r1 sa ~are_eq ~are_neq ~class_of in
+	X1.Rel.assume env.r1 sa ~are_eq ~are_neq ~class_of ~classes in
       let env2, { assume = a2; remove = rm2} = 
-	X2.Rel.assume env.r2 sa ~are_eq ~are_neq ~class_of in
+	X2.Rel.assume env.r2 sa ~are_eq ~are_neq ~class_of ~classes in
       let env3, { assume = a3; remove = rm3} = 
-	X3.Rel.assume env.r3 sa ~are_eq ~are_neq ~class_of in
+	X3.Rel.assume env.r3 sa ~are_eq ~are_neq ~class_of ~classes in
       let env4, { assume = a4; remove = rm4} = 
-	X4.Rel.assume env.r4 sa ~are_eq ~are_neq ~class_of in
+	X4.Rel.assume env.r4 sa ~are_eq ~are_neq ~class_of ~classes in
       let env5, { assume = a5; remove = rm5} = 
-	X5.Rel.assume env.r5 sa ~are_eq ~are_neq ~class_of in
+	X5.Rel.assume env.r5 sa ~are_eq ~are_neq ~class_of ~classes in
       {r1=env1; r2=env2; r3=env3; r4=env4; r5=env5}, 
       { assume = a1@a2@a3@a4@a5;
 	remove = rm1@rm2@rm3@rm4@rm5;}
 	
-    let query env a ~are_eq ~are_neq ~class_of = 
+    let query env a ~are_eq ~are_neq ~class_of ~classes = 
       !Options.thread_yield ();
-      match X1.Rel.query env.r1 a ~are_eq ~are_neq ~class_of with
+      match X1.Rel.query env.r1 a ~are_eq ~are_neq ~class_of ~classes with
 	| Yes _ as ans -> ans
 	| No -> 
-	  match X2.Rel.query env.r2 a ~are_eq ~are_neq ~class_of with
+	  match X2.Rel.query env.r2 a ~are_eq ~are_neq ~class_of ~classes with
 	    | Yes _ as ans -> ans
 	    | No ->
-	      match X3.Rel.query env.r3 a ~are_eq ~are_neq ~class_of with
+	      match X3.Rel.query env.r3 a ~are_eq ~are_neq ~class_of ~classes with
 		| Yes _ as ans -> ans
 		| No -> 
-		    match X4.Rel.query env.r4 a ~are_eq ~are_neq ~class_of with
+		    match X4.Rel.query env.r4 a ~are_eq ~are_neq ~class_of ~classes with
 		      | Yes _ as ans -> ans
-		      | No -> X5.Rel.query env.r5 a ~are_eq ~are_neq ~class_of
+		      | No -> X5.Rel.query env.r5 a ~are_eq ~are_neq ~class_of ~classes
 		      
     let case_split env = 
       !Options.thread_yield ();

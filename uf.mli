@@ -42,6 +42,7 @@ module type S = sig
   val already_distinct : t -> R.r list -> bool
 
   val class_of : t -> Term.t -> Term.t list
+  val cl_extract : t -> Term.Set.t list
   val model : t -> (R.r * Term.t list * (Term.t * R.r) list) list
 
   val print : Format.formatter -> t -> unit

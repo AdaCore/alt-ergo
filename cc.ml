@@ -31,6 +31,7 @@ module type S = sig
   val query : Literal.LT.t -> t -> answer
   val class_of : t -> Term.t -> Term.t list
   val print_model : Format.formatter -> t -> unit
+  val cl_extract : t -> Term.Set.t list
 end
 
 module Make (X : Sig.X) = struct    
@@ -155,7 +156,7 @@ module Make (X : Sig.X) = struct
   let are_equal env ex t1 t2 = 
     if T.equal t1 t2 then ex
     else match Uf.are_equal env.uf t1 t2 with
-      | Yes dep -> Ex.union ex dep
+      | Yes (dep, _) -> Ex.union ex dep
       | No -> raise Exit
 
   let equal_only_by_congruence env ex t1 t2 acc = 
@@ -264,7 +265,7 @@ module Make (X : Sig.X) = struct
 			   let a = A.LT.make (A.Distinct (false, [x; y])) in
 			   let dist = LTerm a in
 			   begin match Uf.are_distinct env.uf t1 t2 with
-			     | Yes ex' -> 
+			     | Yes (ex', _) -> 
 				 let ex_r = Ex.union ex ex' in
 				 Print.contra_congruence a ex_r;
 				 (dist, ex_r) :: acc
@@ -343,8 +344,9 @@ module Make (X : Sig.X) = struct
     let are_eq = Uf.are_equal env.uf in
     let are_neq = Uf.are_distinct env.uf in
     let class_of = Uf.class_of env.uf in
+    let classes = Uf.cl_extract env.uf in
     let relation, result = 
-      X.Rel.assume env.relation sa are_eq are_neq class_of in
+      X.Rel.assume env.relation sa are_eq are_neq class_of classes in
     let env = { env with relation = relation } in
     let env = clean_use env result.remove in
     env, result.assume
@@ -453,14 +455,14 @@ module Make (X : Sig.X) = struct
 	    if rules = 3 then
 	      fprintf fmt "[rule] TR-CCX-CS-Normal-Run@.";
 	    aux lt bad_last (a::dl) base_env l
-	  with Exception.Inconsistent dep ->
+	  with Exception.Inconsistent (dep, classes) ->
             match Ex.remove_fresh exp dep with
               | None ->
                 (* The choice doesn't participate to the inconsistency *)
                 Print.split_backjump (LR.make c) dep;
 		if rules = 3 then
 		  fprintf fmt "[rule] TR-CCX-CS-Case-Split-Conflict@.";
-                raise (Exception.Inconsistent dep)
+                raise (Exception.Inconsistent (dep, classes))
               | Some dep ->
 		if rules = 3 then
 		  fprintf fmt "[rule] TR-CCX-CS-Case-Split-Progress@.";
@@ -481,20 +483,20 @@ module Make (X : Sig.X) = struct
 	  try
 	    let env, lt = f t.gamma_finite in
 	    look_for_sat lt t env []
-	  with Exception.Inconsistent dep -> 
+	  with Exception.Inconsistent (dep, classes) -> 
             if debug_split then
               fprintf fmt "[case-split] I replay choices@.";
 	    if rules = 3 then
 	      fprintf fmt "[rule] TR-CCX-CS-Case-Split-Erase-Choices@.";
 	    (* we replay the conflict in look_for_sat, so we can
 	       safely ignore the explanation which is not useful *)
-	    look_for_sat ~bad_last:(Yes dep)
+	    look_for_sat ~bad_last:(Yes (dep, classes))
 	      [] { t with choices = []} t.gamma t.choices
-      with Exception.Inconsistent d ->
+      with Exception.Inconsistent (d, cl) ->
 	Print.end_case_split ();
 	if rules = 3 then
 	  fprintf fmt "[rule] TR-CCX-CS-Conflict@.";
-	raise (Exception.Inconsistent d)
+	raise (Exception.Inconsistent (d, cl))
     in
     Print.end_case_split (); r
 
@@ -570,17 +572,18 @@ module Make (X : Sig.X) = struct
 	  let are_eq = Uf.are_equal env.uf in
 	  let are_neq = Uf.are_distinct env.uf in
 	  let class_of = Uf.class_of env.uf in
+	  let classes = Uf.cl_extract env.uf in
 	  let rna, ex_rna = term_canonical_view env na Ex.empty in
           X.Rel.query env.relation (rna, Some na, ex_rna) 
-	    are_eq are_neq class_of
-    with Exception.Inconsistent d -> 
-      Yes d
+	    are_eq are_neq class_of classes
+    with Exception.Inconsistent (d, classes) -> 
+      Yes (d, classes)
 
   let empty () = 
     let env = { 
       use = Use.empty ; 
       uf = Uf.empty ; 
-      relation = X.Rel.empty ();
+      relation = X.Rel.empty [];
     }
     in
     let t = { gamma = env; gamma_finite = env; choices = [] } in
@@ -606,6 +609,8 @@ module Make (X : Sig.X) = struct
     if not !zero then fprintf fmt "\n╙@.";
     X.Rel.print_model fmt t.gamma_finite.relation rs
 
+
+  let cl_extract env = Uf.cl_extract env.gamma.uf
 
   let assume a ex t = 
     if !profiling then

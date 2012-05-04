@@ -209,12 +209,12 @@ module Make(X : ALIEN) = struct
        2) n => n_ded *)
     let update_env are_eq are_dist dep env acc gi si p p_ded n n_ded =
       match are_eq gi si, are_dist gi si with
-        | Sig.Yes idep, Sig.No -> 
+        | Sig.Yes (idep, _) , Sig.No -> 
             let conseq = LRmap.add n n_ded dep env.conseq in
             {env with conseq = conseq}, 
             Conseq.add (p_ded, Ex.union dep idep) acc
               
-        | Sig.No, Sig.Yes idep -> 
+        | Sig.No, Sig.Yes (idep, _) -> 
             let conseq = LRmap.add p p_ded dep env.conseq in
             {env with conseq = conseq},
             Conseq.add (n_ded, Ex.union dep idep) acc
@@ -248,7 +248,7 @@ module Make(X : ALIEN) = struct
                    let n     = LR.make (A.Distinct(false, [xi;xj])) in
                    let n_ded = A.LT.make (A.Eq(get,get_stab)) in
                    let dep = match are_eq gtab set with
-                       Yes dep -> dep | No -> assert false
+                       Yes (dep, _) -> dep | No -> assert false
                    in 
                    update_env are_eq are_dist dep env acc gi si p p_ded n n_ded
                | _ -> (env,acc)
@@ -279,7 +279,7 @@ module Make(X : ALIEN) = struct
                let n     = LR.make (A.Distinct(false, [xi;xj])) in
                let n_ded = A.LT.make (A.Eq(gt_of_st,get_stab)) in
                let dep = match are_eq gtab stab with
-                   Yes dep -> dep | No -> assert false
+                   Yes (dep, _) -> dep | No -> assert false
                in 
                update_env are_eq are_dist dep env acc gi si p p_ded n n_ded
              end
@@ -362,7 +362,7 @@ module Make(X : ALIEN) = struct
       env, { assume = l; remove = [] }
 	
 
-    let assume env la ~are_eq ~are_neq ~class_of =
+    let assume env la ~are_eq ~are_neq ~class_of ~classes =
       if !profiling then
 	try 
 	  !Options.timer_start Timers.TArrays;
@@ -375,7 +375,7 @@ module Make(X : ALIEN) = struct
       else assume env la ~are_eq ~are_neq ~class_of
 
 
-    let query _ _ ~are_eq ~are_neq ~class_of = Sig.No
+    let query _ _ ~are_eq ~are_neq ~class_of ~classes = Sig.No
     let add env r = env
     let print_model _ _ _ = ()
 

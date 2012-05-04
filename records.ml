@@ -349,8 +349,8 @@ module Make (X : ALIEN) = struct
     type t = unit
     exception Inconsistent    
     let empty _ = ()
-    let assume _ _ ~are_eq ~are_neq ~class_of = (), { assume = []; remove = []}
-    let query _ _ ~are_eq ~are_neq ~class_of = Sig.No
+    let assume _ _ ~are_eq ~are_neq ~class_of ~classes = (), { assume = []; remove = []}
+    let query _ _ ~are_eq ~are_neq ~class_of ~classes = Sig.No
     let case_split env = []
     let add env _ = env
     let print_model _ _ _ = ()

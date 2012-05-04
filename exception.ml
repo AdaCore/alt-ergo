@@ -18,7 +18,7 @@
 (**************************************************************************)
 
 exception Unsolvable
-exception Inconsistent of Explanation.t
+exception Inconsistent of Explanation.t * Term.Set.t list
 exception Progress
 exception NotCongruent
 exception Trivial

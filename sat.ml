@@ -54,7 +54,7 @@ type t = {
 exception Sat of t
 exception Unsat of Ex.t
 exception I_dont_know of t
-exception IUnsat of Ex.t
+exception IUnsat of Ex.t * Term.Set.t list
 
 let max_max_size = 96
 
@@ -307,7 +307,7 @@ let size_formula = 1_000_000
 let red {f=f} env = 
   let nf = F.mk_not f in
   try 
-    let r = Yes (MF.find nf env.gamma) in
+    let r = Yes (MF.find nf env.gamma, CcX.cl_extract env.tbox) in
     if rules = 2 then fprintf fmt "[rule] TR-Sat-Bcp-Red-1@.";
     r
   with Not_found -> 
@@ -357,7 +357,7 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 	    F.print (F.mk_not f) Ex.print dep_gamma; *)
        let ex_nf = MF.find (F.mk_not f) env.gamma in
        if rules = 2 then fprintf fmt "[rule] TR-Sat-Conflict-1@.";
-       raise (IUnsat (Ex.union dep_gamma ex_nf))
+       raise (IUnsat (Ex.union dep_gamma ex_nf, CcX.cl_extract env.tbox))
      with Not_found -> ());
     if MF.mem f env.gamma then
       begin
@@ -432,10 +432,10 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		in
                 assume env ({f=f';age=age;name=lem;mf=mf;gf=gf},dep)
       end
-  with Exception.Inconsistent expl -> 
+  with Exception.Inconsistent (expl, classes) -> 
     if debug_sat then fprintf fmt "inconsistent %a@." Ex.print expl;
     if rules = 2 then fprintf fmt "[rule] TR-Sat-Conflict-2@.";
-    raise (IUnsat expl)
+    raise (IUnsat (expl, classes))
     
 and bcp env =
   let cl , u = 
@@ -446,16 +446,16 @@ and bcp env =
 	 else 
            (Print.red f1 f2;
 	   match red f1 env with
-	     | Yes d1 -> begin
+	     | Yes (d1, c1) -> begin
 		 match red f2 env with
-		   | Yes d2 -> 
+		   | Yes (d2, c2) -> 
 		       let expl = Ex.union (Ex.union d d1) d2 in
-		       raise (Exception.Inconsistent expl)
+		       raise (Exception.Inconsistent (expl, c1@c2))
 		   | No -> (cl,(f2,Ex.union d d1)::u)
 	       end
 	     | No -> 
 		 match red f2 env with
-		     Yes d2 -> (cl,(f1,Ex.union d d2)::u)
+		     Yes (d2, _) -> (cl,(f1,Ex.union d d2)::u)
 		   | No -> fd::cl , u)
       ) ([],[]) env.delta
   in
@@ -465,7 +465,7 @@ let rec unsat_rec env fg stop max_size =
   try
     if stop < 0 then raise (I_dont_know env);
     back_tracking (assume env fg) stop max_size
-  with IUnsat d ->
+  with IUnsat (d, classes) ->
     Print.unsat (); d
 
 and back_tracking env stop max_size = match env.delta with
@@ -488,7 +488,7 @@ and back_tracking env stop max_size = match env.delta with
 	       begin
 		 Format.printf "--- SAT ---\n";
 		 Format.printf "%a@." print_prop_model m;
-		 raise (IUnsat (Ex.make_deps m))
+		 raise (IUnsat (Ex.make_deps m, []))
 	       end;
 	     raise (Sat env)
 	 | l1, l2 -> 
@@ -526,10 +526,10 @@ let unsat env fg =
     let env = List.fold_left assume env l in
 
     back_tracking env stopb 100
-  with IUnsat dep -> Print.unsat ();dep
+  with IUnsat (dep, classes) -> Print.unsat ();dep
 
 let assume env fg = 
-  try assume env (fg,Ex.empty) with IUnsat d -> raise (Unsat d)
+  try assume env (fg,Ex.empty) with IUnsat (d, classes) -> raise (Unsat d)
 
 let unsat env fg = 
   if !profiling then

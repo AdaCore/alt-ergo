@@ -17,7 +17,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type answer = Yes of Explanation.t | No
+(* type answer = Yes of Explanation.t | No *)
+type answer = Yes of Explanation.t * Term.Set.t list | No
 
 type 'a ac = {h: Symbols.t ; t: Ty.t ; l: ('a * int) list}
 
@@ -35,7 +36,7 @@ module type RELATION = sig
   type t
   type r
 
-  val empty : unit -> t
+  val empty : Term.Set.t list -> t
   
   val assume : 
     t -> 
@@ -43,6 +44,7 @@ module type RELATION = sig
     are_eq : (Term.t -> Term.t -> answer) -> 
     are_neq : (Term.t -> Term.t -> answer) -> 
     class_of : (Term.t -> Term.t list) -> 
+    classes : Term.Set.t list -> 
     t * r result
 
   val query : 
@@ -50,7 +52,8 @@ module type RELATION = sig
     r input -> 
     are_eq : (Term.t -> Term.t -> answer) -> 
     are_neq : (Term.t -> Term.t -> answer) -> 
-    class_of : (Term.t -> Term.t list) -> 
+    class_of : (Term.t -> Term.t list) ->  
+    classes : Term.Set.t list -> 
     answer
 
   val case_split : t -> (r Literal.view * Explanation.t * Num.num) list

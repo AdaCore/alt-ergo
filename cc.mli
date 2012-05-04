@@ -31,6 +31,7 @@ module type S = sig
   val query : Literal.LT.t -> t -> Sig.answer
   val class_of : t -> Term.t -> Term.t list
   val print_model : Format.formatter -> t -> unit
+  val cl_extract : t -> Term.Set.t list
 end
 
 module Make (X:Sig.X) : S

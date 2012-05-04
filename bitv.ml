@@ -772,12 +772,12 @@ module Make(X : ALIEN) = struct
     type r = X.r
     type t =  unit
 
-    let empty () = ()
-    let assume _ _ ~are_eq ~are_neq ~class_of =
+    let empty _ = ()
+    let assume _ _ ~are_eq ~are_neq ~class_of ~classes =
       (), { assume = []; remove = [] }
     let add _ _ = ()
     let case_split _ = []    
-    let query _ _ ~are_eq ~are_neq ~class_of = Sig.No
+    let query _ _ ~are_eq ~are_neq ~class_of ~classes = Sig.No
     let print_model _ _ _ = ()
   end
 

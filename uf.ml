@@ -46,6 +46,7 @@ module type S = sig
   val already_distinct : t -> R.r list -> bool
   
   val class_of : t -> Term.t -> Term.t list
+  val cl_extract : t -> Term.Set.t list
   val model : t -> (R.r * Term.t list * (Term.t * R.r) list) list
   
   val print : Format.formatter -> t -> unit
@@ -134,6 +135,9 @@ module Make ( R : Sig.X ) = struct
     neqs = MapR.empty;
     ac_rs = RS.empty
   }
+
+  let cl_extract env =
+    MapR.fold (fun _ cl acc -> cl :: acc) env.classes []
 
   module Print = struct
 
@@ -240,7 +244,7 @@ module Make ( R : Sig.X ) = struct
 	       let ex = Ex.union (Ex.union ex1 ex2) dep in (* VERIF *)
 	       if rules = 3 then
 		 fprintf fmt "[rule] TR-CCX-Congruence-Conflict@.";
-	       raise (Inconsistent ex)
+	       raise (Inconsistent (ex, cl_extract env))
 	     with Not_found -> 
 	       MapL.add l1 (Ex.union ex1 dep) mapl) 
 	  nq_r1 nq_r2
@@ -536,7 +540,7 @@ module Make ( R : Sig.X ) = struct
         try R.solve rr1 rr2 
 	with Unsolvable ->
 	  if rules = 3 then fprintf fmt "[rule] TR-CCX-Congruence-Conflict@.";
-	  raise (Inconsistent dep)
+	  raise (Inconsistent (dep, cl_extract env))
       end
         
   let rec ac_x eqs env tch = 
@@ -569,7 +573,7 @@ module Make ( R : Sig.X ) = struct
 	   try
 	     let exr = MapR.find rr mapr in
 	     if rules = 3 then fprintf fmt "[rule] TR-CCX-Distinct-Conflict@.";
-	     raise (Inconsistent (Ex.union ex exr))
+	     raise (Inconsistent ((Ex.union ex exr), cl_extract env))
 	   with Not_found ->
 	     let uex = Ex.union ex dep in
 	     let mdis = 
@@ -600,7 +604,7 @@ module Make ( R : Sig.X ) = struct
 			| []  -> 
 			  if rules = 3 then
 			    fprintf fmt "[rule] TR-CCX-Distinct-Conflict@.";
-			  raise (Inconsistent ex) 
+			  raise (Inconsistent (ex, cl_extract env)) 
 			| _   -> env
 		      with Unsolvable -> env) mapr env)
       env newds
@@ -609,7 +613,9 @@ module Make ( R : Sig.X ) = struct
   let are_equal env t1 t2 = 
     let r1, ex_r1 = Env.lookup_by_t t1 env in
     let r2, ex_r2 = Env.lookup_by_t t2 env in
-    if R.equal r1 r2 then Yes(Ex.union ex_r1 ex_r2) else No
+    if R.equal r1 r2 then
+      Yes (Ex.union ex_r1 ex_r2, cl_extract env)
+    else No
 
   let are_distinct env t1 t2 = 
     if debug_uf then
@@ -619,7 +625,7 @@ module Make ( R : Sig.X ) = struct
     try
       ignore (union env r1 r2 (Ex.union ex_r1 ex_r2));
       No
-    with Inconsistent ex -> Yes(ex)
+    with Inconsistent (ex, classes) -> Yes (ex, classes)
 
   let already_distinct env lr = 
     let d = Lit.make (Literal.Distinct (false,lr)) in

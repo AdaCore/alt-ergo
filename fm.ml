@@ -99,6 +99,7 @@ module Make
     polynomes : Intervals.t MP.t;
     known_eqs : SX.t;
     improved : SP.t;
+    classes : Term.Set.t list;
   }
 
   module Debug = struct
@@ -156,12 +157,13 @@ module Make
         end
   end
       
-  let empty _ = { 
+  let empty classes = { 
     inequations = [] ; 
     monomes = MX.empty ; 
     polynomes = MP.empty ; 
     known_eqs = SX.empty ; 
-    improved = SP.empty ; 
+    improved = SP.empty ;
+    classes = classes;
   }
 
   let replace_inequation env x ineq = 
@@ -252,7 +254,7 @@ module Make
 		  let env, ia = init_alien expl pa npa ty use_x env in
 		  let env, ib = init_alien expl pb npb ty use_x env in
 		  let ia, ib = match Intervals.doesnt_contain_0 ib with
-		    | Yes ex when Num.compare_num ca cb = 0 
+		    | Yes (ex, _) when Num.compare_num ca cb = 0 
 			       && P.compare pa' pb' = 0 ->
 		      let expl = Explanation.union ex expl in
 		      Intervals.point da ty expl, Intervals.point db ty expl
@@ -501,7 +503,7 @@ module Make
 	let expl = Explanation.union ineq.Inequation.expl expl in
 	 match ineq_status ineq with
 	   | Bottom           ->
-	       raise (Exception.Inconsistent expl)
+	       raise (Exception.Inconsistent (expl, env.classes))
 		 
 	   | Trivial_eq       -> 
 	       fm_equalities env eqs ineq
@@ -649,7 +651,7 @@ module Make
     let ty = P.type_info p in
     match P.to_list p with
       | ([], (Int 0)) ->
-	  raise (Exception.Inconsistent expl)
+	  raise (Exception.Inconsistent (expl, env.classes))
       | ([], v) ->
 	  env, eqs
       | ([a, x], v) -> 
@@ -695,7 +697,7 @@ module Make
     match P.to_list p with	
       | ([], Int 0) -> env, eqs
       | ([], v) ->
-	  raise (Exception.Inconsistent expl)
+	  raise (Exception.Inconsistent (expl, env.classes))
       | ([a, x], v) -> 
 	  let b = (minus_num v) // a in
 	  let i = Intervals.point b ty expl in
@@ -798,8 +800,8 @@ module Make
     let env, eqs = equalities_from_polynomes env eqs in
     equalities_from_monomes env eqs
 
-  let assume env la ~are_eq ~are_neq ~class_of =
-    let env = {env with improved = SP.empty} in
+  let assume env la ~are_eq ~are_neq ~class_of ~classes =
+    let env = {env with improved = SP.empty; classes = classes} in
     Debug.env env;
     let env, eqs, new_ineqs, expl =
       List.fold_left
@@ -844,9 +846,9 @@ module Make
 	     if debug_fm then 
 	       fprintf fmt "interval inconsistent %a@." 
 		 Explanation.print expl; 
-	     raise (Exception.Inconsistent expl)
+	     raise (Exception.Inconsistent (expl, env.classes))
 	)
-	(env, [], false, Explanation.empty) la 
+	(env, [], false, Explanation.empty) la
 	
     in
     if new_ineqs then 
@@ -876,38 +878,38 @@ module Make
       if debug_fm then 
 	fprintf fmt "interval inconsistent %a@." 
 	  Explanation.print expl; 
-      raise (Exception.Inconsistent expl)
+      raise (Exception.Inconsistent (expl, env.classes))
       
-  let query env a_ex ~are_eq ~are_neq ~class_of =
+  let query env a_ex ~are_eq ~are_neq ~class_of ~classes =
     try 
-      ignore(assume env [a_ex] ~are_eq ~are_neq ~class_of); 
+      ignore(assume env [a_ex] ~are_eq ~are_neq ~class_of ~classes); 
       No
-    with Exception.Inconsistent expl -> Yes expl
+    with Exception.Inconsistent (expl, classes) -> Yes (expl, classes)
 
 
-  let assume env la ~are_eq ~are_neq ~class_of =
+  let assume env la ~are_eq ~are_neq ~class_of ~classes =
     if !profiling then
       try 
 	!Options.timer_start Timers.TArith;
-	let res =assume env la ~are_eq ~are_neq ~class_of in
+	let res =assume env la ~are_eq ~are_neq ~class_of ~classes in
 	!Options.timer_pause Timers.TArith;
 	res
       with e -> 
 	!Options.timer_pause Timers.TArith;
 	raise e
-    else assume env la ~are_eq ~are_neq ~class_of
+    else assume env la ~are_eq ~are_neq ~class_of ~classes
 
-  let query env la ~are_eq ~are_neq ~class_of =
+  let query env la ~are_eq ~are_neq ~class_of ~classes =
     if !profiling then
       try 
 	!Options.timer_start Timers.TArith;
-	let res = query env la ~are_eq ~are_neq ~class_of in
+	let res = query env la ~are_eq ~are_neq ~class_of ~classes in
 	!Options.timer_pause Timers.TArith;
 	res
       with e -> 
 	!Options.timer_pause Timers.TArith;
 	raise e
-    else query env la ~are_eq ~are_neq ~class_of
+    else query env la ~are_eq ~are_neq ~class_of ~classes
 
   let case_split_polynomes env = 
     let o = MP.fold
