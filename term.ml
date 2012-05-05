@@ -187,7 +187,9 @@ module Labels = Hashtbl.Make(H)
   
 let labels = Labels.create 100007
   
-let add_label lbl t = Labels.replace labels t lbl
+let add_label lbl t = 
+  (* eprintf "add %s: %a@." (Hstring.view lbl) print t; *)
+  Labels.replace labels t lbl
   
 let label t = try Labels.find labels t with Not_found -> Hstring.empty
 
@@ -206,3 +208,12 @@ let rec is_labeled_rec depth { f = f; xs = xs } =
 let is_labeled t =
   not (Hstring.equal (label t) Hstring.empty) 
   || is_labeled_rec 0 t
+
+
+
+let print_taged_classes fmt =
+  List.iter (fun cl -> 
+    let cl = List.filter is_labeled (Set.elements cl) in
+    if cl <> [] then
+    fprintf fmt "\n{ %a }" (print_list_sep " , ") cl)
+

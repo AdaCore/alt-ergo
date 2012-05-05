@@ -135,9 +135,11 @@ module Print = struct
       MF.iter (fun f ex ->
 	printf "%a \t->\t%a@." F.print f Ex.print ex) g;
       printf "@[@{<C.Bold>[sat]@} --------------------- GAMMA -]@."
-      
     end
-      
+
+  let bottom classes =
+    if bottom_classes then
+      printf "bottom:%a\n@." Term.print_taged_classes classes      
 
 end
 
@@ -466,7 +468,9 @@ let rec unsat_rec env fg stop max_size =
     if stop < 0 then raise (I_dont_know env);
     back_tracking (assume env fg) stop max_size
   with IUnsat (d, classes) ->
-    Print.unsat (); d
+    Print.bottom classes;
+    Print.unsat (); 
+    d
 
 and back_tracking env stop max_size = match env.delta with
     | []  when stop >= 0  -> 
@@ -526,10 +530,16 @@ let unsat env fg =
     let env = List.fold_left assume env l in
 
     back_tracking env stopb 100
-  with IUnsat (dep, classes) -> Print.unsat ();dep
+  with IUnsat (dep, classes) ->
+    Print.bottom classes;
+    Print.unsat ();
+    dep
 
 let assume env fg = 
-  try assume env (fg,Ex.empty) with IUnsat (d, classes) -> raise (Unsat d)
+  try assume env (fg,Ex.empty) 
+  with IUnsat (d, classes) ->
+    Print.bottom classes;
+    raise (Unsat d)
 
 let unsat env fg = 
   if !profiling then

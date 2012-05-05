@@ -77,6 +77,7 @@ let debug_proof = !debug_proof && proof
 let rules = !rules
 let debug_split = !debug_split
 let restricted = !restricted
+let bottom_classes = !bottom_classes
 
 let thread_yield = ref (fun () -> ())
 

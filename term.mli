@@ -67,6 +67,7 @@ val is_labeled : t -> bool
 val print : Format.formatter -> t -> unit
 val print_list : Format.formatter -> t list -> unit
 val print_list_sep : string -> Format.formatter -> t list -> unit
+val print_taged_classes : Format.formatter -> Set.t list -> unit
 
 val dummy : t 
 

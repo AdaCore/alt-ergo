@@ -90,6 +90,7 @@ let spec = [
      (Num.string_of_num !max_split));
   "-restricted", Arg.Set restricted, 
   " restrict set of decision procedures (equality, arithmetic and AC)";
+  "-bottom-classes", Arg.Set bottom_classes, "show equivalence classes at each bottom of the sat";
 ]
 
 let _ =
