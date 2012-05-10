@@ -215,5 +215,5 @@ let print_taged_classes fmt =
   List.iter (fun cl -> 
     let cl = List.filter is_labeled (Set.elements cl) in
     if cl <> [] then
-    fprintf fmt "\n{ %a }" (print_list_sep " , ") cl)
+    fprintf fmt "\n| %a" (print_list_sep " , ") cl)
 
