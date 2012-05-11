@@ -20,7 +20,13 @@
 open Why_annoted
 
 
-val toggle_prune_nodep : 'a annoted -> GText.tag -> unit
+val prune : ?register:bool -> env -> 'a annoted -> unit
+
+val incorrect_prune : ?register:bool -> env -> 'a annoted -> unit
+
+val unprune : ?register:bool -> env -> 'a annoted -> unit
+
+val toggle_prune : env -> 'a annoted -> unit
 
 val connect : env -> unit
 

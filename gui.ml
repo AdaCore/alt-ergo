@@ -49,8 +49,16 @@ let w =
     ~allow_shrink:true
     ~width:window_width
     ~height:window_height ()
-  
-let quit () =
+
+
+let save_session envs =
+  let session_cout =
+    open_out_gen [Open_creat; Open_wronly; Open_binary] 0o640 !session_file in
+  List.iter (fun env -> output_value session_cout env.actions) envs;
+  close_out session_cout
+
+let quit envs () =
+  save_session envs;
   GMain.quit ()
 
 
@@ -492,10 +500,10 @@ let remove_context env () =
     (fun (td, _) ->
        match td.c with
 	 | APredicate_def (_, _, _, _) ->
-	     toggle_prune_nodep td td.tag
+	     toggle_prune env td
 	 | AAxiom (_, s, _) 
 	     when String.length s = 0 || (s.[0] <> '_'  && s.[0] <> '@') ->
-	     toggle_prune_nodep td td.tag
+	     toggle_prune env td
 	 | _ -> ()
     ) env.ast
 
@@ -666,7 +674,6 @@ let create_inst_view inst_model env buffer sv ~packing () =
 
 
 let _ =
-  ignore(w#connect#destroy ~callback:quit);
 
   let lmanager = GSourceView2.source_language_manager ~default:true in
   let source_language = lmanager#language "alt-ergo" in
@@ -701,8 +708,14 @@ let _ =
       ~scrollable:true
       ~packing:w#add () in
 
-  List.iter
-    (fun l ->
+
+  let session_cin =
+    try Some (open_in_bin !session_file)
+    with Sys_error _ -> None in
+
+  let envs = 
+   List.fold_left
+    (fun acc l ->
        
        let buf1 = match source_language with 
 	 | Some language -> GSourceView2.source_buffer ~language
@@ -788,8 +801,15 @@ let _ =
        let inst_model = empty_inst_model () in
        let timers_model = empty_timers_model table_timers in
 
-       let env = create_env buf1 buf2 error_model st_ctx annoted_ast dep in
+       
+       let actions = Gui_session.read_actions session_cin in
+
+
+       let env = create_env buf1 buf2 error_model st_ctx annoted_ast dep 
+	 actions in
        connect env;
+
+       Gui_replay.replay_session env;
 
        ignore (toolbar#insert_toggle_button
 	 ~text:" Remove context"
@@ -887,8 +907,19 @@ let _ =
        ignore(eventBox#event#connect#key_release
 		~callback:(toggle_ctrl env));
        
-    ) typed_ast;
+       env::acc
 
+    ) [] typed_ast in
+
+  begin
+    match session_cin with 
+      | Some c -> close_in c
+      | None -> ()
+  end;
+
+  let envs = List.rev envs in
+
+  ignore(w#connect#destroy ~callback:(quit envs));
   w#show ();
 
   (* Thread.join(GtkThread.start ()); *)

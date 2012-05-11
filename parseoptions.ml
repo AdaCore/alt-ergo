@@ -108,8 +108,11 @@ let _ =
 	then begin 
 	  smt2file := true ; ofile := Some s
 	end
-	else raise (Arg.Bad "no .mlw, .smt or smt2 extension");
+	else raise (Arg.Bad "no .mlw, .smt or smt2 extension")
   in
   Arg.parse spec set_file usage;
-  match !ofile with Some f -> file := f ; cin := open_in f 
+  match !ofile with 
+    | Some f -> 
+        file := f ; cin := open_in f;
+        session_file := (Filename.chop_extension f)^".agr"
     | None -> smt2file := true; cin := stdin

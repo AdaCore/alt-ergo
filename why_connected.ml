@@ -22,41 +22,44 @@ open Why_annoted
 open Lexing
 open Format
 open Options
+open Gui_session
 
-
-let prune_nodep r t =
+let prune ?(register=true) env r =
   r.pruned <- true;
-  t#set_property (`FOREGROUND "light gray")
+  if register then save env.actions (Prune r.id);
+  r.tag#set_property (`FOREGROUND "light gray")
 
-let incorrect_prune_nodep r t =
+let incorrect_prune ?(register=true) env r =
   r.pruned <- true;
-  t#set_property (`FOREGROUND "tomato")
+  if register then save env.actions (IncorrectPrune r.id);
+  r.tag#set_property (`FOREGROUND "tomato")
 
-let unprune_nodep r t =
+let unprune ?(register=true) env r =
   r.pruned <- false;
-  t#set_property (`FOREGROUND_SET false)
+  if register then save env.actions (Unprune r.id);
+  r.tag#set_property (`FOREGROUND_SET false)
 
-let rec prune r t dep =
-  prune_nodep r t;
-  let deps = match find_tag_inversedeps dep t  with 
+let rec prune_dep env r =
+  prune env r;
+  let deps = match find_tag_inversedeps env.dep r.tag  with 
     | None -> []
     | Some d -> d in
-  List.iter (fun d -> prune d d.tag dep) deps
+  List.iter (fun d -> prune_dep env d) deps
 
-let rec unprune r t dep =
-  unprune_nodep r t;
-  let deps = match find_tag_deps dep t  with 
+let rec unprune_dep env r =
+  unprune env r;
+  let deps = match find_tag_deps env.dep r.tag  with 
     | None -> []
     | Some d -> d in
-  List.iter (fun d -> unprune d d.tag dep) deps
+  List.iter (fun d -> unprune_dep env d) deps
 
-let toggle_incorrect_prune r t =
-  if r.pruned then unprune_nodep r t
-  else incorrect_prune_nodep r t
+let toggle_incorrect_prune env r =
+  if r.pruned then unprune env r
+  else incorrect_prune env r
 
-let toggle_prune_nodep r t =
-  if r.pruned then unprune_nodep r t
-  else prune_nodep r t
+let toggle_prune env r =
+  if r.pruned then unprune env r
+  else prune env r
 
 let search_using t sbuf env =
   List.iter (fun t -> t#set_property (`BACKGROUND_SET false)) env.search_tags;
@@ -125,18 +128,18 @@ let tag_callback t env sbuf ~origin:y z i =
 	    | Some an -> match an with
 		| AD (r,_) ->
 		  if env.ctrl then 
-		    if r.pruned then unprune r t env.dep 
-		    else prune r t env.dep
-		  else toggle_prune_nodep r t
+		    if r.pruned then unprune_dep env r 
+		    else prune_dep env r
+		  else toggle_prune env r
 		| AF (r, Some parent) ->
 		  begin match parent.c, parent.polarity with
 		    | AFop (AOPand, _), false | AFop (AOPor, _), true
 		    | AFop (AOPimp, _), true | AFop (AOPiff, _), _ ->
-		        toggle_incorrect_prune r t
-		    | _ -> toggle_prune_nodep r t
+		        toggle_incorrect_prune env r
+		    | _ -> toggle_prune env r
 		  end
-		| AF (r, None) -> toggle_prune_nodep r t
-		| AT r -> toggle_prune_nodep r t
+		| AF (r, None) -> toggle_prune env r
+		| AT r -> toggle_prune env r
 		| QF _ -> ()
 	end;
 	true
@@ -899,7 +902,7 @@ let prune_unused env expl =
   in
   let prune_top d = match d.c with
     | ATypeDecl _ | AGoal _ | ALogic _ -> ()
-    | _ -> prune_nodep d d.tag
+    | _ -> prune d d.tag
   in
   let rec aux dont ast ids =
     match ast, ids with
@@ -922,7 +925,7 @@ let prune_unused env expl =
 let prune_unused env =
   let prune_top d = match d.c with
     | ATypeDecl _ | AGoal _ | ALogic _ -> ()
-    | _ -> prune_nodep d d.tag
+    | _ -> prune env d
   in
   List.iter (fun (d, _) -> 
     if not (List.mem d.ptag env.proof_toptags) 

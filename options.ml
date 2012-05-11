@@ -21,6 +21,7 @@ open Preoptions
 
 let fmt = fmt
 let file = file
+let session_file = session_file
 let satmode = satmode
 let smt2file = smt2file
 let smtfile = smtfile

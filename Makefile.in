@@ -115,7 +115,8 @@ GENERATED = version.ml \
 	smt_parser.ml smt_parser.mli smt_lex.ml \
 	smtlib2_parse.ml smtlib2_parse.mli smtlib2_lex.ml
 
-GUICMO = $(CMO) $(CMOFRONT) why_annoted.cmo why_connected.cmo gui.cmo
+GUICMO = $(CMO) $(CMOFRONT) gui_session.cmo why_annoted.cmo \
+	 why_connected.cmo gui_replay.cmo gui.cmo
 GUICMX = $(GUICMO:.cmo=.cmx)
 
 byte: $(NAME).byte
@@ -273,10 +274,11 @@ FILES = exception.mli exception.ml \
 	matching.mli matching.ml \
 	sat.mli sat.ml \
 	frontend.mli frontend.ml \
-	why_annoted.mli why_annoted.ml why_connected.mli why_connected.ml\
-	gui.ml\
+	gui_session.mli gui_session.ml why_annoted.mli why_annoted.ml \
+	why_connected.mli why_connected.ml gui_replay.mli gui_replay.ml \
+	gui.ml \
 	main.ml \
-	Makefile.in configure configure.in   \
+	Makefile.in configure configure.in \
 	.depend README INSTALL COPYING CeCILL-C CHANGES
 
 export: source binary

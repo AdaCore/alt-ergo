@@ -23,6 +23,8 @@ open Lexing
 open Format
 open Options
 
+open Gui_session
+
 let indent_size = 4
 let monospace_font = Pango.Font.from_string "mono"
 let general_font = Pango.Font.from_string "sans"
@@ -183,10 +185,11 @@ type env = {
   mutable proof_toptags : GText.tag list;
   mutable start_select : int option;
   mutable stop_select : int option;
-  dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t
+  dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t;
+  actions : action Stack.t;
 }
 
-let create_env buf1 (buf2:sbuffer) errors st_ctx ast dep  =
+let create_env buf1 (buf2:sbuffer) errors st_ctx ast dep actions =
   let titag = buf2#create_tag [`WEIGHT `BOLD; `UNDERLINE `SINGLE] in
   buf2#insert ~tags:[titag] "User instantiated axioms:\n\n";
   {
@@ -203,6 +206,7 @@ let create_env buf1 (buf2:sbuffer) errors st_ctx ast dep  =
     proof_toptags = [];
     start_select = None;
     stop_select = None;
+    actions = actions;
   }
 
 

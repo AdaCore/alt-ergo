@@ -18,6 +18,7 @@
 (**************************************************************************)
 
 open Why_ptree
+open Gui_session
 
 type sbuffer = GSourceView2.source_buffer
 
@@ -161,7 +162,7 @@ type env = {
   inst_buffer : sbuffer;
   errors : error_model;
   st_ctx : GMisc.statusbar_context;
-  mutable ast : (atyped_decl annoted * Why_typing.env)list;
+  mutable ast : (atyped_decl annoted * Why_typing.env) list;
   mutable ctrl : bool;
   mutable last_tag : GText.tag;
   mutable search_tags : GText.tag list;
@@ -169,7 +170,8 @@ type env = {
   mutable proof_toptags : GText.tag list;
   mutable start_select : int option;
   mutable stop_select : int option;
-  dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t
+  dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t;
+  actions : action Stack.t;
 }
 
 val indent_size : int
@@ -183,6 +185,7 @@ val create_env :
   GMisc.statusbar_context ->
   (atyped_decl annoted * Why_typing.env) list -> 
   (atyped_decl annoted list * atyped_decl annoted list) MDep.t ->
+  action Stack.t ->
   env
 
 val find : 

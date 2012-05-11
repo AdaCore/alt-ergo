@@ -24,6 +24,7 @@ let _ =
   Print_color.add_to_format_tag fmt
 
 let file = ref " stdin"
+let session_file = ref ""
 let cin = ref stdin
 
 let bouclage = ref 1

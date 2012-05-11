@@ -19,6 +19,7 @@
 
 val fmt : Format.formatter
 val file : string ref
+val session_file : string ref
 
 val parse_only : bool ref
 val type_only : bool ref
