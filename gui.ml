@@ -992,7 +992,7 @@ let _ =
   let menu = create_menu "File" menubar in
   GToolbox.build_menu menu ~entries:file_entries;
 
-  let menu = create_menu "Options" menubar in
+  let menu = create_menu "Debug" menubar in
   GToolbox.build_menu menu ~entries:debug_entries;
 
   let menu = create_menu "Options" menubar in
