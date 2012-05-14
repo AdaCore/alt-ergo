@@ -462,7 +462,7 @@ let rec least_nested_form used_vars af =
     | _, AFnamed (_, af) -> 
 	least_nested_form used_vars af
 
-let rec add_instance_aux af env vars entries aname =
+let rec add_instance_aux ?(register=true) env id af aname vars entries =
   let ptag =  (tag env.inst_buffer) in
   let goal_form, tyenv, loc =
     let rec find_goal = function
@@ -510,16 +510,16 @@ let rec add_instance_aux af env vars entries aname =
     env.inst_buffer#insert (String.make indent_size ' ');
     add_aaform env.errors env.inst_buffer 1 [] instance;
     env.inst_buffer#insert "\n\n";
-  end
-    
+  end;
+  if register then save env.actions (AddInstance (id, aname, entries))
 
 
-and add_instance_entries af env vars (entries:GEdit.entry list) aname =
+and add_instance_entries ?(register=true) env id af aname vars (entries:GEdit.entry list) =
   let entries = List.map (fun e -> e#text) entries in
-  add_instance_aux af env vars entries aname
+  add_instance_aux ~register env id af aname vars entries
 
-and add_instance af env entries aname =
-  add_instance_aux af env (list_uquant_vars_in_form af) entries aname
+and add_instance ?(register=true) env id af aname entries =
+  add_instance_aux ~register env id af aname (list_uquant_vars_in_form af) entries
 
 
 and popup_axiom t env offset () =
@@ -543,7 +543,7 @@ and popup_axiom t env offset () =
   ignore(GMisc.image ~stock:`CANCEL ~packing:phbox#add ());
   ignore(GMisc.label ~text:"Cancel" ~packing:phbox#add ());
   
-  let vars, entries, af, aname = (match find t env.buffer env.ast with
+  let vars, entries, id, af, aname = (match find t env.buffer env.ast with
     | Some (AD (atd, tyenv)) -> 
       begin
 	  match atd.c with
@@ -576,7 +576,7 @@ and popup_axiom t env offset () =
 		       )::entries in
 		     entries, i+1
 		  ) ([],0) vars in
-		vars, entries, af, aname
+		vars, entries, atd.id, af, aname
 	    | _ -> assert false
 	end
     | _ -> assert false)
@@ -589,7 +589,7 @@ and popup_axiom t env offset () =
   ignore(button_ok#connect#clicked ~callback:
 	   (fun () ->
 	      try
-		add_instance_entries af env vars entries aname;
+		add_instance_entries env id af aname vars entries;
 		pop_w#destroy ()
 		  
 	      with 
@@ -637,9 +637,10 @@ and axiom_callback t env ~origin:y z i =
 
 
 
-and add_trigger t env str offset (sbuf:sbuffer) =
+and add_trigger ?(register=true) t qid env str offset (sbuf:sbuffer) =
   let iter = sbuf#get_iter (`OFFSET offset) in
-  match sbuf#forward_iter_to_source_mark ~category:"trigger" iter with
+  match sbuf#forward_iter_to_source_mark 
+    ~category:(sprintf "trigger_%d" qid) iter with
     | true ->
       begin
 	match find_decl t sbuf env.ast, find t sbuf env.ast with
@@ -660,23 +661,25 @@ and add_trigger t env str offset (sbuf:sbuffer) =
 	    if qf.c.aqf_triggers <> [] then
 	      sbuf#insert ~iter ~tags " | ";
 	    add_aaterm_list_at sbuf tags iter "," atl;
-	    qf.c.aqf_triggers <- qf.c.aqf_triggers@[atl]
+	    qf.c.aqf_triggers <- qf.c.aqf_triggers@[atl];
+	    if register then 
+	      save env.actions (AddTrigger (qf.id, sbuf=env.inst_buffer, str));
 	  | _ -> assert false
       end
     | false -> ()
 
-and readd_trigger id env str offset idbuf =
+and readd_trigger ?(register=true) env id str inst_buf =
   try
     match findbyid id env.ast with
       | QF qf ->
 	let sbuf = 
-	  if idbuf = 2 then env.inst_buffer else env.buffer in
-	add_trigger qf.tag env str offset sbuf
+	  if inst_buf then env.inst_buffer else env.buffer in
+	add_trigger ~register qf.tag id env str 0 sbuf
       | _ -> assert false
-  with Not_found -> ()      
+  with Not_found -> ()
 
 
-and popup_trigger t env (sbuf:sbuffer) offset () =
+and popup_trigger t qid env (sbuf:sbuffer) offset () =
     let pop_w = GWindow.dialog
     ~title:"Add new (multi) trigger"
     ~allow_grow:true
@@ -721,7 +724,7 @@ and popup_trigger t env (sbuf:sbuffer) offset () =
     (fun () ->
       try 
 	let str = buf1#get_text () in
-	add_trigger t env str offset sbuf;
+	add_trigger t qid env str offset sbuf;
 	pop_w#destroy ()
       with 
 	| Why_lexer.Lexical_error s -> 
@@ -738,7 +741,7 @@ and popup_trigger t env (sbuf:sbuffer) offset () =
   ignore(button_cancel#connect#clicked ~callback: pop_w#destroy);
   pop_w#show ()
 
-and triggers_callback t env sbuf ~origin:y z i =
+and triggers_callback t qid env sbuf ~origin:y z i =
   
   let ni = new GText.iter i in
   let offset = ni#offset in
@@ -754,7 +757,7 @@ and triggers_callback t env sbuf ~origin:y z i =
 	      let menuitem = GMenu.image_menu_item ~image
 		~label:"Add trigger(s) ..." ~packing:menu#append () in
 	      ignore(menuitem#connect#activate
-		       ~callback:(popup_trigger t env sbuf offset));
+		       ~callback:(popup_trigger t qid env sbuf offset));
 	      menu#popup ~button:3 ~time:(GdkEvent.Button.time z);
 	      true
 	    else
@@ -776,8 +779,8 @@ and connect_tag env sbuf t =
 and connect_term env sbuf t =
   ignore (t#connect#event ~callback:(term_callback t env sbuf))
 
-and connect_trigger_tag env sbuf t =
-  ignore (t#connect#event ~callback:(triggers_callback t env sbuf))
+and connect_trigger_tag env sbuf t qid =
+  ignore (t#connect#event ~callback:(triggers_callback t qid env sbuf))
 
 and connect_axiom_tag env t =
   ignore (t#connect#event ~callback:(axiom_callback t env))
@@ -841,7 +844,7 @@ and connect_aform env sbuf = function
   | AFop (op, afl) -> connect_aaform_list env sbuf afl
   | AFforall aqf
   | AFexists aqf -> 
-      connect_trigger_tag env sbuf aqf.tag;
+      connect_trigger_tag env sbuf aqf.tag aqf.id;
       connect_quant_form env sbuf aqf.c
   | AFlet (vs, s, t, aaf) ->
       connect_aterm env sbuf t;      

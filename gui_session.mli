@@ -22,8 +22,8 @@ type action =
   | IncorrectPrune of int
   | Unprune of int
   | AddInstance of int * string * string list
-  | AddTrigger of int * string list
-  | LimitLemma of int * string
+  | AddTrigger of int * bool * string
+  | LimitLemma of int * string * int
 
 val resulting_ids : (action, int) Hashtbl.t
 

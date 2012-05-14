@@ -24,14 +24,30 @@ let replay_unprune id env =
     | AT at -> unprune ~register:false env at
     | QF aq -> unprune ~register:false env aq
 
+let replay_addinstance id aname entries env =
+  match findbyid id env.ast with
+    | AD (ad, _) ->
+      begin
+	match ad.c with
+	  | AAxiom (_, aname, af)
+	  | APredicate_def (_, aname,_ , af) ->
+	    add_instance ~register:false env id af aname entries
+	  | _ -> assert false
+      end
+    | _ -> assert false
+
+let replay_limitlemma id name nb env =
+  Hashtbl.add env.insts.h id (ref None, ref 0, name, ref nb)
+
 let replay env = function
   | Prune id -> replay_prune id env
   | IncorrectPrune id -> replay_incorrect_prune id env
   | Unprune id -> replay_unprune id env
-  | AddInstance (id, aname, entries) -> assert false
-    (* add_instance (findform_byid id env.ast) env entries aname *)
-  | AddTrigger (id, trs) -> assert false
-  | LimitLemma (id , nbstr) -> assert false
+  | AddInstance (id, aname, entries) -> replay_addinstance id aname entries env
+  | AddTrigger (id, inst_buf, str) -> 
+    readd_trigger ~register:false env id str inst_buf
+  | LimitLemma (id, name, nb) -> replay_limitlemma id name nb env
+    
 
 
 let replay_session env =
@@ -45,12 +61,12 @@ let undo_action env =
     | Unprune id -> replay env (Prune id)
     | ((AddInstance _ | AddTrigger _ ) as ac) ->
       replay env (Prune (Hashtbl.find resulting_ids ac))
-    | LimitLemma (id, _) -> 
+    | LimitLemma (id, name, _) -> 
       try 
 	Stack.iter (function 
-	  | (LimitLemma (id', nb') as ac) when id = id' -> 
+	  | (LimitLemma (id', name', nb') as ac) when id = id' -> 
 	      replay env ac; raise Exit
 	  | _ -> ()) env.actions;
-	replay env (LimitLemma (id, "inf"))
+	replay env (LimitLemma (id, name, -1))
       with Exit -> ()
 

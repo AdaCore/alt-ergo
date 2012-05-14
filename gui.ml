@@ -634,14 +634,15 @@ let create_inst_view inst_model env buffer sv ~packing () =
   ignore (renderer#connect#edited (fun path s ->
     let row = inst_model.istore#get_iter path in
     let id = inst_model.istore#get ~row ~column:inst_model.icol_tag in
-    let _,_,_,l = Hashtbl.find inst_model.h id in
+    let _,_,name,l = Hashtbl.find inst_model.h id in
     try
       let limit = int_of_string s in
       if limit >= 0 then
 	begin
 	  l := limit;
 	  inst_model.istore#set ~row ~column:inst_model.icol_limit 
-	    (string_of_int limit)
+	    (string_of_int limit);
+	  Gui_session.save env.actions (Gui_session.LimitLemma (id, name,limit))
 	end
       else 
 	begin
@@ -805,11 +806,9 @@ let _ =
        let actions = Gui_session.read_actions session_cin in
 
 
-       let env = create_env buf1 buf2 error_model st_ctx annoted_ast dep 
+       let env = create_env buf1 buf2 error_model inst_model st_ctx annoted_ast dep 
 	 actions in
        connect env;
-
-       Gui_replay.replay_session env;
 
        ignore (toolbar#insert_toggle_button
 	 ~text:" Remove context"
@@ -890,6 +889,8 @@ let _ =
 		~packing:sw4#add ());
 
 
+       Gui_replay.replay_session env;
+       ignore (refresh_instances env.insts ());
 
        let thread = ref None in
        

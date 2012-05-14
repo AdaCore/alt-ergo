@@ -176,6 +176,7 @@ type env = {
   buffer : sbuffer;
   inst_buffer : sbuffer;
   errors : error_model;
+  insts : inst_model;
   st_ctx : GMisc.statusbar_context;
   mutable ast : (atyped_decl annoted * Why_typing.env) list;
   mutable ctrl : bool;
@@ -189,13 +190,14 @@ type env = {
   actions : action Stack.t;
 }
 
-let create_env buf1 (buf2:sbuffer) errors st_ctx ast dep actions =
+let create_env buf1 (buf2:sbuffer) errors insts st_ctx ast dep actions =
   let titag = buf2#create_tag [`WEIGHT `BOLD; `UNDERLINE `SINGLE] in
   buf2#insert ~tags:[titag] "User instantiated axioms:\n\n";
   {
     buffer = buf1;
     inst_buffer = buf2;
     errors = errors;
+    insts = insts;
     st_ctx = st_ctx;
     ast = ast;
     dep = dep;
@@ -807,9 +809,9 @@ let rec of_quant_form (buffer:sbuffer)
     aqf_triggers = List.map (List.map (annot_of_tterm buffer )) trs;
     aqf_form = new_annot buffer (of_tform buffer tf) tf.Why_ptree.annot ptag}
 
-and annot_of_quant_form (buffer:sbuffer) qf =
+and annot_of_quant_form (buffer:sbuffer) qf id =
   let ptag = tag buffer in
-  new_annot buffer (of_quant_form buffer qf) (-1) ptag
+  new_annot buffer (of_quant_form buffer qf) id ptag
 
 and of_tform (buffer:sbuffer) f = match f.Why_ptree.c with
   | TFatom a -> AFatom (of_tatom buffer a)
@@ -819,8 +821,8 @@ and of_tform (buffer:sbuffer) f = match f.Why_ptree.c with
     if op = OPnot || op = OPimp then 
       change_polarity_aform (List.hd afl);
     AFop (of_oplogic buffer  op, afl)
-  | TFforall qf -> AFforall (annot_of_quant_form buffer qf)
-  | TFexists qf -> AFexists (annot_of_quant_form buffer qf)
+  | TFforall qf -> AFforall (annot_of_quant_form buffer qf f.Why_ptree.annot)
+  | TFexists qf -> AFexists (annot_of_quant_form buffer qf f.Why_ptree.annot)
   | TFlet (vs, s, t, tf) ->
       AFlet (vs, s, of_tterm buffer  t, annot_of_tform buffer tf)
   | TFnamed (n, tf) -> 
@@ -1176,7 +1178,8 @@ let rec add_quant_form errors (buffer:sbuffer) indent tags qf =
   buffer#insert ~tags:ntags "[";
   add_triggers errors buffer ntags trs;
   buffer#insert ~tags:ntags "].";
-  ignore(buffer#create_source_mark ~category:"trigger" buffer#end_iter);
+  ignore(buffer#create_source_mark 
+	   ~category:(sprintf "trigger_%d" qf.id) buffer#end_iter);
   buffer#insert "\n";
   buffer#insert (String.make ((indent + 1)* indent_size) ' ');
   add_aaform errors buffer (indent+1) tags aaf

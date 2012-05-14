@@ -161,6 +161,7 @@ type env = {
   buffer : sbuffer;
   inst_buffer : sbuffer;
   errors : error_model;
+  insts : inst_model;
   st_ctx : GMisc.statusbar_context;
   mutable ast : (atyped_decl annoted * Why_typing.env) list;
   mutable ctrl : bool;
@@ -182,6 +183,7 @@ val create_env :
   sbuffer -> 
   sbuffer ->
   error_model ->
+  inst_model ->
   GMisc.statusbar_context ->
   (atyped_decl annoted * Why_typing.env) list -> 
   (atyped_decl annoted list * atyped_decl annoted list) MDep.t ->

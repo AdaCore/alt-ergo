@@ -22,20 +22,23 @@ type action =
   | IncorrectPrune of int
   | Unprune of int
   | AddInstance of int * string * string list
-  | AddTrigger of int * string list
-  | LimitLemma of int * string
+  | AddTrigger of int * bool * string
+  | LimitLemma of int * string * int
 
 let resulting_ids = Hashtbl.create 17
 
 let save actions ac = 
-  (match ac with 
-    | Prune id -> Format.eprintf "Prune %d@." id
-    | IncorrectPrune id -> Format.eprintf "Incorrectprune %d@." id
-    | Unprune id -> Format.eprintf "Unrune %d@." id
-    | AddInstance (id, name, vars) -> ()
-    | AddTrigger (id, trs) -> ()
-    | LimitLemma (id, nb) -> ()
-  );
+  (* (match ac with  *)
+  (*   | Prune id -> Format.eprintf "Prune %d@." id *)
+  (*   | IncorrectPrune id -> Format.eprintf "Incorrectprune %d@." id *)
+  (*   | Unprune id -> Format.eprintf "Unrune %d@." id *)
+  (*   | AddInstance (id, name, vars) ->  *)
+  (*     Format.eprintf "AddInstance %d %s@." id name *)
+  (*   | AddTrigger (id, inst_buf, trs) ->  *)
+  (*     Format.eprintf "AddTriger %d %b %s@." id inst_buf trs *)
+  (*   | LimitLemma (id, name, nb) ->  *)
+  (*     Format.eprintf "LimitLemma %d-%s %d@." id name nb *)
+  (* ); *)
   Stack.push ac actions
 
 

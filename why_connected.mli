@@ -35,3 +35,8 @@ val clear_used_lemmas_tags : env -> unit
 val show_used_lemmas : env -> Explanation.t -> unit
 
 val prune_unused : env -> unit
+
+val add_instance : 
+  ?register:bool -> env -> int -> aform -> string -> string list -> unit
+
+val readd_trigger : ?register:bool -> env -> int -> string -> bool -> unit
