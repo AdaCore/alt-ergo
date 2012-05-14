@@ -62,6 +62,7 @@ BIBBYTE = nums.cma graph.cma unix.cma
 
 BIBOPT = $(BIBBYTE:.cma=.cmxa)
 
+BIBGUIBYTE = threads.cma lablgtk.cma lablgtksourceview2.cma gtkThread.cmo
 BIBGUIOPT = threads.cmxa lablgtk.cmxa lablgtksourceview2.cmxa gtkThread.cmx 
 
 # main target
@@ -145,6 +146,10 @@ $(NAME).opt: $(PRECMX) $(OPTIONSCMX) $(MAINCMX)
 gui: $(PRECMX) $(OPTIONSCMX) $(GUICMX)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLOPT) $(OFLAGS) -o altgr-ergo.opt $(BIBOPT) $(BIBGUIOPT) $^
+
+guibyte: $(PRECMO) $(OPTIONSCMO) $(GUICMO)
+	$(if $(QUIET),@echo 'Linking $@' &&) 
+	$(OCAMLC) $(BFLAGS) -o altgr-ergo.byte $(BIBBYTE) $(BIBGUIBYTE) $^
 
 test: $(OPT)
 	./$(OPT) test.mlw

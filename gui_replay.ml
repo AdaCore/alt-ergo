@@ -40,7 +40,7 @@ let replay_limitlemma id name nb env =
   Hashtbl.add env.insts.h id (ref None, ref 0, name, ref nb)
 
 let replay env = function
-  | Prune id -> replay_prune id env
+  | Prune id -> Format.eprintf "replay Prune %d@." id; replay_prune id env
   | IncorrectPrune id -> replay_incorrect_prune id env
   | Unprune id -> replay_unprune id env
   | AddInstance (id, aname, entries) -> replay_addinstance id aname entries env

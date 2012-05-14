@@ -54,7 +54,10 @@ let w =
 let save_session envs =
   let session_cout =
     open_out_gen [Open_creat; Open_wronly; Open_binary] 0o640 !session_file in
-  List.iter (fun env -> output_value session_cout env.actions) envs;
+  List.iter (fun env ->
+    output_value session_cout env.resulting_ids;
+    output_value session_cout env.actions)
+    envs;
   close_out session_cout
 
 let quit envs () =
@@ -701,13 +704,17 @@ let _ =
 	  exit 1
   in
 
+  let main_vbox = GPack.vbox 
+    ~homogeneous:false ~border_width:0 ~packing:w#add () in
+
+  let menubar = GMenu.menu_bar ~packing:main_vbox#pack () in
 
   let notebook = 
     GPack.notebook ~border_width:0 ~tab_pos:`BOTTOM
       ~show_border:false 
       ~enable_popup:true 
       ~scrollable:true
-      ~packing:w#add () in
+      ~packing:main_vbox#add () in
 
 
   let session_cin =
@@ -803,11 +810,12 @@ let _ =
        let timers_model = empty_timers_model table_timers in
 
        
-       let actions = Gui_session.read_actions session_cin in
+       let resulting_ids = compute_resulting_ids annoted_ast in
+       let actions = Gui_session.read_actions resulting_ids session_cin in
 
 
-       let env = create_env buf1 buf2 error_model inst_model st_ctx annoted_ast dep 
-	 actions in
+       let env = create_env buf1 buf2 error_model inst_model st_ctx annoted_ast
+	 dep actions resulting_ids in
        connect env;
 
        ignore (toolbar#insert_toggle_button
@@ -919,6 +927,86 @@ let _ =
   end;
 
   let envs = List.rev envs in
+
+  let file_entries = [
+    `I ("Save session", fun () -> save_session envs);
+    `S;
+    `I ("Quit", quit envs)
+  ] in
+
+  let not_implemented _ = eprintf "Not implemented@."
+  in
+
+
+  let debug_entries = [
+    `C ("SAT", false, not_implemented);
+    `S;
+    `C ("CC", false, not_implemented);
+    `C ("Use", false, not_implemented);
+    `C ("UF", false, not_implemented);
+    `C ("AC", false, not_implemented);
+    `S;
+    `C ("Arith", false, not_implemented);
+    `C ("Fourier-Motzkin", false, not_implemented);
+    `C ("Arrays", false, not_implemented);
+    `C ("Bit-vectors", false, not_implemented);
+    `C ("Sum", false, not_implemented);
+    `C ("Records", false, not_implemented);
+    `S;
+    `C ("Case split", false, not_implemented);
+    `C ("Proofs", false, not_implemented);
+    `C ("Typing", false, not_implemented);
+    `C ("Verbose", false, not_implemented);
+  ] in
+
+  let options_entries = [
+    `C ("Unsat cores (proofs)", false, not_implemented);
+    `S;
+    `C ("Model", false, not_implemented);
+    `C ("Complete model", false, not_implemented);
+    `C ("All models", false, not_implemented);
+    `S;
+    `C ("Variables in triggers", false, not_implemented);
+    `C ("Glouton", false, not_implemented);
+    `C ("Contra congruence", true, not_implemented);
+    `S;
+    `C ("Restricted", false, not_implemented);
+  ] in
+  
+  let help_entries = [
+    `I ("About", fun () -> Format.printf "%s@." Version.version);
+  ] in
+  
+  let entries = [
+    `M ("File", file_entries);
+    `M ("Debug", debug_entries);
+    `M ("Options", options_entries);
+    `M ("Help", help_entries)
+  ] in
+  
+  let create_menu label menubar =
+    let item = GMenu.menu_item ~label ~packing:menubar#append () in
+    GMenu.menu ~packing:item#set_submenu ()
+  in
+
+  let menu = create_menu "File" menubar in
+  GToolbox.build_menu menu ~entries:file_entries;
+
+  let menu = create_menu "Options" menubar in
+  GToolbox.build_menu menu ~entries:debug_entries;
+
+  let menu = create_menu "Options" menubar in
+  GToolbox.build_menu menu ~entries:options_entries;
+
+  let menu = create_menu "Help" menubar in
+  GToolbox.build_menu menu ~entries:help_entries;
+
+  (* (\* Popup menu *\) *)
+  (* let button = GButton.button ~label:"Popup" ~packing:main_vbox#add () in *)
+  (* button#connect#clicked ~callback:(fun () -> *)
+  (*   GToolbox.popup_menu ~entries ~button:0 *)
+  (* 	  ~time:(GtkMain.Main.get_current_event_time ()) *)
+  (*   ); *)
 
   ignore(w#connect#destroy ~callback:(quit envs));
   w#show ();

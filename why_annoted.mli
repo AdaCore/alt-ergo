@@ -173,6 +173,7 @@ type env = {
   mutable stop_select : int option;
   dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t;
   actions : action Stack.t;
+  resulting_ids : (string * int) list;
 }
 
 val indent_size : int
@@ -188,6 +189,7 @@ val create_env :
   (atyped_decl annoted * Why_typing.env) list -> 
   (atyped_decl annoted list * atyped_decl annoted list) MDep.t ->
   action Stack.t ->
+  (string * int) list ->
   env
 
 val find : 
@@ -255,3 +257,6 @@ val findbyid :
 
 val findbyid_decl : 
   int -> (atyped_decl annoted * Why_typing.env) list -> annoted_node
+
+val compute_resulting_ids : 
+  (atyped_decl annoted * Why_typing.env) list -> (string * int) list

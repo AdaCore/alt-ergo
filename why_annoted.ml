@@ -188,9 +188,12 @@ type env = {
   mutable stop_select : int option;
   dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t;
   actions : action Stack.t;
+  resulting_ids : (string * int) list;
 }
 
-let create_env buf1 (buf2:sbuffer) errors insts st_ctx ast dep actions =
+
+let create_env buf1 (buf2:sbuffer) errors insts st_ctx ast dep
+    actions resulting_ids=
   let titag = buf2#create_tag [`WEIGHT `BOLD; `UNDERLINE `SINGLE] in
   buf2#insert ~tags:[titag] "User instantiated axioms:\n\n";
   {
@@ -209,6 +212,7 @@ let create_env buf1 (buf2:sbuffer) errors insts st_ctx ast dep actions =
     start_select = None;
     stop_select = None;
     actions = actions;
+    resulting_ids = resulting_ids;
   }
 
 
@@ -1655,49 +1659,13 @@ let findbyid = findbyid_aux false
 
 let findbyid_decl = findbyid_aux true
 
-
-
-
-
-
-
-
-
-
-
-(* let rec findbyid_aform id af = *)
-(*   match af with     *)
-(*     | AFatom aat -> () *)
-(*     | AFop (_, aafl) -> *)
-(*       List.iter (findbyid_aaform id) aafl *)
-(*     | AFforall aaqf | AFexists aaqf -> *)
-(* 	if aaqf.id = id then raise (Foundannot aaqf) *)
-(* 	else findform_byid_aaform id aaqf.c.aqf_form *)
-(*     | AFlet (_,_,_, aaf) | AFnamed (_, aaf) -> *)
-(*       findform_byid_aaform id aaf *)
-
-(* and findform_byid_aaform id aaf = *)
-(*   if aaf.id = id then raise (Foundannot aaf) *)
-(*   else findform_byid_aform id aaf.c *)
-
-
-(* let findform_byid_atyped_decl id td = *)
-(*   if td.id < id then () *)
-(*   else if td.id = id then rasie (Foundannot td) *)
-(*   else match td.c with *)
-(*     | ARewriting (_,_, _)  *)
-(*     | ALogic _ | ATypeDecl _  -> () *)
-
-(*     | APredicate_def (_,_,_, af)  *)
-(*     | AFunction_def (_,_,_,_, af)  *)
-(*     | AAxiom (_, _, af) -> *)
-(* 	findform_byid_aform id af *)
-
-(*     | AGoal (_,_, aaf) -> *)
-(* 	findform_byid_aaform id aaf *)
-
-(* let findform_byid l = *)
-(*   try *)
-(*     List.iter (findform_byid_atyped_decl id) l; *)
-(*     raise Not_found *)
-(*   with Foundannot a -> a *)
+let compute_resulting_ids =
+  List.fold_left (fun acc (td, _) -> match td.c with
+    | ARewriting (_,_, _) -> acc
+    | ALogic (_, names, _) -> (List.map (fun n -> n, td.id) names)@acc
+    | ATypeDecl (_, _, name, _)
+    | APredicate_def (_, name, _, _) 
+    | AFunction_def (_, name, _, _, _) 
+    | AAxiom (_, name, _)
+    | AGoal (_, name, _) -> (name, td.id)::acc)
+    []
