@@ -61,7 +61,7 @@ let max_max_size = 96
 module Print = struct
 
   let assume {f=f;age=age;name=lem;mf=mf} dep = 
-    if debug_sat then
+    if debug_sat () then
       begin
 	(match F.view f with
 	  | F.Unit _ -> ()
@@ -97,32 +97,32 @@ module Print = struct
       end
 
   let unsat () = 
-    if debug_sat then printf "@[@{<C.Bold>[sat]@} @{<C.G_Red_B>unsat@}@]@."
+    if debug_sat () then printf "@[@{<C.Bold>[sat]@} @{<C.G_Red_B>unsat@}@]@."
 
   let mround s = 
-    if debug_sat then 
+    if debug_sat () then 
       printf "@[@{<C.Bold>[sat]@} matching round of size %d@]@." s
 
   let decide f = 
-    if debug_sat then 
+    if debug_sat () then 
       printf "@[@{<C.Bold>[sat]@} @{<C.G_Green>I decide@} on %a@]@." F.print f
 
   let backtracking f = 
-    if debug_sat then 
+    if debug_sat () then 
       printf "@[@{<C.Bold>[sat]@} @{<C.G_Green>I backtrack@} on %a@]@." 
 	F.print f
 
   let backjumping f = 
-    if debug_sat then 
+    if debug_sat () then 
       (printf "@[@{<C.Bold>[sat]@} @{<C.G_Green>I don't consider the case @}";
        printf "%a@]@." F.print f)
        
-  let elim _ _ = if debug_sat && verbose then printf "@[@{<C.Bold>[elim]@}@."
+  let elim _ _ = if debug_sat () && verbose () then printf "@[@{<C.Bold>[elim]@}@."
 
-  let red _ _ = if debug_sat && verbose then printf "@[@{<C.Bold>[red]@}@."
+  let red _ _ = if debug_sat () && verbose () then printf "@[@{<C.Bold>[red]@}@."
 
   let delta d = 
-    if debug_sat && verbose then begin
+    if debug_sat () && verbose () then begin
       printf "@[@{<C.Bold>[sat]@} - Delta ---------------------]@.";
       List.iter (fun (f1, f2, ex) ->
 	printf "(%a or %a), %a@." F.print f1.f F.print f2.f Ex.print ex) d;
@@ -130,7 +130,7 @@ module Print = struct
     end
     
   let gamma g =
-    if debug_sat then begin
+    if debug_sat () then begin
       printf "@[@{<C.Bold>[sat]@} - GAMMA ---------------------]@.";
       MF.iter (fun f ex ->
 	printf "%a \t->\t%a@." F.print f Ex.print ex) g;
@@ -138,7 +138,7 @@ module Print = struct
     end
 
   let bottom classes =
-    if bottom_classes then
+    if bottom_classes () then
       printf "bottom:%a\n@." Term.print_taged_classes classes      
 
 end
@@ -233,7 +233,7 @@ let new_facts mode env =
 
 
 let mround predicate mode env max_size =
-  if rules = 2 then fprintf fmt "[rule] TR-Sat-Mround@.";
+  if rules () = 2 then fprintf fmt "[rule] TR-Sat-Mround@.";
   let round mode =
     Print.mround max_size;
     let axioms = if predicate then env.definitions else env.lemmas in
@@ -248,13 +248,13 @@ let mround predicate mode env max_size =
         in
         bouclage (n-1) (env, (new_facts mode env))
     in
-    let _, lf = bouclage Options.bouclage (env, []) in
+    let _, lf = bouclage (Options.bouclage ()) (env, []) in
     max_size, lf 
   in
   !Options.timer_start Timers.TMatch;
-  let max_size, lf = round (mode || Options.goal_directed) in 
+  let max_size, lf = round (mode || Options.goal_directed ()) in 
   let res = 
-    if Options.goal_directed && lf = [] then round false 
+    if Options.goal_directed () && lf = [] then round false 
     else max_size, lf
   in
   !Options.timer_pause Timers.TMatch;
@@ -266,7 +266,7 @@ let extract_prop_model t =
   MF.iter 
     (fun f _ -> 
        let lbl = F.label f in
-       if complete_model || not (Hstring.equal Hstring.empty lbl) then
+       if complete_model () || not (Hstring.equal Hstring.empty lbl) then
 	 s := SF.add f !s
     ) 
     t.gamma;
@@ -293,7 +293,7 @@ let print_model fmt t =
 
 let elim {f=f} env = 
   if MF.mem f env.gamma then
-    (if rules = 2 then fprintf fmt "[rule] TR-Sat-Bcp-Elim-1@.";
+    (if rules () = 2 then fprintf fmt "[rule] TR-Sat-Bcp-Elim-1@.";
      true)
   else
     let el = match F.view f with 
@@ -301,7 +301,7 @@ let elim {f=f} env =
       | _ -> false
     in
     if el then 
-      if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-Let@.";
+      if rules () = 2 then fprintf fmt "[rule] TR-Sat-Assume-Let@.";
     el
 
 let size_formula = 1_000_000
@@ -310,7 +310,7 @@ let red {f=f} env =
   let nf = F.mk_not f in
   try 
     let r = Yes (MF.find nf env.gamma, CcX.cl_extract env.tbox) in
-    if rules = 2 then fprintf fmt "[rule] TR-Sat-Bcp-Red-1@.";
+    if rules () = 2 then fprintf fmt "[rule] TR-Sat-Bcp-Red-1@.";
     r
   with Not_found -> 
     let r = match F.view nf with
@@ -318,7 +318,7 @@ let red {f=f} env =
       | _ -> No
     in
     (match r with 
-      |	Yes _ -> if rules = 2 then fprintf fmt "[rule] TR-Sat-Bcp-Red-2@."
+      |	Yes _ -> if rules () = 2 then fprintf fmt "[rule] TR-Sat-Bcp-Red-2@."
       | No -> ());
     r
 	
@@ -332,11 +332,11 @@ let pred_def env f =
 
 let add_dep f dep =
   match F.view f with 
-    | F.Literal _ when proof -> 
+    | F.Literal _ when proof () -> 
       if not (Ex.mem_as_bj f dep) then
 	Ex.union (Ex.singleton ~bj:false f) dep
       else dep
-    | F.Clause _ when proof -> 
+    | F.Clause _ when proof () -> 
 	Ex.union (Ex.singleton ~bj:false f) dep
     | _ -> dep
   
@@ -344,7 +344,7 @@ let add_dep f dep =
 let rec add_dep_of_formula f dep =
   let dep = add_dep f dep in
   match F.view f with 
-    | F.Unit (f1, f2) when proof ->
+    | F.Unit (f1, f2) when proof () ->
       add_dep_of_formula f2 (add_dep_of_formula f1 dep)
     | _ -> dep
 
@@ -358,12 +358,12 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 	 (* fprintf fmt "ass:%a %a @." 
 	    F.print (F.mk_not f) Ex.print dep_gamma; *)
        let ex_nf = MF.find (F.mk_not f) env.gamma in
-       if rules = 2 then fprintf fmt "[rule] TR-Sat-Conflict-1@.";
+       if rules () = 2 then fprintf fmt "[rule] TR-Sat-Conflict-1@.";
        raise (IUnsat (Ex.union dep_gamma ex_nf, CcX.cl_extract env.tbox))
      with Not_found -> ());
     if MF.mem f env.gamma then
       begin
-	if rules = 2 then fprintf fmt "[rule] TR-Sat-Remove@.";
+	if rules () = 2 then fprintf fmt "[rule] TR-Sat-Remove@.";
 	env
       end
     else 
@@ -372,25 +372,25 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 	if size > size_formula then env
 	else
 	  let env =
-	    if mf && glouton  && size < size_formula then 
+	    if mf && glouton () && size < size_formula then 
 	      add_terms env (F.terms f) gf age lem else env in
 	  let env = { env with gamma = MF.add f dep_gamma env.gamma } in
 	  Print.assume ff dep;
 	  match F.view f with
 	    | F.Unit (f1, f2) ->
-	      if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-U@.";
+	      if rules () = 2 then fprintf fmt "[rule] TR-Sat-Assume-U@.";
 	      let env = assume env 
 		({ f = f1; age = age; name = lem; mf = mf; gf = gf }, dep) in
 	      assume env 
 		({ f = f2; age = age; name = lem; mf = mf; gf = gf }, dep) 
 	    | F.Clause(f1,f2) -> 
-	      if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-C@.";
+	      if rules () = 2 then fprintf fmt "[rule] TR-Sat-Assume-C@.";
 		let p1 = {f=f1;age=age;name=lem;mf=mf;gf=gf} in
 		let p2 = {f=f2;age=age;name=lem;mf=mf;gf=gf} in
 		bcp { env with delta = (p1,p2,dep)::env.delta }
 
 	    | F.Lemma _ ->
-	      if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-Ax@.";
+	      if rules () = 2 then fprintf fmt "[rule] TR-Sat-Assume-Ax@.";
 		let age , dep = 
 		  try 
 		    let age' , dep' = MF.find f env.lemmas in
@@ -400,7 +400,7 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		bcp { env with lemmas=MF.add f (age,dep) env.lemmas }
 
 	    | F.Literal a ->
-		if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-Lit@.";
+		if rules () = 2 then fprintf fmt "[rule] TR-Sat-Assume-Lit@.";
 		let env = 
 		  if mf && size < size_formula then 
 		    add_terms env (A.LT.terms_of a) gf age lem
@@ -409,8 +409,8 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		let tbox, new_terms, cpt = CcX.assume a dep env.tbox in
 		let env = add_terms env new_terms gf age lem in
 		steps := Int64.add (Int64.of_int cpt) !steps;
-		if stepsb <> -1 
-		  && Int64.compare !steps (Int64.of_int stepsb) > 0 then 
+		if stepsb () <> -1 
+		  && Int64.compare !steps (Int64.of_int (stepsb ())) > 0 then 
 		  begin 
 		    printf "Steps limit reached: %Ld@." !steps;
 		    exit 1
@@ -419,12 +419,12 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		bcp env
 
 	    | F.Skolem{F.sko_subst=sigma; sko_f=f} -> 
-	      if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-Sko@.";
+	      if rules () = 2 then fprintf fmt "[rule] TR-Sat-Assume-Sko@.";
 		let f' = F.apply_subst sigma f in
 		assume env ({f=f';age=age;name=lem;mf=mf;gf=gf},dep)
 
             | F.Let {F.let_var=lvar; let_term=lterm; let_subst=s; let_f=lf} ->
-	      if rules = 2 then fprintf fmt "[rule] TR-Sat-Assume-Let@.";
+	      if rules () = 2 then fprintf fmt "[rule] TR-Sat-Assume-Let@.";
                 let f' = F.apply_subst s lf in
 		let id = F.id f' in
                 let v = Symbols.Map.find lvar (fst s) in
@@ -435,8 +435,8 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
                 assume env ({f=f';age=age;name=lem;mf=mf;gf=gf},dep)
       end
   with Exception.Inconsistent (expl, classes) -> 
-    if debug_sat then fprintf fmt "inconsistent %a@." Ex.print expl;
-    if rules = 2 then fprintf fmt "[rule] TR-Sat-Conflict-2@.";
+    if debug_sat () then fprintf fmt "inconsistent %a@." Ex.print expl;
+    if rules () = 2 then fprintf fmt "[rule] TR-Sat-Conflict-2@.";
     raise (IUnsat (expl, classes))
     
 and bcp env =
@@ -488,7 +488,7 @@ and back_tracking env stop max_size = match env.delta with
       (match l1, l2 with
 	 | [], [] -> 
 	     let m = extract_prop_model env in
-	     if all_models then 
+	     if all_models () then 
 	       begin
 		 Format.printf "--- SAT ---\n";
 		 Format.printf "%a@." print_prop_model m;
@@ -505,17 +505,17 @@ and back_tracking env stop max_size = match env.delta with
       let {f=f;age=g;name=lem;mf=mf} = a in
       Print.decide f;
       let dep = unsat_rec {env with delta=l} (a,Ex.singleton f) stop max_size in
-      if debug_sat then fprintf fmt "unsat_rec : %a@." Ex.print dep;
+      if debug_sat () then fprintf fmt "unsat_rec : %a@." Ex.print dep;
       try
 	let dep' = Ex.remove f dep in
 	Print.backtracking (F.mk_not f);
-	if rules = 2 then fprintf fmt "[rule] TR-Sat-Decide@.";
+	if rules () = 2 then fprintf fmt "[rule] TR-Sat-Decide@.";
 	unsat_rec
 	  (assume {env with delta=l} (b, Ex.union d dep'))
 	  ({a with f=F.mk_not f},dep') stop max_size
       with Not_found -> 
 	Print.backjumping (F.mk_not f);
-	if rules = 2 then fprintf fmt "[rule] TR-Sat-Backjumping@.";
+	if rules () = 2 then fprintf fmt "[rule] TR-Sat-Backjumping@.";
 	dep
 	
 let unsat env fg = 
@@ -529,7 +529,7 @@ let unsat env fg =
     let _ , l = mround false true env max_max_size in
     let env = List.fold_left assume env l in
 
-    back_tracking env stopb 100
+    back_tracking env (stopb ()) 100
   with IUnsat (dep, classes) ->
     Print.bottom classes;
     Print.unsat ();

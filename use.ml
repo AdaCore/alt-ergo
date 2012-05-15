@@ -83,7 +83,7 @@ module Make (X : Sig.X) = struct
       (find p g) touched 
       
   let print g = 
-    if debug_use then 
+    if debug_use () then 
       begin
 	let sterms fmt = ST.iter (F.fprintf fmt "%a " T.print) in
 	let satoms fmt =

@@ -182,7 +182,7 @@ module Make ( R : Sig.X ) = struct
       MapR.iter (fun k s -> fprintf fmt "%a -> %a\n" R.print k lm_print s) m
 
     let all fmt env = 
-      if debug_uf then
+      if debug_uf () then
 	begin
 	  fprintf fmt "-------------------------------------------------@.";
 	  fprintf fmt "%a %a %a %a %a" 
@@ -204,7 +204,7 @@ module Make ( R : Sig.X ) = struct
       !Options.thread_yield ();
       try MapR.find (MapT.find t env.make) env.repr
       with Not_found -> 
-	if debug_uf then fprintf fmt "Uf: Not_found %a@." Term.print t;
+	if debug_uf () then fprintf fmt "Uf: Not_found %a@." Term.print t;
 	assert false (*R.make t, Ex.empty*) (* XXXX *)
 	  
     let lookup_by_r r env = 
@@ -242,7 +242,7 @@ module Make ( R : Sig.X ) = struct
 	     try 
 	       let ex2 = MapL.find l1 mapl in
 	       let ex = Ex.union (Ex.union ex1 ex2) dep in (* VERIF *)
-	       if rules = 3 then
+	       if rules () = 3 then
 		 fprintf fmt "[rule] TR-CCX-Congruence-Conflict@.";
 	       raise (Inconsistent (ex, cl_extract env))
 	     with Not_found -> 
@@ -346,7 +346,7 @@ module Make ( R : Sig.X ) = struct
 
     let normal_form env r =
       let rr, ex = canon env r Ex.empty in
-      if rewriting && verbose then 
+      if rewriting () && verbose () then 
         fprintf fmt "canon %a = %a@." R.print r R.print rr;
       rr,ex
 
@@ -358,7 +358,7 @@ module Make ( R : Sig.X ) = struct
       try MapR.find r env.repr with Not_found -> normal_form env r
 
     let init_leaf env p = 
-      if debug_uf then fprintf fmt "init_leaf: %a@." R.print p;
+      if debug_uf () then fprintf fmt "init_leaf: %a@." R.print p;
       let in_repr = MapR.mem p env.repr in
       let in_neqs = MapR.mem p env.neqs in
       { env with
@@ -397,7 +397,7 @@ module Make ( R : Sig.X ) = struct
 	       | l1 , cm , l2 -> 
 		   let rx = R.color {ac with l = Ac.add h (d,1) l1} in
 		   let ry = R.color {g  with l = Ac.add h (v,1) l2} in
-                   if debug_uf then
+                   if debug_uf () then
                      fprintf fmt "[uf] critical pair: %a = %a@." 
                        R.print rx R.print ry;
                    if not (R.equal rx ry) then 
@@ -417,7 +417,7 @@ module Make ( R : Sig.X ) = struct
 	      let d2, ex_d2 = normal_form env (R.subst p v d) in
 	      if R.equal g2 gx then (* compose *)
 		begin
-		  if debug_ac && R.equal g2 d2 then
+		  if debug_ac () && R.equal g2 d2 then
 		    Format.eprintf "Compose : %a -> %a on %a and %a@." 
 		      R.print p R.print v
 		      Ac.print g R.print d;
@@ -426,7 +426,7 @@ module Make ( R : Sig.X ) = struct
 		  end
 	      else (* collapse *)
                 begin
-                  if debug_ac then
+                  if debug_ac () then
                     fprintf fmt "[uf] collapse: %a = %a@."
 		      R.print g2 R.print d2;
                   let ex = Ex.union 
@@ -510,12 +510,12 @@ module Make ( R : Sig.X ) = struct
   end
     
   let add env t = 
-    if rules = 3 then fprintf fmt "[rule] TR-UFX-Add@.";
+    if rules () = 3 then fprintf fmt "[rule] TR-UFX-Add@.";
     if MapT.mem t env.make then env, [] else Env.init_term env t
 
   let ac_solve eqs dep (env, tch) (p, v) = 
     (* pourquoi recuperer le representant de rv? r = rv d'apres testopt *)
-    if debug_uf then 
+    if debug_uf () then 
       printf "[uf] ac-solve: %a |-> %a %a@." R.print p R.print v Ex.print dep;
     assert ( let rp, _ = Env.find_or_normal_form env p in R.equal p rp);
     let rv, ex_rv = Env.find_or_normal_form env v in
@@ -527,11 +527,11 @@ module Make ( R : Sig.X ) = struct
     let rr1, ex_r1 = Env.find_or_normal_form env r1 in
     let rr2, ex_r2 = Env.find_or_normal_form env r2 in
     let dep = Ex.union dep (Ex.union ex_r1 ex_r2) in
-    if debug_uf then 
+    if debug_uf () then 
       printf "[uf] x-solve: %a = %a %a@."
 	R.print rr1 R.print rr2 Ex.print dep;
     if R.equal rr1 rr2 then begin
-      if rules = 3 then fprintf fmt "[rule] TR-CCX-Remove@.";
+      if rules () = 3 then fprintf fmt "[rule] TR-CCX-Remove@.";
       [] (* Remove rule *)
     end
     else 
@@ -539,7 +539,7 @@ module Make ( R : Sig.X ) = struct
 	ignore (Env.update_neqs rr1 rr2 dep env);
         try R.solve rr1 rr2 
 	with Unsolvable ->
-	  if rules = 3 then fprintf fmt "[rule] TR-CCX-Congruence-Conflict@.";
+	  if rules () = 3 then fprintf fmt "[rule] TR-CCX-Congruence-Conflict@.";
 	  raise (Inconsistent (dep, cl_extract env))
       end
         
@@ -547,16 +547,16 @@ module Make ( R : Sig.X ) = struct
     if Queue.is_empty eqs then env, tch
     else 
       let r1, r2, dep = Queue.pop eqs in
-      if debug_uf then 
+      if debug_uf () then 
 	printf "[uf] ac(x): delta (%a) = delta (%a)@." 
 	  R.print r1 R.print r2;
       let sbs = x_solve env r1 r2 dep in
       let env, tch = List.fold_left (ac_solve eqs dep) (env, tch) sbs in
-      if debug_uf then Print.all fmt env;
+      if debug_uf () then Print.all fmt env;
       ac_x eqs env tch
       
   let union env r1 r2 dep =
-    if rules = 3 then fprintf fmt "[rule] TR-UFX-Union@.";
+    if rules () = 3 then fprintf fmt "[rule] TR-UFX-Union@.";
     let equations = Queue.create () in 
     Queue.push (r1,r2, dep) equations;
     ac_x equations env []
@@ -564,7 +564,7 @@ module Make ( R : Sig.X ) = struct
   let rec distinct env rl dep =
     Print.all fmt env;
     let d = Lit.make (Literal.Distinct (false,rl)) in
-    if debug_uf then fprintf fmt "[uf] distinct %a@." Lit.print d;
+    if debug_uf () then fprintf fmt "[uf] distinct %a@." Lit.print d;
     let env, _, newds = 
       List.fold_left
 	(fun (env, mapr, newds) r -> 
@@ -572,7 +572,7 @@ module Make ( R : Sig.X ) = struct
 	   let rr, ex = Env.find_or_normal_form env r in 
 	   try
 	     let exr = MapR.find rr mapr in
-	     if rules = 3 then fprintf fmt "[rule] TR-CCX-Distinct-Conflict@.";
+	     if rules () = 3 then fprintf fmt "[rule] TR-CCX-Distinct-Conflict@.";
 	     raise (Inconsistent ((Ex.union ex exr), cl_extract env))
 	   with Not_found ->
 	     let uex = Ex.union ex dep in
@@ -602,7 +602,7 @@ module Make ( R : Sig.X ) = struct
 			    else
 			      distinct env [a; b] ex
 			| []  -> 
-			  if rules = 3 then
+			  if rules () = 3 then
 			    fprintf fmt "[rule] TR-CCX-Distinct-Conflict@.";
 			  raise (Inconsistent (ex, cl_extract env)) 
 			| _   -> env
@@ -618,7 +618,7 @@ module Make ( R : Sig.X ) = struct
     else No
 
   let are_distinct env t1 t2 = 
-    if debug_uf then
+    if debug_uf () then
       printf " [uf] are_distinct %a %a @." T.print t1 T.print t2; 
     let r1, ex_r1 = Env.lookup_by_t t1 env in
     let r2, ex_r2 = Env.lookup_by_t t2 env in
@@ -648,7 +648,7 @@ module Make ( R : Sig.X ) = struct
       let l, to_rel =
 	List.fold_left (fun (l, to_rel) t ->
 	  let rt = MapT.find t env.make in
-	  if complete_model || T.is_labeled t then
+	  if complete_model () || T.is_labeled t then
 	    if rt <> r then t::l, (t,rt)::to_rel
 	    else l, (t,rt)::to_rel
 	  else l, to_rel
@@ -665,11 +665,11 @@ module Make ( R : Sig.X ) = struct
 
 
   let find env t = 
-    if rules = 3 then fprintf fmt "[rule] TR-UFX-Find@.";
+    if rules () = 3 then fprintf fmt "[rule] TR-UFX-Find@.";
     Env.lookup_by_t t env
 
   let find_r = 
-    if rules = 3 then fprintf fmt "[rule] TR-UFX-Find@.";
+    if rules () = 3 then fprintf fmt "[rule] TR-UFX-Find@.";
     Env.find_or_normal_form
 
   let print = Print.all 

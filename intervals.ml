@@ -93,7 +93,7 @@ let print_borne pretty fmt = function
   | Minfty -> fprintf fmt "%s" (if pretty then "-∞" else "-inf")
   | Pinfty -> fprintf fmt "%s" (if pretty then "+∞" else "+inf")
   | Strict (v, e) | Large (v, e) ->
-    if verbose || proof then 
+    if verbose () || proof () then 
       fprintf fmt "%s %a" (string_of_num v) Ex.print e
     else fprintf fmt "%s" (string_of_num v)
       
@@ -115,11 +115,11 @@ let rec print_list pretty fmt = function
 
 let pretty_print fmt {ints = ints; is_int = b; expl = e } = 
   print_list true fmt ints;
-  if verbose || proof then fprintf fmt " %a" Ex.print e
+  if verbose () || proof () then fprintf fmt " %a" Ex.print e
   
 let print fmt {ints = ints; is_int = b; expl = e } = 
   print_list false fmt ints;
-  if verbose || proof then fprintf fmt " %a" Ex.print e
+  if verbose () || proof () then fprintf fmt " %a" Ex.print e
 
 let undefined ty = {
   ints = [Minfty, Pinfty];
@@ -311,7 +311,7 @@ let scale_interval n (b1,b2) =
 
 
 let scale n uints =
-  if rules = 4 then fprintf fmt "[rule] TR-Arith-Axiomes scale@.";
+  if rules () = 4 then fprintf fmt "[rule] TR-Arith-Axiomes scale@.";
   let l = List.map (scale_interval n) uints.ints in
   union { uints with ints = l; expl = uints.expl }
 	    
@@ -542,7 +542,7 @@ let exclude uints1 uints2 =
   intersect (complement uints1) uints2 
 
 let mult u1 u2 =
-  if rules = 4 then fprintf fmt "[rule] TR-Arith-Axiomes mult@.";
+  if rules () = 4 then fprintf fmt "[rule] TR-Arith-Axiomes mult@.";
   let resl, expl = 
     List.fold_left
       (fun (l', expl) b1 ->
@@ -557,7 +557,7 @@ let mult u1 u2 =
                  (Ex.union u1.expl u2.expl) }
 
 let power n u =
-  if rules = 4 then fprintf fmt "[rule] TR-Arith-Axiomes power@.";
+  if rules () = 4 then fprintf fmt "[rule] TR-Arith-Axiomes power@.";
   let l = List.map (power_bornes n) u.ints in
   union { u with ints = l }
 
@@ -643,7 +643,7 @@ let root_interval is_int (b1,b2) n =
   if compare_bornes u l > 0 then [] else [u,l]
 
 let sqrt {ints = l; is_int = is_int; expl = e } =
-  if rules = 4 then fprintf fmt "[rule] TR-Arith-Axiomes sqrt@.";
+  if rules () = 4 then fprintf fmt "[rule] TR-Arith-Axiomes sqrt@.";
   let l =
     List.fold_left
       (fun l' bs ->
@@ -652,7 +652,7 @@ let sqrt {ints = l; is_int = is_int; expl = e } =
   union { ints = l; is_int = is_int; expl = e }
 
 let rec root n ({ints = l; is_int = is_int; expl = e} as u) =
-  if rules = 4 then fprintf fmt "[rule] TR-Arith-Axiomes root@.";
+  if rules () = 4 then fprintf fmt "[rule] TR-Arith-Axiomes root@.";
   if n mod 2 = 0 then root (n/2) (sqrt u)
   else
     let l =
@@ -720,7 +720,7 @@ let inv ({ints=l; is_int=is_int} as u) =
   with Exit -> { u with ints = [Minfty, Pinfty]  }
 
 let div i1 i2 =
-  if rules = 4 then fprintf fmt "[rule] TR-Arith-Axiomes div@.";
+  if rules () = 4 then fprintf fmt "[rule] TR-Arith-Axiomes div@.";
   let inv_i2 = inv i2 in
   if inv_i2.ints = [Minfty, Pinfty] then inv_i2
   else

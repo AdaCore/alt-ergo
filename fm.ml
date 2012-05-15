@@ -107,11 +107,11 @@ module Make
     let list_of_ineqs fmt = List.iter (fprintf fmt "%a  " Inequation.print)
 
     let assume a = 
-      if debug_fm then 
+      if debug_fm () then 
 	fprintf fmt "[fm] We assume: %a@." LR.print (LR.make a)
 	
     let cross x cpos cneg others ninqs =
-      if debug_fm then begin
+      if debug_fm () then begin
 	fprintf fmt "[fm] We cross on %a@." X.print x;
 	fprintf fmt "with:@.  cpos = %a@.  cneg = %a@.  others = %a@."
 	  list_of_ineqs cpos list_of_ineqs cneg 
@@ -124,7 +124,7 @@ module Make
       SX.iter (fprintf fmt "%a, " X.print) use
 
     let env env = 
-      if debug_fm then begin
+      if debug_fm () then begin
 	fprintf fmt "------------- FM: inequations-------------------------@.";
         List.iter
           (fun (a,{Inequation.ple0=p; is_le=is_le}) ->
@@ -147,7 +147,7 @@ module Make
       end
 
     let implied_equalities l = 
-      if debug_fm then 
+      if debug_fm () then 
         begin
           fprintf fmt "[fm] %d implied equalities@." (List.length l);
           List.iter 
@@ -641,7 +641,7 @@ module Make
 *)
 
   let fm env eqs expl = 
-    if rules = 4 then fprintf fmt "[rule] TR-Arith-Fm@.";
+    if rules () = 4 then fprintf fmt "[rule] TR-Arith-Fm@.";
     fourier (env, eqs) (List.map snd env.inequations) expl
 
   let is_num r = 
@@ -808,7 +808,7 @@ module Make
 	(fun (env, eqs, new_ineqs, expl) (a, root, e) ->
 	   let a = normal_form a in
 	   let expl = Explanation.union e expl in
-           if debug_fm then 
+           if debug_fm () then 
 	     begin 
 	       Debug.assume a;
 	       fprintf fmt "explanations: %a@." Explanation.print expl
@@ -843,7 +843,7 @@ module Make
 	       | _ -> (env, eqs, new_ineqs, expl) 
 		   
 	   with Intervals.NotConsistent expl ->
-	     if debug_fm then 
+	     if debug_fm () then 
 	       fprintf fmt "interval inconsistent %a@." 
 		 Explanation.print expl; 
 	     raise (Exception.Inconsistent (expl, env.classes))
@@ -852,7 +852,7 @@ module Make
 	
     in
     if new_ineqs then 
-      if debug_fm then 
+      if debug_fm () then 
 	fprintf fmt "new explanations %a@." Explanation.print expl; 
     try
       (* we only call fm when new ineqs are assumed *)
@@ -875,7 +875,7 @@ module Make
       in
       env, result
     with Intervals.NotConsistent expl ->
-      if debug_fm then 
+      if debug_fm () then 
 	fprintf fmt "interval inconsistent %a@." 
 	  Explanation.print expl; 
       raise (Exception.Inconsistent (expl, env.classes))
@@ -929,11 +929,11 @@ module Make
       | Some (s, p, n, ex) -> 
           let r1 = P.alien_of p in
 	  let r2 = P.alien_of (P.create [] n  (P.type_info p)) in
-	  if debug_fm then
+	  if debug_fm () then
 	    fprintf fmt "[case-split] %a = %a@." X.print r1 X.print r2;
 	  [L.Eq(r1, r2), ex, s]
       | None -> 
-	  if debug_fm then fprintf fmt "[case-split] polynomes: nothing@.";
+	  if debug_fm () then fprintf fmt "[case-split] polynomes: nothing@.";
 	  []
 
   let case_split_monomes env = 
@@ -955,15 +955,15 @@ module Make
           let ty = X.type_info x in
           let r1 = x in
 	  let r2 = P.alien_of (P.create [] n  ty) in
-	  if debug_fm then
+	  if debug_fm () then
 	    fprintf fmt "[case-split] %a = %a@." X.print r1 X.print r2;
 	  [L.Eq(r1, r2), ex, s]
       | None -> 
-	  if debug_fm then fprintf fmt "[case-split] monomes: nothing@.";
+	  if debug_fm () then fprintf fmt "[case-split] monomes: nothing@.";
 	  []
    
   let case_split env = 
-    if rules = 4 then fprintf fmt "[rule] TR-Arith-CaseSplit@.";
+    if rules () = 4 then fprintf fmt "[rule] TR-Arith-CaseSplit@.";
     match case_split_polynomes env with
       | []     -> case_split_monomes env
       | choices -> choices

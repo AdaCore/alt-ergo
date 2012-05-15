@@ -151,7 +151,7 @@ struct
   module MR = Map.Make(struct type t = r let compare = compare end)
     
   let print fmt r = 
-    if term_like_pp then 
+    if term_like_pp () then 
       match r with
         | X1 t    -> fprintf fmt "%a" X1.print t
         | X2 t    -> fprintf fmt "%a" X2.print t
@@ -221,10 +221,10 @@ struct
     let {Term.f=sb} = Term.view t in
     match 
       X1.is_mine_symb sb,
-      not restricted && X2.is_mine_symb sb,
-      not restricted && X3.is_mine_symb sb,
-      not restricted && X4.is_mine_symb sb,
-      not restricted && X5.is_mine_symb sb,
+      not (restricted ()) && X2.is_mine_symb sb,
+      not (restricted ()) && X3.is_mine_symb sb,
+      not (restricted ()) && X4.is_mine_symb sb,
+      not (restricted ()) && X5.is_mine_symb sb,
       AC.is_mine_symb sb 
     with
       | true  , false , false, false, false, false -> X1.make t
@@ -239,10 +239,10 @@ struct
   let fully_interpreted sb =
     match 
       X1.is_mine_symb sb,
-      not restricted && X2.is_mine_symb sb,
-      not restricted && X3.is_mine_symb sb,
-      not restricted && X4.is_mine_symb sb,
-      not restricted && X5.is_mine_symb sb,
+      not (restricted ()) && X2.is_mine_symb sb,
+      not (restricted ()) && X3.is_mine_symb sb,
+      not (restricted ()) && X4.is_mine_symb sb,
+      not (restricted ()) && X5.is_mine_symb sb,
       AC.is_mine_symb sb 
     with
       | true  , false , false, false, false, false -> X1.fully_interpreted sb
@@ -298,7 +298,7 @@ struct
   let rec solve_list  solved l =
     List.fold_left
       (fun solved (a,b) -> 
-         if debug_combine then
+         if debug_combine () then
            fprintf fmt "solve_list %a=%a@." print a print b;
 	 let cmp = compare a b in
 	 if cmp = 0 then solved else
@@ -338,13 +338,13 @@ struct
       | (Ac _|Term _), (Ac _|Term _) -> [if cmp > 0 then a,b else b,a]
 
   and solve_theoryj solved xi xj =
-    if debug_combine then
+    if debug_combine () then
       fprintf fmt "solvej %a=%a@." print xi print xj;
     let cp , sol = partition (theory_num xj) (solvei  xi xj) in
     solve_list  (add_mr solved cp) (List.rev_map (fun (x,y) -> y,x) sol)
 
   and solvei  a b =
-    if debug_combine then
+    if debug_combine () then
       fprintf fmt "solvei %a=%a@." print a print b;
     match b with
       | X1 _ -> X1.solve  a b
@@ -381,10 +381,10 @@ struct
 
 
   let solve  a b =
-    if debug_combine then 
+    if debug_combine () then 
       fprintf fmt "[combine] solving %a = %a yields:@." print a print b;
     let sbs = solve  a b in
-    if debug_combine then begin
+    if debug_combine () then begin
       let c = ref 0 in
       List.iter 
         (fun (p,v) -> 

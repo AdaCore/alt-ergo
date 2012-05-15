@@ -38,7 +38,7 @@ let print_status d s steps =
 	if not satmode then Loc.report std_formatter d.st_loc;
 	if satmode then printf "@{<C.F_Red>unsat@}@." 
 	else printf "@{<C.F_Green>Valid@} (%2.4f) (%Ld)@." (Time.get()) steps;
-	if proof && not debug_proof then 
+	if proof () && not (debug_proof ()) then 
           printf "Proof:\n%a@." Explanation.print_proof dep
 	  
     | Inconsistent ->

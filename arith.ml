@@ -201,7 +201,7 @@ module Make
         P.create l c ty
 *)
   let make t =
-    if rules = 4 then fprintf fmt "[rule] TR-Arith-Make@.";
+    if rules () = 4 then fprintf fmt "[rule] TR-Arith-Make@.";
     let {T.ty = ty} = T.view t in
     let p, ctx = mke (Int 1) (empty_polynome ty) t [] in
     is_mine (arith_to_ac p), ctx
@@ -465,7 +465,7 @@ module Make
 
 
   let solve_aux r1 r2 =
-    if debug_arith then 
+    if debug_arith () then 
       fprintf fmt "[arith] we solve %a=%a@." X.print r1 X.print r2;
     let p1 = embed r1 in
     let p2 = embed r2 in
@@ -475,10 +475,10 @@ module Make
     if ty = Ty.Treal then solve_real pp else solve_int pp
 
   let solve r1 r2 =
-    if rules = 4 then fprintf fmt "[rule] TR-Arith-Solve@.";
+    if rules () = 4 then fprintf fmt "[rule] TR-Arith-Solve@.";
     let sbs = solve_aux r1 r2 in
     let sbs = List.fast_sort (fun (a,_) (x,y) -> X.compare x a)sbs in
-    if debug_arith then begin
+    if debug_arith () then begin
       fprintf fmt "[arith] solving %a = %a yields:@." X.print r1 X.print r2;
       let c = ref 0 in
       List.iter 

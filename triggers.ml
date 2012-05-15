@@ -333,9 +333,9 @@ let multi_triggers gopt bv vty trs =
   let lm = List.map (fun (lt, _, _) -> lt) l_parties in
   let mv , mt = List.partition (List.exists is_var) lm in
   let mv , mt = sort mv , sort mt in
-  let lm = if gopt || triggers_var then mt@mv else mt in
-  let m = at_most redondance  lm in
-  at_most redondance m
+  let lm = if gopt || triggers_var () then mt@mv else mt in
+  let m = at_most (redondance ()) lm in
+  at_most (redondance ()) m
 
 let rec vty_ty acc t = 
   let t = Ty.shorten t in
@@ -476,16 +476,16 @@ let make_triggers gopt vterm vtype trs =
       [] -> 
 	multi_triggers gopt vterm vtype trs
     | trs' -> 
-	let f l = at_most redondance (List.map (fun (t, _, _) -> [t]) l) in
+	let f l = at_most (redondance ()) (List.map (fun (t, _, _) -> [t]) l) in
 	let trs_v, trs_nv = List.partition (fun (t, _, _) -> is_var t) trs' in
 	let ll = 
 	  if trs_nv = [] then
-	    if triggers_var || gopt then 
+	    if triggers_var () || gopt then 
 	      f trs_v 
 	    else [] (*multi_triggers vars trs*)
 	  else f trs_nv 
 	in 
-	if glouton then ll@(multi_triggers gopt vterm vtype trs) else ll
+	if glouton () then ll@(multi_triggers gopt vterm vtype trs) else ll
 
 let rec make_rec pol gopt vterm vtype f = 
   let c, trs = match f.c with
@@ -557,7 +557,7 @@ let rec make_rec pol gopt vterm vtype f =
 	let f1', trs1 = make_rec pol gopt vterm'' vtype'' f1 in
 	let f2', trs2 = make_rec pol gopt vterm'' vtype'' f2 in
 	let trs12 = 
-	  if Options.notriggers || qf.qf_triggers = [] then
+	  if Options.notriggers () || qf.qf_triggers = [] then
 	    begin
 	      (make_triggers false vterm' vtype' (STRS.elements trs1))@
 		(make_triggers false vterm' vtype' (STRS.elements trs2))
@@ -595,7 +595,7 @@ let rec make_rec pol gopt vterm vtype f =
 	  make_rec pol gopt 
 	    (Vterm.union vterm vterm') (Vtype.union vtype vtype') qf.qf_form in
 	let trs' = 
-	  if Options.notriggers || qf.qf_triggers=[] then
+	  if Options.notriggers () || qf.qf_triggers=[] then
 	    make_triggers gopt vterm' vtype' (STRS.elements trs)
 	  else 
 	    let lf = filter_good_triggers (vterm',vtype') qf.qf_triggers in

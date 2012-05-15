@@ -60,10 +60,37 @@ let save_session envs =
     envs;
   close_out session_cout
 
+let save_dialog envs () =
+  if GToolbox.question_box 
+    ~title:"Save session" ~buttons:["Cancel"; "Save"] 
+    ~default:2 ~icon:(GMisc.image ~stock:`SAVE  ~icon_size:`DIALOG ())
+    "Would you like to save the current session ?" = 2 then save_session envs
+  else ()
+    
 let quit envs () =
-  save_session envs;
+  save_dialog envs ();
   GMain.quit ()
 
+
+let show_about () =
+  (* let v = Format.sprintf "Alt-Ergo version %s" Version.version in *)
+  let v = "Alt-Ergo" in
+  let aw = GWindow.about_dialog ~name:v 
+    ~authors:["Sylvain Conchon"; 
+	      "Évelyne Contejean"; 
+	      "Francois Bobot";
+	      "Mohamed Iguernelala";
+	      "Stephane Lescuyer";
+	      "Alain Mebsout"]
+    ~copyright:"2006-2012\nCNRS - INRIA - Université Paris Sud"
+    ~license:"CeCILL-C"
+    ~version:Version.version
+    ~website:"http://alt-ergo.lri.fr"
+    ~title:v ()
+  in
+  ignore (aw#connect#response ~callback:(fun _ -> aw#destroy ()));
+  ignore (aw#connect#close ~callback:(aw#destroy));
+  aw#show ()
 
 let pop_error ?(error=false) ~message () =
   let pop_w = GWindow.dialog
@@ -341,7 +368,7 @@ let update_status image label buttonclean env d s steps =
 	if not satmode then Loc.report std_formatter d.st_loc;
 	if satmode then printf "@{<C.F_Red>unsat@}@."
 	else printf "@{<C.F_Green>Valid@} (%2.4f) (%Ld)@." time steps;
-	if proof then begin 
+	if proof () then begin 
 	  printf "Proof:\n%a@." Explanation.print_proof dep;
 	  show_used_lemmas env dep
 	end;
@@ -410,10 +437,10 @@ let rec run buttonrun buttonstop buttonclean inst_model timers_model
   clear_used_lemmas_tags env;
     
   let ast = to_ast env.ast in
-  if debug then fprintf fmt "AST : \n-----\n%a@." print_typed_decl_list ast;
+  if debug () then fprintf fmt "AST : \n-----\n%a@." print_typed_decl_list ast;
 
   let ast_pruned =
-    if select > 0 then Pruning.split_and_prune select ast
+    if select () > 0 then Pruning.split_and_prune (select ()) ast
     else [List.map (fun f -> f,true) ast] in
 
   (* let chan = Event.new_channel () in *)
@@ -441,7 +468,7 @@ let rec run buttonrun buttonstop buttonclean inst_model timers_model
     (fun () ->
        (try
 	  (* Thread.yield (); *)
-	  if debug then fprintf fmt "Starting alt-ergo thread@.";
+	  if debug () then fprintf fmt "Starting alt-ergo thread@.";
 	  Frontend.Time.start ();
 
 	  Options.timer_start := Timers.start timers_model.timers;
@@ -458,7 +485,7 @@ let rec run buttonrun buttonstop buttonclean inst_model timers_model
 	with 
 	  | Abort_thread ->
 	      Timers.update timers_model.timers;
-	      if debug then fprintf fmt "alt-ergo thread terminated@.";
+	      if debug () then fprintf fmt "alt-ergo thread terminated@.";
 	      image#set_stock `DIALOG_QUESTION;
 	      label#set_text "  Process aborted";
 	      buttonstop#misc#hide ();
@@ -466,7 +493,7 @@ let rec run buttonrun buttonstop buttonclean inst_model timers_model
 	  |  e -> 
 	      Timers.update timers_model.timers;
 	      let message = sprintf "Error: %s" (Printexc.to_string e) in
-	      if debug then fprintf fmt "alt-ergo thread terminated@.";
+	      if debug () then fprintf fmt "alt-ergo thread terminated@.";
 	      image#set_stock `DIALOG_ERROR;
 	      label#set_text (" "^message);
 	      buttonstop#misc#hide ();
@@ -474,7 +501,7 @@ let rec run buttonrun buttonstop buttonclean inst_model timers_model
 	      fprintf fmt "%s@." message;
 	      pop_error ~error:true ~message ()
        );
-       if debug then fprintf fmt "Send done signal to waiting thread@.";
+       if debug () then fprintf fmt "Send done signal to waiting thread@.";
        buttonstop#misc#hide ();
        buttonrun#misc#show ();
        (* Event.sync (Event.send chan true) *)
@@ -677,6 +704,67 @@ let create_inst_view inst_model env buffer sv ~packing () =
   view
 
 
+let next_begins i buf found_all_tag =
+  let iter = ref i in
+  while !iter#compare buf#end_iter < 0 && 
+    not (!iter#begins_tag (Some found_all_tag)) do
+    iter := !iter#forward_to_tag_toggle (Some found_all_tag)
+  done;
+  if !iter#compare buf#end_iter >= 0 then raise Not_found;
+  !iter
+
+let prev_ends i buf found_all_tag =
+  let iter = ref i in
+  while !iter#compare buf#start_iter > 0 && 
+    not (!iter#ends_tag (Some found_all_tag)) do
+    iter := !iter#backward_to_tag_toggle (Some found_all_tag)
+  done;
+  if !iter#compare buf#start_iter <= 0 then raise Not_found;
+  !iter
+
+let search_next ?(backward=false) (sv:GSourceView2.source_view) 
+    (buf:sbuffer) found_tag found_all_tag () =
+  try
+    let iter = buf#get_iter_at_char buf#cursor_position in    
+    buf#remove_tag found_tag ~start:buf#start_iter ~stop:buf#end_iter;
+    let i1 = 
+      if backward then prev_ends iter buf found_all_tag
+      else next_begins iter buf found_all_tag
+    in
+    let i2 =
+      if backward then i1#backward_to_tag_toggle (Some found_all_tag)
+      else i1#forward_to_tag_toggle (Some found_all_tag)
+    in
+    buf#apply_tag found_tag ~start:i1 ~stop:i2;
+    ignore(sv#scroll_to_iter 
+	     ~use_align:true ~yalign:0.1 i1#backward_line);
+    buf#place_cursor ~where:i2
+  with Not_found -> ()
+      
+let search_one buf str result iter found_all_tag =
+  result :=
+    GSourceView2.iter_forward_search !iter [] 
+    ~start:buf#start_iter ~stop:buf#end_iter str;
+  match !result with
+    | None -> ()
+    | Some (i1, i2) ->
+      buf#apply_tag found_all_tag ~start:i1 ~stop:i2;
+      iter := i2
+	
+let search_all entry (sv:GSourceView2.source_view) 
+    (buf:sbuffer) found_tag found_all_tag () =
+  buf#remove_tag found_tag ~start:buf#start_iter ~stop:buf#end_iter;
+  buf#remove_tag found_all_tag ~start:buf#start_iter ~stop:buf#end_iter;
+  let str = entry#text in
+  let iter = ref buf#start_iter in
+  if str <> "" then
+    let result = ref None in
+    search_one buf str result iter found_all_tag;
+    while !result <> None do
+      search_one buf str result iter found_all_tag
+    done
+
+
 let _ =
 
   let lmanager = GSourceView2.source_language_manager ~default:true in
@@ -739,9 +827,9 @@ let _ =
        buf2#set_style_scheme scheme;
 
        let annoted_ast = annot buf1 l in
-       if debug then fprintf fmt "Computing dependencies ... ";
+       if debug () then fprintf fmt "Computing dependencies ... ";
        let dep = make_dep annoted_ast in
-       if debug then fprintf fmt "Done@.";
+       if debug () then fprintf fmt "Done@.";
 
        
        let text = List.fold_left
@@ -763,8 +851,10 @@ let _ =
 
        let rbox = GPack.vbox ~border_width:0 ~packing:vbox#add () in
 
+       
+       let toolbox = GPack.hbox ~border_width:0 ~packing:rbox#pack () in
 
-       let toolbar = GButton.toolbar ~tooltips:true ~packing:rbox#pack () in
+       let toolbar = GButton.toolbar ~tooltips:true ~packing:toolbox#add () in
        toolbar#set_icon_size `DIALOG;
        
        let hb = GPack.paned `HORIZONTAL 
@@ -874,6 +964,48 @@ let _ =
 	 )#coerce () in
 	buttonclean#misc#hide ();
 
+       let toolsearch = 
+	 GButton.toolbar ~tooltips:true ~packing:(toolbox#pack ~fill:true) () in
+       toolsearch#set_icon_size `DIALOG;
+
+       let search_box = GPack.hbox ~spacing:5 ~border_width:5 () in
+       ignore(GMisc.image ~icon_size:`LARGE_TOOLBAR
+	 ~stock:`FIND ~packing:search_box#add ());
+       let search_entry = GEdit.entry ~packing:search_box#add () in
+       ignore(toolsearch#insert_widget search_box#coerce);
+
+       let button_seach_forw = toolsearch#insert_button
+	 (* ~text:"Search" *)
+	 ~icon:(GMisc.image ~stock:`GO_DOWN  ~icon_size:`LARGE_TOOLBAR()
+	 )#coerce () in
+       let button_seach_back = toolsearch#insert_button
+	 (* ~text:"Search" *)
+	 ~icon:(GMisc.image ~stock:`GO_UP  ~icon_size:`LARGE_TOOLBAR()
+	 )#coerce () in
+
+       let found_all_tag = buf1#create_tag [`BACKGROUND "yellow"] in
+       let found_tag = buf1#create_tag [`BACKGROUND "orange"] in
+
+       ignore(search_entry#connect#changed
+		~callback:(search_all search_entry 
+			     tv1 buf1 found_tag found_all_tag));
+
+       ignore(search_entry#event#connect#key_press
+		~callback:(fun k ->
+		  if GdkEvent.Key.string k = "\r" then begin
+		    search_next tv1 buf1 found_tag found_all_tag ();
+		    true
+		  end
+		  else false
+		));
+
+       ignore(button_seach_forw#connect#clicked 
+	 ~callback:(search_next tv1 buf1 found_tag found_all_tag));
+       ignore(button_seach_back#connect#clicked 
+	 ~callback:(search_next ~backward:true 
+		      tv1 buf1 found_tag found_all_tag));
+
+
 
        let sw3 = GBin.scrolled_window
 	    ~vpolicy:`AUTOMATIC 
@@ -884,6 +1016,7 @@ let _ =
 	 ~packing:sw3#add ());
 
        add_to_buffer error_model env.buffer env.ast;
+       env.buffer#place_cursor ~where:buf1#start_iter;
 
        if error_model.some then fr3#misc#show ();
 
@@ -929,7 +1062,7 @@ let _ =
   let envs = List.rev envs in
 
   let file_entries = [
-    `I ("Save session", fun () -> save_session envs);
+    `I ("Save session", save_dialog envs);
     `S;
     `I ("Quit", quit envs)
   ] in
@@ -939,50 +1072,51 @@ let _ =
 
 
   let debug_entries = [
-    `C ("SAT", false, not_implemented);
+    `C ("SAT", debug_sat (), set_debug_sat);
     `S;
-    `C ("CC", false, not_implemented);
-    `C ("Use", false, not_implemented);
-    `C ("UF", false, not_implemented);
-    `C ("AC", false, not_implemented);
+    `C ("CC", debug_cc (), set_debug_cc);
+    `C ("Use", debug_use (), set_debug_use);
+    `C ("UF", debug_uf (), set_debug_uf);
+    `C ("AC", debug_ac (), set_debug_ac);
     `S;
-    `C ("Arith", false, not_implemented);
-    `C ("Fourier-Motzkin", false, not_implemented);
-    `C ("Arrays", false, not_implemented);
-    `C ("Bit-vectors", false, not_implemented);
-    `C ("Sum", false, not_implemented);
+    `C ("Arith", debug_arith (), set_debug_arith);
+    `C ("Fourier-Motzkin", debug_fm (), set_debug_fm);
+    `C ("Arrays", debug_arrays (), set_debug_arrays);
+    `C ("Bit-vectors", debug_bitv (), set_debug_bitv);
+    `C ("Sum", debug_sum (), set_debug_sum);
     `C ("Records", false, not_implemented);
     `S;
-    `C ("Case split", false, not_implemented);
-    `C ("Proofs", false, not_implemented);
-    `C ("Typing", false, not_implemented);
-    `C ("Verbose", false, not_implemented);
+    `C ("Case split", debug_split (), set_debug_split);
+    `C ("Replay proofs", debug_proof (), set_debug_proof);
+    `C ("Typing", debug_typing (), set_debug_typing);
+    `C ("Verbose", verbose (), set_verbose);
   ] in
 
   let options_entries = [
-    `C ("Unsat cores (proofs)", false, not_implemented);
+    `C ("Unsat cores (proofs)", proof (), set_proof);
     `S;
-    `C ("Model", false, not_implemented);
-    `C ("Complete model", false, not_implemented);
-    `C ("All models", false, not_implemented);
+    `C ("Model", model (), set_model);
+    `C ("Complete model", complete_model (), set_complete_model);
+    `C ("All models", all_models (), set_all_models);
     `S;
-    `C ("Variables in triggers", false, not_implemented);
-    `C ("Glouton", false, not_implemented);
-    `C ("Contra congruence", true, not_implemented);
+    `C ("Variables in triggers", triggers_var (), set_triggers_var);
+    `C ("Glouton", glouton (), set_glouton);
+    `C ("Contra congruence", not (nocontracongru ()),
+	fun b -> set_nocontracongru (not b));
     `S;
-    `C ("Restricted", false, not_implemented);
+    `C ("Restricted", restricted (), set_restricted);
   ] in
   
   let help_entries = [
-    `I ("About", fun () -> Format.printf "%s@." Version.version);
+    `I ("About", show_about);
   ] in
   
-  let entries = [
-    `M ("File", file_entries);
-    `M ("Debug", debug_entries);
-    `M ("Options", options_entries);
-    `M ("Help", help_entries)
-  ] in
+  (* let entries = [ *)
+  (*   `M ("File", file_entries); *)
+  (*   `M ("Debug", debug_entries); *)
+  (*   `M ("Options", options_entries); *)
+  (*   `M ("Help", help_entries) *)
+  (* ] in *)
   
   let create_menu label menubar =
     let item = GMenu.menu_item ~label ~packing:menubar#append () in
@@ -1000,13 +1134,6 @@ let _ =
 
   let menu = create_menu "Help" menubar in
   GToolbox.build_menu menu ~entries:help_entries;
-
-  (* (\* Popup menu *\) *)
-  (* let button = GButton.button ~label:"Popup" ~packing:main_vbox#add () in *)
-  (* button#connect#clicked ~callback:(fun () -> *)
-  (*   GToolbox.popup_menu ~entries ~button:0 *)
-  (* 	  ~time:(GtkMain.Main.get_current_event_time ()) *)
-  (*   ); *)
 
   ignore(w#connect#destroy ~callback:(quit envs));
   w#show ();

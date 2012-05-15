@@ -128,7 +128,7 @@ module Make(X : ALIEN) = struct
     module Debug = struct
 
       let assume fmt la = 
-        if debug_arrays && la <> [] then begin
+        if debug_arrays () && la <> [] then begin
           fprintf fmt "[Arrays.Rel] We assume@.";
           L.iter (fun (a,_,_) -> fprintf fmt "  > %a@." 
                     LR.print (LR.make a)) la;
@@ -142,7 +142,7 @@ module Make(X : ALIEN) = struct
         TBS.iter (fun k v -> fprintf fmt "%a --> %a@." T.print k print_sets v)
 
       let env fmt env = 
-        if debug_arrays then begin
+        if debug_arrays () then begin
           fprintf fmt "-- gets ----------------------------------------@.";
           print_gets fmt env.gets;
           fprintf fmt "-- tabs of sets --------------------------------@.";
@@ -153,7 +153,7 @@ module Make(X : ALIEN) = struct
         end
 
       let new_equalities fmt st = 
-        if debug_arrays then 
+        if debug_arrays () then 
           begin
             fprintf fmt "[Arrays] %d implied equalities@." 
 	      (Conseq.cardinal st);
@@ -343,11 +343,11 @@ module Make(X : ALIEN) = struct
     let case_split env = 
       try
         let a = LRset.choose env.split in
-        if debug_arrays then 
+        if debug_arrays () then 
           fprintf fmt "[Arrays.case-split] %a@." LR.print a;
         [LR.view a, Ex.empty, Num.Int 2] 
       with Not_found ->
-	if debug_arrays then fprintf fmt "[Arrays.case-split] Nothing@.";
+	if debug_arrays () then fprintf fmt "[Arrays.case-split] Nothing@.";
 	[]
           
     let assume env la ~are_eq ~are_neq ~class_of =

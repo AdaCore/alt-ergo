@@ -28,17 +28,17 @@ type action =
 let resulting_ids = Hashtbl.create 17
 
 let save actions ac = 
-  (match ac with
-    | Prune id -> Format.eprintf "Prune %d@." id
-    | IncorrectPrune id -> Format.eprintf "Incorrectprune %d@." id
-    | Unprune id -> Format.eprintf "Unrune %d@." id
-    | AddInstance (id, name, vars) ->
-      Format.eprintf "AddInstance %d %s@." id name
-    | AddTrigger (id, inst_buf, trs) ->
-      Format.eprintf "AddTriger %d %b %s@." id inst_buf trs
-    | LimitLemma (id, name, nb) ->
-      Format.eprintf "LimitLemma %d-%s %d@." id name nb
-  );
+  (* (match ac with *)
+  (*   | Prune id -> Format.eprintf "Prune %d@." id *)
+  (*   | IncorrectPrune id -> Format.eprintf "Incorrectprune %d@." id *)
+  (*   | Unprune id -> Format.eprintf "Unrune %d@." id *)
+  (*   | AddInstance (id, name, vars) -> *)
+  (*     Format.eprintf "AddInstance %d %s@." id name *)
+  (*   | AddTrigger (id, inst_buf, trs) -> *)
+  (*     Format.eprintf "AddTriger %d %b %s@." id inst_buf trs *)
+  (*   | LimitLemma (id, name, nb) -> *)
+  (*     Format.eprintf "LimitLemma %d-%s %d@." id name nb *)
+  (* ); *)
   Stack.push ac actions
 
 let compute_ids_offsets old_res res =

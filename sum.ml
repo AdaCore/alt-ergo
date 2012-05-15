@@ -115,17 +115,17 @@ module Make(X : ALIEN) = struct
       | Alien _    , Alien _    -> assert false
     
   let solve a b =
-    if debug_sum then fprintf fmt "[Sum] we solve %a = %a@."  
+    if debug_sum () then fprintf fmt "[Sum] we solve %a = %a@."  
       X.print a X.print b;
     try
       let res = solve a b in
-      if debug_sum then (match res with
+      if debug_sum () then (match res with
           [p,v] -> fprintf fmt "\twe get: %a |-> %a@." X.print p X.print v
         | []    -> fprintf fmt "\tthe equation is trivial@."
         | _ -> assert false);
       res
     with Unsolvable -> 
-      if debug_sum then fprintf fmt "\tthe equation is unsolvable@.";
+      if debug_sum () then fprintf fmt "\tthe equation is unsolvable@.";
       raise Unsolvable
 
   let solve a b =
@@ -160,12 +160,12 @@ module Make(X : ALIEN) = struct
     module Debug = struct
 
       let assume bol r1 r2 =
-        if debug_sum then
+        if debug_sum () then
           fprintf fmt "[Sum.Rel] we assume %a %s %a@." 
             X.print r1 (if bol then "=" else "<>") X.print r2
 
         let print_env env =
-          if debug_sum then begin
+          if debug_sum () then begin
             fprintf fmt "--SUM env ---------------------------------@.";
             MX.iter
               (fun r (hss, ex) ->
@@ -276,11 +276,11 @@ module Make(X : ALIEN) = struct
       match acc with 
         | Some (n,r,hs) -> 
 	    let r' = is_mine (Cons(hs,X.type_info r)) in
-	    if debug_sum then
+	    if debug_sum () then
 	      fprintf fmt "[case-split] %a = %a@." X.print r X.print r';
 	    [A.Eq(r, r'), Ex.empty, Num.Int n]
         | None -> 
-	    if debug_sum then fprintf fmt "[case-split] sum: nothing@.";
+	    if debug_sum () then fprintf fmt "[case-split] sum: nothing@.";
 	    []
       
 

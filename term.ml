@@ -65,13 +65,13 @@ let rec print fmt t =
 	fprintf fmt "(%a %a %a)" print e1 Sy.print x print e2
 
     | _, [] -> 
-        if Options.debug then
+        if Options.debug () then
           fprintf fmt "%a:%a" Sy.print x Ty.print ty
         else
           fprintf fmt "%a" Sy.print x
           
     | _, _ ->
-        if Options.debug then 
+        if Options.debug () then 
           fprintf fmt "%a(%a):%a" Sy.print x print_list l Ty.print ty
         else 
           fprintf fmt "%a(%a)" Sy.print x print_list l

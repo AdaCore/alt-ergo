@@ -133,7 +133,7 @@ module Make (X : S) = struct
 
 
   let print fmt p =
-    if Options.term_like_pp then pprint fmt p 
+    if Options.term_like_pp () then pprint fmt p 
     else begin
       M.iter 
         (fun t n -> fprintf fmt "%s*%a " (string_of_num n) X.print t) p.m;
@@ -157,7 +157,7 @@ module Make (X : S) = struct
     { m = m; c = c; ty = ty }
       
   let add p1 p2 = 
-    if rules = 4 then fprintf fmt "[rule] TR-Arith-Poly plus@.";
+    if rules () = 4 then fprintf fmt "[rule] TR-Arith-Poly plus@.";
     let m = 
       M.fold 
 	(fun x a m -> 
@@ -181,16 +181,16 @@ module Make (X : S) = struct
     { acx with m = m}
       
   let mult p1 p2 =
-    if rules = 4 then fprintf fmt "[rule] TR-Arith-Poly mult@.";
+    if rules () = 4 then fprintf fmt "[rule] TR-Arith-Poly mult@.";
     let p = mult_const p1.c p2 in
     M.fold (fun x a p -> add (mult_monome a x p2) p) p1.m p
 
   let sub p1 p2 =
-    if rules = 4 then fprintf fmt "[rule] TR-Arith-Poly moins@."; 
+    if rules () = 4 then fprintf fmt "[rule] TR-Arith-Poly moins@."; 
     add p1 (mult (create [] (Int (-1)) p1.ty) p2)
 
   let div p1 p2 =
-    if rules = 4 then fprintf fmt "[rule] TR-Arith-Poly div@.";
+    if rules () = 4 then fprintf fmt "[rule] TR-Arith-Poly div@.";
     if M.is_empty p2.m then
       if p2.c =/ Int 0 then raise Division_by_zero
       else 
@@ -205,7 +205,7 @@ module Make (X : S) = struct
 
 
   let modulo p1 p2 =
-    if rules = 4 then fprintf fmt "[rule] TR-Arith-Poly mod@.";
+    if rules () = 4 then fprintf fmt "[rule] TR-Arith-Poly mod@.";
     if M.is_empty p2.m then
       if p2.c =/ Int 0 then raise Division_by_zero
       else 

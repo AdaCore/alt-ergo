@@ -121,7 +121,7 @@ module Make (X : X) = struct
       in
       List.fold_left add_rec env xs
     in
-    let env = if age>age_limite then env else add_rec env t in
+    let env = if age > age_limite () then env else add_rec env t in
     !Options.timer_pause Timers.TMatch;
     env
       

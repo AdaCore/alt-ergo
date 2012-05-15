@@ -74,7 +74,7 @@ let make_instance f =
   apply_subst_formula (List.map List.hd lt) f.qf_form
 
 let make f = 
-  if Options.no_rm_eq_existential 
+  if Options.no_rm_eq_existential ()
   then TFexists f
   else
     try (*TFop(OPor,[TFexists f;*)

@@ -596,7 +596,7 @@ module Make(X : ALIEN) = struct
 	    let unif_slic = equations_slice parts in
 	    let eq_pr = equalities_propagation unif_slic in
 	    let sol = build_solution unif_slic eq_pr in 
-	    if Options.debug_bitv then 
+	    if Options.debug_bitv () then 
 	      begin
 		Print.print_sliced_sys err st_sys;
 		Print.print_c_solve_res err sys_sols;
@@ -705,7 +705,7 @@ module Make(X : ALIEN) = struct
 
   (* ne resout pas quand c'est deja resolu *)
   let solve u t = 
-    if Options.debug_bitv then 
+    if Options.debug_bitv () then 
       eprintf "[Bitv] solve %a = %a@." X.print u X.print t;
     
     match X.extract u , X.extract t with 
@@ -737,7 +737,7 @@ module Make(X : ALIEN) = struct
 	      bv = Canonizer.I_Comp(subst_rec x subs u ,subst_rec x subs v)}
 
   let subst x subs biv = 
-    if Options.debug_bitv then 
+    if Options.debug_bitv () then 
       eprintf "[Bitv] subst %a |-> %a in %a@." X.print x X.print subs print biv;
     if biv = [] then is_mine biv
     else 

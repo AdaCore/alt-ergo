@@ -216,7 +216,7 @@ let rec print fmt f =
   | Literal a -> 
       Literal.LT.print fmt a
   | Lemma {triggers = trs; main = f; name = n} -> 
-      if verbose then
+      if verbose () then
 	fprintf fmt "(lemma: %s)[%a] %a" 
 	  n
 	  (fun fmt -> 

@@ -70,20 +70,20 @@ module Make (X : Sig.X) = struct
   module Print = struct
     
     let begin_case_split () = 
-      if debug_split then
+      if debug_split () then
 	fprintf fmt "============= Begin CASE-SPLIT ===============@."
 
     let end_case_split () = 
-      if debug_split then
+      if debug_split () then
 	fprintf fmt "============= End CASE-SPLIT ===============@."
 
     let cc r1 r2 =
-      if debug_cc then 
+      if debug_cc () then 
 	fprintf fmt "@{<C.Bold>[cc]@} congruence closure : %a = %a@." 
 	  X.print r1 X.print r2
 
     let make_cst t ctx =
-      if debug_cc then 
+      if debug_cc () then 
 	if ctx = [] then ()
 	else begin
           fprintf fmt "[cc] contraints of make(%a)@." Term.print t;
@@ -95,7 +95,7 @@ module Make (X : Sig.X) = struct
 	end
 
     let add_to_use t = 
-      if debug_cc then 
+      if debug_cc () then 
 	fprintf fmt "@{<C.Bold>[cc]@} add_to_use: %a@." T.print t
 	
     let lrepr fmt = List.iter (fprintf fmt "%a " X.print)
@@ -104,40 +104,40 @@ module Make (X : Sig.X) = struct
       fprintf fmt "@{<C.Bold>[cc]@} leaves of %a@.@." T.print t; lrepr fmt lvs
 	
     let contra_congruence a ex = 
-      if debug_cc then 
+      if debug_cc () then 
 	fprintf fmt "[cc] find that %a %a by contra-congruence@." 
 	  A.LT.print a Ex.print ex
 
     let split_size sz = 
-      if debug_split then
+      if debug_split () then
 	fprintf fmt ">size case-split: %s@." (Num.string_of_num sz)
 
     let split_backtrack neg_c ex_c = 
-      if debug_split then
+      if debug_split () then
         fprintf fmt "[case-split] I backtrack on %a : %a@."
           LR.print neg_c Ex.print ex_c
 
     let split_assume c ex_c =
-      if debug_split then
+      if debug_split () then
         fprintf fmt "[case-split] I assume %a : %a@."
           LR.print c Ex.print ex_c
 
     let split_backjump c dep =
-      if debug_split then
+      if debug_split () then
         fprintf fmt "[case-split] I backjump on %a : %a@."
           LR.print c Ex.print dep
 
     let assume_literal sa =
-      if debug_cc then
+      if debug_cc () then
 	fprintf fmt "[cc] assume literal : %a@." LR.print (LR.make sa)
 
     let congruent a ex =
-      if debug_cc then
+      if debug_cc () then
 	fprintf fmt "[cc] new fact by conrgruence : %a ex[%a]@." 
           A.LT.print a Ex.print ex
 
     let query a =
-      if debug_cc then fprintf fmt "[cc] query : %a@." A.LT.print a
+      if debug_cc () then fprintf fmt "[cc] query : %a@." A.LT.print a
 
   end
     
@@ -310,7 +310,7 @@ module Make (X : Sig.X) = struct
     (* nothing to do if the term already exists *)
     if Uf.mem env.uf t then env, choices
     else begin
-      if rules = 3 then fprintf fmt "[rule] TR-CCX-AddTerm@.";
+      if rules () = 3 then fprintf fmt "[rule] TR-CCX-AddTerm@.";
       Print.add_to_use t;
 
       (* we add t's arguments in env *)
@@ -391,23 +391,23 @@ module Make (X : Sig.X) = struct
 	    Print.assume_literal sa;
 	    match sa with
 	      | A.Eq(r1, r2) ->
-		if rules = 3 then fprintf fmt "[rule] TR-CCX-Congruence@.";
+		if rules () = 3 then fprintf fmt "[rule] TR-CCX-Congruence@.";
 		let env, l = congruence_closure env r1 r2 ex in
 		let env, choices = assume_literal env choices l in
-		if Options.nocontracongru then env, choices
+		if Options.nocontracongru () then env, choices
 		else 
 		  let env, choices = 
 		    assume_literal env choices (contra_congruence env r1 ex) 
 		  in
 		  assume_literal env choices (contra_congruence env r2 ex)
 	      | A.Distinct (false, lr) ->
-		if rules = 3 then fprintf fmt "[rule] TR-CCX-Distinct@.";
+		if rules () = 3 then fprintf fmt "[rule] TR-CCX-Distinct@.";
 		if Uf.already_distinct env.uf lr then env, choices
 		else 
 		  {env with uf = Uf.distinct env.uf lr ex}, choices
 	      | A.Distinct (true, _) -> assert false
 	      | A.Builtin _ ->
-		if rules = 3 then fprintf fmt "[rule] TR-CCX-Builtin@.";
+		if rules () = 3 then fprintf fmt "[rule] TR-CCX-Builtin@.";
 		env, choices)
 	  (env, choices) lsa
       in
@@ -421,7 +421,7 @@ module Make (X : Sig.X) = struct
       match li, bad_last with
       | [], _ -> 
 	begin
-	  if rules = 3 then
+	  if rules () = 3 then
 	    fprintf fmt "[rule] TR-CCX-CS-Case-Split@.";
           match X.Rel.case_split base_env.relation with
 	    | [] -> 
@@ -439,7 +439,7 @@ module Make (X : Sig.X) = struct
 		  (fun acc (a,s,_,_) ->
 		     Num.mult_num acc s) (Num.Int 1) (l@dl) in
               Print.split_size sz;
-	      if Num.le_num sz max_split then aux ch No dl base_env l
+	      if Num.le_num sz (max_split ()) then aux ch No dl base_env l
 	      else
 		{ t with gamma_finite = base_env; choices = List.rev dl }, ch
 	end
@@ -458,7 +458,7 @@ module Make (X : Sig.X) = struct
 	  try
             Print.split_assume (LR.make c) ex_c_exp;
 	    let base_env, ch = assume_literal base_env ch [LSem c, ex_c_exp] in
-	    if rules = 3 then
+	    if rules () = 3 then
 	      fprintf fmt "[rule] TR-CCX-CS-Normal-Run@.";
 	    aux ch bad_last (a::dl) base_env l
 	  with Exception.Inconsistent (dep, classes) ->
@@ -466,11 +466,11 @@ module Make (X : Sig.X) = struct
               | None ->
                 (* The choice doesn't participate to the inconsistency *)
                 Print.split_backjump (LR.make c) dep;
-		if rules = 3 then
+		if rules () = 3 then
 		  fprintf fmt "[rule] TR-CCX-CS-Case-Split-Conflict@.";
                 raise (Exception.Inconsistent (dep, classes))
               | Some dep ->
-		if rules = 3 then
+		if rules () = 3 then
 		  fprintf fmt "[rule] TR-CCX-CS-Case-Split-Progress@.";
                 (* The choice participates to the inconsistency *)
                 let neg_c = LR.neg (LR.make c) in
@@ -490,9 +490,9 @@ module Make (X : Sig.X) = struct
 	    let env, ch = f t.gamma_finite in
 	    look_for_sat ch t env []
 	  with Exception.Inconsistent (dep, classes) -> 
-            if debug_split then
+            if debug_split () then
               fprintf fmt "[case-split] I replay choices@.";
-	    if rules = 3 then
+	    if rules () = 3 then
 	      fprintf fmt "[rule] TR-CCX-CS-Case-Split-Erase-Choices@.";
 	    (* we replay the conflict in look_for_sat, so we can
 	       safely ignore the explanation which is not useful *)
@@ -500,7 +500,7 @@ module Make (X : Sig.X) = struct
 	      [] { t with choices = []} t.gamma t.choices
       with Exception.Inconsistent (d, cl) ->
 	Print.end_case_split ();
-	if rules = 3 then
+	if rules () = 3 then
 	  fprintf fmt "[rule] TR-CCX-CS-Conflict@.";
 	raise (Exception.Inconsistent (d, cl))
     in

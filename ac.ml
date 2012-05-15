@@ -177,7 +177,7 @@ module Make (X : Sig.X) = struct
 	L.iter (F.fprintf fmt "%a" (pr_elt sep))((p,n-1)::l)
 	  
   let print fmt {h=h ; l=l} = 
-    if Sy.equal h (Sy.Op Sy.Mult) && Options.term_like_pp then
+    if Sy.equal h (Sy.Op Sy.Mult) && Options.term_like_pp () then
       F.fprintf fmt "%a" (pr_xs "'*'") l
     else
       F.fprintf fmt "%a(%a)" Sy.print h (pr_xs ",") l
@@ -187,7 +187,7 @@ module Make (X : Sig.X) = struct
   let subst p v ({h=h;l=l;t=t} as tm)  =
     !Options.thread_yield ();
     !Options.timer_start Timers.TAc;
-    if debug_ac then
+    if debug_ac () then
       F.fprintf fmt "[ac] subst %a by %a in %a@." 
 	X.print p X.print v X.print (X.ac_embed tm);
     let t = X.color {tm with l=compact (fold_flatten h (X.subst p v) l)} in

@@ -316,40 +316,40 @@ let rec type_term env f =
 
 and type_term_desc env loc = function
   | PPconst ConstTrue -> 
-      if rules = 1 then
+      if rules () = 1 then
 	fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print Ty.Tbool;
       TTconst Ttrue, Ty.Tbool
   | PPconst ConstFalse -> 
-      if rules = 1 then
+      if rules () = 1 then
 	fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print Ty.Tbool;
       TTconst Tfalse, Ty.Tbool
   | PPconst ConstVoid -> 
-      if rules = 1 then
+      if rules () = 1 then
 	fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print Ty.Tunit;
       TTconst Tvoid, Ty.Tunit
   | PPconst (ConstInt n) -> 
-      if rules = 1 then
+      if rules () = 1 then
 	fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print Ty.Tint;
       TTconst(Tint n), Ty.Tint
   | PPconst (ConstReal n) -> 
-      if rules = 1 then
+      if rules () = 1 then
 	fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print Ty.Treal;
       TTconst(Treal n), Ty.Treal
   | PPconst (ConstBitv n) -> 
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print
+      if rules () = 1 then fprintf fmt "[rule] TR-Typing-Const type %a@." Ty.print
       (Ty.Tbitv (String.length n));
       TTconst(Tbitv n), Ty.Tbitv (String.length n)
   | PPvar p -> 
       begin
 	try let s,t = Env.find env p in 
-	    if rules = 1 then
+	    if rules () = 1 then
 	      fprintf fmt "[rule] TR-Typing-Var$_\\Gamma$ type %a@."
 		Ty.print t;
 	    TTvar s , t
 	with Not_found -> 
 	  match Env.fresh_type env p loc with
 	    | s, { Env.args = []; result = ty} -> 
-	      if rules = 1 then
+	      if rules () = 1 then
 		fprintf fmt "[rule] TR-Typing-Var$_\\Delta$ type %a@." 
 		Ty.print ty;
 	      TTvar s , ty 
@@ -362,7 +362,7 @@ and type_term_desc env loc = function
 	let s, {Env.args = lt; result = t} = Env.fresh_type env p loc in
 	try
 	  List.iter2 Ty.unify lt lt_args; 
-	  if rules = 1 then
+	  if rules () = 1 then
 	    fprintf fmt "[rule] TR-Typing-App type %a@." Ty.print t;
 	  TTapp(s,te_args), t
 	with 
@@ -380,11 +380,11 @@ and type_term_desc env loc = function
 	let ty2 = Ty.shorten te2.c.tt_ty in
 	match ty1, ty2 with
 	  | Ty.Tint, Ty.Tint -> 
-	    if rules = 1 then fprintf fmt "[rule] TR-Typing-OpBin type %a@."
+	    if rules () = 1 then fprintf fmt "[rule] TR-Typing-OpBin type %a@."
 	      Ty.print ty1;
 	    TTinfix(te1,s,te2) , ty1
 	  | Ty.Treal, Ty.Treal -> 
-	    if rules = 1 then fprintf fmt "[rule] TR-Typing-OpBin type %a@."
+	    if rules () = 1 then fprintf fmt "[rule] TR-Typing-OpBin type %a@."
 	      Ty.print ty2; 
 	    TTinfix(te1,s,te2), ty2
 	  | Ty.Tint, _ -> error (ShouldHaveType(ty2,Ty.Tint)) t2.pp_loc
@@ -400,17 +400,17 @@ and type_term_desc env loc = function
 	let ty2 = Ty.shorten te2.c.tt_ty in
 	match ty1, ty2 with
 	  | Ty.Tint, Ty.Tint ->  
-	    if rules = 1 then fprintf fmt "[rule] TR-Typing-OpMod type %a@."
+	    if rules () = 1 then fprintf fmt "[rule] TR-Typing-OpMod type %a@."
 	      Ty.print ty1;
 	    TTinfix(te1,s,te2) , ty1
 	  | _ -> error (ShouldHaveTypeInt ty1) t1.pp_loc
       end
   | PPprefix(PPneg, {pp_desc=PPconst (ConstInt n)}) -> 
-    if rules = 1 then fprintf fmt "[rule] TR-Typing-OpUnarith type %a@." 
+    if rules () = 1 then fprintf fmt "[rule] TR-Typing-OpUnarith type %a@." 
       Ty.print Ty.Tint;
       TTconst(Tint ("-"^n)), Ty.Tint
   | PPprefix(PPneg, {pp_desc=PPconst (ConstReal n)}) -> 
-    if rules = 1 then fprintf fmt "[rule] TR-Typing-OpUnarith type %a@." 
+    if rules () = 1 then fprintf fmt "[rule] TR-Typing-OpUnarith type %a@." 
       Ty.print Ty.Treal;
       TTconst(Treal (Num.minus_num n)), Ty.Treal
   | PPprefix(PPneg, e) -> 
@@ -418,7 +418,7 @@ and type_term_desc env loc = function
       let ty = Ty.shorten te.c.tt_ty in
       if ty<>Ty.Tint && ty<>Ty.Treal then
 	error (ShouldHaveTypeIntorReal ty) e.pp_loc;
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-OpUnarith type %a@." 
+      if rules () = 1 then fprintf fmt "[rule] TR-Typing-OpUnarith type %a@." 
 	Ty.print ty;
       TTprefix(Symbols.Op Symbols.Minus, te), ty
   | PPconcat(t1, t2) ->
@@ -429,7 +429,7 @@ and type_term_desc env loc = function
 	let ty2 = Ty.shorten te2.c.tt_ty in
 	match ty1, ty2 with
 	  | Ty.Tbitv n , Ty.Tbitv m -> 
-	    if rules = 1 then
+	    if rules () = 1 then
 	      fprintf fmt "[rule] TR-Typing-OpConcat type %a@." 
 	      Ty.print (Ty.Tbitv (n+m));
 	    TTconcat(te1, te2), Ty.Tbitv (n+m)
@@ -450,7 +450,7 @@ and type_term_desc env loc = function
 	      if j>=n then error (BitvExtractRange(n,j) ) loc;
 	      let tei = type_term env ei in
 	      let tej = type_term env ej in
-	      if rules = 1 then
+	      if rules () = 1 then
 		fprintf fmt "[rule] TR-Typing-OpExtract type %a@." 
 		Ty.print (Ty.Tbitv (j-i+1));
 	      TTextract(te, tei, tej), Ty.Tbitv (j-i+1)
@@ -466,7 +466,7 @@ and type_term_desc env loc = function
 	  | Ty.Tfarray (tykey,tyval) ->
 	      begin try
 	        Ty.unify tykey tykey2;
-		if rules = 1 then
+		if rules () = 1 then
 		  fprintf fmt "[rule] TR-Typing-OpGet type %a@." 
 		  Ty.print tyval;
                 TTget(te1, te2), tyval
@@ -488,7 +488,7 @@ and type_term_desc env loc = function
 	  match ty1 with
 	    | Ty.Tfarray (tykey,tyval) ->
 		Ty.unify tykey tykey2;Ty.unify tyval tyval2;
-		if rules = 1 then
+		if rules () = 1 then
 		  fprintf fmt "[rule] TR-Typing-OpSet type %a@." 
 		  Ty.print ty1;
 		TTset(te1, te2, te3), ty1
@@ -509,7 +509,7 @@ and type_term_desc env loc = function
 	let ty3 = Ty.shorten te3.c.tt_ty in
 	if not (Ty.equal ty2 ty3) then
 	  error (ShouldHaveType(ty3,ty2)) t3.pp_loc;
-	if rules = 1 then
+	if rules () = 1 then
 	  fprintf fmt "[rule] TR-Typing-Ite type %a@." Ty.print ty2;
 	TTapp(Symbols.name "ite",[te1;te2;te3]) , ty2
       end
@@ -590,7 +590,7 @@ and type_term_desc env loc = function
       let te2 = type_term env t2 in
       let ty2 = Ty.shorten te2.c.tt_ty in
       let s, _ = Env.find env x in
-      if rules = 1 then
+      if rules () = 1 then
 	fprintf fmt "[rule] TR-Typing-Let type %a@." Ty.print ty2;
       TTlet(s, te1, te2), ty2
 
@@ -625,13 +625,13 @@ let rec join_exists f = match f.pp_desc with
 let rec type_form env f =
   let rec type_pp_desc = function
     | PPconst ConstTrue -> 
-        if rules = 1 then fprintf fmt "[rule] TR-Typing-True$_F$@.";
+        if rules () = 1 then fprintf fmt "[rule] TR-Typing-True$_F$@.";
 	TFatom {c=TAtrue; annot=new_id ()}, Sy.empty
     | PPconst ConstFalse ->  
-        if rules = 1 then fprintf fmt "[rule] TR-Typing-False$_F$@.";
+        if rules () = 1 then fprintf fmt "[rule] TR-Typing-False$_F$@.";
 	TFatom {c=TAfalse; annot=new_id ()}, Sy.empty
     | PPvar p ->
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-Var$_F$@.";
+      if rules () = 1 then fprintf fmt "[rule] TR-Typing-Var$_F$@.";
 	let r = begin
 	  match Env.fresh_type env p f.pp_loc with
 	    | s, { Env.args = []; result = Ty.Tbool} -> 
@@ -644,7 +644,7 @@ let rec type_form env f =
 	end in r, freevars_form r
 	  
     | PPapp(p,args ) -> 
-        if rules = 1 then fprintf fmt "[rule] TR-Typing-App$_F$@.";
+        if rules () = 1 then fprintf fmt "[rule] TR-Typing-App$_F$@.";
 	let r = 
 	  begin
 	    let te_args = List.map (type_term env) args in
@@ -674,7 +674,7 @@ let rec type_form env f =
 	in r, freevars_form r
 	  
     | PPdistinct (args) ->
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-Distinct$_F$@.";
+      if rules () = 1 then fprintf fmt "[rule] TR-Typing-Distinct$_F$@.";
 	let r = 
 	  begin
 	    let te_args = List.map (type_term env) args in
@@ -695,7 +695,7 @@ let rec type_form env f =
     | PPinfix 
 	({pp_desc = PPinfix (_, (PPlt|PPle|PPgt|PPge|PPeq|PPneq), a)} as p, 
 	 (PPlt | PPle | PPgt | PPge | PPeq | PPneq as r), b) ->
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-OpComp$_F$@.";
+      if rules () = 1 then fprintf fmt "[rule] TR-Typing-OpComp$_F$@.";
 	let r = 
           let q = { pp_desc = PPinfix (a, r, b); pp_loc = f.pp_loc } in
           let f1,_ = type_form env p in
@@ -703,7 +703,7 @@ let rec type_form env f =
           TFop(OPand, [f1;f2])
 	in r, freevars_form r
     | PPinfix(t1, (PPeq | PPneq as op), t2) -> 
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-OpBin$_F$@.";
+      if rules () = 1 then fprintf fmt "[rule] TR-Typing-OpBin$_F$@.";
 	let r = 
 	  let tt1 = type_term env t1 in
 	  let tt2 = type_term env t2 in
@@ -716,7 +716,7 @@ let rec type_form env f =
 	  with Ty.TypeClash(t1,t2) -> error (Unification(t1,t2)) f.pp_loc
 	in r, freevars_form r
     | PPinfix(t1, (PPlt | PPgt | PPge | PPle as op), t2) -> 
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-OpComp$_F$@.";
+      if rules () = 1 then fprintf fmt "[rule] TR-Typing-OpComp$_F$@.";
 	let r = 
 	  let tt1 = type_term env t1 in
 	  let tt2 = type_term env t2 in
@@ -740,7 +740,7 @@ let rec type_form env f =
 	  with Ty.TypeClash(t1,t2) -> error (Unification(t1,t2)) f.pp_loc
 	in r, freevars_form r
     | PPinfix(f1,op ,f2) -> 
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-OpConnectors$_F$@.";
+      if rules () = 1 then fprintf fmt "[rule] TR-Typing-OpConnectors$_F$@.";
 	begin
 	  let f1,fv1 = type_form env f1 in
 	  let f2,fv2 = type_form env f2 in
@@ -753,10 +753,10 @@ let rec type_form env f =
 	      | _ -> assert false), Sy.union fv1 fv2)
 	end
     | PPprefix(PPnot,f) ->
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-OpNot$_F$@."; 
+      if rules () = 1 then fprintf fmt "[rule] TR-Typing-OpNot$_F$@."; 
 	let f, fv = type_form env f in TFop(OPnot,[f]),fv
     | PPif(f1,f2,f3) -> 
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-Ite$_F$@.";
+      if rules () = 1 then fprintf fmt "[rule] TR-Typing-Ite$_F$@.";
 	let f1 = type_term env f1 in
 	let f2,fv2 = type_form env f2 in
 	let f3,fv3 = type_form env f3 in
@@ -797,14 +797,14 @@ let rec type_form env f =
 	in
 	(match f.pp_desc with 
 	     PPforall _ ->
-	       if rules = 1 then fprintf fmt "[rule] TR-Typing-Forall$_F$@.";
+	       if rules () = 1 then fprintf fmt "[rule] TR-Typing-Forall$_F$@.";
 	       TFforall qf_form
 	   | _ -> 
-	     if rules = 1 then fprintf fmt "[rule] TR-Typing-Exists$_F$@.";
+	     if rules () = 1 then fprintf fmt "[rule] TR-Typing-Exists$_F$@.";
 	     Existantial.make qf_form), 
 	(List.fold_left (fun acc (l,_) -> Sy.remove l acc) fv bvars)
     | PPlet (var,t,f) -> 
-      if rules = 1 then fprintf fmt "[rule] TR-Typing-Let$_F$@.";
+      if rules () = 1 then fprintf fmt "[rule] TR-Typing-Let$_F$@.";
 	let {c= { tt_ty = ttype }} as tt = type_term env t in
 	let svar = Symbols.var var in
 	let up = Env.list_of env in
@@ -1156,14 +1156,14 @@ let type_decl (acc, env) d =
   try
     match d with
       | Logic (loc, ac, lp, pp_ty) -> 
-	if rules = 1 then fprintf fmt "[rule] TR-Typing-LogicFun$_F$@.";
+	if rules () = 1 then fprintf fmt "[rule] TR-Typing-LogicFun$_F$@.";
 	  let env' = Env.add_logics env ac lp pp_ty loc in
 	  let lp = List.map fst lp in
 	  let td = {c = TLogic(loc,lp,pp_ty); annot = new_id () } in
 	  (td, env)::acc, env'
 
       | Axiom(loc,name,f) -> 
-	if rules = 1 then fprintf fmt "[rule] TR-Typing-AxiomDecl$_F$@.";
+	if rules () = 1 then fprintf fmt "[rule] TR-Typing-AxiomDecl$_F$@.";
 	  let f, _ = type_form env f in 
 	  let f = Triggers.make false f in
 	  let td = {c = TAxiom(loc,name,f); annot = new_id () } in
@@ -1171,7 +1171,7 @@ let type_decl (acc, env) d =
 
       | Rewriting(loc, name, lr) -> 
 	  let lf = List.map (type_form env) lr in
-          if Options.rewriting then
+          if Options.rewriting () then
             let rules = List.map (fun (f,_) -> make_rules loc f) lf in
 	    let td = {c = TRewriting(loc, name, rules); annot = new_id () } in
 	    (td, env)::acc, env
@@ -1180,7 +1180,7 @@ let type_decl (acc, env) d =
 
 
       | Goal(loc,n,f) ->
-	if rules = 1 then fprintf fmt "[rule] TR-Typing-GoalDecl$_F$@.";
+	if rules () = 1 then fprintf fmt "[rule] TR-Typing-GoalDecl$_F$@.";
 	  (*let f = move_up f in*)
 	  let f = alpha_renaming f in
 	  let env', axioms, goal = 
@@ -1230,11 +1230,11 @@ let type_decl (acc, env) d =
 	  let td = 
 	    match d with 
 	      | Function_def(_,_,_,t,_) ->
-		if rules = 1 then 
+		if rules () = 1 then 
 		  fprintf fmt "[rule] TR-Typing-LogicFun$_F$@.";
 		TFunction_def(loc,n,l,t,f)
 	      | _ ->
-		if rules = 1 then
+		if rules () = 1 then
 		  fprintf fmt "[rule] TR-Typing-LogicPred$_F$@.";
 		TPredicate_def(loc,n,l,f)
 	  in
@@ -1242,7 +1242,7 @@ let type_decl (acc, env) d =
 	  (td_a, env)::acc, env
 
       | TypeDecl(loc, ls, s, body) -> 
-	if rules = 1 then fprintf fmt "[rule] TR-Typing-TypeDecl$_F$@.";
+	if rules () = 1 then fprintf fmt "[rule] TR-Typing-TypeDecl$_F$@.";
 	  let env1 = Env.add_type_decl env ls s body loc in
 	  let td1 =  TTypeDecl(loc, ls, s, body) in
 	  let td1_a = { c = td1; annot=new_id () } in
