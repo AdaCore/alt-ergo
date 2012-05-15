@@ -42,3 +42,8 @@ val open_file:
 val processing:
   (Why_ptree.sat_tdecl -> output -> int64 -> 'a) -> 
   ((int tdecl, int) annoted * Why_typing.env) list list -> unit
+
+
+val print_status : sat_tdecl -> output -> int64 -> unit
+
+val main : unit -> unit

@@ -86,6 +86,7 @@ let profiling = ref false
 let timer_start = ref (fun _ -> ())
 let timer_pause = ref (fun _ -> ())
 
+let replay = !replay
 
 
 let set_type_only b = Preoptions.type_only := b

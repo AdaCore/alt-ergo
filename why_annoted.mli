@@ -192,6 +192,15 @@ val create_env :
   (string * int) list ->
   env
 
+val create_replay_env :
+  sbuffer -> 
+  error_model ->
+  inst_model ->
+  (atyped_decl annoted * Why_typing.env) list ->
+  action Stack.t ->
+  (string * int) list ->
+  env
+
 val find : 
   GText.tag -> sbuffer -> (atyped_decl annoted * Why_typing.env) list -> 
   annoted_node option

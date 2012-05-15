@@ -215,6 +215,25 @@ let create_env buf1 (buf2:sbuffer) errors insts st_ctx ast dep
     resulting_ids = resulting_ids;
   }
 
+let create_replay_env buf1 errors insts ast actions resulting_ids =
+ {
+    buffer = buf1;
+    inst_buffer = GSourceView2.source_buffer ();
+    errors = errors;
+    insts = insts;
+    st_ctx = (GMisc.statusbar ())#new_context ~name:"";
+    ast = ast;
+    dep = MDep.empty;
+    ctrl = false;
+    last_tag = GText.tag ();
+    search_tags = [];
+    proof_tags = [];
+    proof_toptags = [];
+    start_select = None;
+    stop_select = None;
+    actions = actions;
+    resulting_ids = resulting_ids;
+  }
 
 let tag (buffer:sbuffer) = buffer#create_tag []
 

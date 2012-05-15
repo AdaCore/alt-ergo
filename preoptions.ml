@@ -98,3 +98,5 @@ let set_rules = function
   | "cc" -> rules := 3
   | "arith" -> rules := 4
   | _ -> rules := -1
+
+let replay = ref false

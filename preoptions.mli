@@ -84,3 +84,5 @@ val set_rules : string -> unit
 val restricted : bool ref
 
 val bottom_classes : bool ref
+
+val replay : bool ref

@@ -83,6 +83,7 @@ val profiling : bool ref
 val timer_start : (Timers.kind -> unit) ref
 val timer_pause : (Timers.kind -> unit) ref
 
+val replay : bool
 
 val set_parse_only : bool -> unit
 val set_type_only : bool -> unit

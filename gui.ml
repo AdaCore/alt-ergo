@@ -26,29 +26,16 @@ open Format
 open Options
 
 let inf = Glib.Utf8.from_unichar 8734
-
-let () = 
-  try 
-    let _ = GMain.init () in
-    Options.profiling := true;
-    Options.thread_yield := Thread.yield
-      
-  with Gtk.Error s -> eprintf "%s@." s
-
-(* GTK *)
-
 let window_width = 950
 let window_height = 700
 let show_discharged = ref false
 
+(* GTK *)
 
-let w = 
-  GWindow.window
-    ~title:"AltGr-Ergo"
-    ~allow_grow:true
-    ~allow_shrink:true
-    ~width:window_width
-    ~height:window_height ()
+let () = 
+  try 
+    let _ = GMain.init () in ()
+  with Gtk.Error s -> eprintf "%s@." s
 
 
 let save_session envs =
@@ -60,15 +47,15 @@ let save_session envs =
     envs;
   close_out session_cout
 
-let save_dialog envs () =
+let save_dialog cancel envs () =
   if GToolbox.question_box 
-    ~title:"Save session" ~buttons:["Cancel"; "Save"] 
+    ~title:"Save session" ~buttons:[cancel; "Save"] 
     ~default:2 ~icon:(GMisc.image ~stock:`SAVE  ~icon_size:`DIALOG ())
     "Would you like to save the current session ?" = 2 then save_session envs
   else ()
     
 let quit envs () =
-  save_dialog envs ();
+  save_dialog "Quit" envs ();
   GMain.quit ()
 
 
@@ -420,6 +407,25 @@ let force_interrupt old_action_ref n =
     | _ -> fprintf fmt "Not in threaded mode@."
 
 
+
+let run_replay env =
+  let ast = to_ast env.ast in
+  if debug () then fprintf fmt "AST : \n-----\n%a@." print_typed_decl_list ast;
+
+  let ast_pruned =
+    if select () > 0 then Pruning.split_and_prune (select ()) ast
+    else [List.map (fun f -> f,true) ast] in
+
+  Frontend.Time.start ();
+  List.iter 
+    (fun dcl ->
+      let cnf = Cnf.make dcl in
+      ignore (Queue.fold
+		(Frontend.process_decl Frontend.print_status)
+		(empty_sat_inst env.insts, true, Explanation.empty) cnf)
+    ) ast_pruned
+
+
 let rec run buttonrun buttonstop buttonclean inst_model timers_model 
     image label thread env () =
   
@@ -765,7 +771,19 @@ let search_all entry (sv:GSourceView2.source_view)
     done
 
 
-let _ =
+let start_gui () =
+
+  Options.profiling := true;
+  Options.thread_yield := Thread.yield;
+    
+  let w = 
+    GWindow.window
+      ~title:"AltGr-Ergo"
+      ~allow_grow:true
+      ~allow_shrink:true
+      ~width:window_width
+      ~height:window_height ()
+  in
 
   let lmanager = GSourceView2.source_language_manager ~default:true in
   let source_language = lmanager#language "alt-ergo" in
@@ -804,6 +822,8 @@ let _ =
       ~scrollable:true
       ~packing:main_vbox#add () in
 
+  let note_search = Hashtbl.create 7 in
+
 
   let session_cin =
     try Some (open_in_bin !session_file)
@@ -840,8 +860,9 @@ let _ =
 	 ) "" annoted_ast in
 
        let label = GMisc.label ~text () in
+       let nb_page = ref 0 in
        let append g = 
-	 ignore(notebook#append_page ~tab_label:label#coerce g); () in
+	 nb_page := notebook#append_page ~tab_label:label#coerce g in
        
        let eventBox = GBin.event_box ~border_width:0 ~packing:append () in
        
@@ -972,6 +993,8 @@ let _ =
        ignore(GMisc.image ~icon_size:`LARGE_TOOLBAR
 	 ~stock:`FIND ~packing:search_box#add ());
        let search_entry = GEdit.entry ~packing:search_box#add () in
+       Hashtbl.add note_search !nb_page search_entry;
+
        ignore(toolsearch#insert_widget search_box#coerce);
 
        let button_seach_forw = toolsearch#insert_button
@@ -992,7 +1015,7 @@ let _ =
 
        ignore(search_entry#event#connect#key_press
 		~callback:(fun k ->
-		  if GdkEvent.Key.string k = "\r" then begin
+		  if GdkEvent.Key.keyval k = GdkKeysyms._Return then begin
 		    search_next tv1 buf1 found_tag found_all_tag ();
 		    true
 		  end
@@ -1062,7 +1085,7 @@ let _ =
   let envs = List.rev envs in
 
   let file_entries = [
-    `I ("Save session", save_dialog envs);
+    `I ("Save session", save_dialog "Cancel" envs);
     `S;
     `I ("Quit", quit envs)
   ] in
@@ -1135,9 +1158,92 @@ let _ =
   let menu = create_menu "Help" menubar in
   GToolbox.build_menu menu ~entries:help_entries;
 
+  
+  let focus_search () =
+    let p = notebook#current_page in
+    let e = Hashtbl.find note_search p in
+    e#misc#grab_focus ()    
+  in
+
+
+  let shortcuts =
+    [
+      GdkKeysyms._q, [`CONTROL], "Ctrl-q", "Quit", quit envs;
+      GdkKeysyms._s, [`CONTROL], "Ctrl-s", "Save", save_dialog "Cancel" envs;
+      GdkKeysyms._f, [`CONTROL], "Ctrl-f", "Search", focus_search;
+    ] in
+
+  let _ = List.iter
+    (fun (k,mods,_,_,f) -> Okey.add w ~mods k f)
+    shortcuts
+  in
+    
   ignore(w#connect#destroy ~callback:(quit envs));
   w#show ();
 
   (* Thread.join(GtkThread.start ()); *)
-  GtkThread.main ();
+  GtkThread.main ()
 
+
+let start_replay () =
+  
+  let lb = from_channel cin in
+  let typed_ast, _ = 
+    try Frontend.open_file !file lb
+    with
+      | Why_lexer.Lexical_error s -> 
+	  Loc.report err_formatter (lexeme_start_p lb, lexeme_end_p lb);
+	  printf "lexical error: %s\n@." s;
+	  exit 1
+      | Parsing.Parse_error ->
+	  let  loc = (lexeme_start_p lb, lexeme_end_p lb) in
+	  Loc.report err_formatter loc;
+          printf "syntax error\n@.";
+	exit 1
+      | Common.Error(e,l) -> 
+	  Loc.report err_formatter l; 
+	  printf "typing error: %a\n@." Common.report e;
+	  exit 1
+  in
+
+  let session_cin =
+    try Some (open_in_bin !session_file)
+    with Sys_error _ -> None in
+
+  List.iter
+    (fun l ->
+       
+       let buf1 = GSourceView2.source_buffer () in
+
+       let annoted_ast = annot buf1 l in
+
+       let error_model = empty_error_model () in
+       let inst_model = empty_inst_model () in
+       
+       let resulting_ids = compute_resulting_ids annoted_ast in
+       let actions = Gui_session.read_actions resulting_ids session_cin in
+
+
+       (* cradingue *)
+       let env = create_replay_env buf1 error_model inst_model annoted_ast
+	 actions resulting_ids in
+
+       add_to_buffer error_model env.buffer env.ast;
+
+       Gui_replay.replay_session env;
+       run_replay env
+
+    ) typed_ast;
+
+  begin
+    match session_cin with 
+      | Some c -> close_in c
+      | None -> ()
+  end
+
+
+
+
+let _ = 
+  if replay then start_replay () 
+  else start_gui ()

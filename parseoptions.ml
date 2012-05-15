@@ -91,6 +91,7 @@ let spec = [
   "-restricted", Arg.Set restricted, 
   " restrict set of decision procedures (equality, arithmetic and AC)";
   "-bottom-classes", Arg.Set bottom_classes, "show equivalence classes at each bottom of the sat";
+  "-replay", Arg.Set replay, "replay session saved in .agr";
 ]
 
 let _ =
