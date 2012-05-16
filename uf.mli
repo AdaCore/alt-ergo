@@ -43,7 +43,8 @@ module type S = sig
 
   val class_of : t -> Term.t -> Term.t list
   val cl_extract : t -> Term.Set.t list
-  val model : t -> (R.r * Term.t list * (Term.t * R.r) list) list
+  val model : t -> 
+    (R.r * Term.t list * (Term.t * R.r) list) list * (Term.t list) list
 
   val print : Format.formatter -> t -> unit
 

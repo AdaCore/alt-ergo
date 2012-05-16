@@ -47,8 +47,8 @@ module type S = sig
   
   val class_of : t -> Term.t -> Term.t list
   val cl_extract : t -> Term.Set.t list
-  val model : t -> (R.r * Term.t list * (Term.t * R.r) list) list
-  
+  val model : t -> 
+    (R.r * Term.t list * (Term.t * R.r) list) list * (Term.t list) list
   val print : Format.formatter -> t -> unit
  
 end
@@ -644,24 +644,37 @@ module Make ( R : Sig.X ) = struct
     with Not_found -> [t]
 
   let model env =
-    MapR.fold (fun r cl acc ->
-      let l, to_rel =
-	List.fold_left (fun (l, to_rel) t ->
-	  let rt = MapT.find t env.make in
-	  if complete_model () || T.is_labeled t then
-	    if rt <> r then t::l, (t,rt)::to_rel
-	    else l, (t,rt)::to_rel
-	  else l, to_rel
-	) ([], []) (SetT.elements cl) in
-      (* let l = List.filter  *)
-      (* 	(fun t ->  *)
-      (* 	  (MapT.find t env.make) <> r &&  *)
-      (* 	    (complete_model || T.is_labeled t) *)
-      (* 	)  *)
-      (* 	(SetT.elements cl) in *)
-      (r, l, to_rel)::acc
-    ) env.classes []
-      
+    let eqs =
+      MapR.fold (fun r cl acc ->
+	let l, to_rel =
+	  List.fold_left (fun (l, to_rel) t ->
+	    let rt = MapT.find t env.make in
+	    if complete_model () || T.is_labeled t then
+	      if rt <> r then t::l, (t,rt)::to_rel
+	      else l, (t,rt)::to_rel
+	    else l, to_rel
+	  ) ([], []) (SetT.elements cl) in
+	(r, l, to_rel)::acc
+      ) env.classes []
+    in
+    let rec extract_neqs acc makes =
+      try
+	let x, rx = MapT.choose makes in
+	let makes = MapT.remove x makes in
+	let acc =
+	  if complete_model () || T.is_labeled x then
+	    MapT.fold (fun y ry acc ->
+	      if (complete_model () || T.is_labeled y)
+		&& already_distinct env [rx; ry]
+	      then [y; x]::acc
+	      else acc
+	    ) makes acc
+	  else acc
+	in extract_neqs acc makes
+      with Not_found -> acc
+    in
+    let neqs = extract_neqs [] env.make in
+    eqs, neqs
 
 
   let find env t = 

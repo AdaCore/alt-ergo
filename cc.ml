@@ -600,6 +600,7 @@ module Make (X : Sig.X) = struct
 
   let print_model fmt t =
     let zero = ref true in
+    let eqs, neqs = Uf.model t.gamma_finite.uf in
     let rs = 
       List.fold_left (fun acc (r, l, to_rel) ->
 	if l <> [] then begin
@@ -611,7 +612,15 @@ module Make (X : Sig.X) = struct
 	  fprintf fmt "\n║ %a = %a" (T.print_list_sep " = ") l X.print r;
 	end;
 	to_rel@acc
-      ) [] (Uf.model t.gamma_finite.uf) in
+      ) [] eqs in
+    List.iter (fun lt ->
+      if !zero then begin 
+	fprintf fmt " Theory:";
+	fprintf fmt "\n╓───────";
+	zero := false;
+      end;
+      fprintf fmt "\n║ %a" (T.print_list_sep " <> ") lt;
+    ) neqs;
     if not !zero then fprintf fmt "\n╙@.";
     X.Rel.print_model fmt t.gamma_finite.relation rs
 

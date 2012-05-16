@@ -28,7 +28,6 @@ open Options
 let inf = Glib.Utf8.from_unichar 8734
 let window_width = 950
 let window_height = 700
-let show_discharged = ref false
 
 (* GTK *)
 

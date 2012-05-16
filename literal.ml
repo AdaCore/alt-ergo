@@ -138,13 +138,13 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
     let lbl = if lbl = "" then lbl else lbl^":" in
     match view a with
       | Eq (z1, z2) -> 
-	  Format.fprintf fmt "%s%a=%a" lbl X.print z1 X.print z2
+	  Format.fprintf fmt "%s %a = %a" lbl X.print z1 X.print z2
 	  (*if equal z1 z2 then Format.fprintf fmt "PTrue"
 	  else Format.fprintf fmt "%s%a=%a" lbl X.print z1 X.print z2*)
       | Distinct (b,(z::l)) -> 
 	  let b = if b then "~" else "" in
-	  Format.fprintf fmt "%s%s%a" lbl b X.print z;
-	  List.iter (fun x -> Format.fprintf fmt "<>%a" X.print x) l
+	  Format.fprintf fmt "%s %s%a" lbl b X.print z;
+	  List.iter (fun x -> Format.fprintf fmt " <> %a" X.print x) l
 
       | Builtin (true, n, [v1;v2]) when Hstring.equal n ale ->
 	  Format.fprintf fmt "%s %a <= %a" lbl X.print v1 X.print v2
@@ -160,7 +160,7 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
 
       | Builtin (b, n, l) ->
 	  let b = if b then "" else "~" in
-	  Format.fprintf fmt "%s%s%s(%a)" lbl b (Hstring.view n) print_list l
+	  Format.fprintf fmt "%s %s %s(%a)" lbl b (Hstring.view n) print_list l
       | _ -> assert false
     
   module Set = Set.Make(T)
