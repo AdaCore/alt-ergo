@@ -194,22 +194,26 @@ let add_label lbl t =
 let label t = try Labels.find labels t with Not_found -> Hstring.empty
 
 
-let rec is_labeled_rec depth { f = f; xs = xs } =
+let label_model h =
+  try String.sub (Hstring.view h) 0 6 = "model:"
+  with Invalid_argument _ -> false
+
+let rec is_in_model_rec depth { f = f; xs = xs } =
   let lb = Symbols.label f in
-  (not (Hstring.equal lb Hstring.empty)
+  (label_model lb
    &&
      (try
-	let md = int_of_string (Hstring.view lb) in
+	let md = Scanf.sscanf (Hstring.view lb) "model:%d" (fun x -> x) in
 	depth <= md
-      with Failure _ -> true))
+      with Scanf.Scan_failure _ -> true))
   || 
-    List.exists (is_labeled_rec (depth +1)) xs
+    List.exists (is_in_model_rec (depth +1)) xs
 
-let is_labeled t =
-  not (Hstring.equal (label t) Hstring.empty) 
-  || is_labeled_rec 0 t
+let is_in_model t =
+  label_model (label t) || is_in_model_rec 0 t
 
 
+let is_labeled t = not (Hstring.equal (label t) Hstring.empty)
 
 let print_taged_classes fmt =
   List.iter (fun cl -> 

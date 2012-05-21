@@ -990,13 +990,12 @@ module Make
 	      (Intervals.add u' 
 		 (Intervals.point c (P.type_info p) Explanation.empty)) in
 	  if !zero then begin 
-	    fprintf fmt " Relation:";
-	    fprintf fmt "\n╓─────────";
+	    fprintf fmt "Relation:";
 	    zero := false;
 	  end;
-	  fprintf fmt "\n║ %a ∈ %a" Term.print t Intervals.pretty_print u
+	  fprintf fmt "\n %a ∈ %a" Term.print t Intervals.pretty_print u
       with Not_found -> ()
     ) rs;
-    if not !zero then fprintf fmt "\n╙@."
+    if not !zero then fprintf fmt "\n@."
 
 end

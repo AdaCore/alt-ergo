@@ -273,18 +273,16 @@ let extract_prop_model t =
   !s
 
 let print_prop_model fmt s =
-  SF.iter (fprintf fmt "\n║ %a" F.print) s
+  SF.iter (fprintf fmt "\n %a" F.print) s
 
 let print_model fmt t =
-  fprintf fmt "\n╭───────────────╮ ";
-  fprintf fmt "\n│     Model     │";
-  fprintf fmt "\n╰───────────────╯\n";
+  fprintf fmt "\nModel\n@.";
   let pm = extract_prop_model t in
   if not (SF.is_empty pm) then begin
-    fprintf fmt " Propositional:";
-    fprintf fmt "\n╓──────────────";
+    fprintf fmt "Propositional:";
+    fprintf fmt "\n";
     print_prop_model fmt pm;
-    fprintf fmt "\n╙@.";
+    fprintf fmt "\n@.";
   end;
   CcX.print_model fmt t.tbox
 

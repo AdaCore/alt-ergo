@@ -543,11 +543,10 @@ let remove_context env () =
     ) env.ast
 
 
-let toggle_ctrl env key =
+let set_ctrl env b key =
   if GdkEvent.Key.hardware_keycode key = 37 then
-    (env.ctrl <- not env.ctrl; true)
+    (env.ctrl <- b; true)
   else false
-
 
 let empty_error_model () = 
   let rcols = new GTree.column_list in
@@ -887,14 +886,15 @@ let start_gui () =
 
        let fr1 = GBin.frame ~shadow_type:`ETCHED_OUT
 	 ~width:(60 * window_width / 100)
-	 ~height:(80 * window_height / 100)
+	 ~height:(50 * window_height / 100)
 	 ~packing:(vb1#pack1 ~shrink:true ~resize:true) () in
 
        let fr2 = GBin.frame ~shadow_type:`ETCHED_OUT
-	 ~height:(35 * window_height / 100)
+	 ~height:(15 * window_height / 100)
 	 ~packing:(vb2#pack1 ~shrink:true ~resize:true) () in
 
        let fr3 = GBin.frame ~shadow_type:`ETCHED_OUT ~show:false
+	 ~height:(5 * window_height / 100)
 	 ~packing:(vb1#pack2 ~shrink:true ~resize:true) () in
 
        let binfo = GPack.vbox ~border_width:0 
@@ -1066,10 +1066,10 @@ let start_gui () =
 		      result_image result_label thread));
 
        ignore(eventBox#event#connect#key_press
-		~callback:(toggle_ctrl env));
+		~callback:(set_ctrl env true));
 
        ignore(eventBox#event#connect#key_release
-		~callback:(toggle_ctrl env));
+		~callback:(set_ctrl env false));
        
        env::acc
 

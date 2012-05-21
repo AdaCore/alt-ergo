@@ -643,13 +643,23 @@ module Make ( R : Sig.X ) = struct
       SetT.elements (MapR.find rt env.classes)
     with Not_found -> [t]
 
+
+  let mapt_choose m =
+    let r = ref None in
+    (try 
+       MapT.iter (fun x rx -> 
+	 r := Some (x, rx); raise Exit
+       ) m 
+     with Exit -> ());
+    match !r with Some b -> b | _ -> raise Not_found
+
   let model env =
     let eqs =
       MapR.fold (fun r cl acc ->
 	let l, to_rel =
 	  List.fold_left (fun (l, to_rel) t ->
 	    let rt = MapT.find t env.make in
-	    if complete_model () || T.is_labeled t then
+	    if complete_model () || T.is_in_model t then
 	      if rt <> r then t::l, (t,rt)::to_rel
 	      else l, (t,rt)::to_rel
 	    else l, to_rel
@@ -659,12 +669,12 @@ module Make ( R : Sig.X ) = struct
     in
     let rec extract_neqs acc makes =
       try
-	let x, rx = MapT.choose makes in
+	let x, rx = mapt_choose makes in
 	let makes = MapT.remove x makes in
 	let acc =
-	  if complete_model () || T.is_labeled x then
+	  if complete_model () || T.is_in_model x then
 	    MapT.fold (fun y ry acc ->
-	      if (complete_model () || T.is_labeled y)
+	      if (complete_model () || T.is_in_model y)
 		&& already_distinct env [rx; ry]
 	      then [y; x]::acc
 	      else acc

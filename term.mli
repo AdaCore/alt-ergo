@@ -62,7 +62,7 @@ val union_subst : subst -> subst -> subst
 
 val add_label : Hstring.t -> t -> unit
 val label : t -> Hstring.t
-val is_labeled : t -> bool
+val is_in_model : t -> bool
 
 val print : Format.formatter -> t -> unit
 val print_list : Format.formatter -> t list -> unit
