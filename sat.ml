@@ -261,12 +261,16 @@ let mround predicate mode env max_size =
   res
   
 
+let label_model h =
+  try String.sub (Hstring.view h) 0 6 = "model:"
+  with Invalid_argument _ -> false
+
 let extract_prop_model t = 
   let s = ref SF.empty in
   MF.iter 
     (fun f _ -> 
        let lbl = F.label f in
-       if complete_model () || not (Hstring.equal Hstring.empty lbl) then
+       if complete_model () || label_model lbl then
 	 s := SF.add f !s
     ) 
     t.gamma;
@@ -280,7 +284,6 @@ let print_model fmt t =
   let pm = extract_prop_model t in
   if not (SF.is_empty pm) then begin
     fprintf fmt "Propositional:";
-    fprintf fmt "\n";
     print_prop_model fmt pm;
     fprintf fmt "\n@.";
   end;
