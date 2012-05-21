@@ -289,6 +289,13 @@ let print_model fmt t =
   end;
   CcX.print_model fmt t.tbox
 
+let refresh_model_handler =
+  if model () then
+    fun t ->   
+      Sys.set_signal Sys.sigabrt 
+	(Sys.Signal_handle (fun _ -> 
+	  printf "%a@.\nAborting@." print_model t; exit 1))
+  else fun _ -> ()
 
 (* sat-solver *)
 
@@ -351,6 +358,7 @@ let rec add_dep_of_formula f dep =
 
 
 let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
+  refresh_model_handler env;
   !Options.thread_yield ();
   try
     let dep = add_dep f dep in
