@@ -86,3 +86,4 @@ val restricted : bool ref
 val bottom_classes : bool ref
 
 val replay : bool ref
+val timelimit : float ref

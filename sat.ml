@@ -289,12 +289,19 @@ let print_model fmt t =
   end;
   CcX.print_model fmt t.tbox
 
+
+let _ =
+  if not (model ()) then
+      Sys.set_signal Sys.sigalrm
+	(Sys.Signal_handle (fun _ -> !timeout ()))
+
 let refresh_model_handler =
   if model () then
     fun t ->   
-      Sys.set_signal Sys.sigabrt 
-	(Sys.Signal_handle (fun _ -> 
-	  printf "%a@.\nAborting@." print_model t; exit 1))
+      Sys.set_signal Sys.sigalrm
+	(Sys.Signal_handle (fun _ ->
+	  printf "%a@." print_model t;
+	  !timeout ()))
   else fun _ -> ()
 
 (* sat-solver *)

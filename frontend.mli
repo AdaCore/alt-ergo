@@ -21,9 +21,11 @@ open Why_ptree
 
 module Time : sig
 
-  val start: unit -> unit
+  val start : unit -> unit
+  val get : unit -> float
 
-  val get: unit -> float
+  val set_timeout : unit -> unit
+  val unset_timeout : unit -> unit
 
 end
 

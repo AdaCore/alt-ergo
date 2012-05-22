@@ -389,6 +389,7 @@ let update_status image label buttonclean env d s steps =
 
 
 exception Abort_thread
+exception Timeout
 
 let interrupt = ref None
 
@@ -407,6 +408,15 @@ let force_interrupt old_action_ref n =
 
 
 
+let rec kill_thread thread () =
+  match !thread with 
+    | Some r -> 
+	interrupt :=  Some (Thread.id r);
+	Thread.join r
+    | _ -> 
+	interrupt := None
+
+
 let run_replay env =
   let ast = to_ast env.ast in
   if debug () then fprintf fmt "AST : \n-----\n%a@." print_typed_decl_list ast;
@@ -416,13 +426,15 @@ let run_replay env =
     else [List.map (fun f -> f,true) ast] in
 
   Frontend.Time.start ();
+  Frontend.Time.set_timeout ();
   List.iter 
     (fun dcl ->
       let cnf = Cnf.make dcl in
       ignore (Queue.fold
 		(Frontend.process_decl Frontend.print_status)
 		(empty_sat_inst env.insts, true, Explanation.empty) cnf)
-    ) ast_pruned
+    ) ast_pruned;
+  Frontend.Time.unset_timeout ()
 
 
 let rec run buttonrun buttonstop buttonclean inst_model timers_model 
@@ -469,13 +481,13 @@ let rec run buttonrun buttonstop buttonclean inst_model timers_model
 
   reset_timers timers_model;
 
-   thread := Some (Thread.create
+  thread := Some (Thread.create
     (fun () ->
        (try
 	  (* Thread.yield (); *)
 	  if debug () then fprintf fmt "Starting alt-ergo thread@.";
 	  Frontend.Time.start ();
-
+	  Frontend.Time.set_timeout ();
 	  Options.timer_start := Timers.start timers_model.timers;
 	  Options.timer_pause := Timers.pause timers_model.timers;
 
@@ -486,16 +498,29 @@ let rec run buttonrun buttonstop buttonclean inst_model timers_model
 			 (Frontend.process_decl 
 			    (update_status image label buttonclean env))
 			 (empty_sat_inst inst_model, true, Explanation.empty) cnf)
-	    ) ast_pruned
+	    ) ast_pruned;
+	  
+	  Frontend.Time.unset_timeout ()
 	with 
 	  | Abort_thread ->
+	      Frontend.Time.unset_timeout ();
 	      Timers.update timers_model.timers;
 	      if debug () then fprintf fmt "alt-ergo thread terminated@.";
 	      image#set_stock `DIALOG_QUESTION;
 	      label#set_text "  Process aborted";
 	      buttonstop#misc#hide ();
 	      buttonrun#misc#show ()
-	  |  e -> 
+	  | Timeout ->
+	      Frontend.Time.unset_timeout ();
+	      Timers.update timers_model.timers;
+	      if debug () then 
+		fprintf fmt "alt-ergo thread terminated (timeout)@.";
+	      image#set_stock `CUT;
+	      label#set_text "  Timeout";
+	      buttonstop#misc#hide ();
+	      buttonrun#misc#show ()
+	  | e -> 
+	      Frontend.Time.unset_timeout ();
 	      Timers.update timers_model.timers;
 	      let message = sprintf "Error: %s" (Printexc.to_string e) in
 	      if debug () then fprintf fmt "alt-ergo thread terminated@.";
@@ -517,18 +542,10 @@ let rec run buttonrun buttonstop buttonclean inst_model timers_model
        ignore (refresh_timers timers_model ())
     ) ());
 
-  Thread.yield ()
+
+   Thread.yield ()
   (* ignore (Thread.create (fun () ->  *)
   (* match !thread with Some s -> Thread.join s | _ -> assert false) ()) *)
-
-
-let rec kill_thread buttonrun buttonstop image label thread () =
-  match !thread with 
-    | Some r -> 
-	interrupt :=  Some (Thread.id r);
-	Thread.join r
-    | _ -> 
-	interrupt := None
 
 let remove_context env () =
   List.iter
@@ -773,7 +790,10 @@ let start_gui () =
 
   Options.profiling := true;
   Options.thread_yield := Thread.yield;
-    
+  
+  (* TODO: crash : change this*)
+  timeout := (fun () -> printf "Timeout@."; raise Timeout);
+
   let w = 
     GWindow.window
       ~title:"AltGr-Ergo"
@@ -1062,8 +1082,7 @@ let start_gui () =
 		      result_image result_label thread env));
 
        ignore(buttonstop#connect#clicked 
-	 ~callback:(kill_thread buttonrun buttonstop 
-		      result_image result_label thread));
+	 ~callback:(kill_thread thread));
 
        ignore(eventBox#event#connect#key_press
 		~callback:(set_ctrl env true));

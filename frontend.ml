@@ -41,6 +41,17 @@ module Time = struct
     start();
     res
 
+
+  let set_timeout () =
+    if timelimit () <> 0. then
+      ignore (Unix.setitimer Unix.ITIMER_REAL
+		{ Unix.it_value = timelimit (); Unix.it_interval = 0. })
+	
+  let unset_timeout () =
+    if timelimit () <> 0. then
+      ignore (Unix.setitimer Unix.ITIMER_REAL
+		{ Unix.it_value = 0.; Unix.it_interval = 0. })
+
 end
 
 type output = Unsat of Explanation.t | Inconsistent | Sat | Unknown
@@ -100,6 +111,7 @@ let process_decl print_status (env, consistent, dep) d =
 	print_status d Unknown (Sat.stop ());
         if model () then Sat.print_model std_formatter t;
 	env , consistent, dep
+
 
 let open_file file lb =
   let d ,status =
@@ -179,11 +191,13 @@ let print_status d s steps =
 	else printf "I don't know@."
 
 
-let main _ = 
+let main _ =
+  Time.set_timeout ();
   let lb = from_channel cin in 
   try 
     let d, status = open_file !file lb in 
-    processing print_status d
+    processing print_status d;
+    Time.unset_timeout ();
   with
     | Why_lexer.Lexical_error s -> 
 	Loc.report err_formatter (lexeme_start_p lb, lexeme_end_p lb);

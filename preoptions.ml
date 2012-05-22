@@ -82,7 +82,7 @@ let rules = ref (-1)
 let max_split = ref (Num.Int 1000000)
 let restricted = ref false
 let bottom_classes = ref false
-
+let timelimit = ref 0.
 
 let show_version () = Format.printf "%s@." Version.version; exit 0
 let show_libdir () = Format.printf "%s@." Version.libdir; exit 0

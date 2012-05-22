@@ -76,12 +76,14 @@ val rules : unit -> int
 val debug_split : unit -> bool
 val restricted : unit -> bool
 val bottom_classes : unit -> bool
+val timelimit : unit -> float
 
 val thread_yield : (unit -> unit) ref
 
 val profiling : bool ref
 val timer_start : (Timers.kind -> unit) ref
 val timer_pause : (Timers.kind -> unit) ref
+val timeout : (unit -> unit) ref
 
 val replay : bool
 
@@ -136,3 +138,4 @@ val set_rules : int -> unit
 val set_debug_split : bool -> unit
 val set_restricted : bool -> unit
 val set_bottom_classes : bool -> unit
+val set_timelimit : float -> unit

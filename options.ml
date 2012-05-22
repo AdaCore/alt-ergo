@@ -79,12 +79,14 @@ let rules () = !rules
 let debug_split () = !debug_split
 let restricted () = !restricted
 let bottom_classes () = !bottom_classes
+let timelimit () = !timelimit
 
 let thread_yield = ref (fun () -> ())
 
 let profiling = ref false
 let timer_start = ref (fun _ -> ())
 let timer_pause = ref (fun _ -> ())
+let timeout = ref (fun () -> Format.printf "Timeout@."; exit 142)
 
 let replay = !replay
 
@@ -140,3 +142,4 @@ let set_rules b = Preoptions.rules := b
 let set_debug_split b = Preoptions.debug_split := b
 let set_restricted b = Preoptions.restricted := b
 let set_bottom_classes b = Preoptions.bottom_classes := b
+let set_timelimit b = Preoptions.timelimit := b
