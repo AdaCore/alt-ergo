@@ -54,7 +54,8 @@ module Time = struct
 
 end
 
-type output = Unsat of Explanation.t | Inconsistent | Sat | Unknown
+type output = Unsat of Explanation.t | Inconsistent 
+	      | Sat of Sat.t | Unknown of Sat.t
 
 let check_produced_proof dep =
   if verbose () then 
@@ -99,7 +100,7 @@ let process_decl print_status (env, consistent, dep) d =
 	  env, consistent, dep
   with 
     | Sat.Sat t -> 
-	print_status d Sat (Sat.stop ());
+	print_status d (Sat t) (Sat.stop ());
         if model () then Sat.print_model std_formatter t;
 	env , consistent, dep
     | Sat.Unsat dep' -> 
@@ -108,7 +109,7 @@ let process_decl print_status (env, consistent, dep) d =
 	print_status d Inconsistent (Sat.stop ());
 	env , false, dep
     | Sat.I_dont_know t -> 
-	print_status d Unknown (Sat.stop ());
+	print_status d (Unknown t) (Sat.stop ());
         if model () then Sat.print_model std_formatter t;
 	env , consistent, dep
 
@@ -180,12 +181,12 @@ let print_status d s steps =
 	   fprintf fmt "Inconsistent assumption@.")
 	else printf "unsat@."
 	  
-    | Unknown ->
+    | Unknown t ->
 	if not satmode then
 	  (Loc.report std_formatter d.st_loc; printf "I don't know.@.")
 	else printf "unknown@."
 	  
-    | Sat  -> 
+    | Sat t -> 
 	if not satmode then Loc.report std_formatter d.st_loc;
 	if satmode then printf "unknown (sat)@." 
 	else printf "I don't know@."

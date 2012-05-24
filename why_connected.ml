@@ -81,16 +81,23 @@ let search_using t sbuf env =
     
 (* let arrow_cursor () = Gdk.Cursor.create `ARROW *)
 
-let set_select env sbuf = 
-  match env.start_select, env.stop_select with
-    | Some b, Some e ->
-	  sbuf#select_range 
-	    (sbuf#get_iter (`OFFSET b)) (sbuf#get_iter (`OFFSET e))
-    (* | None, Some e -> *)
-    (* 	if sbuf#has_selection then *)
-    (* 	  let ib, _ = sbuf#selection_bounds in *)
-    (* 	  sbuf#select_range ib (sbuf#get_iter (`OFFSET e)) *)
-    | _ -> ()
+let set_select env sbuf = ()
+  (* match env.start_select, env.stop_select with *)
+  (*   | Some b, Some e -> *)
+  (* 	  sbuf#select_range *)
+  (* 	    (sbuf#get_iter (`OFFSET b)) (sbuf#get_iter (`OFFSET e)) *)
+  (*   (\* | None, Some _ -> *\) *)
+  (*   (\* 	if sbuf#has_selection then *\) *)
+  (*   (\* 	  let ib, _ = sbuf#selection_bounds in *\) *)
+  (*   (\* 	  env.start_select <- Some ib#offset; *\) *)
+  (*   (\*       set_select env sbuf *\) *)
+  (*   (\* | Some _, None -> *\) *)
+  (*   (\* 	if sbuf#has_selection then *\) *)
+  (*   (\* 	  let _, ie = sbuf#selection_bounds in *\) *)
+  (*   (\* 	  env.stop_select <- Some ie#offset; *\) *)
+  (*   (\*       set_select env sbuf *\) *)
+	  
+  (*   | _ -> () *)
 
 let tag_callback t env sbuf ~origin:y z i =
   let ofs = (new GText.iter i)#offset in
@@ -542,7 +549,7 @@ and popup_axiom t env offset () =
   let phbox = GPack.hbox ~packing:button_cancel#add () in
   ignore(GMisc.image ~stock:`CANCEL ~packing:phbox#add ());
   ignore(GMisc.label ~text:"Cancel" ~packing:phbox#add ());
-  
+
   let vars, entries, id, af, aname = (match find t env.buffer env.ast with
     | Some (AD (atd, tyenv)) -> 
       begin
@@ -581,7 +588,7 @@ and popup_axiom t env offset () =
 	end
     | _ -> assert false)
   in
-    		
+
   let errors_l = GMisc.label ~text:"" ~packing:pop_w#vbox#pack () in
   errors_l#misc#modify_fg [`NORMAL, `NAME "red"];
   errors_l#misc#hide ();
@@ -683,7 +690,8 @@ and popup_trigger t qid env (sbuf:sbuffer) offset () =
     let pop_w = GWindow.dialog
     ~title:"Add new (multi) trigger"
     ~allow_grow:true
-    ~width:400 ()
+    ~width:400 
+    ~height:100 ()
     (* ~icon:(GdkPixbuf.from_xpm_data Logo.xpm_logo) ()  *)
     in
   let bbox = GPack.button_box `HORIZONTAL ~border_width:5 ~layout:`END

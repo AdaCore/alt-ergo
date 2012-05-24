@@ -62,8 +62,8 @@ BIBBYTE = nums.cma graph.cma unix.cma
 
 BIBOPT = $(BIBBYTE:.cma=.cmxa)
 
-BIBGUIBYTE = threads.cma lablgtk.cma lablgtksourceview2.cma gtkThread.cmo okey.cmo
-BIBGUIOPT = threads.cmxa lablgtk.cmxa lablgtksourceview2.cmxa gtkThread.cmx okey.cmx
+BIBGUIBYTE = threads.cma lablgtk.cma lablgtksourceview2.cma gtkThread.cmo
+BIBGUIOPT = threads.cmxa lablgtk.cmxa lablgtksourceview2.cmxa gtkThread.cmx
 
 # main target
 #############

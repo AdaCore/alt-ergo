@@ -39,18 +39,24 @@ let compare_bornes b1 b2 =
 
 let compare_bu_bl b1 b2 =
   match b1, b2 with
-    | (Minfty | Pinfty), _ | _,(Minfty | Pinfty) 
-    | Strict _, Strict _ | Large _, Large _ -> 
-      compare_bornes b1 b2 
+    | (Minfty | Pinfty), _ | _,(Minfty | Pinfty)
+    | Large _, Large _ -> 
+      compare_bornes b1 b2
+    | Strict _, Strict _ ->
+      let c = compare_bornes b1 b2 in
+      if c = 0 then -1 else c
     | Strict (v1, _), Large (v2, _) | Large (v1, _), Strict (v2, _) ->
       let c = compare_num v1 v2 in
       if c = 0 then -1 else c
       
 let compare_bl_bu b1 b2 =
   match b1, b2 with
-    | (Minfty | Pinfty), _ | _,(Minfty | Pinfty) 
-    | Strict _, Strict _ | Large _, Large _ -> 
-      compare_bornes b1 b2 
+    | (Minfty | Pinfty), _ | _,(Minfty | Pinfty)
+    | Large _, Large _ -> 
+      compare_bornes b1 b2
+    | Strict _, Strict _ ->
+      let c = compare_bornes b1 b2 in
+      if c = 0 then 1 else c
     | Strict (v1, _), Large (v2, _) | Large (v1, _), Strict (v2, _) ->
       let c = compare_num v1 v2 in
       if c = 0 then 1 else c
@@ -111,7 +117,7 @@ let rec print_list pretty fmt = function
   | [t] -> print_interval pretty fmt t
   | t::l -> fprintf fmt "%a%s%a" 
     (print_interval pretty) t 
-    (if pretty then "∪" else "") (print_list pretty) l
+    (if pretty then " ∪ " else " ") (print_list pretty) l
 
 let pretty_print fmt {ints = ints; is_int = b; expl = e } = 
   print_list true fmt ints;
@@ -251,9 +257,9 @@ let rec union_bornes l =
   match l with
     | [] | [_] -> l
     | (l1, u1)::((l2, u2)::r as r2) ->
-	if compare_bornes u1 l2 < 0 then
+	if compare_bu_bl u1 l2 < 0 then
 	  (l1, u1)::(union_bornes r2)
-	else if compare_bornes u1 u2 > 0 then
+	else if compare_bu_bu u1 u2 > 0 then
 	  union_bornes ((l1, u1)::r)
 	else
 	  union_bornes ((l1, u2)::r)

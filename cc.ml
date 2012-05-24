@@ -193,10 +193,10 @@ module Make (X : Sig.X) = struct
 	  A.Eq(r1, r2), ex
       | A.Distinct (b, lt) -> 
 	  let lr, ex = fold_find_with_explanation find ex_a lt in 
-	  A.Distinct (b, lr), ex
+	  A.Distinct (b, List.rev lr), ex
       | A.Builtin(b, s, l) -> 
 	  let lr, ex  = fold_find_with_explanation find ex_a l in
-	  A.Builtin(b, s, List.rev lr), ex
+	  A.Builtin (b, s, List.rev lr), ex
 
   let term_canonical_view env a ex_a =  
     view (Uf.find env.uf) (A.LT.view a) ex_a
@@ -383,7 +383,7 @@ module Make (X : Sig.X) = struct
   and assume_literal env choices la =
     !Options.thread_yield ();
     if la = [] then env, choices
-    else 
+    else
       let env, choices, lsa = semantic_view env choices la in
       let env, choices =
 	List.fold_left
@@ -439,7 +439,9 @@ module Make (X : Sig.X) = struct
 		  (fun acc (a,s,_,_) ->
 		     Num.mult_num acc s) (Num.Int 1) (l@dl) in
               Print.split_size sz;
-	      if Num.le_num sz (max_split ()) then aux ch No dl base_env l
+	      if Num.le_num sz (max_split ()) || 
+		Num.lt_num (max_split ()) (Num.Int 0) then
+		aux ch No dl base_env l
 	      else
 		{ t with gamma_finite = base_env; choices = List.rev dl }, ch
 	end

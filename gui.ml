@@ -103,6 +103,29 @@ let pop_error ?(error=false) ~message () =
   pop_w#show ()
 
 
+let pop_model sat_env () =
+  let pop_w = GWindow.dialog
+    ~title:"Model"
+    ~allow_grow:true
+    ~destroy_with_parent:true
+    ~width:400
+    ~height:300 ()
+  in
+  let sw1 = GBin.scrolled_window
+    ~vpolicy:`AUTOMATIC
+    ~hpolicy:`AUTOMATIC
+    ~packing:pop_w#vbox#add () in
+  let buf1 = GSourceView2.source_buffer () in
+  let tv1 = GSourceView2.source_view ~source_buffer:buf1 ~packing:(sw1#add) 
+    ~wrap_mode:`CHAR() in
+  let _ = tv1#misc#modify_font monospace_font in
+  let _ = tv1#set_editable false in
+  fprintf str_formatter "%a" Sat.print_model sat_env;
+  let model_text = (flush_str_formatter()) in
+  buf1#set_text model_text;
+
+  pop_w#show ()
+
 
 let compare_rows icol_number (model:#GTree.model) row1 row2 =
   let t1 = model#get ~row:row1 ~column:icol_number in
@@ -372,20 +395,22 @@ let update_status image label buttonclean env d s steps =
 	image#set_stock `EXECUTE;
 	label#set_text "  Inconsistent assumption"
 	  
-    | Frontend.Unknown ->
+    | Frontend.Unknown t ->
 	if not satmode then
 	  (Loc.report std_formatter d.st_loc; printf "I don't know.@.")
 	else printf "unknown@.";
 	image#set_stock `NO;
-	label#set_text (sprintf "  I don't know (%2.2f s)" (Frontend.Time.get()))
+	label#set_text (sprintf "  I don't know (%2.2f s)" (Frontend.Time.get()));
+	if model () then pop_model t ()
 	  
-    | Frontend.Sat  ->
+    | Frontend.Sat t ->
 	if not satmode then Loc.report std_formatter d.st_loc;
 	if satmode then printf "unknown (sat)@." 
 	else printf "I don't know@.";
 	image#set_stock `NO;
 	label#set_text
-	  (sprintf "  I don't know (sat) (%2.2f s)" (Frontend.Time.get()))
+	  (sprintf "  I don't know (sat) (%2.2f s)" (Frontend.Time.get()));
+	if model () then pop_model t ()
 
 
 exception Abort_thread
@@ -1183,19 +1208,24 @@ let start_gui () =
     e#misc#grab_focus ()    
   in
 
+  let mod_mask = [`MOD2 ; `MOD3 ; `MOD4 ; `MOD5 ; `LOCK] in
 
-  let shortcuts =
-    [
-      GdkKeysyms._q, [`CONTROL], "Ctrl-q", "Quit", quit envs;
-      GdkKeysyms._s, [`CONTROL], "Ctrl-s", "Save", save_dialog "Cancel" envs;
-      GdkKeysyms._f, [`CONTROL], "Ctrl-f", "Search", focus_search;
-    ] in
-
-  let _ = List.iter
-    (fun (k,mods,_,_,f) -> Okey.add w ~mods k f)
-    shortcuts
+  let key_press ev =
+    let key_ev = GdkEvent.Key.keyval ev in
+    let mods_ev = List.filter 
+      (fun m -> not (List.mem m mod_mask)) (GdkEvent.Key.state ev) in
+    match mods_ev with
+      |	[`CONTROL] ->
+	(match key_ev with
+	  | k when k = GdkKeysyms._q -> quit envs (); true
+	  | k when k = GdkKeysyms._s -> save_dialog "Cancel" envs (); true
+	  | k when k = GdkKeysyms._f -> focus_search (); true
+	  | _ -> false)
+      | _ -> false
   in
-    
+
+  ignore (w#event#connect#key_press ~callback:(key_press));
+
   ignore(w#connect#destroy ~callback:(quit envs));
   w#show ();
 
