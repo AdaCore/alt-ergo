@@ -213,7 +213,7 @@ let create_env buf1 (buf2:sbuffer) errors insts st_ctx ast dep
     start_select = None;
     stop_select = None;
     actions = actions;
-    saved_actions = actions;
+    saved_actions = Stack.copy actions;
     resulting_ids = resulting_ids;
   }
 
