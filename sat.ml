@@ -288,10 +288,6 @@ let print_model fmt t =
   CcX.print_model fmt t.tbox
 
 
-let _ =
-  if not (model ()) then
-      Sys.set_signal Sys.sigalrm
-	(Sys.Signal_handle (fun _ -> !timeout ()))
 
 let refresh_model_handler =
   if model () then
