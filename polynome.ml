@@ -80,6 +80,10 @@ module Make (X : S) = struct
   type t = { m : num M.t; c : num; ty : Ty.t }
 
 
+  let num_0 = Int 0
+  let num_1 = Int 1
+  let num_minus_1 = Int (-1)
+
   let map_to_list m = List.rev (M.fold (fun x a aliens -> (a, x)::aliens) m [])
 
   exception Out of int
@@ -209,7 +213,10 @@ module Make (X : S) = struct
     if M.is_empty p2.m then
       if p2.c =/ Int 0 then raise Division_by_zero
       else 
-        if M.is_empty p1.m then { p1 with c = mod_num p1.c p2.c }
+        if M.is_empty p1.m then
+	  let c = mod_num p1.c p2.c in
+	  let c = if c </ (Int 0) then p2.c +/ c else c in
+	  { p1 with c = c }
         else raise Not_a_num
     else raise Maybe_zero
       
