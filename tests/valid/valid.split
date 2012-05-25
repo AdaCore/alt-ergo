@@ -3086,7 +3086,19 @@ goal g11: forall a,b:int. a % b = 1 -> b = 10 -> a % 10 = 1
 $
 goal g12: forall a:int. a % 2 = (a + 2) % 2
 $
-goal g12: forall a,b:int. a % 2 = (a + 2*b) % 2
+goal g13: forall a,b:int. a % 2 = (a + 2*b) % 2
+$
+goal g14: (-1) % 32 = 31
+$
+goal g15: (-1) % 32 <> -1
+$
+goal g16: forall x:int. x = -1 -> x % 32  = 31
+$
+goal g17: forall x:int. x = -1 -> x % (-32)  = 31
+$
+goal g18: 1 % (-32) = 1
+$
+goal g19: (-1) % (-32) = 31
 
 
 

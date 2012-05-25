@@ -47,6 +47,7 @@ module type T = sig
   val div : t -> t -> t * bool
   val modulo : t -> t -> t
 
+  val is_num : t -> num option
   val is_empty : t -> bool
   val find : r -> t -> num
   val choose : t -> num * r
@@ -147,7 +148,7 @@ module Make (X : S) = struct
 
 
 
-  let is_num p = M.is_empty p.m
+  let is_num p = if M.is_empty p.m then Some p.c else None
 
   let find x m = try M.find x m with Not_found -> num_0
 
@@ -215,7 +216,7 @@ module Make (X : S) = struct
       else 
         if M.is_empty p1.m then
 	  let c = mod_num p1.c p2.c in
-	  let c = if c </ (num_0) then p2.c +/ c else c in
+	  let c = if c </ (num_0) then abs_num (p2.c) +/ c else c in
 	  { p1 with c = c }
         else raise Not_a_num
     else raise Maybe_zero

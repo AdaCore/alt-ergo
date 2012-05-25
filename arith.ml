@@ -99,10 +99,19 @@ module Make
      c2. md < t2 ;
      c3. exists k. t1 = t2 * k + t ;
      c4. t2 <> 0 (already checked) *)
-  let mk_modulo md t1 t2 ctx = 
+  let mk_modulo md t1 t2 p2 ctx = 
     let zero = T.int "0" in
     let c1 = A.LT.make (A.Builtin(true, ale, [zero; md])) in
-    let c2 = A.LT.make (A.Builtin(true, alt, [md; t2])) in
+    let c2 =
+      match P.is_num p2 with
+	| Some n2 -> 
+	    let an2 = abs_num n2 in
+	    assert (is_integer_num an2);
+	    let t2 = T.int (string_of_num an2) in
+	    A.LT.make (A.Builtin(true, alt, [md; t2]))
+	| None -> 
+	    A.LT.make (A.Builtin(true, alt, [md; t2])) 
+    in
     let k  = T.fresh_name Ty.Tint in
     let t3 = T.make (Sy.Op Sy.Mult) [t2;k] Ty.Tint in
     let t3 = T.make (Sy.Op Sy.Plus) [t3;md] Ty.Tint in
@@ -160,7 +169,7 @@ module Make
 	      let t = T.make mod_symb [t1; t2] Ty.Tint in    
               let ctx = match e with
                 | Division_by_zero | Polynome.Maybe_zero -> ctx
-                | Polynome.Not_a_num -> mk_modulo t t1 t2 ctx
+                | Polynome.Not_a_num -> mk_modulo t t1 t2 p2 ctx
                 | _ -> assert false 
               in 
               P.create [coef, X.term_embed t] (Int 0) ty, ctx 

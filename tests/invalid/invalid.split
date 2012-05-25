@@ -182,7 +182,20 @@ goal g20:
   min <= k <= max ->
   max - min <= 10 ->
   max - min = 0 ->
-  false 
+  false
+
+$
+goal g21: (-1) % 32 = -1
+
+$
+goal g22: (-1) % 32 < 0
+
+$
+goal g23: forall x:int. x= -1 -> x % (-32) = -33
+
+$
+goal g24: forall x,y:int. x= -1 -> x % (-32) = y -> false
+
 
 $
 goal g8 : forall x:real. x < 3.0 -> x <= 2.0
