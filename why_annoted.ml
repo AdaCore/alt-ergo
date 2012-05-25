@@ -188,6 +188,7 @@ type env = {
   mutable stop_select : int option;
   dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t;
   actions : action Stack.t;
+  saved_actions : action Stack.t;
   resulting_ids : (string * int) list;
 }
 
@@ -212,6 +213,7 @@ let create_env buf1 (buf2:sbuffer) errors insts st_ctx ast dep
     start_select = None;
     stop_select = None;
     actions = actions;
+    saved_actions = actions;
     resulting_ids = resulting_ids;
   }
 
@@ -232,6 +234,7 @@ let create_replay_env buf1 errors insts ast actions resulting_ids =
     start_select = None;
     stop_select = None;
     actions = actions;
+    saved_actions = actions;
     resulting_ids = resulting_ids;
   }
 

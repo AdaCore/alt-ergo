@@ -173,6 +173,7 @@ type env = {
   mutable stop_select : int option;
   dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t;
   actions : action Stack.t;
+  saved_actions : action Stack.t;
   resulting_ids : (string * int) list;
 }
 

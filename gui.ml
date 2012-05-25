@@ -47,11 +47,11 @@ let save_session envs =
   close_out session_cout
 
 let save_dialog cancel envs () =
-  if GToolbox.question_box 
-    ~title:"Save session" ~buttons:[cancel; "Save"] 
-    ~default:2 ~icon:(GMisc.image ~stock:`SAVE  ~icon_size:`DIALOG ())
-    "Would you like to save the current session ?" = 2 then save_session envs
-  else ()
+  if List.exists (fun env -> env.actions <> env.saved_actions) envs then
+    if GToolbox.question_box 
+      ~title:"Save session" ~buttons:[cancel; "Save"] 
+      ~default:2 ~icon:(GMisc.image ~stock:`SAVE  ~icon_size:`DIALOG ())
+      "Would you like to save the current session ?" = 2 then save_session envs
     
 let quit envs () =
   save_dialog "Quit" envs ();
