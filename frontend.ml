@@ -67,7 +67,7 @@ let check_produced_proof dep =
       (Formula.Set.fold
          (fun f env -> 
             Sat.assume env {Sat.f=f;age=0;name=None;mf=false;gf=false}
-         ) (Explanation.formulas_of dep) Sat.empty)
+         ) (Explanation.formulas_of dep) (Sat.empty ()))
     in
     raise (Sat.Sat env)
   with 
@@ -113,6 +113,43 @@ let process_decl print_status (env, consistent, dep) d =
         if model () then Sat.print_model std_formatter t;
 	env , consistent, dep
 
+exception Parse_only
+
+let rec add_theory env s =
+  let c_in = open_in s in
+  let lb = from_channel c_in in 
+  try 
+    let includes, a = Why_parser.file Why_lexer.token lb in
+    let env = List.fold_left add_theory env includes in
+    if parse_only () then raise Parse_only;
+    let d, env = Why_typing.file true env a in
+    close_in c_in;
+    let d = List.map (fun (d, _) -> (d, true)) d in
+    let cnf =  Cnf.make_theory d in
+    let f = Queue.fold (fun formulas d ->
+      match d.st_decl with
+        | Assume (f, _) | PredDef f ->
+          f :: formulas
+        | RwtDef _ | Query _ -> assert false)
+      [] cnf in
+    Custom_theory.add_theory f;
+    env
+  with
+    | Parse_only -> env
+    | Why_lexer.Lexical_error s -> 
+      Loc.report err_formatter (lexeme_start_p lb, lexeme_end_p lb);
+      eprintf "lexical error in theory: %s\n@." s;
+      exit 1
+    | Parsing.Parse_error ->
+      let  loc = (lexeme_start_p lb, lexeme_end_p lb) in
+      Loc.report err_formatter loc;
+      eprintf "syntax error in theory\n@.";
+      exit 1
+    | Common.Error(e,l) -> 
+      Loc.report err_formatter l; 
+      eprintf "typing error in theory: %a\n@." Common.report e;
+      exit 1
+
 
 let open_file file lb =
   let d ,status =
@@ -122,7 +159,7 @@ let open_file file lb =
       let l = List.flatten (List.map Smt_to_why.bench_to_why l) in
       if verbose () then printf "done.@.";
       if parse_only () then exit 0;
-      let ltd = Why_typing.file (l) in
+      let ltd, _ = Why_typing.file false Why_typing.empty_env l in
       let lltd = Why_typing.split_goals ltd in
       lltd, status
     end
@@ -132,14 +169,16 @@ let open_file file lb =
       let l = Smtlib2_to_why.smt2_to_why commands in
       if verbose () then printf "done.@.";
       if parse_only () then exit 0;
-      let ltd = Why_typing.file l in
+      let ltd, _ = Why_typing.file false Why_typing.empty_env l in
       let lltd = Why_typing.split_goals ltd in
       lltd, Smt_ast.Unknown
     end
     else
-      let a = Why_parser.file Why_lexer.token lb in
+      let includes, a = Why_parser.file Why_lexer.token lb in
+      (* Customized theories given as include *)
+      let env = List.fold_left add_theory Why_typing.empty_env includes in
       if parse_only () then exit 0;
-      let ltd = Why_typing.file a in
+      let ltd, _ = Why_typing.file false env a in
       let lltd = Why_typing.split_goals ltd in
       lltd, Smt_ast.Unknown
   in
@@ -161,7 +200,7 @@ let processing report declss =
        (fun dcl ->
 	  let cnf = Cnf.make dcl in 
 	  ignore (Queue.fold (process_decl report)
-		    (Sat.empty, true, Explanation.empty) cnf)
+		    (Sat.empty (), true, Explanation.empty) cnf)
        )) (pruning declss)
 
 

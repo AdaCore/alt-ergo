@@ -616,11 +616,11 @@ let rec join_forall f = match f.pp_desc with
   | _ -> [] , [] , f
 
 let rec join_exists f = match f.pp_desc with
-  | PPexists (vars, ty, f) -> 
-      let tyvars,f = join_exists f in  
-      (vars, ty)::tyvars ,  f
+  | PPexists (vars, ty, trs1, f) -> 
+      let tyvars,trs2,f = join_exists f in  
+      (vars, ty)::tyvars , trs1@trs2,  f
   | PPnamed (_, f) -> join_exists f
-  | _ -> [] , f
+  | _ -> [] , [] , f
 
 let rec type_form env f =
   let rec type_pp_desc = function
@@ -771,9 +771,9 @@ let rec type_form env f =
 	    | PPforall(vars,ty,triggers,f') -> 
 		let ty_vars, triggers', f' = join_forall f' in
 		(vars, ty)::ty_vars,ty ,triggers@triggers', f'
-	    | PPexists(vars,ty,f') -> 
-		let ty_vars, f' = join_exists f' in
-		(vars, ty)::ty_vars, ty, [], f'
+	    | PPexists(vars,ty,triggers,f') -> 
+		let ty_vars, triggers', f' = join_exists f' in
+		(vars, ty)::ty_vars, ty, triggers@triggers', f'
 	    | _ -> assert false
 	in
 	let env' = 
@@ -819,9 +819,9 @@ let rec type_form env f =
     | PPforall_named (lx, tys, trs, f) ->
         let lx = List.map fst lx in
 	type_pp_desc (PPforall (lx, tys, trs, f))
-    | PPexists_named (lx, tys, f)  ->
+    | PPexists_named (lx, tys, trs, f)  ->
         let lx = List.map fst lx in
-	type_pp_desc (PPexists (lx, tys, f))
+	type_pp_desc (PPexists (lx, tys, trs, f))
 
     | _ -> 
 	let te1 = type_term env f in
@@ -941,7 +941,7 @@ and alpha_rec ((up, m) as s) f =
 	let ff2 = alpha_renaming s f2 in
 	PPlet(x, ff1, ff2)
 	
-    | PPexists(lx, ty, f1) ->
+    | PPexists(lx, ty, trs, f1) ->
 	let s, lx = 
 	  List.fold_left
 	    (fun (s, lx) x ->
@@ -954,9 +954,10 @@ and alpha_rec ((up, m) as s) f =
 		 (S.add x up, m), x :: lx)
 	    (s, []) lx
 	in
+	let trs = List.map (List.map (alpha_renaming s)) trs in
 	let ff1 = alpha_renaming s f1 in
-	PPexists(lx, ty, ff1)
-    | PPexists_named (lx, ty, f1) ->
+	PPexists(lx, ty, trs, ff1)
+    | PPexists_named (lx, ty, trs, f1) ->
 	let s, lx = 
 	  List.fold_left
 	    (fun (s, lx) (x, lbl) ->
@@ -970,7 +971,8 @@ and alpha_rec ((up, m) as s) f =
 	    (s, []) lx
 	in
 	let ff1 = alpha_renaming s f1 in
-	PPexists_named (lx, ty, ff1)
+	let trs = List.map (List.map (alpha_renaming s)) trs in
+	PPexists_named (lx, ty, trs, ff1)
  
 let alpha_renaming = alpha_renaming (S.empty, MString.empty)
 
@@ -1017,11 +1019,11 @@ let rec intro_hypothesis env valid_mode f =
 	env, f1::axioms , goal
     | PPforall (lv, pp_ty, _, f) when valid_mode ->  
 	intro_hypothesis (Env.add_names env lv pp_ty f.pp_loc) valid_mode f
-    | PPexists (lv, pp_ty, f) when not valid_mode-> 
+    | PPexists (lv, pp_ty, _, f) when not valid_mode-> 
 	intro_hypothesis (Env.add_names env lv pp_ty f.pp_loc) valid_mode f
     | PPforall_named (lvb, pp_ty, _, f) when valid_mode ->  
 	intro_hypothesis (Env.add_names_lbl env lvb pp_ty f.pp_loc) valid_mode f
-    | PPexists_named (lvb, pp_ty, f) when not valid_mode-> 
+    | PPexists_named (lvb, pp_ty, _, f) when not valid_mode-> 
 	intro_hypothesis (Env.add_names_lbl env lvb pp_ty f.pp_loc) valid_mode f
     | _ -> 
 	let env , f = elim_toplevel_forall env valid_mode f in
@@ -1057,9 +1059,9 @@ let rec max_terms acc f =
 	max_terms acc f2
 
     | PPforall(_, _, _, _) 
-    | PPexists(_, _, _) 
+    | PPexists(_, _, _, _) 
     | PPforall_named(_, _, _, _) 
-    | PPexists_named(_, _, _) 
+    | PPexists_named(_, _, _, _) 
     | PPvar _ 
     | PPlet(_, _, _) 
     | PPinfix(_, _, _) -> raise Exit
@@ -1140,11 +1142,11 @@ let rec monomorphize_form tf =
   in 
   { tf with c = c }
 
-let axioms_of_rules loc name lf acc env =
+let axioms_of_rules keep_triggers loc name lf acc env =
   let acc = 
     List.fold_left
       (fun acc (f, _) ->
-        let f = Triggers.make false f in
+        let f = Triggers.make keep_triggers false f in
         let name = (Common.fresh_string ()) ^ "_" ^ name in
         let td = {c = TAxiom(loc,name,f); annot = new_id () } in
 	(td, env)::acc
@@ -1152,7 +1154,7 @@ let axioms_of_rules loc name lf acc env =
   in 
   acc, env
       
-let type_decl (acc, env) d = 
+let type_decl keep_triggers (acc, env) d = 
   try
     match d with
       | Logic (loc, ac, lp, pp_ty) -> 
@@ -1165,7 +1167,7 @@ let type_decl (acc, env) d =
       | Axiom(loc,name,f) -> 
 	if rules () = 1 then fprintf fmt "[rule] TR-Typing-AxiomDecl$_F$@.";
 	  let f, _ = type_form env f in 
-	  let f = Triggers.make false f in
+	  let f = Triggers.make keep_triggers false f in
 	  let td = {c = TAxiom(loc,name,f); annot = new_id () } in
 	  (td, env)::acc, env
 
@@ -1176,7 +1178,7 @@ let type_decl (acc, env) d =
 	    let td = {c = TRewriting(loc, name, rules); annot = new_id () } in
 	    (td, env)::acc, env
           else
-            axioms_of_rules loc name lf acc env
+            axioms_of_rules keep_triggers loc name lf acc env
 
 
       | Goal(loc,n,f) ->
@@ -1190,14 +1192,14 @@ let type_decl (acc, env) d =
 	      (fun acc f ->
 		 let f,_ = type_form env' f in
 		 let f = monomorphize_form f in
-                 let f = Triggers.make false f in
+                 let f = Triggers.make keep_triggers false f in
 		 let td = {c = TAxiom(loc, fresh_axiom_name(), f);
 			   annot = new_id () } in
 		 (td, env')::acc) acc axioms
 	  in
 	  let goal, _ = type_form env' goal in
           let goal = monomorphize_form goal in
-	  let goal = Triggers.make true goal in
+	  let goal = Triggers.make keep_triggers true goal in
 	  let td = {c = TGoal(loc, n, goal); annot = new_id () } in
 	  (td, env')::acc, env
 
@@ -1226,7 +1228,7 @@ let type_decl (acc, env) d =
 	  let trs = max_terms e in
 	  let f = make_pred loc ([p]::[trs]) f l in
 	  let f,_ = type_form env f in
-	  let f = Triggers.make false f in
+	  let f = Triggers.make keep_triggers false f in
 	  let td = 
 	    match d with 
 	      | Function_def(_,_,_,t,_) ->
@@ -1261,13 +1263,13 @@ let type_decl (acc, env) d =
     Loc.report std_formatter loc; 
     acc, env
 
-let file ld = 
-  let ltd, _ = 
+let file keep_triggers env ld =
+  let ltd, env = 
     List.fold_left 
-      (fun acc d -> type_decl acc d)
-      ([], Env.empty) ld
+      (fun acc d -> type_decl keep_triggers acc d)
+      ([], env) ld
   in
-  List.rev ltd
+  List.rev ltd, env
 
 let split_goals l =
   let _, _, ret = 
@@ -1292,3 +1294,5 @@ let term env vars t =
   type_term env t
 
 type env = Env.t
+
+let empty_env = Env.empty

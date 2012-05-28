@@ -73,7 +73,8 @@
 	"type", TYPE;
 	"unit", UNIT;
 	"void", VOID;
-	"with", WITH
+	"with", WITH;
+	"include", INCLUDE
       ]
 	       
   let newline lexbuf =

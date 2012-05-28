@@ -1,8 +1,8 @@
-let formulas = ref []
+let formulas : Formula.t list list ref = ref []
 
 let add_theory f =
   (*List.iter (Format.fprintf Options.fmt "%a@." Formula.print) f;*)
-  formulas := f
+  formulas := f :: !formulas
 
 module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r)
   (CC : Sig.CC with type Rel.r = Use.r
@@ -435,10 +435,10 @@ module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r)
                     conseq = Boxed.Map.empty;
                     seen = Boxed.Map.empty;
                     inst = I.empty } in
-      let lt, env, cc, lits = List.fold_left 
+      let lt, env, cc, lits = List.fold_left (List.fold_left
         (fun acc f -> 
           let f = Boxed.from_formula f true in
-          assume_formula acc (f, Explanation.empty))
+          assume_formula acc (f, Explanation.empty)))
         (lt, env, cc, []) !formulas in
       let env = if !formulas = [] then None
         else Some env in

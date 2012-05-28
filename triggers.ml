@@ -487,7 +487,17 @@ let make_triggers gopt vterm vtype trs =
 	in 
 	if glouton () then ll@(multi_triggers gopt vterm vtype trs) else ll
 
-let rec make_rec pol gopt vterm vtype f = 
+let check_triggers trs (bv, vty) =
+  if trs = [] then 
+         failwith "There should be a trigger for every quantified formula in a theory.";
+  List.iter (fun l -> 
+       let s1 = List.fold_left (vars_of_term bv) Vterm.empty l in
+       let s2 = List.fold_left vty_term Vtype.empty l in
+       if not (Vtype.subset vty s2) or not (Vterm.subset bv s1) then 
+         failwith "Triggers of a theory should contain every quantified types
+and variables.") trs; trs
+
+let rec make_rec keep_triggers pol gopt vterm vtype f = 
   let c, trs = match f.c with
     | TFatom {c = (TAfalse | TAtrue)} ->
 	f.c, STRS.empty
@@ -525,13 +535,15 @@ let rec make_rec pol gopt vterm vtype f =
 	  end
     | TFop (OPimp, [f1; f2]) -> 
 	
-	let f1, trs1  = make_rec (neg_pol pol) gopt vterm vtype f1 in
-	let f2, trs2  = make_rec pol gopt vterm vtype f2 in
+	let f1, trs1  = 
+          make_rec keep_triggers (neg_pol pol) gopt vterm vtype f1 in
+	let f2, trs2  = make_rec keep_triggers pol gopt vterm vtype f2 in
 	let trs = STRS.union trs1 trs2 in
 	TFop(OPimp, [f1; f2]), trs
 
     | TFop (OPnot, [f1]) -> 
-	let f1, trs1  = make_rec (neg_pol pol) gopt vterm vtype f1 in
+	let f1, trs1  = 
+          make_rec keep_triggers (neg_pol pol) gopt vterm vtype f1 in
 	TFop(OPnot, [f1]), trs1
 
     (* | OPiff 
@@ -541,7 +553,7 @@ let rec make_rec pol gopt vterm vtype f =
 	let lf, trs = 
 	  List.fold_left
 	    (fun (lf, trs1) f ->
-	       let f, trs2 = make_rec pol gopt vterm vtype f in
+	       let f, trs2 = make_rec keep_triggers pol gopt vterm vtype f in
 	       f::lf, STRS.union trs1 trs2) ([], STRS.empty) lf in
 	TFop(op,List.rev lf), trs
 
@@ -554,10 +566,11 @@ let rec make_rec pol gopt vterm vtype f =
 
 	let vterm'' = Vterm.union vterm vterm' in
 	let vtype'' = Vtype.union vtype vtype' in
-	let f1', trs1 = make_rec pol gopt vterm'' vtype'' f1 in
-	let f2', trs2 = make_rec pol gopt vterm'' vtype'' f2 in
+	let f1', trs1 = make_rec keep_triggers pol gopt vterm'' vtype'' f1 in
+	let f2', trs2 = make_rec keep_triggers pol gopt vterm'' vtype'' f2 in
 	let trs12 = 
-	  if Options.notriggers () || qf.qf_triggers = [] then
+	  if keep_triggers then check_triggers qf.qf_triggers (vterm', vtype')
+	  else if Options.notriggers () || qf.qf_triggers = [] then
 	    begin
 	      (make_triggers false vterm' vtype' (STRS.elements trs1))@
 		(make_triggers false vterm' vtype' (STRS.elements trs2))
@@ -592,10 +605,11 @@ let rec make_rec pol gopt vterm vtype f =
 	  List.fold_left 
 	    (fun b (s,_) -> Vterm.add s b) Vterm.empty qf.qf_bvars in
 	let f', trs = 
-	  make_rec pol gopt 
+	  make_rec keep_triggers pol gopt 
 	    (Vterm.union vterm vterm') (Vtype.union vtype vtype') qf.qf_form in
 	let trs' = 
-	  if Options.notriggers () || qf.qf_triggers=[] then
+	  if keep_triggers then check_triggers qf.qf_triggers (vterm', vtype')
+	  else if Options.notriggers () || qf.qf_triggers=[] then
 	    make_triggers gopt vterm' vtype' (STRS.elements trs)
 	  else 
 	    let lf = filter_good_triggers (vterm',vtype') qf.qf_triggers in
@@ -611,27 +625,29 @@ let rec make_rec pol gopt vterm vtype f =
 	   | _ -> TFexists r , trs)
 
     | TFlet (up, v, t, f) ->
-	let f, trs = make_rec pol gopt vterm vtype f in 
+	let f, trs = make_rec keep_triggers pol gopt vterm vtype f in 
 	let trs = STRS.union trs (potential_triggers (vterm, vtype) [t]) in
 	(* XXX correct for terms *)
 	TFlet (up, v, t, f), trs
 
     | TFnamed(lbl, f) -> 
-	let f, trs = make_rec pol gopt vterm vtype f in
+	let f, trs = make_rec keep_triggers pol gopt vterm vtype f in
 	TFnamed(lbl, f), trs
   in
   { f with c = c }, trs
 	  
-let make gopt f = match f.c with
+let make keep_triggers gopt f = match f.c with
   | TFforall _ | TFexists _ -> 
-      let f, _ = make_rec Pos gopt Vterm.empty Vtype.empty f in
+      let f, _ = make_rec keep_triggers Pos gopt Vterm.empty Vtype.empty f in
       f
   | _  ->  
       let vty = vty_form Vtype.empty f in
-      let f, trs = make_rec Pos gopt Vterm.empty vty f in
+      let f, trs = make_rec keep_triggers Pos gopt Vterm.empty vty f in
       if Vtype.is_empty vty then f
       else 
 	let trs = STRS.elements trs in
+        if keep_triggers then
+          failwith "No polymorphism in use-defined theories.";
 	let trs = make_triggers gopt Vterm.empty vty trs in
 	{ f with c = TFforall 
 	  {qf_bvars=[]; qf_upvars=[]; qf_triggers=trs; qf_form=f }}

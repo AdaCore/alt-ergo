@@ -63,11 +63,11 @@ and pp_desc =
   | PPconcat of lexpr * lexpr
   | PPif of lexpr * lexpr * lexpr
   | PPforall of string list * ppure_type * lexpr list list * lexpr
-  | PPexists of string list * ppure_type * lexpr
+  | PPexists of string list * ppure_type * lexpr list list * lexpr
   | PPforall_named of 
       (string * string) list * ppure_type * lexpr list list * lexpr
   | PPexists_named of
-      (string * string) list * ppure_type * lexpr
+      (string * string) list * ppure_type * lexpr list list * lexpr
   | PPnamed of string * lexpr
   | PPlet of string * lexpr * lexpr
 

@@ -19,7 +19,8 @@
 
 open Why_ptree
 
-(* make b f computes the triggers for a formula f 
+(* make k b f computes the triggers for a formula f
+   if k is true existing triggers are checked
    if b is true then variables are authorized in mutli-triggers *)
-val make : bool -> (int tform, int) annoted -> (int tform, int) annoted
+val make : bool -> bool -> (int tform, int) annoted -> (int tform, int) annoted
 

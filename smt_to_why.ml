@@ -53,7 +53,7 @@ let make_exists f bl =
   let f = 
     List.fold_left 
       (fun f x -> pexp f.pp_loc 
-        (PPexists ([x.var], sort_to_type f.pp_loc x.sort, f))) f bl
+        (PPexists ([x.var], sort_to_type f.pp_loc x.sort, [], f))) f bl
   in f.pp_desc
 
 let make_infix op = function

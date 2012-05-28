@@ -69,6 +69,7 @@
 %token <string> FLOAT
 %token <Num.num> NUM
 %token <string> STRING
+%token INCLUDE
 %token WITH
 %token AND LEFTARROW ARROW AC AT AXIOM REWRITING
 %token BAR HAT
@@ -85,6 +86,7 @@
 
 /* Precedences */
 
+%nonassoc INCLUDE
 %nonassoc WITH
 %nonassoc IN
 %nonassoc prec_forall prec_exists
@@ -108,18 +110,27 @@
 %start trigger
 %type <Why_ptree.lexpr> lexpr
 %start lexpr
-%type <Why_ptree.file> file
+%type <string list * Why_ptree.file> file
 %start file
 %%
 
 file:
+| includes list1_decl EOF 
+   { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
+     $1, $2 }
 | list1_decl EOF 
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
-     $1 }
+     [], $1 }
 | EOF 
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
-     [] }
+     [], [] }
 ;
+
+includes:
+| INCLUDE STRING { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
+     [$2]}
+| INCLUDE STRING includes{ if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
+     $2::$3}
 
 list1_decl:
 | decl 
@@ -320,18 +331,19 @@ lexpr:
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
      mk_pp (PPforall ($2, $4, $5, $7)) }
 
-| EXISTS list1_ident_sep_comma COLON primitive_type DOT lexpr %prec prec_exists
+| EXISTS list1_ident_sep_comma COLON primitive_type triggers DOT lexpr %prec prec_exists
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
-     mk_pp (PPexists ($2, $4, $6)) }
+     mk_pp (PPexists ($2, $4, $5, $7)) }
 
 | FORALL list1_named_ident_sep_comma COLON primitive_type triggers 
   DOT lexpr %prec prec_forall
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
      mk_pp (PPforall_named ($2, $4, $5, $7)) }
 
-| EXISTS list1_named_ident_sep_comma COLON primitive_type DOT lexpr %prec prec_exists
+| EXISTS list1_named_ident_sep_comma COLON primitive_type triggers 
+  DOT lexpr %prec prec_exists
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
-     mk_pp (PPexists_named ($2, $4, $6)) }
+     mk_pp (PPexists_named ($2, $4, $5, $7)) }
 
 | ident_or_string COLON lexpr %prec prec_named
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";

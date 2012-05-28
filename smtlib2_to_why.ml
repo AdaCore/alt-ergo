@@ -180,9 +180,10 @@ and inline_ppdesc s ({ pp_desc = descb } as leb) excl = function
     let excl = sl@excl in
     PPforall (sl, pt, List.map (List.map (inline_lexpr s leb excl)) lll,
 	      inline_lexpr s leb excl le)
-  | PPexists (sl, pt, le) ->
+  | PPexists (sl, pt, lll, le) ->
     let excl = sl@excl in
-    PPexists (sl, pt, inline_lexpr s leb excl le)
+    PPexists (sl, pt, List.map (List.map (inline_lexpr s leb excl)) lll,
+              inline_lexpr s leb excl le)
   | PPnamed (n, le) ->
     PPnamed (n, inline_lexpr s leb excl le)
   | PPlet (n, le1, le2) ->
@@ -364,13 +365,13 @@ and forall_of_sortedvarlist pos t triggers = function
 
 and exists_of_sortedvarlist pos t = function
   | [] -> raise Not_Implemented
-  | [sv] -> 
+  | [sv] -> (* Triggers for existentials could be accepted in SMTlib2 *)
     let (s, ppt) = stringppt_of_sortedvar sv in
-    PPexists ([s], ppt, lexpr_of_term predicates t)
+    PPexists ([s], ppt, [], lexpr_of_term predicates t)
   | sv::l -> 
     let (s, ppt) = stringppt_of_sortedvar sv in
     let le2 = { pp_loc = pos; pp_desc = exists_of_sortedvarlist pos t l } in
-    PPexists ([s], ppt, le2)
+    PPexists ([s], ppt, [], le2)
 
 and ppapp_of_string pos s tl predicates =
   match prefix_of_string s with

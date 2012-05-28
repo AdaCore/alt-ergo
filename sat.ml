@@ -582,7 +582,7 @@ let assume env fg =
   else assume env fg
 
 
-let empty = { 
+let empty () = { 
   gamma = MF.empty;
   delta = [] ;
   tbox = CcX.empty (); 
@@ -593,7 +593,7 @@ let empty = {
 } 
 
 let empty_with_inst add_inst =
-  { empty with add_inst = add_inst }
+  { (empty ()) with add_inst = add_inst }
 
 let start () = steps := 0L
 let stop () = !steps

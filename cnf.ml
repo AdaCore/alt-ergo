@@ -253,3 +253,169 @@ let make l =
        | TFunction_def(loc, n, _, _, f) -> push_assume f n loc b
        | TTypeDecl _ | TLogic _  -> ()) l;
   queue
+
+(* For customized theories. Formulas are simplified so that the first
+   part of a disjuction is a literal or a quantifier *)
+
+type tree = Map of (F.t * tree) list | Leaf
+
+let make_form_theory name f = 
+  let make_lit a =
+    match a.c with
+      | TAtrue -> 
+	A.LT.vrai
+      | TAfalse -> 
+	A.LT.faux
+      | TAeq [t1;t2] -> 
+	let lit = A.LT.make (A.Eq (make_term t1, make_term t2)) in
+	lit
+      | TApred t ->
+	let lit = A.LT.mk_pred (make_term t) in
+	lit
+      | TAneq lt | TAdistinct lt -> 
+	let lt = List.map make_term lt in
+	let lit = A.LT.make (A.Distinct (false, lt)) in
+	lit
+      | TAle [t1;t2] -> 
+	let lit = 
+	  A.LT.make (A.Builtin(true,ale,[make_term t1;make_term t2]))
+	in lit
+      | TAlt [t1;t2] ->  
+	begin match t1.c.tt_ty with
+	  | Ty.Tint -> 
+	    let one = 
+	      {c = {tt_ty = Ty.Tint; 
+		    tt_desc = TTconst(Tint "1")}; annot = t1.annot} in
+	    let tt2 = 
+	      T.make (Symbols.Op Symbols.Minus) 
+		[make_term t2; make_term one] Ty.Tint in
+	    let lit = 
+	      A.LT.make (A.Builtin(true,ale,[make_term t1; tt2]))
+	    in lit
+	  | _ -> 
+	    let lit = 
+	      A.LT.make 
+		(A.Builtin(true, alt, [make_term t1; make_term t2])) 
+	    in lit
+	end
+      | TAbuilt(n,lt) ->
+	let lit = A.LT.make (A.Builtin(true,n,List.map make_term lt)) in
+	lit
+      | _ -> assert false in
+
+  let rec mk_and t1 t2 =
+    List.fold_right (fun (f, m1) t2 ->
+      try let m2 = List.assoc f t2 in
+          let m = match m1, m2 with
+            | m, Leaf | Leaf, m -> m
+            | Map m1, Map m2 -> Map (mk_and m1 m2) in
+          (f, m) :: t2
+      with Not_found -> (f, m1) :: t2) t1 t2 in
+
+  let rec mk_or t1 t2 = List.fold_right (fun (f, m1) t1 ->
+    let m1 = match m1 with
+        | Leaf -> Map t2
+        | Map m1 -> Map (mk_or m1 t2) in
+    (f, m1) :: t1) t1 [] in
+
+  let rec reconstruct id ff d =
+    match d with
+      | Leaf -> ff
+      | Map l ->
+        match List.rev l with
+          | [] -> assert false
+          | (f, d) :: l ->
+            let f = List.fold_left (fun ff (f, d) ->
+              F.mk_and (reconstruct id f d) ff id) (reconstruct id f d) l in
+            F.mk_or ff f id in
+
+  let reconstruct l id =
+    match List.rev l with
+      | [] -> assert false
+      | (f, d) :: l ->
+        List.fold_left (fun ff (f, d) ->
+          F.mk_and (reconstruct id f d) ff id) (reconstruct id f d) l in
+
+  let rec make_form pol c id = match c with
+    | TFatom a -> let a = make_lit a in
+	          if pol then [F.mk_lit a id, Leaf]
+                  else [F.mk_not (F.mk_lit a id), Leaf]
+    | TFop(((OPand | OPor) as op),[f1;f2]) -> 
+	let ff1 = make_form pol f1.c f1.annot in
+	let ff2 = make_form pol f2.c f2.annot in
+	let mkop = match op, pol with 
+	  | OPand, true | OPor, false -> mk_and ff1 ff2
+	  | _ -> mk_or ff1 ff2 in
+	mkop
+    | TFop(OPnot,[f]) -> 
+	make_form (not pol) f.c f.annot
+    | TFop(OPimp,[f1;f2]) -> 
+	let ff1 = make_form (not pol) f1.c f1.annot in
+	let ff2 = make_form pol f2.c f2.annot in
+        if pol then mk_or ff1 ff2
+        else mk_and ff1 ff2
+    | TFop(OPif t,[f2;f3]) -> 
+	let tt = make_term t in
+        let lit = F.mk_lit (Literal.LT.mk_pred tt) id in
+        let nlit = [F.mk_not lit, Leaf] in
+        let lit = [lit, Leaf] in
+	let ff2 = make_form pol f2.c f2.annot in
+	let ff3 = make_form pol f3.c f3.annot in
+        let ff1 = if pol then mk_and lit ff2
+          else mk_or nlit ff2 in
+        let ff2 = if pol then mk_and nlit ff3
+          else mk_or lit ff3 in
+        if pol then mk_or ff1 ff2
+        else mk_and ff1 ff2
+    | TFop(OPiff,[f1;f2]) -> 
+	let ff1 = make_form pol f1.c f1.annot in
+	let ff2 = make_form pol f2.c f2.annot in
+	let nf1 = make_form (not pol) f1.c f1.annot in
+	let nf2 = make_form (not pol) f2.c f2.annot in
+        if pol then mk_and (mk_or nf1 ff2) (mk_or ff1 nf2)
+        else mk_and (mk_or ff1 ff2) (mk_or nf1 nf2)
+    | (TFforall qf | TFexists qf) as f -> 
+	let bvars = varset_of_list qf.qf_bvars in
+	let upvars = varset_of_list qf.qf_upvars in
+	let trs = List.map make_trigger qf.qf_triggers in
+	let ff = make_form pol qf.qf_form.c qf.qf_form.annot in
+        let ff = reconstruct ff id in
+	begin match f, pol with
+	  | TFforall _, true | TFexists _, false -> 
+            [F.mk_forall upvars bvars trs ff name id, Leaf]
+	  | TFexists _, true | TFforall _, false -> 
+            [F.mk_exists upvars bvars trs ff name id, Leaf]
+	  | _ -> assert false
+	end
+    | TFlet(up,lvar,lterm,lf) -> 
+	let ff = make_form pol lf.c lf.annot in
+        let ff = reconstruct ff id in
+        [F.mk_let (varset_of_list up) lvar (make_term lterm) ff id, Leaf]
+
+    | TFnamed(lbl, f) ->
+	make_form pol f.c f.annot
+
+    | _ -> assert false
+  in
+  reconstruct (make_form true f.c f.annot) f.annot
+
+let make_theory l =
+  clear();
+  List.iter
+    (fun (d,b) -> match d.c with
+       | TAxiom(loc, name, f) -> 
+         let ff = make_form_theory name f in
+         Queue.push {st_decl=Assume(ff, b) ; st_loc=loc} queue
+       | TRewriting(loc, name, lr) -> assert false
+       | TGoal(loc, n, f) -> assert false
+       | TPredicate_def(loc, n, [], f) -> 
+         let ff = make_form_theory n f in
+         Queue.push {st_decl=Assume(ff, b) ; st_loc=loc} queue
+       | TPredicate_def(loc, n, _, f) ->
+         let ff = make_form_theory n f in
+         Queue.push {st_decl=PredDef ff ; st_loc=loc} queue
+       | TFunction_def(loc, n, _, _, f) -> 
+         let ff = make_form_theory n f in
+         Queue.push {st_decl=Assume(ff, b) ; st_loc=loc} queue
+       | TTypeDecl _ | TLogic _  -> ()) l;
+  queue
