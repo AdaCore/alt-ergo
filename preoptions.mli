@@ -87,3 +87,5 @@ val bottom_classes : bool ref
 
 val replay : bool ref
 val timelimit : float ref
+
+val debug_custom : bool ref

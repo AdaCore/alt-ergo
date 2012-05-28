@@ -139,3 +139,6 @@ val set_debug_split : bool -> unit
 val set_restricted : bool -> unit
 val set_bottom_classes : bool -> unit
 val set_timelimit : float -> unit
+
+val debug_custom : unit -> bool
+val set_debug_custom : bool -> unit

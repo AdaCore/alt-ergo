@@ -23,6 +23,7 @@ type answer = Yes of Explanation.t * Term.Set.t list | No
 type 'a ac = {h: Symbols.t ; t: Ty.t ; l: ('a * int) list}
 
 type 'a literal = LSem of 'a Literal.view | LTerm of Literal.LT.t
+                  | LBoxed of Boxed.t
 
 type 'a input =  
     'a Literal.view * Literal.LT.t option * Explanation.t
@@ -181,4 +182,46 @@ module type EXPLANATION = sig
   type t = Formula.Set.t option
 
   val union : t -> t-> t
+end
+
+module type CC =  sig
+
+  module Rel : sig 
+    type t
+    type r
+    type choice
+
+    val choice_to_literal : choice -> r literal
+    val choice_mk_not : choice -> choice
+    val choice_print : Format.formatter -> choice -> unit
+    val extract_terms_from_choice : Term.Set.t -> choice -> Term.Set.t
+
+    val query : t -> r input ->
+      are_eq:(Term.t -> Term.t -> answer) ->
+      are_neq:(Term.t -> Term.t -> answer) ->
+      class_of:(Term.t -> Term.t list) ->
+      classes:Term.Set.t list -> answer
+
+    val case_split : t -> (choice * Explanation.t * Num.num) list
+
+    val print_model : Format.formatter -> t -> (Term.t * r) list -> unit
+  end
+
+  type use
+  type uf
+  type 'a accumulator
+
+  type env = { 
+      use : use;  
+      uf : uf ;
+      relation : Rel.t }
+
+  val empty : unit -> env
+  val assume_literal : env -> Rel.r accumulator ->
+    (Rel.r literal * Explanation.t) list -> env * Rel.r accumulator
+  val add : env -> Rel.r accumulator -> Literal.LT.t -> 
+    Explanation.t -> env * Rel.r accumulator
+  val term_canonical_view : env -> Literal.LT.t -> Explanation.t ->
+    (Rel.r Literal.view * Explanation.t)
+
 end

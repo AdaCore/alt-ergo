@@ -103,3 +103,5 @@ let set_rules = function
   | _ -> rules := -1
 
 let replay = ref false
+
+let debug_custom = ref false

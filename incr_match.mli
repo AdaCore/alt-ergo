@@ -17,30 +17,23 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module T  : sig type t = Term.t end
-module S  : sig type t = Symbols.t end
-module ST : sig type elt = T.t type t = Term.Set.t end
-module SA : Set.S with type elt = Literal.LT.t * Explanation.t
-  
-type elt = ST.t * SA.t
+type 'a trigger_info = {
+  trigger_orig : 'a; 
+  trigger_formula : 'a ;
+  trigger_dep : Explanation.t ;
+}
 
-module type S = 
-sig
-  
-  type t 
-  type r
-  val empty : t
-  val find : r -> t -> elt
-  val add : r -> elt -> t -> t
-  val mem : r -> t -> bool
-  val print : t -> unit
-  val up_add : t -> ST.elt -> r -> r list -> t
-      
-  val congr_add : t -> r list -> ST.t
-  
-  val up_close_up :t -> r -> r -> t
-  val congr_close_up : t -> r -> r list -> elt
+module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r) :sig
+
+  type 'a t
+
+  type 'a result = ('a trigger_info * (Term.subst * Explanation.t) list) list
+
+  val empty : 'a t
+  val add_term : Explanation.t -> Term.t -> 'a t -> Uf.t -> 'a t * 'a result
+  val add_trigger : 'a trigger_info -> Term.t list -> 'a t -> Uf.t -> 
+    'a t * 'a result
+  val merge : Use.r -> Use.r -> Term.t -> 'a t -> (Uf.t * Use.t) ->
+    'a t * 'a result
+
 end
-    
-module Make :
-  functor (X : Sig.X) -> S with type r = X.r

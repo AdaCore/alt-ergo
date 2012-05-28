@@ -143,3 +143,6 @@ let set_debug_split b = Preoptions.debug_split := b
 let set_restricted b = Preoptions.restricted := b
 let set_bottom_classes b = Preoptions.bottom_classes := b
 let set_timelimit b = Preoptions.timelimit := b
+
+let debug_custom () = !debug_custom
+let set_debug_custom b = Preoptions.debug_custom := b

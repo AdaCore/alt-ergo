@@ -85,7 +85,7 @@ OPTIONSCMO = parseoptions.cmo
 CMO = timers.cmo options.cmo exception.cmo loc.cmo \
       hashcons.cmo hstring.cmo symbols.cmo \
       subst.cmo ty.cmo common.cmo term.cmo literal.cmo formula.cmo \
-      explanation.cmo \
+      boxed.cmo explanation.cmo \
       why_parser.cmo why_lexer.cmo pretty.cmo \
       smt_parser.cmo smt_lex.cmo smt_to_why.cmo \
       smtlib2_util.cmo smtlib2_ast.cmo \
@@ -93,6 +93,7 @@ CMO = timers.cmo options.cmo exception.cmo loc.cmo \
       polynome.cmo ac.cmo \
       uf.cmo use.cmo intervals.cmo fm.cmo arith.cmo \
       records.cmo bitv.cmo arrays.cmo sum.cmo \
+      incr_match.cmo instantiation.cmo custom_theory.cmo \
       combine.cmo cc.cmo \
       existantial.cmo \
       triggers.cmo cnf.cmo why_typing.cmo matching.cmo \
@@ -254,7 +255,7 @@ FILES = exception.mli exception.ml \
 	term.mli term.ml \
 	literal.mli literal.ml \
 	formula.mli formula.ml \
-	explanation.mli explanation.ml \
+	boxed.mli boxed.ml explanation.mli explanation.ml \
 	why_ptree.mli why_parser.mly why_lexer.mll \
 	smt_ast.mli smt_parser.mly smt_lex.mll smt_to_why.ml \
 	smtlib2_util.ml smtlib2_ast.ml \
@@ -275,6 +276,8 @@ FILES = exception.mli exception.ml \
 	arrays.ml arrays.mli \
 	sum.ml sum.mli \
 	bitv.mli bitv.ml \
+	incr_match.ml incr_match.mli instantiation.ml instantiation.mli \
+	custom_theory.ml custom_theory.mli\
 	combine.mli combine.ml cc.mli cc.ml ac.ml ac.mli\
 	matching.mli matching.ml \
 	sat.mli sat.ml \
