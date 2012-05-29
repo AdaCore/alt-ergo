@@ -104,29 +104,27 @@ let pop_error ?(error=false) ~message () =
 
 
 let pop_model sat_env () =
-  let f ()  = 
-    let pop_w = GWindow.dialog
-      ~title:"Model"
-      ~allow_grow:true
-      ~destroy_with_parent:true
-      ~width:400
-      ~height:300 ()
-    in
-    let sw1 = GBin.scrolled_window
-      ~vpolicy:`AUTOMATIC
-      ~hpolicy:`AUTOMATIC
-      ~packing:pop_w#vbox#add () in
-    let buf1 = GSourceView2.source_buffer () in
-    let tv1 = GSourceView2.source_view ~source_buffer:buf1 ~packing:(sw1#add) 
-      ~wrap_mode:`CHAR() in
-    let _ = tv1#misc#modify_font monospace_font in
-    let _ = tv1#set_editable false in
-    fprintf str_formatter "%a" Sat.print_model sat_env;
-    let model_text = (flush_str_formatter()) in
-    buf1#set_text model_text;
-    pop_w#show ()
+  let pop_w = GWindow.dialog
+    ~title:"Model"
+    ~allow_grow:true
+    ~destroy_with_parent:true
+    ~width:400
+    ~height:300 ()
   in
-  GtkThread.async f ()
+  let sw1 = GBin.scrolled_window
+    ~vpolicy:`AUTOMATIC
+    ~hpolicy:`AUTOMATIC
+    ~packing:pop_w#vbox#add () in
+  let buf1 = GSourceView2.source_buffer () in
+  let tv1 = GSourceView2.source_view ~source_buffer:buf1 ~packing:(sw1#add) 
+    ~wrap_mode:`CHAR() in
+  let _ = tv1#misc#modify_font monospace_font in
+  let _ = tv1#set_editable false in
+  fprintf str_formatter "%a" Sat.print_model sat_env;
+  let model_text = (flush_str_formatter()) in
+  buf1#set_text model_text;
+  pop_w#show ()
+
 
 
 let compare_rows icol_number (model:#GTree.model) row1 row2 =
@@ -371,6 +369,10 @@ let empty_sat_inst inst_model =
   reset_inst inst_model;
   Sat.empty_with_inst (add_inst inst_model)
 
+
+exception Abort_thread
+exception Timeout
+
 let update_status image label buttonclean env d s steps =
   let satmode = !smtfile or !smt2file or !satmode in 
   match s with
@@ -402,7 +404,8 @@ let update_status image label buttonclean env d s steps =
 	  (Loc.report std_formatter d.st_loc; printf "I don't know.@.")
 	else printf "unknown@.";
 	image#set_stock `NO;
-	label#set_text (sprintf "  I don't know (%2.2f s)" (Frontend.Time.get()));
+	label#set_text (sprintf "  I don't know (%2.2f s)" 
+			  (Frontend.Time.get()));
 	if model () then pop_model t ()
 	  
     | Frontend.Sat t ->
@@ -414,9 +417,63 @@ let update_status image label buttonclean env d s steps =
 	  (sprintf "  I don't know (sat) (%2.2f s)" (Frontend.Time.get()));
 	if model () then pop_model t ()
 
+let update_aborted image label buttonstop buttonrun timers_model = function
+  | Abort_thread ->
+      Frontend.Time.unset_timeout ();
+      Timers.update timers_model.timers;
+      if debug () then fprintf fmt "alt-ergo thread terminated@.";
+      image#set_stock `DIALOG_QUESTION;
+      label#set_text "  Process aborted";
+      buttonstop#misc#hide ();
+      buttonrun#misc#show ()
+  | Timeout ->
+      Frontend.Time.unset_timeout ();
+      Timers.update timers_model.timers;
+      if debug () then 
+	fprintf fmt "alt-ergo thread terminated (timeout)@.";
+      image#set_stock `CUT;
+      label#set_text "  Timeout";
+      buttonstop#misc#hide ();
+      buttonrun#misc#show ()
+  | e -> 
+      Frontend.Time.unset_timeout ();
+      Timers.update timers_model.timers;
+      let message = sprintf "Error: %s" (Printexc.to_string e) in
+      if debug () then fprintf fmt "alt-ergo thread terminated@.";
+      image#set_stock `DIALOG_ERROR;
+      label#set_text (" "^message);
+      buttonstop#misc#hide ();
+      buttonrun#misc#show ();
+      fprintf fmt "%s@." message;
+      pop_error ~error:true ~message ()
 
-exception Abort_thread
-exception Timeout
+
+
+let wrapper_update_status image label buttonclean env d s steps =
+  GtkThread.async (fun () ->
+    update_status image label buttonclean env d s steps 
+  ) ()
+
+let wrapper_update_aborted image label buttonstop buttonrun timers_model e =
+  GtkThread.async (fun () ->
+    update_aborted image label buttonstop buttonrun timers_model e
+  ) ()
+
+let wrapper_reset buttonstop buttonrun =
+  GtkThread.async (fun () ->
+    buttonstop#misc#hide ();
+    buttonrun#misc#show ();
+  ) ()
+
+let wrapper_refresh_instances inst_model =
+  GtkThread.async (fun () ->
+    ignore (refresh_instances inst_model ())
+  )
+
+let wrapper_refresh_timers timers_model =
+  GtkThread.async (fun () ->
+    ignore (refresh_timers timers_model ())
+  )
 
 let interrupt = ref None
 
@@ -523,50 +580,23 @@ let rec run buttonrun buttonstop buttonclean inst_model timers_model
 	       let cnf = Cnf.make dcl in
 	       ignore (Queue.fold
 			 (Frontend.process_decl 
-			    (update_status image label buttonclean env))
-			 (empty_sat_inst inst_model, true, Explanation.empty) cnf)
+			    (wrapper_update_status image label buttonclean env))
+			 (empty_sat_inst inst_model, true, Explanation.empty)
+			 cnf)
 	    ) ast_pruned;
 	  
 	  Frontend.Time.unset_timeout ()
-	with 
-	  | Abort_thread ->
-	      Frontend.Time.unset_timeout ();
-	      Timers.update timers_model.timers;
-	      if debug () then fprintf fmt "alt-ergo thread terminated@.";
-	      image#set_stock `DIALOG_QUESTION;
-	      label#set_text "  Process aborted";
-	      buttonstop#misc#hide ();
-	      buttonrun#misc#show ()
-	  | Timeout ->
-	      Frontend.Time.unset_timeout ();
-	      Timers.update timers_model.timers;
-	      if debug () then 
-		fprintf fmt "alt-ergo thread terminated (timeout)@.";
-	      image#set_stock `CUT;
-	      label#set_text "  Timeout";
-	      buttonstop#misc#hide ();
-	      buttonrun#misc#show ()
-	  | e -> 
-	      Frontend.Time.unset_timeout ();
-	      Timers.update timers_model.timers;
-	      let message = sprintf "Error: %s" (Printexc.to_string e) in
-	      if debug () then fprintf fmt "alt-ergo thread terminated@.";
-	      image#set_stock `DIALOG_ERROR;
-	      label#set_text (" "^message);
-	      buttonstop#misc#hide ();
-	      buttonrun#misc#show ();
-	      fprintf fmt "%s@." message;
-	      pop_error ~error:true ~message ()
+	with e -> 
+	  wrapper_update_aborted image label buttonstop buttonrun timers_model e
        );
        if debug () then fprintf fmt "Send done signal to waiting thread@.";
-       buttonstop#misc#hide ();
-       buttonrun#misc#show ();
        (* Event.sync (Event.send chan true) *)
+       wrapper_reset buttonstop buttonrun;
        Thread.delay 0.001;
        GMain.Timeout.remove to_id;
        GMain.Timeout.remove ti_id;
-       ignore (refresh_instances inst_model ());
-       ignore (refresh_timers timers_model ())
+       wrapper_refresh_instances inst_model ();
+       wrapper_refresh_timers timers_model ();
     ) ());
 
 
