@@ -124,7 +124,12 @@ module Make (X : ALIEN) = struct
 	    let l, ctx = 
 	      List.fold_right2 
 		(fun x (lb, _) (l, ctx) -> 
-		   let r, ctx = make_rec x ctx in (lb, r)::l, ctx) 
+		   let r, ctx = make_rec x ctx in 
+		   let dlb = 
+		     Term.make (Symbols.Op (Symbols.Access lb)) [t] ty in
+		   let c = Literal.LT.make (Literal.Eq (dlb, dlb)) in
+		   (lb, r)::l, c::ctx
+		) 
 		xs lbs ([], ctx)
 	    in
 	    Record (l, ty), ctx
@@ -136,6 +141,7 @@ module Make (X : ALIEN) = struct
 		    Access (a, r, ty), ctx
 		| _ -> assert false
 	    end
+
 	| _, _ -> 
 	    let r, ctx' = X.make t in
 	    Other (r, ty), ctx'@ctx
