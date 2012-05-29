@@ -104,27 +104,29 @@ let pop_error ?(error=false) ~message () =
 
 
 let pop_model sat_env () =
-  let pop_w = GWindow.dialog
-    ~title:"Model"
-    ~allow_grow:true
-    ~destroy_with_parent:true
-    ~width:400
-    ~height:300 ()
+  let f ()  = 
+    let pop_w = GWindow.dialog
+      ~title:"Model"
+      ~allow_grow:true
+      ~destroy_with_parent:true
+      ~width:400
+      ~height:300 ()
+    in
+    let sw1 = GBin.scrolled_window
+      ~vpolicy:`AUTOMATIC
+      ~hpolicy:`AUTOMATIC
+      ~packing:pop_w#vbox#add () in
+    let buf1 = GSourceView2.source_buffer () in
+    let tv1 = GSourceView2.source_view ~source_buffer:buf1 ~packing:(sw1#add) 
+      ~wrap_mode:`CHAR() in
+    let _ = tv1#misc#modify_font monospace_font in
+    let _ = tv1#set_editable false in
+    fprintf str_formatter "%a" Sat.print_model sat_env;
+    let model_text = (flush_str_formatter()) in
+    buf1#set_text model_text;
+    pop_w#show ()
   in
-  let sw1 = GBin.scrolled_window
-    ~vpolicy:`AUTOMATIC
-    ~hpolicy:`AUTOMATIC
-    ~packing:pop_w#vbox#add () in
-  let buf1 = GSourceView2.source_buffer () in
-  let tv1 = GSourceView2.source_view ~source_buffer:buf1 ~packing:(sw1#add) 
-    ~wrap_mode:`CHAR() in
-  let _ = tv1#misc#modify_font monospace_font in
-  let _ = tv1#set_editable false in
-  fprintf str_formatter "%a" Sat.print_model sat_env;
-  let model_text = (flush_str_formatter()) in
-  buf1#set_text model_text;
-
-  pop_w#show ()
+  GtkThread.async f ()
 
 
 let compare_rows icol_number (model:#GTree.model) row1 row2 =
