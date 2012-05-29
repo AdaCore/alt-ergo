@@ -623,7 +623,7 @@ let rec join_exists f = match f.pp_desc with
   | _ -> [] , [] , f
 
 let rec type_form env f =
-  let rec type_pp_desc = function
+  let rec type_pp_desc pp_desc = match pp_desc with
     | PPconst ConstTrue -> 
         if rules () = 1 then fprintf fmt "[rule] TR-Typing-True$_F$@.";
 	TFatom {c=TAtrue; annot=new_id ()}, Sy.empty
@@ -767,7 +767,7 @@ let rec type_form env f =
 	TFnamed(lbl, f), fv
     | PPforall _ | PPexists _ ->
 	let ty_vars, ty, triggers, f' = 
-	  match f.pp_desc with 
+	  match pp_desc with 
 	    | PPforall(vars,ty,triggers,f') -> 
 		let ty_vars, triggers', f' = join_forall f' in
 		(vars, ty)::ty_vars,ty ,triggers@triggers', f'
