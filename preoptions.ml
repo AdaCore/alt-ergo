@@ -102,6 +102,11 @@ let set_rules = function
   | "arith" -> rules := 4
   | _ -> rules := -1
 
+let set_limit t =
+  match Sys.os_type with
+    | "Win32" -> Format.eprintf "timelimit not supported on Win32 (ignored)@."
+    | _ -> timelimit := t
+
 let replay = ref false
 
 let debug_custom = ref false

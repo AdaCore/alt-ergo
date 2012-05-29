@@ -80,6 +80,7 @@ val show_libdir : unit -> unit
 val set_max_split : string -> unit
 val set_proof : bool -> unit
 val set_rules : string -> unit
+val set_limit : float -> unit
 
 val restricted : bool ref
 

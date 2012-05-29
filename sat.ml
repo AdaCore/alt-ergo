@@ -292,16 +292,20 @@ let print_model fmt t =
 
 let _ =
   if not (model ()) then
+    try
       Sys.set_signal Sys.sigalrm
 	(Sys.Signal_handle (fun _ -> !timeout ()))
+    with Invalid_argument _ -> ()
 
 let refresh_model_handler =
   if model () then
-    fun t ->   
-      Sys.set_signal Sys.sigalrm
-	(Sys.Signal_handle (fun _ ->
-	  printf "%a@." print_model t;
-	  !timeout ()))
+    fun t ->
+      try
+	Sys.set_signal Sys.sigalrm
+	  (Sys.Signal_handle (fun _ ->
+	    printf "%a@." print_model t;
+	    !timeout ()))
+      with Invalid_argument _ -> ()
   else fun _ -> ()
 
 (* sat-solver *)
