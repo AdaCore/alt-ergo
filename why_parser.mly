@@ -10,6 +10,7 @@
 /*     Mohamed Iguernelala                                                */
 /*     Stephane Lescuyer                                                  */
 /*     Alain Mebsout                                                      */
+/*     Claire Dross                                                       */
 /*                                                                        */
 /*     CNRS - INRIA - Universite Paris Sud                                */
 /*                                                                        */

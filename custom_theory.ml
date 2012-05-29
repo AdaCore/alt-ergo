@@ -1,4 +1,24 @@
-let formulas : Formula.t list list ref = ref []
+l(**************************************************************************)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*     Copyright (C) 2006-2011                                            *)
+(*                                                                        *)
+(*     Sylvain Conchon                                                    *)
+(*     Evelyne Contejean                                                  *)
+(*                                                                        *)
+(*     Francois Bobot                                                     *)
+(*     Mohamed Iguernelala                                                *)
+(*     Stephane Lescuyer                                                  *)
+(*     Alain Mebsout                                                      *)
+(*     Claire Dross                                                       *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*   This file is distributed under the terms of the CeCILL-C licence     *)
+(*                                                                        *)
+(**************************************************************************)
+
+et formulas : Formula.t list list ref = ref []
 
 let add_theory f =
   (*List.iter (Format.fprintf Options.fmt "%a@." Formula.print) f;*)

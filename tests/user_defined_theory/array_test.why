@@ -1,0 +1,49 @@
+include "array_theory.why"
+
+(* Classic tests for the two triggers of a2 *)
+
+goal g1: forall a1, a2 : array. forall i1, i2, v1, v2, jj : int.
+i1 <> jj -> i2 <> jj -> set (a1, i1, v1) = set (a2, i2, v2) -> get (a1, jj) = get (a2, jj)
+
+goal g2: forall a : array. forall i1, i2, v1, v2, j : int.
+i1 <> j -> i2 <> j -> get (set (a, i1, v1), j) = get (set (a, i2, v2), j)
+
+(* Test for benchmarking *)
+goal g3: forall a : array. forall i1, i2, v1, v2, j : int.
+i1 <> j -> i2 <> j -> get (set (set (a, i2, v2), i1, v1), j) = get (a, j)
+
+(* Tests for mem from the theory *)
+
+goal g4 : forall a : array. forall i, v, w : int. v <> w -> get (a, i) <> w ->
+	mem (set (a, i, v), w) = mem (a, w)
+
+goal g5 : forall a : array. forall i1, i2, v1, v2 : int.
+           i1 <> i2 -> mem (set (set (a, i1, v1), i2, v2), v1)
+
+(* Tests for max *)
+
+goal g6 : forall a : array. forall i : int. get (a, i) = max (a, i, i)
+
+goal g7 : forall a : array. forall i, j : int.
+      j > i ->
+       (get (a, i) > get (a, j) and max (a, i, j) = max (a, i, j -1) or  max (a, i, j) = max (a, i+1, j))
+
+(* Tests for sum *)
+
+goal g8 : forall a : array. forall i : int. get (a, i) = sum (a, i, i)
+
+goal g9 : forall a : array. forall i, k, j : int.
+      j > k > i ->
+       sum (a, i-1, j+1) = get (a,i-1) + sum (a, i, k-1) + get (a,k) + sum (a, k+1, j) + get (a,j+1)
+
+goal g10 : forall a : array. forall i : int.
+       sum (a, i, i+3) = get(a,i) + get (a,i+1)  + get (a,i+2) + get (a,i+3)
+
+goal g11 : forall a : array. forall i, j, k, v : int. j >= i -> max (a, i, j) <= v ->
+       sum (set (a, k, v), i, j) >= sum (a, i, j)
+
+goal g12 : forall a : array. forall i, v : int. not mem (a, v)  ->
+       sum (a, i, i) <> v
+
+goal g13 : forall a : array. forall i, j, v : int. not mem (a, v)  -> i+2 <= j -1 ->
+       sum (a, i, j) <> v + get (a, i+1) + sum (a, i+2, j-1) + get (a, j)
