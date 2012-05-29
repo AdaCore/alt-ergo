@@ -608,9 +608,12 @@ and type_term_desc env loc = function
 
 
 let rec join_forall f = match f.pp_desc with
-  | PPforall(vs,ty,trs1,f) -> 
+  | PPforall(vs, ty, trs1, f) -> 
       let tyvars,trs2,f = join_forall f in  
       (vs,ty)::tyvars , trs1@trs2 , f
+  | PPforall_named (vs, ty, trs1, f) ->      
+      let vs = List.map fst vs in
+      join_forall {f with pp_desc = PPforall (vs, ty, trs1, f)}
   | PPnamed(lbl, f) -> 
       join_forall f
   | _ -> [] , [] , f
@@ -619,6 +622,9 @@ let rec join_exists f = match f.pp_desc with
   | PPexists (vars, ty, trs1, f) -> 
       let tyvars,trs2,f = join_exists f in  
       (vars, ty)::tyvars , trs1@trs2,  f
+  | PPexists_named (vs, ty, trs1, f) ->      
+      let vs = List.map fst vs in
+      join_exists {f with pp_desc = PPexists (vs, ty, trs1, f)}
   | PPnamed (_, f) -> join_exists f
   | _ -> [] , [] , f
 
@@ -795,13 +801,14 @@ let rec type_form env f =
 	  qf_triggers = ty_triggers ;
 	  qf_form = f'}
 	in
-	(match f.pp_desc with 
-	     PPforall _ ->
+	(match pp_desc with 
+	   | PPforall _ ->
 	       if rules () = 1 then fprintf fmt "[rule] TR-Typing-Forall$_F$@.";
 	       TFforall qf_form
-	   | _ -> 
-	     if rules () = 1 then fprintf fmt "[rule] TR-Typing-Exists$_F$@.";
-	     Existantial.make qf_form), 
+	   | PPexists _ -> 
+	       if rules () = 1 then fprintf fmt "[rule] TR-Typing-Exists$_F$@.";
+	       Existantial.make qf_form
+	   | _ -> assert false), 
 	(List.fold_left (fun acc (l,_) -> Sy.remove l acc) fv bvars)
     | PPlet (var,t,f) -> 
       if rules () = 1 then fprintf fmt "[rule] TR-Typing-Let$_F$@.";
