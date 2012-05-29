@@ -325,7 +325,7 @@ lexpr:
 | IF lexpr THEN lexpr ELSE lexpr %prec prec_ite
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
      mk_pp (PPif ($2, $4, $6)) }
-
+/*
 | FORALL list1_ident_sep_comma COLON primitive_type triggers 
   DOT lexpr %prec prec_forall
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
@@ -334,7 +334,7 @@ lexpr:
 | EXISTS list1_ident_sep_comma COLON primitive_type triggers DOT lexpr %prec prec_exists
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
      mk_pp (PPexists ($2, $4, $5, $7)) }
-
+*/
 | FORALL list1_named_ident_sep_comma COLON primitive_type triggers 
   DOT lexpr %prec prec_forall
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
@@ -520,10 +520,12 @@ ident:
 | IDENT { $1 }
 ;
 
+/*
 list1_ident_sep_comma:
 | ident                             { [$1] }
 | ident COMMA list1_ident_sep_comma { $1 :: $3 }
 ;
+*/
 
 list1_named_ident_sep_comma:
 | named_ident                                   { [$1] }
@@ -536,7 +538,7 @@ ident_or_string:
 ;
 
 named_ident:
-| IDENT  { $1, "" }
+| IDENT { $1, "" }
 | IDENT STRING { $1, $2 }
 ;
 
