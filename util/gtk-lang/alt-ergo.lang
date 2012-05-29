@@ -65,6 +65,7 @@
 	  <keyword>goal</keyword>
 	  <keyword>hypothesis</keyword>
 	  <keyword>if</keyword>
+	  <keyword>include</keyword>
 	  <keyword>instance</keyword>
 	  <keyword>logic</keyword>
 	  <keyword>not</keyword>
@@ -74,6 +75,7 @@
 	  <keyword>rewriting</keyword>
 	  <keyword>then</keyword>
 	  <keyword>type</keyword>
+	  <keyword>with</keyword>
 	</context>
 	<context id="types" style-ref="type">
 	  <!-- pervasives types -->

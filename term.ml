@@ -194,23 +194,19 @@ let add_label lbl t =
 let label t = try Labels.find labels t with Not_found -> Hstring.empty
 
 
-let label_model h =
-  try String.sub (Hstring.view h) 0 6 = "model:"
-  with Invalid_argument _ -> false
-
 let rec is_in_model_rec depth { f = f; xs = xs } =
   let lb = Symbols.label f in
-  (label_model lb
+  (Common.label_model lb
    &&
      (try
 	let md = Scanf.sscanf (Hstring.view lb) "model:%d" (fun x -> x) in
 	depth <= md
-      with Scanf.Scan_failure _ -> true))
+      with Scanf.Scan_failure _ | End_of_file-> true))
   || 
     List.exists (is_in_model_rec (depth +1)) xs
 
 let is_in_model t =
-  label_model (label t) || is_in_model_rec 0 t
+  Common.label_model (label t) || is_in_model_rec 0 t
 
 
 let is_labeled t = not (Hstring.equal (label t) Hstring.empty)

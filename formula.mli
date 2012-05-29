@@ -62,6 +62,7 @@ val mk_let : Term.Set.t -> Symbols.t -> Term.t -> t -> int -> t
 
 val add_label : Hstring.t -> t -> unit
 val label : t -> Hstring.t
+val is_in_model : t -> bool
 
 val view : t -> view
 val size : t -> int

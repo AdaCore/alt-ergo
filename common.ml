@@ -247,3 +247,7 @@ let fake_neq =  Symbols.name "@neq"
 let fake_lt =  Symbols.name "@lt"
 let fake_le =  Symbols.name "@le"
 
+
+let label_model h =
+  try String.sub (Hstring.view h) 0 6 = "model:"
+  with Invalid_argument _ -> false

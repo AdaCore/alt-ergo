@@ -408,6 +408,12 @@ let label f =
   match view f with
     | Literal l -> Literal.LT.label l
     | _ -> Hstring.empty
+
+let is_in_model f =
+  match view f with
+    | Literal l -> 
+        Common.label_model (Literal.LT.label l) || Literal.LT.is_in_model l
+    | _ -> false
 	
 let free_vars =
   let rec free_rec acc f = 

@@ -181,6 +181,7 @@ module type S_Term = sig
 
   val terms_of : t -> Term.Set.t
   val vars_of : t -> Symbols.Set.t
+  val is_in_model : t -> bool
 
 (*  module SetEq : Set.S with type elt = t * Term.t * Term.t*)
 end
@@ -221,6 +222,15 @@ module LT : S_Term = struct
  module SS = Symbols.Set     
  let vars_of a = 
    Term.Set.fold (fun t -> SS.union (Term.vars_of t)) (terms_of a) SS.empty
+
+ let is_in_model l =
+   match view l with
+     | Eq (t1, t2) -> 
+         Term.is_in_model t1 || Term.is_in_model t2
+     | Distinct (_, tl) | Builtin (_, _, tl) ->
+         List.exists Term.is_in_model tl
+
+
 
 end
 

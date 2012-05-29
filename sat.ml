@@ -260,17 +260,11 @@ let mround predicate mode env max_size =
   !Options.timer_pause Timers.TMatch;
   res
   
-
-let label_model h =
-  try String.sub (Hstring.view h) 0 6 = "model:"
-  with Invalid_argument _ -> false
-
 let extract_prop_model t = 
   let s = ref SF.empty in
   MF.iter 
     (fun f _ -> 
-       let lbl = F.label f in
-       if complete_model () || label_model lbl then
+       if complete_model () || F.is_in_model f then
 	 s := SF.add f !s
     ) 
     t.gamma;
@@ -506,10 +500,10 @@ and back_tracking env stop max_size = match env.delta with
 	     add_terms env (F.terms f) gf g lem) env l1 
       in
       (match l1, l2 with
-	 | [], [] -> 
-	     let m = extract_prop_model env in
+	 | [], [] ->
 	     if all_models () then 
 	       begin
+		 let m = extract_prop_model env in
 		 Format.printf "--- SAT ---\n";
 		 Format.printf "%a@." print_prop_model m;
 		 raise (IUnsat (Ex.make_deps m, []))
