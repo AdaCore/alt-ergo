@@ -45,10 +45,13 @@ module Make (X : ALIEN) = struct
 
   let rec print fmt = function
     | Record (lbs, _) -> 
-	fprintf fmt "{ ";
-	List.iter 
-	  (fun (lb, e) -> 
-	     fprintf fmt "%s = %a; " (Hstring.view lb) print e) lbs;
+	fprintf fmt "{";
+        let _ = List.fold_left
+	  (fun first (lb, e) -> 
+	    fprintf fmt "%s%s = %a"
+	       (if first then "" else "; ") (Hstring.view lb) print e;
+	    false
+	  ) true lbs in
 	fprintf fmt "}"
     | Access(a, e, _) -> 
 	fprintf fmt "%a.%s" print e (Hstring.view a)

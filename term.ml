@@ -70,7 +70,7 @@ let rec print fmt t =
 	      assert (List.length l = List.length lbs);
 	      fprintf fmt "{";
 	      ignore (List.fold_left2 (fun first (field,_) e -> 
-		fprintf fmt "%s%s=%a"  (if first then "" else "; ")
+		fprintf fmt "%s%s = %a"  (if first then "" else "; ")
 		  (Hstring.view field) print e;
 		false
 	      ) true lbs l);
