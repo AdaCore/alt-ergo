@@ -980,6 +980,8 @@ and alpha_rec ((up, m) as s) f =
 	let ff1 = alpha_renaming s f1 in
 	let trs = List.map (List.map (alpha_renaming s)) trs in
 	PPexists_named (lx, ty, trs, ff1)
+    | PPassert f' -> PPassert (alpha_renaming s f')
+    | PPcut f' -> PPcut (alpha_renaming s f')
  
 let alpha_renaming = alpha_renaming (S.empty, MString.empty)
 
@@ -1165,14 +1167,14 @@ let type_decl keep_triggers (acc, env) d =
   try
     match d with
       | Logic (loc, ac, lp, pp_ty) -> 
-	if rules () = 1 then fprintf fmt "[rule] TR-Typing-LogicFun$_F$@.";
+	  if rules () = 1 then fprintf fmt "[rule] TR-Typing-LogicFun$_F$@.";
 	  let env' = Env.add_logics env ac lp pp_ty loc in
 	  let lp = List.map fst lp in
 	  let td = {c = TLogic(loc,lp,pp_ty); annot = new_id () } in
 	  (td, env)::acc, env'
 
       | Axiom(loc,name,f) -> 
-	if rules () = 1 then fprintf fmt "[rule] TR-Typing-AxiomDecl$_F$@.";
+	  if rules () = 1 then fprintf fmt "[rule] TR-Typing-AxiomDecl$_F$@.";
 	  let f, _ = type_form env f in 
 	  let f = Triggers.make keep_triggers false f in
 	  let td = {c = TAxiom(loc,name,f); annot = new_id () } in
@@ -1188,26 +1190,35 @@ let type_decl keep_triggers (acc, env) d =
             axioms_of_rules keep_triggers loc name lf acc env
 
 
-      | Goal(loc,n,f) ->
-	if rules () = 1 then fprintf fmt "[rule] TR-Typing-GoalDecl$_F$@.";
+      | Goal(loc, n,f) ->
+	  if rules () = 1 then fprintf fmt "[rule] TR-Typing-GoalDecl$_F$@.";
 	  (*let f = move_up f in*)
 	  let f = alpha_renaming f in
 	  let env', axioms, goal = 
 	    intro_hypothesis env (not (!smtfile or !smt2file or !satmode)) f in
-	  let acc =
-	    List.fold_left
+	  let acc = 
+	    List.fold_left 
 	      (fun acc f ->
+		 let sort, f = match f.pp_desc with 
+		   | PPassert g -> Some Assert, g
+		   | PPcut g -> Some Cut, g
+		   | _ -> None, f
+		 in
 		 let f,_ = type_form env' f in
 		 let f = monomorphize_form f in
                  let f = Triggers.make keep_triggers false f in
-		 let td = {c = TAxiom(loc, fresh_axiom_name(), f);
-			   annot = new_id () } in
+		 let tf = 
+		   match sort with
+		     | None -> TAxiom(loc, fresh_axiom_name(), f)
+		     | Some s -> TGoal(loc, s, "", f)
+		 in
+		 let td = {c = tf; annot = new_id () } in
 		 (td, env')::acc) acc axioms
 	  in
 	  let goal, _ = type_form env' goal in
           let goal = monomorphize_form goal in
 	  let goal = Triggers.make keep_triggers true goal in
-	  let td = {c = TGoal(loc, n, goal); annot = new_id () } in
+	  let td = {c = TGoal(loc, Thm, n, goal); annot = new_id () } in
 	  (td, env')::acc, env
 
       | Predicate_def(loc,n,l,e) 
@@ -1239,19 +1250,19 @@ let type_decl keep_triggers (acc, env) d =
 	  let td = 
 	    match d with 
 	      | Function_def(_,_,_,t,_) ->
-		if rules () = 1 then 
-		  fprintf fmt "[rule] TR-Typing-LogicFun$_F$@.";
-		TFunction_def(loc,n,l,t,f)
+		  if rules () = 1 then 
+		    fprintf fmt "[rule] TR-Typing-LogicFun$_F$@.";
+		  TFunction_def(loc,n,l,t,f)
 	      | _ ->
-		if rules () = 1 then
-		  fprintf fmt "[rule] TR-Typing-LogicPred$_F$@.";
-		TPredicate_def(loc,n,l,f)
+		  if rules () = 1 then
+		    fprintf fmt "[rule] TR-Typing-LogicPred$_F$@.";
+		  TPredicate_def(loc,n,l,f)
 	  in
 	  let td_a = { c = td; annot=new_id () } in
 	  (td_a, env)::acc, env
 
       | TypeDecl(loc, ls, s, body) -> 
-	if rules () = 1 then fprintf fmt "[rule] TR-Typing-TypeDecl$_F$@.";
+	  if rules () = 1 then fprintf fmt "[rule] TR-Typing-TypeDecl$_F$@.";
 	  let env1 = Env.add_type_decl env ls s body loc in
 	  let td1 =  TTypeDecl(loc, ls, s, body) in
 	  let td1_a = { c = td1; annot=new_id () } in
@@ -1283,7 +1294,12 @@ let split_goals l =
     List.fold_left
       (fun (ctx, hyp, ret) ( (td, env) as x) -> 
 	 match td.c with 
-	   | TGoal _ -> ctx, [], (x::(hyp@ctx))::ret
+	   | TGoal (_, Assert, _, _) -> 
+	       ctx, [], (x::(hyp@ctx))::ret		 
+
+	   | TGoal (_, _, _, _) -> 
+	       ctx, [], (x::(hyp@ctx))::ret
+		 
 	   | TAxiom (_, s, _) when String.length s > 0 && s.[0] = '@' ->
 	       ctx, x::hyp, ret
 	   | _ -> x::ctx, hyp, ret) ([],[],[]) l

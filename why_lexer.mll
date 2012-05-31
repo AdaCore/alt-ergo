@@ -74,7 +74,9 @@
 	"unit", UNIT;
 	"void", VOID;
 	"with", WITH;
-	"include", INCLUDE
+	"include", INCLUDE;
+	"cut", CUT;
+	"assert", ASSERT
       ]
 	       
   let newline lexbuf =

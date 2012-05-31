@@ -36,7 +36,7 @@ type gformula = {
   age: int; 
   name: F.t option; 
   mf: bool;
-  gf: bool
+  gf: bool;
 }
 
 module H = Hashtbl.Make(Formula)
@@ -534,11 +534,13 @@ and back_tracking env stop max_size = match env.delta with
 	if rules () = 2 then fprintf fmt "[rule] TR-Sat-Backjumping@.";
 	dep
 	
-let unsat env fg = 
+let unsat env with_terms fg = 
   try
     let env = assume env (fg,Ex.empty) in
-    let env = add_terms env (F.terms fg.f) fg.gf fg.age fg.name in
-
+    let env = 
+      if not with_terms then env
+      else add_terms env (F.terms fg.f) fg.gf fg.age fg.name 
+    in
     let _ , l = mround true false env max_max_size in
     let env = List.fold_left assume env l in
 
@@ -557,17 +559,17 @@ let assume env fg =
     Print.bottom classes;
     raise (Unsat d)
 
-let unsat env fg = 
+let unsat env ?(with_terms = true) fg = 
   if !profiling then
     try 
       !Options.timer_start Timers.TSat;
-      let env = unsat env fg in
+      let env = unsat env with_terms fg in
       !Options.timer_pause Timers.TSat;
       env
     with e -> 
       !Options.timer_pause Timers.TSat;
       raise e
-  else unsat env fg
+  else unsat env with_terms fg
 
 let assume env fg = 
   if !profiling then

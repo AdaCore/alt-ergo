@@ -248,7 +248,7 @@ let make l =
        | TRewriting(loc, name, lr) -> 
 	   Queue.push 
 	     {st_decl=RwtDef(List.map make_rule lr); st_loc=loc} queue
-       | TGoal(loc, n, f) -> push_query n f loc
+       | TGoal(loc, sort, n, f) -> push_query n f loc
        | TPredicate_def(loc, n, [], f) -> push_assume f n loc b
        | TPredicate_def(loc, n, _, f) -> push_preddef f n loc b
        | TFunction_def(loc, n, _, _, f) -> push_assume f n loc b
@@ -408,7 +408,7 @@ let make_theory l =
          let ff = make_form_theory name f in
          Queue.push {st_decl=Assume(ff, b) ; st_loc=loc} queue
        | TRewriting(loc, name, lr) -> assert false
-       | TGoal(loc, n, f) -> assert false
+       | TGoal(loc, _, n, f) -> assert false
        | TPredicate_def(loc, n, [], f) -> 
          let ff = make_form_theory n f in
          Queue.push {st_decl=Assume(ff, b) ; st_loc=loc} queue
