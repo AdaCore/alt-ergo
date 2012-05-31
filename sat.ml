@@ -259,12 +259,14 @@ let mround predicate mode env max_size =
   in
   !Options.timer_pause Timers.TMatch;
   res
-  
+
+let is_literal f = match F.view f with F.Literal _ -> true | _ -> false
+
 let extract_prop_model t = 
   let s = ref SF.empty in
   MF.iter 
     (fun f _ -> 
-       if complete_model () || F.is_in_model f then
+       if (complete_model () && is_literal f) || F.is_in_model f then
 	 s := SF.add f !s
     ) 
     t.gamma;

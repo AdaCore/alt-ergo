@@ -217,17 +217,22 @@ let rec print fmt f =
       Literal.LT.print fmt a
   | Lemma {triggers = trs; main = f; name = n} -> 
       if verbose () then
-	fprintf fmt "(lemma: %s)[%a] %a" 
+	let first = ref true in
+	fprintf fmt "(lemma: %s)[%a]@  %a" 
 	  n
 	  (fun fmt -> 
-	     List.iter (fun (l, _) -> fprintf fmt "%a@ |" T.print_list l)) 
+	     List.iter (fun (l, _) -> 
+	       fprintf fmt "%s%a"
+		 (if !first then "" else " | ") T.print_list l;
+	       first := false;
+	     ))
 	  trs print f
       else 
 	fprintf fmt "lem %s" n
 
-  | Unit(f1, f2) -> fprintf fmt "@[(%a &@ %a)@]" print f1 print f2
+  | Unit(f1, f2) -> fprintf fmt "@[(%a /\\@ %a)@]" print f1 print f2
 
-  | Clause(f1, f2) -> fprintf fmt "@[(%a v@ %a)@]" print f1 print f2
+  | Clause(f1, f2) -> fprintf fmt "@[(%a \\/@ %a)@]" print f1 print f2
 
   | Skolem{sko_f=f} -> fprintf fmt "<sko> (%a)" print f
 
