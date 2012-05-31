@@ -61,6 +61,23 @@ let rec print fmt t =
     | Sy.Op Sy.Extract, [e1; e2; e3] ->
 	fprintf fmt "%a^{%a,%a}" print e1 print e2 print e3
 
+    | Sy.Op (Sy.Access field), [e] ->
+	fprintf fmt "%a.%s" print e (Hstring.view field)
+
+    | Sy.Op (Sy.Record), _ ->
+        begin match ty with
+	  | Ty.Trecord {Ty.lbs=lbs} ->
+	      assert (List.length l = List.length lbs);
+	      fprintf fmt "{";
+	      ignore (List.fold_left2 (fun first (field,_) e -> 
+		fprintf fmt "%s%s=%a"  (if first then "" else "; ")
+		  (Hstring.view field) print e;
+		false
+	      ) true lbs l);
+	      fprintf fmt "}";
+	  | _ -> assert false
+	end
+
     | Sy.Op op, [e1; e2] -> 
 	fprintf fmt "(%a %a %a)" print e1 Sy.print x print e2
 

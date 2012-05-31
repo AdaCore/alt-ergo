@@ -59,7 +59,6 @@ let quit envs () =
 
 
 let show_about () =
-  (* let v = Format.sprintf "Alt-Ergo version %s" Version.version in *)
   let v = "Alt-Ergo" in
   let aw = GWindow.about_dialog ~name:v 
     ~authors:["Sylvain Conchon"; 
@@ -266,8 +265,6 @@ let refresh_timers t () =
     tsat +. tmatch +. tcc +. tarith +. tarrays +. tsum +. trecords +. tac in
 
   let total = if total = 0. then 1. else total in
-  (* eprintf "%f@.%f@.%f@.%f@." *)
-  (*   tsat total (tsat /. total) (tsat *. 100. /. total); *)
 
   t.tl_sat#set_text (sprintf "%3.2f s" tsat);
   t.tl_match#set_text (sprintf "%3.2f s" tmatch);
@@ -312,7 +309,6 @@ let reset_timers timers_model =
 
 
 let refresh_instances ({istore=istore} as inst_model) () =
-  (* eprintf "refresh@."; *)
   Hashtbl.iter (fun id (r, n, name, limit) -> 
     let row, upd_info = 
       match !r with
@@ -322,7 +318,6 @@ let refresh_instances ({istore=istore} as inst_model) () =
 	  r := Some row;
 	  row, true in
     let nb = !n in
-    (* eprintf "refresh: %s %d@." name nb; *)
     inst_model.max <- max inst_model.max nb;
     if upd_info then begin
       istore#set ~row ~column:inst_model.icol_icon `INFO;
@@ -339,7 +334,6 @@ let refresh_instances ({istore=istore} as inst_model) () =
     
 
 let add_inst ({h=h} as inst_model) orig =
-  (* eprintf "guisafe:%b@." (GtkThread.gui_safe ()); *)
   let id = Formula.id orig in
   let name = 
     match Formula.view orig with 
@@ -543,18 +537,7 @@ let rec run buttonrun buttonstop buttonclean inst_model timers_model
   let ast_pruned =
     if select () > 0 then Pruning.split_and_prune (select ()) ast
     else [List.map (fun f -> f,true) ast] in
-
-  (* let chan = Event.new_channel () in *)
   
-  (* ignore (Thread.create *)
-  (*   (fun () -> *)
-  (*      (\* Thread.yield (); *\) *)
-  (*      ignore (Event.sync (Event.receive chan)); *)
-  (*      if debug then fprintf fmt "Waiting thread : signal recieved@."; *)
-  (*      buttonstop#misc#hide (); *)
-  (*      buttonrun#misc#show () *)
-  (*   ) ()); *)
-
   (* refresh instances *)
   let to_id = 
     GMain.Timeout.add ~ms:300 ~callback:(refresh_instances inst_model)
@@ -590,7 +573,6 @@ let rec run buttonrun buttonstop buttonclean inst_model timers_model
 	  wrapper_update_aborted image label buttonstop buttonrun timers_model e
        );
        if debug () then fprintf fmt "Send done signal to waiting thread@.";
-       (* Event.sync (Event.send chan true) *)
        wrapper_reset buttonstop buttonrun;
        Thread.delay 0.001;
        GMain.Timeout.remove to_id;
@@ -599,10 +581,7 @@ let rec run buttonrun buttonstop buttonclean inst_model timers_model
        wrapper_refresh_timers timers_model ();
     ) ());
 
-
    Thread.yield ()
-  (* ignore (Thread.create (fun () ->  *)
-  (* match !thread with Some s -> Thread.join s | _ -> assert false) ()) *)
 
 let remove_context env () =
   List.iter
