@@ -1,0 +1,14 @@
+
+logic P,Q : int -> prop
+logic R : int,int -> prop
+logic G : prop
+
+axiom a1 : forall x : int [P(x)]. P(x) -> Q(x)
+axiom a2 : forall x,y : int[R(x,y)]. Q(x) -> Q(y) -> R(x,y)
+axiom a3 : forall x,y,z:int. R(x,y) -> G
+
+goal g : 
+     forall x:int. P(x) -> P(y) -> cut(R(x,y)) -> G
+
+goal g : 
+     forall x:int. P(x) -> cut(Q(x)) -> P(y) -> assert(R(x,y)) -> G
