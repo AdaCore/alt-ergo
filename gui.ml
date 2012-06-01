@@ -524,7 +524,7 @@ let run_replay env =
   Frontend.Time.unset_timeout ()
 
 
-let rec run buttonrun buttonstop buttonclean inst_model timers_model 
+let run buttonrun buttonstop buttonclean inst_model timers_model 
     image label thread env () =
   
   (* Install the signal handler: *)
@@ -990,16 +990,6 @@ let start_gui () =
        let resulting_ids = compute_resulting_ids annoted_ast in
        let actions = Gui_session.read_actions resulting_ids session_cin in
 
-
-       let env = create_env buf1 buf2 error_model inst_model st_ctx annoted_ast
-	 dep actions resulting_ids in
-       connect env;
-
-       ignore (toolbar#insert_toggle_button
-	 ~text:" Remove context"
-	 ~icon:(GMisc.image ~stock:`CUT ~icon_size:`LARGE_TOOLBAR ())#coerce
-	 ~callback:(remove_context env) ());
-
        let sw1 = GBin.scrolled_window
 	    ~vpolicy:`AUTOMATIC 
 	    ~hpolicy:`AUTOMATIC
@@ -1023,6 +1013,16 @@ let start_gui () =
        in
        let _ = tv2#misc#modify_font monospace_font in
        let _ = tv2#set_editable false in
+
+
+       let env = create_env buf1 buf2 error_model inst_model st_ctx annoted_ast
+	 dep actions resulting_ids in
+       connect env;
+
+       ignore (toolbar#insert_toggle_button
+	 ~text:" Remove context"
+	 ~icon:(GMisc.image ~stock:`CUT ~icon_size:`LARGE_TOOLBAR ())#coerce
+	 ~callback:(remove_context env) ());
 
        let buttonrun = toolbar#insert_button
 	 ~text:" Run Alt-Ergo"
@@ -1059,7 +1059,6 @@ let start_gui () =
        ignore(GMisc.image ~icon_size:`LARGE_TOOLBAR
 	 ~stock:`FIND ~packing:search_box#add ());
        let search_entry = GEdit.entry ~packing:search_box#add () in
-       Hashtbl.add note_search !nb_page search_entry;
 
        ignore(toolsearch#insert_widget search_box#coerce);
 
@@ -1137,6 +1136,11 @@ let start_gui () =
        ignore(eventBox#event#connect#key_release
 		~callback:(set_ctrl env false));
        
+       Hashtbl.add note_search !nb_page 
+	 (search_entry,
+	  run buttonrun buttonstop buttonclean inst_model 
+	    timers_model result_image result_label thread env);
+
        env::acc
 
     ) [] typed_ast in
@@ -1226,8 +1230,14 @@ let start_gui () =
   
   let focus_search () =
     let p = notebook#current_page in
-    let e = Hashtbl.find note_search p in
+    let e, _ = Hashtbl.find note_search p in
     e#misc#grab_focus ()    
+  in
+
+  let launch_run () =
+    let p = notebook#current_page in
+    let _, r = Hashtbl.find note_search p in
+    r ()
   in
 
   let mod_mask = [`MOD2 ; `MOD3 ; `MOD4 ; `MOD5 ; `LOCK] in
@@ -1242,6 +1252,7 @@ let start_gui () =
 	  | k when k = GdkKeysyms._q -> quit envs (); true
 	  | k when k = GdkKeysyms._s -> save_dialog "Cancel" envs (); true
 	  | k when k = GdkKeysyms._f -> focus_search (); true
+	  | k when k = GdkKeysyms._r -> launch_run (); true
 	  | _ -> false)
       | _ -> false
   in
