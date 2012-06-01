@@ -596,7 +596,7 @@ let print_typed_decl fmt td = match td.Why_ptree.c with
   | TRewriting (_, s, rwtl) -> 
     fprintf fmt "rewriting %s : %a" s print_rwt_list rwtl
   | TGoal (_, Thm, s, tf) -> fprintf fmt "goal %s : %a" s print_tform tf
-  | TGoal (_, Assert, s, tf) -> fprintf fmt "assert %s : %a" s print_tform tf
+  | TGoal (_, Check, s, tf) -> fprintf fmt "check %s : %a" s print_tform tf
   | TGoal (_, Cut, s, tf) -> fprintf fmt "cut %s : %a" s print_tform tf
   | TLogic (_, ls, ty) ->
       fprintf fmt "logic %a : %a" print_string_list ls print_plogic_type ty
@@ -1303,7 +1303,7 @@ let add_atyped_decl errors (buffer:sbuffer) d =
 
   | AGoal (loc, gs, s, aaf) ->
       let goal_str =
-	match gs with Thm -> "goal" | Assert -> "assert" | Cut -> "cut" in
+	match gs with Thm -> "goal" | Check -> "check" | Cut -> "cut" in
       buffer#insert ~tags:[d.tag;d.ptag] (sprintf "%s %s :" goal_str s);
       buffer#insert "\n";
       d.line <- buffer#line_count;

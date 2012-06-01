@@ -229,9 +229,9 @@ let push_preddef f name loc match_flag =
   let ff , _ = make_form name f in
   Queue.push {st_decl=PredDef ff ; st_loc=loc} queue
       
-let push_query n f loc = 
+let push_query n f loc sort = 
   let ff, lits = make_form "" f in
-  Queue.push {st_decl=Query(n,ff,lits) ; st_loc=loc} queue
+  Queue.push {st_decl=Query(n, ff, lits, sort) ; st_loc=loc} queue
 
 let make_rule ({rwt_left = t1; rwt_right = t2} as r) = 
   { r with rwt_left = make_term t1; rwt_right = make_term t2 }
@@ -248,7 +248,7 @@ let make l =
        | TRewriting(loc, name, lr) -> 
 	   Queue.push 
 	     {st_decl=RwtDef(List.map make_rule lr); st_loc=loc} queue
-       | TGoal(loc, sort, n, f) -> push_query n f loc
+       | TGoal(loc, sort, n, f) -> push_query n f loc sort
        | TPredicate_def(loc, n, [], f) -> push_assume f n loc b
        | TPredicate_def(loc, n, _, f) -> push_preddef f n loc b
        | TFunction_def(loc, n, _, _, f) -> push_assume f n loc b

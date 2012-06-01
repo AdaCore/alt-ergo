@@ -70,7 +70,7 @@ and pp_desc =
       (string * string) list * ppure_type * lexpr list list * lexpr
   | PPnamed of string * lexpr
   | PPlet of string * lexpr * lexpr
-  | PPassert of lexpr
+  | PPcheck of lexpr
   | PPcut of lexpr
 
 (* Declarations. *)
@@ -173,7 +173,7 @@ type 'a rwt_rule = {
   rwt_right : 'a
 }
 
-type goal_sort = Cut | Assert | Thm
+type goal_sort = Cut | Check | Thm
 
 type 'a tdecl = 
   | TAxiom of loc * string * ('a tform, 'a) annoted
@@ -195,7 +195,7 @@ type sat_decl_aux =
   | Assume of Formula.t * bool 
   | PredDef of Formula.t
   | RwtDef of (Term.t rwt_rule) list
-  | Query of string *  Formula.t * Literal.LT.t list
+  | Query of string *  Formula.t * Literal.LT.t list * goal_sort
 
 type sat_tdecl = {
   st_loc : loc;

@@ -919,7 +919,7 @@ let start_gui () =
 	 (fun _ (td,_) ->
 	    match td.c with
 	      | AGoal (_, Thm, s, _) -> "goal "^s
-	      | AGoal (_, Assert, s, _) -> "assert "^s
+	      | AGoal (_, Check, s, _) -> "check "^s
 	      | AGoal (_, Cut, s, _) -> "cut "^s
 	      | _ -> "Empty"
 	 ) "" annoted_ast in

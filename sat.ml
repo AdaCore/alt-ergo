@@ -560,7 +560,7 @@ let assume env fg =
     Print.bottom classes;
     raise (Unsat d)
 
-let unsat env ?(with_terms = true) fg = 
+let unsat env ~with_terms fg = 
   if !profiling then
     try 
       !Options.timer_start Timers.TSat;

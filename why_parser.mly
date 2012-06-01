@@ -75,7 +75,7 @@
 %token AND LEFTARROW ARROW AC AT AXIOM REWRITING
 %token BAR HAT
 %token BOOL COLON COMMA PV DISTINCT DOT ELSE EOF EQUAL
-%token EXISTS FALSE VOID FORALL FUNCTION GE GOAL GT ASSERT CUT
+%token EXISTS FALSE VOID FORALL FUNCTION GE GOAL GT CHECK CUT
 %token IF IN INT BITV
 %token LE LET LEFTPAR LEFTSQ LEFTBR LOGIC LRARROW LT MINUS 
 %token NOT NOTEQ OR PERCENT PLUS PREDICATE PROP 
@@ -90,7 +90,7 @@
 %nonassoc INCLUDE
 %nonassoc WITH
 %nonassoc IN
-%nonassoc prec_forall prec_exists ASSERT CUT
+%nonassoc prec_forall prec_exists
 %right ARROW LRARROW
 %right OR
 %right AND 
@@ -102,6 +102,7 @@
 %nonassoc uminus
 %nonassoc NOT DOT
 %right prec_named
+%nonassoc CHECK CUT
 %left LEFTSQ
 %nonassoc LIDENT
 
@@ -345,8 +346,8 @@ lexpr:
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
      mk_pp (PPlet ($2, $4, $6)) }
 
-| ASSERT lexpr
-    { mk_pp (PPassert $2) } 
+| CHECK lexpr
+    { mk_pp (PPcheck $2) } 
 
 | CUT lexpr
     { mk_pp (PPcut $2) } 

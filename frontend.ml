@@ -88,10 +88,10 @@ let process_decl print_status (env, consistent, dep) d =
 
       | RwtDef r -> assert false
 
-      | Query(n, f, lits)-> 
+      | Query(n, f, lits, sort)->
 	  let dep = 
 	    if consistent then
-	      let dep' = Sat.unsat env 
+	      let dep' = Sat.unsat env ~with_terms:(sort <> Check)
 		{Sat.f=f;age=0;name=None;mf=true;gf=true} in
 	      Explanation.union dep' dep
 	    else dep
