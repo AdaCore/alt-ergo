@@ -56,7 +56,9 @@
 	<context id="keywords" style-ref="keyword">
 	  <keyword>ac</keyword>
 	  <keyword>and</keyword>
+	  <keyword>assert</keyword>
 	  <keyword>axiom</keyword>
+	  <keyword>cut</keyword>
 	  <keyword>distinct</keyword>
 	  <keyword>else</keyword>
 	  <keyword>exists</keyword>

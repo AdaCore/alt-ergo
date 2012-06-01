@@ -138,7 +138,7 @@ and aform =
 type atyped_decl = 
   | AAxiom of loc * string * aform
   | ARewriting of loc * string * ((aterm rwt_rule) annoted) list
-  | AGoal of loc * string * aform annoted
+  | AGoal of loc * goal_sort * string * aform annoted
   | ALogic of loc * string list * plogic_type
   | APredicate_def of loc * string * (string * ppure_type) list * aform
   | AFunction_def 

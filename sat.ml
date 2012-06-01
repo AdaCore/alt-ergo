@@ -275,8 +275,9 @@ let extract_prop_model t =
 let print_prop_model fmt s =
   SF.iter (fprintf fmt "\n %a" F.print) s
 
-let print_model fmt t =
-  fprintf fmt "\nModel\n@.";
+let print_model ~header fmt t =
+  Format.print_flush ();
+  if header then fprintf fmt "\nModel\n@.";
   let pm = extract_prop_model t in
   if not (SF.is_empty pm) then begin
     fprintf fmt "Propositional:";
@@ -299,7 +300,7 @@ let refresh_model_handler =
       try
 	Sys.set_signal Sys.sigalrm
 	  (Sys.Signal_handle (fun _ ->
-	    printf "%a@." print_model t;
+	    printf "%a@." (print_model ~header:true) t;
 	    !timeout ()))
       with Invalid_argument _ -> ()
   else fun _ -> ()

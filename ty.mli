@@ -75,6 +75,7 @@ val union_subst : subst -> subst -> subst
 val compare_subst : subst -> subst -> int
 
 val print : Format.formatter -> t -> unit
+val print_full : Format.formatter -> t -> unit
 (*val printl : Format.formatter -> t list -> unit*)
 
 module Svty : Set.S

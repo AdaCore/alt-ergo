@@ -47,7 +47,7 @@ val pred_def : t -> Formula.t -> t
    [size]. Raises Sat if [f] is satisfiable in [env] *)
 val unsat : t -> ?with_terms:bool -> gformula -> Explanation.t
 
-val print_model : Format.formatter -> t -> unit
+val print_model : header:bool -> Format.formatter -> t -> unit
 
 val start : unit -> unit
 val stop : unit -> int64

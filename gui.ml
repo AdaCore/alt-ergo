@@ -48,10 +48,19 @@ let save_session envs =
 
 let save_dialog cancel envs () =
   if List.exists (fun env -> env.actions <> env.saved_actions) envs then
-    if GToolbox.question_box 
-      ~title:"Save session" ~buttons:[cancel; "Save"] 
-      ~default:2 ~icon:(GMisc.image ~stock:`SAVE  ~icon_size:`DIALOG ())
-      "Would you like to save the current session ?" = 2 then save_session envs
+    if List.exists 
+      (fun env -> not (Gui_session.safe_session env.actions)) envs then
+      GToolbox.message_box 
+	~title:"Unsafe session" 
+	~icon:(GMisc.image ~stock:`DIALOG_ERROR  ~icon_size:`DIALOG ())
+	~ok:"OK"
+	"Your current session is unsafe: satifiability is not preserved.\nPlease ensure you haven't performed any incorrect prunings before saving."
+    else
+      if GToolbox.question_box 
+	~title:"Save session" ~buttons:[cancel; "Save"] 
+	~default:2 ~icon:(GMisc.image ~stock:`SAVE  ~icon_size:`DIALOG ())
+	"Would you like to save the current session ?" = 2 then
+	save_session envs
     
 let quit envs () =
   save_dialog "Quit" envs ();
@@ -119,7 +128,7 @@ let pop_model sat_env () =
     ~wrap_mode:`CHAR() in
   let _ = tv1#misc#modify_font monospace_font in
   let _ = tv1#set_editable false in
-  fprintf str_formatter "%a" Sat.print_model sat_env;
+  fprintf str_formatter "%a" (Sat.print_model ~header:false) sat_env;
   let model_text = (flush_str_formatter()) in
   buf1#set_text model_text;
   pop_w#show ()
@@ -444,28 +453,28 @@ let update_aborted image label buttonstop buttonrun timers_model = function
 
 
 let wrapper_update_status image label buttonclean env d s steps =
-  GtkThread.async (fun () ->
+  GtkThread.sync (fun () ->
     update_status image label buttonclean env d s steps 
   ) ()
 
 let wrapper_update_aborted image label buttonstop buttonrun timers_model e =
-  GtkThread.async (fun () ->
+  GtkThread.sync (fun () ->
     update_aborted image label buttonstop buttonrun timers_model e
   ) ()
 
 let wrapper_reset buttonstop buttonrun =
-  GtkThread.async (fun () ->
+  GtkThread.sync (fun () ->
     buttonstop#misc#hide ();
     buttonrun#misc#show ();
   ) ()
 
 let wrapper_refresh_instances inst_model =
-  GtkThread.async (fun () ->
+  GtkThread.sync (fun () ->
     ignore (refresh_instances inst_model ())
   )
 
 let wrapper_refresh_timers timers_model =
-  GtkThread.async (fun () ->
+  GtkThread.sync (fun () ->
     ignore (refresh_timers timers_model ())
   )
 
@@ -909,7 +918,9 @@ let start_gui () =
        let text = List.fold_left
 	 (fun _ (td,_) ->
 	    match td.c with
-	      | AGoal (_, s, _) -> "goal "^s
+	      | AGoal (_, Thm, s, _) -> "goal "^s
+	      | AGoal (_, Assert, s, _) -> "assert "^s
+	      | AGoal (_, Cut, s, _) -> "cut "^s
 	      | _ -> "Empty"
 	 ) "" annoted_ast in
 

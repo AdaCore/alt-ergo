@@ -102,7 +102,7 @@ let process_decl print_status (env, consistent, dep) d =
   with 
     | Sat.Sat t -> 
 	print_status d (Sat t) (Sat.stop ());
-        if model () then Sat.print_model std_formatter t;
+        if model () then Sat.print_model ~header:true std_formatter t;
 	env , consistent, dep
     | Sat.Unsat dep' -> 
         let dep = Explanation.union dep dep' in
@@ -111,7 +111,7 @@ let process_decl print_status (env, consistent, dep) d =
 	env , false, dep
     | Sat.I_dont_know t -> 
 	print_status d (Unknown t) (Sat.stop ());
-        if model () then Sat.print_model std_formatter t;
+        if model () then Sat.print_model ~header:true std_formatter t;
 	env , consistent, dep
 
 exception Parse_only

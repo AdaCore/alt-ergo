@@ -161,7 +161,7 @@ let tag_callback t env sbuf ~origin:y z i =
 	  begin
 	    let tyt = match find t sbuf env.ast with
 	      | Some (AT at) ->
-		  fprintf str_formatter ": %a" Ty.print at.c.at_ty;
+		  fprintf str_formatter ": %a" Ty.print_full at.c.at_ty;
 		  flush_str_formatter ()
 	      | Some (AF _) -> ": formula"
 	      | Some (QF _) -> ": quantified formula"
@@ -478,7 +478,7 @@ let rec add_instance_aux ?(register=true) env id af aname vars entries =
       | x::r -> find_goal r in
     let g, tyenv = find_goal env.ast in
     match g.c with
-      | AGoal (loc, _, f) -> f, tyenv, loc
+      | AGoal (loc, _, _, f) -> f, tyenv, loc
       | _ -> raise Not_found
   in
   let instance, used_vars =
@@ -876,7 +876,7 @@ let connect_atyped_decl env td =
     | ARewriting (_, _, arwtl) ->
 	connect_tag env env.buffer td.tag
 	(* TODO *)
-    | AGoal (_, _, aaf) ->
+    | AGoal (_, _, _, aaf) ->
 	connect_tag env env.buffer td.tag;
 	connect_aform env env.buffer aaf.c
     | AFunction_def (_, _, _, _, af) ->

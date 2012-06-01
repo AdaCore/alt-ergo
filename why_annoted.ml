@@ -149,7 +149,7 @@ and aform =
 type atyped_decl = 
   | AAxiom of loc * string * aform
   | ARewriting of loc * string * ((aterm rwt_rule) annoted) list
-  | AGoal of loc * string * aform annoted
+  | AGoal of loc * goal_sort * string * aform annoted
   | ALogic of loc * string list * plogic_type
   | APredicate_def of loc * string * (string * ppure_type) list * aform
   | AFunction_def 
@@ -372,7 +372,7 @@ let findin_atyped_delc tag buffer (td, env) stop_decl =
 	    | Some _ -> acc
 	    | None -> findin_aterm_list tag buffer [rl; rr]
 	  ) rwtl None*)
-    | AGoal (_, _, aaf) ->
+    | AGoal (_, _, _, aaf) ->
 	let goodbuf =  aaf.buf#get_oid = buffer#get_oid in
 	let c = compare tag#priority aaf.tag#priority in
 	if goodbuf && c = 0 then Some (AF (aaf, None))
@@ -595,7 +595,9 @@ let print_typed_decl fmt td = match td.Why_ptree.c with
   | TAxiom (_, s, tf) -> fprintf fmt "axiom %s : %a" s print_tform tf
   | TRewriting (_, s, rwtl) -> 
     fprintf fmt "rewriting %s : %a" s print_rwt_list rwtl
-  | TGoal (_, s, tf) -> fprintf fmt "goal %s : %a" s print_tform tf
+  | TGoal (_, Thm, s, tf) -> fprintf fmt "goal %s : %a" s print_tform tf
+  | TGoal (_, Assert, s, tf) -> fprintf fmt "assert %s : %a" s print_tform tf
+  | TGoal (_, Cut, s, tf) -> fprintf fmt "cut %s : %a" s print_tform tf
   | TLogic (_, ls, ty) ->
       fprintf fmt "logic %a : %a" print_string_list ls print_plogic_type ty
   | TPredicate_def (_, p, spptl, tf) ->
@@ -748,7 +750,7 @@ let make_dep_atyped_decl dep d =
 	  let dep = make_dep_aterm d vars dep r.c.rwt_left in
 	  make_dep_aterm d vars dep r.c.rwt_right
 	) dep arwtl
-  | AGoal (loc, s, aaf) -> make_dep_aform d [] dep aaf.c
+  | AGoal (loc, _, s, aaf) -> make_dep_aform d [] dep aaf.c
   | ALogic (loc, ls, ty) -> MDep.add d ([], []) dep
   | APredicate_def (loc, p, spptl, af) ->
       let dep = MDep.add d ([], []) dep in
@@ -873,9 +875,9 @@ let annot_of_typed_decl (buffer:sbuffer) td =
 	    td.Why_ptree.annot ptag
 	) rwtl in
       ARewriting (loc, s, arwtl)
-    | TGoal (loc, s, tf) ->
+    | TGoal (loc, gs, s, tf) ->
         let g = new_annot buffer (of_tform buffer tf) tf.Why_ptree.annot ptag in
-        AGoal (loc, s, g)
+        AGoal (loc, gs, s, g)
     | TLogic (loc, ls, ty) -> ALogic (loc, ls, ty)
     | TPredicate_def (loc, p, spptl, tf) ->
         APredicate_def (loc, p,  spptl, of_tform buffer  tf)
@@ -1000,7 +1002,7 @@ let to_typed_decl td =
 	       rwt_right = to_tterm ar.id ar.c.rwt_right}::rwtl
       ) [] arwtl in
       TRewriting (loc, s, rwtl)
-    | AGoal (loc, s, aaf) -> TGoal (loc, s, to_tform aaf)
+    | AGoal (loc, gs, s, aaf) -> TGoal (loc, gs, s, to_tform aaf)
     | ALogic (loc, ls, ty) -> TLogic (loc, ls, ty)
     | APredicate_def (loc, p, spptl, af) ->
       TPredicate_def (loc, p, spptl, void_to_tform af td.id)
@@ -1159,9 +1161,9 @@ let add_oplogic (buffer:sbuffer) indent tags op =
   | AOPnot -> buffer#insert ~tags "not "
   | AOPif at ->
       buffer#insert (String.make indent ' ');
-      buffer#insert ~tags "if  ";
+      buffer#insert ~tags "if ";
       add_aterm buffer tags at;
-      buffer#insert ~tags "  then"
+      buffer#insert ~tags " then "
   | AOPiff -> buffer#insert ~tags "<-> "
 
 let add_rwt (buffer:sbuffer) indent tags r =
@@ -1299,8 +1301,10 @@ let add_atyped_decl errors (buffer:sbuffer) d =
       add_rwt_list buffer 1 [d.tag;d.ptag] arwtl;
       buffer#insert "\n\n"
 
-  | AGoal (loc, s, aaf) -> 
-      buffer#insert ~tags:[d.tag;d.ptag] (sprintf "goal %s :" s);
+  | AGoal (loc, gs, s, aaf) ->
+      let goal_str =
+	match gs with Thm -> "goal" | Assert -> "assert" | Cut -> "cut" in
+      buffer#insert ~tags:[d.tag;d.ptag] (sprintf "%s %s :" goal_str s);
       buffer#insert "\n";
       d.line <- buffer#line_count;
       buffer#insert (String.make indent_size ' ');
@@ -1464,7 +1468,7 @@ let findtags_atyped_delc sl td acc =
     | AFunction_def (_, _, _, _, af) ->
 	findtags_aform sl af acc
     | ARewriting (_, _, rwtl) -> acc
-    | AGoal (_, _, aaf) ->
+    | AGoal (_, _, _, aaf) ->
 	findtags_aform sl aaf.c acc
     | ALogic _
     | ATypeDecl _ -> acc
@@ -1550,7 +1554,7 @@ let findproof_atyped_decl ids td (ax,acc) =
       let acc, found = findproof_aform ids af acc false in
       if found then td.ptag::ax, acc else ax,acc
 
-    | AGoal (_,_, aaf) ->
+    | AGoal (_,_,_, aaf) ->
       let acc, found = findproof_aaform ids aaf acc false in
       if found then td.ptag::ax, acc else ax,acc
 
@@ -1591,7 +1595,7 @@ let find_line_id_atyped_decl id td =
     | AAxiom (_, _, af) ->
 	find_line_id_aform id af
 
-    | AGoal (_,_, aaf) ->
+    | AGoal (_,_,_, aaf) ->
 	find_line_id_aaform id aaf
 
 let find_line id l =
@@ -1668,7 +1672,7 @@ let findbyid_atyped_decl  stop_decl id (td, tyenv) =
     | AAxiom (_, _, af) ->
 	findbyid_aform id af
 
-    | AGoal (_,_, aaf) ->
+    | AGoal (_,_,_, aaf) ->
 	findbyid_aaform id aaf
 
 let findbyid_aux stop_decl id l =
@@ -1689,5 +1693,5 @@ let compute_resulting_ids =
     | APredicate_def (_, name, _, _) 
     | AFunction_def (_, name, _, _, _) 
     | AAxiom (_, name, _)
-    | AGoal (_, name, _) -> (name, td.id)::acc)
+    | AGoal (_,_, name, _) -> (name, td.id)::acc)
     []
