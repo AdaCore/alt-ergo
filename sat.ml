@@ -535,11 +535,11 @@ and back_tracking env stop max_size = match env.delta with
 	if rules () = 2 then fprintf fmt "[rule] TR-Sat-Backjumping@.";
 	dep
 	
-let unsat env with_terms fg = 
+let unsat env fg =
   try
-    let env = assume env (fg,Ex.empty) in
+    let env = assume env (fg, Ex.empty) in
     let env = 
-      if not with_terms then env
+      if not fg.mf then env
       else add_terms env (F.terms fg.f) fg.gf fg.age fg.name 
     in
     let _ , l = mround true false env max_max_size in
@@ -560,17 +560,17 @@ let assume env fg =
     Print.bottom classes;
     raise (Unsat d)
 
-let unsat env ~with_terms fg = 
+let unsat env fg = 
   if !profiling then
     try 
       !Options.timer_start Timers.TSat;
-      let env = unsat env with_terms fg in
+      let env = unsat env fg in
       !Options.timer_pause Timers.TSat;
       env
     with e -> 
       !Options.timer_pause Timers.TSat;
       raise e
-  else unsat env with_terms fg
+  else unsat env fg
 
 let assume env fg = 
   if !profiling then
