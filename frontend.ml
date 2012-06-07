@@ -67,7 +67,8 @@ let check_produced_proof dep =
     let env =
       (Formula.Set.fold
          (fun f env -> 
-            Sat.assume env {Sat.f=f;age=0;name=None;mf=false;gf=false}
+            Sat.assume env 
+	      {Sat.f=f;age=0;name=None;mf=false;gf=false; from_terms = []}
          ) (Explanation.formulas_of dep) (Sat.empty ()))
     in
     raise (Sat.Sat env)
@@ -80,7 +81,8 @@ let process_decl print_status (env, consistent, dep) d =
   try
     match d.st_decl with
       | Assume(f,mf) -> 
-	  Sat.assume env {Sat.f=f;age=0;name=None;mf=mf;gf=false},
+	  Sat.assume env 
+	    {Sat.f=f;age=0;name=None;mf=mf;gf=false; from_terms = []},
 	  consistent, dep
 
       |	PredDef f -> 
@@ -92,7 +94,8 @@ let process_decl print_status (env, consistent, dep) d =
 	  let dep = 
 	    if consistent then
 	      let dep' = Sat.unsat env 
-		{Sat.f=f;age=0;name=None;mf=(sort <> Check);gf=true} in
+		{Sat.f=f;age=0;name=None;
+		 mf=(sort <> Check);gf=true; from_terms = []} in
 	      Explanation.union dep' dep
 	    else dep
           in

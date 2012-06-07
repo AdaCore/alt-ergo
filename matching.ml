@@ -27,8 +27,10 @@ type gsubst = {
   sbt : T.subst ; 
   gen : int ;     (* l'age d'une substitution est l'age du plus vieux 
 		     terme qu'elle contient *)
-  goal : bool     (* vrai si la substitution contient un terme ayant un lien 
+  goal : bool;    (* vrai si la substitution contient un terme ayant un lien 
 		     avec le but de la PO *)
+  s_term_orig : Term.t list;
+  s_lem_orig : Formula.t;
 }
 
 type trigger_info = {
@@ -42,7 +44,8 @@ type trigger_info = {
 type term_info = {
   term_age : int ;   (* age du terme *)
   term_from_goal : bool ; (* vrai si le terme provient du but de la PO *)
-  term_orig : Formula.t option (* lemme d'origine du terme *)
+  term_from_formula : Formula.t option; (* lemme d'origine du terme *)
+  term_from_terms : Term.t list;
 }
 
 module type X = sig
@@ -71,7 +74,8 @@ module Make (X : X) = struct
 
   type info = {
     age : int ; (* age du terme *)
-    lem_orig : F.t option ; (* lemme d'ou provient eventuellement le terme *)
+    lem_orig : F.t list ; (* lemme d'ou provient eventuellement le terme *)
+    t_orig : Term.t list; 
     but : bool  (* le terme a-t-il un lien avec le but final de la PO *)
   }
 
@@ -101,54 +105,109 @@ module Make (X : X) = struct
       op_gen i.age g , op_but i.but b 
     with Not_found -> g , b
 
-  let add_term { term_age = age; term_from_goal = but; term_orig = lem} t env =
+  let add_term info t env =
+    eprintf ">>>> %d@." (MT.cardinal env.info);
     !Options.timer_start Timers.TMatch;
     let rec add_rec env t = 
-      let {T.f=f;xs=xs} = T.view t in
-      let env = 
-	let map_f = try SubstT.find f env.fils with Not_found -> MT.empty in
-	
-	(* - l'age d'un terme est le min entre l'age passe en argument
-	   et l'age dans la map 
-	   - un terme est en lien avec le but de la PO seulement s'il
-	   ne peut etre produit autrement (d'ou le &&)
-	   - le lemme de provenance est le dernier lemme
-	*)
-	let g , b = infos min (&&) t age but env in
-	{ env with
-	    fils = SubstT.add f (MT.add t xs map_f) env.fils; 
-	    info= MT.add t {age=g; lem_orig=lem; but=b} env.info }
-      in
-      List.fold_left add_rec env xs
+      if MT.mem t env.info then env
+      else
+	let {T.f=f; xs=xs} = T.view t in
+	let env = 
+	  let map_f = try SubstT.find f env.fils with Not_found -> MT.empty in
+	  
+	  (* - l'age d'un terme est le min entre l'age passe en argument
+	     et l'age dans la map 
+	     - un terme est en lien avec le but de la PO seulement s'il
+	     ne peut etre produit autrement (d'ou le &&)
+	     - le lemme de provenance est le dernier lemme
+	  *)
+	  let g, b = infos min (&&) t info.term_age info.term_from_goal env in
+	  let from_lems = 
+	    List.fold_left 
+	      (fun acc t ->
+		 try (MT.find t env.info).lem_orig @ acc
+		 with Not_found -> acc) 
+	      (match info.term_from_formula with None -> [] | Some a -> [a]) 
+	      info.term_from_terms
+	  in
+	  (*eprintf "[Matching.add_term] %a : " Term.print t;
+	  List.iter (eprintf "%a " Formula.print) from_lems;
+	  eprintf "@.";*)
+	  { env with
+	      fils = SubstT.add f (MT.add t xs map_f) env.fils; 
+	      info = 
+	      MT.add t 
+		{ age=g; lem_orig = from_lems; but=b; 
+	          t_orig = info.term_from_terms } 
+		env.info 
+	  }
+	in
+	List.fold_left add_rec env xs
     in
-    let env = if age > age_limite () then env else add_rec env t in
+    let env = if info.term_age > age_limite () then env else add_rec env t in
     !Options.timer_pause Timers.TMatch;
     env
       
   let add_trigger p trs env = { env with pats = (p, trs) ::env.pats }
 
   exception Deja_vu
-  let deja_vu lem1 = 
-    function None -> false | Some lem2 -> F.compare lem1 lem2=0
+  let deja_vu lem1 lems = 
+    List.exists (fun lem2 -> F.compare lem1 lem2 = 0) lems
 
-  let all_terms f ty env pinfo {sbt=(s_t,s_ty); gen=g; goal=b} lsbt_acc = 
+  let matching_loop_bound = 2
+
+  module HF = Hashtbl.Make(F)
+  let matching_loop lems orig =
+    List.length lems > 4 ||
+    match lems with
+      | [] | [_] -> false
+      | f :: l -> 
+	  let h = HF.create 17 in
+	  HF.add h f (ref 1);
+	  let max, _ = 
+	    List.fold_left 
+	      (fun ((max, _) as acc) f -> try 
+		 let m = HF.find h f in
+		 incr m;
+		 if !m > max then (!m, f) else acc
+	       with Not_found -> HF.add h f (ref 1); acc)
+	      (1, f) l
+	  in 
+	  max > matching_loop_bound 
+	  (*|| (try !(HF.find h orig) > 20 with Not_found -> false)*)
+
+  let all_terms 
+      f ty env pinfo 
+      {sbt=(s_t,s_ty); gen=g; goal=b; 
+       s_term_orig=s_torig; 
+       s_lem_orig = s_lorig} lsbt_acc = 
     SubstT.fold 
       (fun k s l -> 
 	 MT.fold 
 	   (fun t _ l -> 
 	      try
-		let s_ty = Ty.matching s_ty ty (T.view t).T.ty in
-		let ng , but = 
-		  try 
-		    let {age=ng;lem_orig=lem'; but=bt} = MT.find t env.info in
-		    if deja_vu pinfo.trigger_orig lem' then raise Deja_vu;
-		    max ng g , bt or b
-		  with Not_found -> g , b
+		let lems = 
+		  try (MT.find t env.info).lem_orig with Not_found -> []
 		in
-		{sbt=(SubstT.add f t s_t, s_ty);gen=ng; goal=but}::l
+		if matching_loop lems pinfo.trigger_orig then l
+		else
+		  let s_ty = Ty.matching s_ty ty (T.view t).T.ty in
+		  let ng , but = 
+		    try 
+		      let {age=ng;lem_orig=lem'; but=bt} = MT.find t env.info in
+		      if deja_vu pinfo.trigger_orig lem' then raise Deja_vu;
+		      max ng g , bt or b
+		    with Not_found -> g , b
+		  in
+		  { sbt = (SubstT.add f t s_t, s_ty);
+		    gen = ng; 
+		    goal = but;
+		    s_term_orig = t :: s_torig;
+		    s_lem_orig = s_lorig
+		  }::l
 	      with Ty.TypeClash _ | Deja_vu-> l
 	   ) s l
-      )env.fils lsbt_acc
+      ) env.fils lsbt_acc
 
   let add_msymb uf f t ({sbt=(s_t,s_ty)} as sg)= 
     try 
@@ -158,13 +217,6 @@ module Make (X : X) = struct
       then sg 
       else raise Echec
     with Not_found ->  {sg with sbt=(SubstT.add f t s_t,s_ty) }
-
-(* ancien iter_exception: pas complet
-
-  let rec iter_exception f gsb l = match l with
-      []    -> raise Echec
-    | xs::l -> try (f gsb xs) with Echec -> iter_exception f gsb l
-*)	
 
   let rec iter_exception f gsb l =
     let l = 
@@ -176,12 +228,13 @@ module Make (X : X) = struct
     !Options.thread_yield ();
     let {T.f=f_pat;xs=pats;ty=ty_pat} =  T.view pat in
     match f_pat with
-	Symbols.Var _ -> 
+      |	Symbols.Var _ -> 
 	  let sb =
             (try
 	       let s_ty = Ty.matching s_ty ty_pat (T.view t).T.ty in
 	       let g',b' = infos max (||) t g b env in
-	       add_msymb uf f_pat t {sbt=(s_t,s_ty);gen=g';goal=b'}
+	       add_msymb uf f_pat t 
+		 { sg with sbt=(s_t,s_ty); gen=g'; goal=b' }
 	     with Ty.TypeClash _ -> raise Echec)
           in 
           [sb]
@@ -213,7 +266,7 @@ module Make (X : X) = struct
         ) [sg] pats xs 
     with Invalid_argument _ -> raise Echec
 
-  let matchpat env uf pat_info lsbt_acc ({sbt=st,sty;gen=g;goal=b} as sg, pat) = 
+  let matchpat env uf pat_info lsbt_acc ({sbt=st,sty;gen=g;goal=b} as sg, pat) =
     let {T.f=f;xs=pats;ty=ty} = T.view pat in
     match f with
       |	Symbols.Var _ -> all_terms f ty env pat_info sg lsbt_acc
@@ -221,15 +274,26 @@ module Make (X : X) = struct
 	  try  
 	    MT.fold 
 	      (fun t xs lsbt ->
-		try
-		  let s_ty = 
-		    try Ty.matching sty ty (T.view t).T.ty 
-		    with Ty.TypeClash _ -> sty in
-		  let gen, but = infos max (||) t g b env in
-		  let aux = 
-                    matchterms env uf {sbt=st,s_ty; gen=gen; goal=but} pats xs in
-                  List.rev_append aux lsbt
-		with Echec -> lsbt
+		 let lems = 
+		   try (MT.find t env.info).lem_orig with Not_found -> []
+		 in
+		 if matching_loop lems pat_info.trigger_orig then lsbt
+		 else
+		   try
+		     let s_ty = 
+		       try Ty.matching sty ty (T.view t).T.ty 
+		       with Ty.TypeClash _ -> sty in
+		     let gen, but = infos max (||) t g b env in
+		     let aux = 
+                       matchterms env uf 
+			 { sg with 
+			     sbt = st, s_ty; 
+			     gen = gen; 
+			     goal = but; 
+			     s_term_orig = t::sg.s_term_orig } 
+			 pats xs in
+                     List.rev_append aux lsbt
+		   with Echec -> lsbt
               ) (SubstT.find f env.fils) lsbt_acc
 	  with Not_found -> lsbt_acc
 	    
@@ -239,7 +303,14 @@ module Make (X : X) = struct
          matchpat env uf pat_info acc (sg, T.apply_subst sg.sbt pat)) [] lsubsts
       
   let matching (pat_info, pats) env uf =
-    let egs = {sbt=(SubstT.empty,Ty.esubst) ; gen = 0; goal = false} in
+    let egs = 
+      { sbt=(SubstT.empty,Ty.esubst); 
+        gen = 0; 
+	goal = false; 
+	s_term_orig = [];
+	s_lem_orig = pat_info.trigger_orig;
+      } 
+    in
     List.fold_left (matchpats env uf pat_info) [egs] pats
 
   let query env uf = 

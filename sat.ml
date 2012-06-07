@@ -35,6 +35,7 @@ type gformula = {
   f: F.t; 
   age: int; 
   name: F.t option; 
+  from_terms : Term.t list;
   mf: bool;
   gf: bool;
 }
@@ -60,7 +61,7 @@ let max_max_size = 96
 
 module Print = struct
 
-  let assume {f=f;age=age;name=lem;mf=mf} dep = 
+  let assume {f=f;age=age;name=lem;mf=mf;from_terms=terms} dep = 
     if debug_sat () then
       begin
 	(match F.view f with
@@ -76,15 +77,16 @@ module Print = struct
 	      printf "@[%a@]@]@." F.print f
 		
 	  | F.Literal a -> 
-	      let s = 
-		match lem with 
-		    None -> "" 
-		  | Some ff -> 
-		      (match F.view ff with F.Lemma xx -> xx.F.name | _ -> "") 
+	      Term.print_list str_formatter terms;
+	      let s = flush_str_formatter () in
+	      let n = match lem with 
+		| None -> ""  
+		| Some ff -> 
+		    (match F.view ff with F.Lemma xx -> xx.F.name | _ -> "")
 	      in
 	      printf "\n@[@{<C.Bold>[sat]@}";
 	      printf "@{<C.G_Blue_B>I assume a literal@}";
-	      printf "(%s) %a@]@." s Literal.LT.print a;
+	      printf "(%s : %s) %a@]@." n s Literal.LT.print a;
 	      printf "================================================@.@."
 		
 	  | F.Skolem{F.sko_subst=(s,s_ty); sko_f=f} ->
@@ -117,9 +119,11 @@ module Print = struct
       (printf "@[@{<C.Bold>[sat]@} @{<C.G_Green>I don't consider the case @}";
        printf "%a@]@." F.print f)
        
-  let elim _ _ = if debug_sat () && verbose () then printf "@[@{<C.Bold>[elim]@}@."
+  let elim _ _ = 
+    if debug_sat () && verbose () then printf "@[@{<C.Bold>[elim]@}@."
 
-  let red _ _ = if debug_sat () && verbose () then printf "@[@{<C.Bold>[red]@}@."
+  let red _ _ = 
+    if debug_sat () && verbose () then printf "@[@{<C.Bold>[red]@}@."
 
   let delta d = 
     if debug_sat () && verbose () then begin
@@ -145,16 +149,19 @@ end
 
 (* matching part of the solver *)
 
-let add_terms env s goal age lem =
+let add_terms env s goal age lem terms =
   !Options.timer_start Timers.TMatch;
   let infos = { 
     Matching.term_age = age ; 
     term_from_goal = goal ;
-    term_orig = lem ;
+    term_from_formula = lem ;
+    term_from_terms = terms
   }
   in
+  let env = 
+    { env with matching = Term.Set.fold (MM.add_term infos) s env.matching } in
   !Options.timer_pause Timers.TMatch;
-  { env with matching = Term.Set.fold (MM.add_term infos) s env.matching }
+  env
 
 exception EnoughLemmasAlready of t * int
 
@@ -209,9 +216,15 @@ let add_instance_info env orig =
 let new_facts mode env = 
   List.fold_left
     (fun acc ({Matching.trigger_formula=f; trigger_query = guard; 
-	       trigger_age=age; trigger_dep=dep; trigger_orig=orig }, subst_list) ->
+	       trigger_age=age; trigger_dep=dep; trigger_orig=orig }, 
+	      subst_list) ->
        List.fold_left
-	 (fun acc {Matching.sbt=s;gen=g;goal=b} ->
+	 (fun acc 
+	    {Matching.sbt = s; 
+	     gen = g; 
+	     goal = b; 
+	     s_term_orig = torig;
+	     s_lem_orig = lorig; } ->
 	    match guard with
 	      | Some a when 
 		  CcX.query (Literal.LT.apply_subst s a) env.tbox = No -> acc
@@ -222,7 +235,13 @@ let new_facts mode env =
 		      let nf = F.apply_subst s f in
 		      if MF.mem nf env.gamma then acc else
 			let p = 
-			  {f=nf;age=1+(max g age);name=Some f;mf=true;gf=b} in
+			  { f = nf;
+			    age = 1+(max g age);
+			    mf = true;
+			    gf = b;
+			    name = Some lorig;
+			    from_terms = torig
+			  } in
 			add_instance_info env orig;
 			(p,dep)::acc
 		    with Exit -> acc
@@ -238,17 +257,7 @@ let mround predicate mode env max_size =
     Print.mround max_size;
     let axioms = if predicate then env.definitions else env.lemmas in
     let env, max_size = mtriggers env axioms max_size in
-    let rec bouclage n (env, lf) =
-      if n <=0 then (env, lf)
-      else 
-        let env = 
-	  List.fold_left 
-	    (fun env (f,_) -> add_terms env (F.terms f.f) mode f.age None)
-	    env lf
-        in
-        bouclage (n-1) (env, (new_facts mode env))
-    in
-    let _, lf = bouclage (Options.bouclage ()) (env, []) in
+    let lf = new_facts mode env in
     max_size, lf 
   in
   !Options.timer_start Timers.TMatch;
@@ -340,7 +349,7 @@ let red {f=f} env =
 	
 
 let pred_def env f = 
-  let ff = {f=f;age=0;name=None;mf=false;gf=false} in
+  let ff = {f=f;age=0;name=None;mf=false;gf=false; from_terms=[]} in
   Print.assume ff Explanation.empty;
   { env with definitions = MF.add f (0,Ex.empty) env.definitions }
 
@@ -390,20 +399,18 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 	else
 	  let env =
 	    if mf && glouton () && size < size_formula then 
-	      add_terms env (F.terms f) gf age lem else env in
+	      add_terms env (F.terms f) gf age lem ff.from_terms else env in
 	  let env = { env with gamma = MF.add f dep_gamma env.gamma } in
 	  Print.assume ff dep;
 	  match F.view f with
 	    | F.Unit (f1, f2) ->
 	      if rules () = 2 then fprintf fmt "[rule] TR-Sat-Assume-U@.";
-	      let env = assume env 
-		({ f = f1; age = age; name = lem; mf = mf; gf = gf }, dep) in
-	      assume env 
-		({ f = f2; age = age; name = lem; mf = mf; gf = gf }, dep) 
+	      let env = assume env ({ ff with f = f1}, dep) in
+	      assume env ({ ff with f = f2}, dep) 
 	    | F.Clause(f1,f2) -> 
 	      if rules () = 2 then fprintf fmt "[rule] TR-Sat-Assume-C@.";
-		let p1 = {f=f1;age=age;name=lem;mf=mf;gf=gf} in
-		let p2 = {f=f2;age=age;name=lem;mf=mf;gf=gf} in
+		let p1 = { ff with f=f1 } in
+		let p2 = { ff with f=f2 } in
 		bcp { env with delta = (p1,p2,dep)::env.delta }
 
 	    | F.Lemma _ ->
@@ -420,11 +427,11 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		if rules () = 2 then fprintf fmt "[rule] TR-Sat-Assume-Lit@.";
 		let env = 
 		  if mf && size < size_formula then 
-		    add_terms env (A.LT.terms_of a) gf age lem
+		    add_terms env (A.LT.terms_of a) gf age lem ff.from_terms
 		  else env 
 		in
 		let tbox, new_terms, cpt = CcX.assume a dep env.tbox in
-		let env = add_terms env new_terms gf age lem in
+		let env = add_terms env new_terms gf age lem ff.from_terms in
 		steps := Int64.add (Int64.of_int cpt) !steps;
 		if stepsb () <> -1 
 		  && Int64.compare !steps (Int64.of_int (stepsb ())) > 0 then 
@@ -438,7 +445,7 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 	    | F.Skolem{F.sko_subst=sigma; sko_f=f} -> 
 	      if rules () = 2 then fprintf fmt "[rule] TR-Sat-Assume-Sko@.";
 		let f' = F.apply_subst sigma f in
-		assume env ({f=f';age=age;name=lem;mf=mf;gf=gf},dep)
+		assume env ({ ff with f=f' },dep)
 
             | F.Let {F.let_var=lvar; let_term=lterm; let_subst=s; let_f=lf} ->
 	      if rules () = 2 then fprintf fmt "[rule] TR-Sat-Assume-Let@.";
@@ -446,10 +453,9 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		let id = F.id f' in
                 let v = Symbols.Map.find lvar (fst s) in
                 let env = assume env 
-		  ({f=F.mk_lit (A.LT.make (A.Eq(v,lterm))) id;
-		    age=age;name=lem;mf=mf;gf=gf},dep) 
+		  ({ ff with f=F.mk_lit (A.LT.make (A.Eq(v,lterm))) id},dep) 
 		in
-                assume env ({f=f';age=age;name=lem;mf=mf;gf=gf},dep)
+                assume env ({ ff with f=f' },dep)
       end
   with Exception.Inconsistent (expl, classes) -> 
     if debug_sat () then fprintf fmt "inconsistent %a@." Ex.print expl;
@@ -499,8 +505,8 @@ and back_tracking env stop max_size = match env.delta with
 
       let env = 
 	List.fold_left 
-	  (fun env ({f=f; age=g; name=lem; gf=gf},_) -> 
-	     add_terms env (F.terms f) gf g lem) env l1 
+	  (fun env ({f=f; age=g; name=lem; gf=gf} as ff,_) -> 
+	     add_terms env (F.terms f) gf g lem ff.from_terms) env l1 
       in
       (match l1, l2 with
 	 | [], [] ->
@@ -540,7 +546,7 @@ let unsat env fg =
     let env = assume env (fg, Ex.empty) in
     let env = 
       if not fg.mf then env
-      else add_terms env (F.terms fg.f) fg.gf fg.age fg.name 
+      else add_terms env (F.terms fg.f) fg.gf fg.age fg.name fg.from_terms
     in
     let _ , l = mround true false env max_max_size in
     let env = List.fold_left assume env l in

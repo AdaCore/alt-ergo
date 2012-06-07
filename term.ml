@@ -175,9 +175,28 @@ let vty_of t =
   in
   vty_of Ty.Svty.empty t
 
+module Hsko = Hashtbl.Make(H)
+let gen_sko ty = make (Sy.fresh "@sko") [] ty
+
+let is_skolem_cst v = 
+  try
+    String.sub (Sy.to_string v.f) 0 4 = "_sko"
+  with Invalid_argument _ -> false
+
+let find_skolem = 
+  let hsko = Hsko.create 17 in
+  fun v ty ->
+    if is_skolem_cst v then
+      try Hsko.find hsko v
+      with Not_found -> 
+	let c = gen_sko ty in Hsko.add hsko v c; c
+    else v
+
 let rec apply_subst ((s_t,s_ty) as s) t = 
   let {f=f;xs=xs;ty=ty} = view t in
-  try Sy.Map.find f s_t
+  try 
+    let v = Sy.Map.find f s_t in
+    find_skolem v ty
   with Not_found -> 
     make f (List.map (apply_subst s) xs) (Ty.apply_subst s_ty ty)
 

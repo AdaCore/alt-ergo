@@ -56,7 +56,7 @@ module Make (X : Sig.X) = struct
 
   module NoCustom : Sig.CC with type Rel.r = X.r
     with type 'a accumulator =
-                                  ('a Sig.literal * Ex.t) list * ('a * 'a * Ex.t) list 
+    ('a Sig.literal * Ex.t) list * ('a * 'a * Ex.t) list 
       with type use = Use.t
         with type uf = Uf.t = struct
 
@@ -86,7 +86,8 @@ module Make (X : Sig.X) = struct
             let lrepr fmt = List.iter (fprintf fmt "%a " X.print)
 
             let leaves t lvs = 
-              fprintf fmt "@{<C.Bold>[cc]@} leaves of %a@.@." T.print t; lrepr fmt lvs
+              fprintf fmt "@{<C.Bold>[cc]@} leaves of %a@.@." 
+		T.print t; lrepr fmt lvs
 	        
             let contra_congruence a ex = 
               if debug_cc () then 
@@ -119,7 +120,8 @@ module Make (X : Sig.X) = struct
             let extract_from_semvalues =
               List.fold_left
                 (fun acc r -> 
-	          match X.term_extract r with Some t -> SetT.add t acc | _ -> acc)
+	          match X.term_extract r with 
+		    | Some t -> SetT.add t acc | _ -> acc)
             let extract_terms_from_choice acc ch =
 	      match ch with
 	        | A.Eq(r1, r2) -> extract_from_semvalues acc [r1; r2]
@@ -183,7 +185,8 @@ module Make (X : Sig.X) = struct
 
           let fold_find_with_explanation find ex l = 
             List.fold_left 
-              (fun (lr, ex) t -> let r, ex_r = find t in r::lr, Ex.union ex_r ex)
+              (fun (lr, ex) t -> 
+		 let r, ex_r = find t in r::lr, Ex.union ex_r ex)
               ([], ex) l
 
           let view find va ex_a = 
@@ -677,7 +680,6 @@ module Make (X : Sig.X) = struct
 	!Options.timer_pause Timers.TCC;
 	raise e
     else assume a ex t
-
 
   let query a t = 
     if !profiling then

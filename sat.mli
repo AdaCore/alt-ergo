@@ -20,11 +20,12 @@
 type t
 
 type gformula = { 
-  f:Formula.t; 
-  age: int; 
-  name: Formula.t option; 
-  mf: bool;
-  gf: bool;
+  f : Formula.t; 
+  age : int; 
+  name : Formula.t option; 
+  from_terms : Term.t list;
+  mf : bool;
+  gf : bool;
 }
 
 exception Sat of t
