@@ -458,23 +458,23 @@ let wrapper_update_status image label buttonclean env d s steps =
   ) ()
 
 let wrapper_update_aborted image label buttonstop buttonrun timers_model e =
-  GtkThread.sync (fun () ->
+  GtkThread.async (fun () ->
     update_aborted image label buttonstop buttonrun timers_model e
   ) ()
 
 let wrapper_reset buttonstop buttonrun =
-  GtkThread.sync (fun () ->
+  GtkThread.async (fun () ->
     buttonstop#misc#hide ();
-    buttonrun#misc#show ();
+    buttonrun#misc#show ()
   ) ()
 
 let wrapper_refresh_instances inst_model =
-  GtkThread.sync (fun () ->
+  GtkThread.async (fun () ->
     ignore (refresh_instances inst_model ())
   )
 
 let wrapper_refresh_timers timers_model =
-  GtkThread.sync (fun () ->
+  GtkThread.async (fun () ->
     ignore (refresh_timers timers_model ())
   )
 
@@ -884,7 +884,7 @@ let start_gui () =
       ~enable_popup:true 
       ~scrollable:true
       ~packing:main_vbox#add () in
-
+       
   let note_search = Hashtbl.create 7 in
 
 
@@ -1280,7 +1280,7 @@ let start_replay () =
 	  let  loc = (lexeme_start_p lb, lexeme_end_p lb) in
 	  Loc.report err_formatter loc;
           printf "syntax error\n@.";
-	exit 1
+	  exit 1
       | Common.Error(e,l) -> 
 	  Loc.report err_formatter l; 
 	  printf "typing error: %a\n@." Common.report e;
