@@ -68,7 +68,8 @@ let check_produced_proof dep =
       (Formula.Set.fold
          (fun f env -> 
             Sat.assume env 
-	      {Sat.f=f;age=0;name=None;mf=false;gf=false; from_terms = []}
+	      {Sat.f=f;age=0;name=None;mf=false;
+	       gf=false; from_terms = []; inv=false}
          ) (Explanation.formulas_of dep) (Sat.empty ()))
     in
     raise (Sat.Sat env)
@@ -80,9 +81,10 @@ let check_produced_proof dep =
 let process_decl print_status (env, consistent, dep) d =
   try
     match d.st_decl with
-      | Assume(f,mf) -> 
+      | Assume(f, mf, inv) -> 
 	  Sat.assume env 
-	    {Sat.f=f;age=0;name=None;mf=mf;gf=false; from_terms = []},
+	    {Sat.f=f; age=0; name=None; 
+	     mf=mf; gf=false; from_terms = []; inv=inv},
 	  consistent, dep
 
       |	PredDef f -> 
@@ -95,7 +97,7 @@ let process_decl print_status (env, consistent, dep) d =
 	    if consistent then
 	      let dep' = Sat.unsat env 
 		{Sat.f=f;age=0;name=None;
-		 mf=(sort <> Check);gf=true; from_terms = []} in
+		 mf=(sort <> Check);gf=true; from_terms = []; inv=false} in
 	      Explanation.union dep' dep
 	    else dep
           in
@@ -132,7 +134,7 @@ let rec add_theory env s =
     let cnf =  Cnf.make_theory d in
     let f = Queue.fold (fun formulas d ->
       match d.st_decl with
-        | Assume (f, _) | PredDef f ->
+        | Assume (f, _, _ ) | PredDef f ->
           f :: formulas
         | RwtDef _ | Query _ -> assert false)
       [] cnf in

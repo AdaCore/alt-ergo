@@ -598,7 +598,7 @@ let remove_context env () =
        match td.c with
 	 | APredicate_def (_, _, _, _) ->
 	     toggle_prune env td
-	 | AAxiom (_, s, _) 
+	 | AAxiom (_, s, _, _) 
 	     when String.length s = 0 || (s.[0] <> '_'  && s.[0] <> '@') ->
 	     toggle_prune env td
 	 | _ -> ()

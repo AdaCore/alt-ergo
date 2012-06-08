@@ -72,7 +72,7 @@
 %token <string> STRING
 %token INCLUDE
 %token WITH
-%token AND LEFTARROW ARROW AC AT AXIOM REWRITING
+%token AND LEFTARROW ARROW AC AT AXIOM INVERSION REWRITING
 %token BAR HAT
 %token BOOL COLON COMMA PV DISTINCT DOT ELSE EOF EQUAL
 %token EXISTS FALSE VOID FORALL FUNCTION GE GOAL GT CHECK CUT ADDTERM
@@ -166,7 +166,10 @@ decl:
      Predicate_def (loc (), $2, $4, $7) }
 | AXIOM ident COLON lexpr
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-decl@.";
-     Axiom (loc (), $2, $4) }
+     Axiom (loc (), $2, false, $4) }
+| INVERSION ident COLON lexpr
+   { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-decl@.";
+     Axiom (loc (), $2, true, $4) }
 | REWRITING ident COLON list1_lexpr_sep_pv
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-decl@.";
      Rewriting(loc (), $2, $4) }

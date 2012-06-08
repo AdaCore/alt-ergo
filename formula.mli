@@ -23,7 +23,8 @@ type lemma =
     { qvars: Symbols.Set.t;  (* toplevel quantified variables *)
       triggers : (Term.t list * Literal.LT.t option) list; (* multi-triggers *)
       main : t;  (* the main lemma's formula *)
-      name : string; }
+      name : string; 
+    }
       
 and llet = {
   let_var: Symbols.t;
@@ -53,8 +54,7 @@ val mk_if : Term.t -> t -> t -> int -> t
 val mk_iff : t -> t -> int -> t
 val mk_lit : Literal.LT.t -> int -> t
 val mk_forall : Term.Set.t -> Term.Set.t -> 
-  (Term.t list * Literal.LT.t option) list -> t ->
-  string -> int -> t
+  (Term.t list * Literal.LT.t option) list -> t -> string -> int -> t
 val mk_exists : Term.Set.t -> Term.Set.t -> 
   (Term.t list * Literal.LT.t option) list -> t ->
   string -> int -> t

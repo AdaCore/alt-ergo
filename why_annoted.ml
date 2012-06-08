@@ -147,7 +147,7 @@ and aform =
   | AFnamed of Hstring.t * aform annoted
 
 type atyped_decl = 
-  | AAxiom of loc * string * aform
+  | AAxiom of loc * string * inversion * aform
   | ARewriting of loc * string * ((aterm rwt_rule) annoted) list
   | AGoal of loc * goal_sort * string * aform annoted
   | ALogic of loc * string list * plogic_type
@@ -360,7 +360,7 @@ let findin_atyped_delc tag buffer (td, env) stop_decl =
   else if goodbuf && c > 0 then None
   else if stop_decl then Some (AD (td, env))
   else match td.c with
-    | AAxiom (_, _, af)
+    | AAxiom (_, _, _, af)
     | APredicate_def (_, _, _, af)
     | AFunction_def (_, _, _, _, af) ->
         let aaf = new_annot buffer af (-1) tag in
@@ -592,7 +592,8 @@ let rec print_record_type fmt = function
       fprintf fmt "%s : %a; %a" c print_ppure_type ty print_record_type l
 
 let print_typed_decl fmt td = match td.Why_ptree.c with
-  | TAxiom (_, s, tf) -> fprintf fmt "axiom %s : %a" s print_tform tf
+  | TAxiom (_, s, true, tf) -> fprintf fmt "inversion %s : %a" s print_tform tf
+  | TAxiom (_, s, _, tf) -> fprintf fmt "axiom %s : %a" s print_tform tf
   | TRewriting (_, s, rwtl) -> 
     fprintf fmt "rewriting %s : %a" s print_rwt_list rwtl
   | TGoal (_, Thm, s, tf) -> fprintf fmt "goal %s : %a" s print_tform tf
@@ -741,7 +742,7 @@ and make_dep_aaform d ex dep aaf = make_dep_aform d ex dep aaf.c
 
 let make_dep_atyped_decl dep d =
   match d.c with
-  | AAxiom (loc, s, af) -> make_dep_aform d [] dep af
+  | AAxiom (loc, s, _, af) -> make_dep_aform d [] dep af
   | ARewriting (loc, s, arwtl) ->
       List.fold_left
 	(fun dep r ->
@@ -864,7 +865,7 @@ and annot_of_tform (buffer:sbuffer) t =
 let annot_of_typed_decl (buffer:sbuffer) td = 
   let ptag = tag buffer in
   let c = match td.Why_ptree.c with
-    | TAxiom (loc, s, tf) -> AAxiom (loc, s, of_tform buffer tf)
+    | TAxiom (loc, s, inv, tf) -> AAxiom (loc, s, inv, of_tform buffer tf)
     | TRewriting (loc, s, rwtl) ->
       let arwtl = List.map 
 	(fun rwt ->
@@ -991,9 +992,9 @@ and from_aaform_list = function
 
 let to_typed_decl td =
   let c = match td.c with
-    | AAxiom (loc, s, af) -> 
+    | AAxiom (loc, s, inv, af) -> 
       let af = void_to_tform af td.id in
-      TAxiom (loc, s, af)
+      TAxiom (loc, s, inv, af)
     | ARewriting (loc, s, arwtl) -> 
       let rwtl = List.fold_left (fun rwtl ar ->
 	if ar.pruned then rwtl
@@ -1283,10 +1284,10 @@ and add_aaform errors (buffer:sbuffer) indent tags
 
 let add_atyped_decl errors (buffer:sbuffer) d =
   match d.c with
-  | AAxiom (loc, s, af) ->
+  | AAxiom (loc, s, inv, af) ->
       let keyword = 
 	if String.length s > 0 && (s.[0] = '_'  || s.[0] = '@') 
-	then "hypothesis" else "axiom" in
+	then "hypothesis" else if inv then "inversion" else "axiom" in
       buffer#insert ~tags:[d.tag;d.ptag] (sprintf "%s %s :" keyword s);
       buffer#insert "\n";
       d.line <- buffer#line_count;
@@ -1463,7 +1464,7 @@ and findtags_aaform sl aaf acc =
 
 let findtags_atyped_delc sl td acc =
   match td.c with
-    | AAxiom (_, _, af)
+    | AAxiom (_, _, _, af)
     | APredicate_def (_, _, _, af)
     | AFunction_def (_, _, _, _, af) ->
 	findtags_aform sl af acc
@@ -1550,7 +1551,7 @@ let findproof_atyped_decl ids td (ax,acc) =
 
     | APredicate_def (_,_,_, af) 
     | AFunction_def (_,_,_,_, af) 
-    | AAxiom (_, _, af) -> 
+    | AAxiom (_, _, _, af) -> 
       let acc, found = findproof_aform ids af acc false in
       if found then td.ptag::ax, acc else ax,acc
 
@@ -1592,7 +1593,7 @@ let find_line_id_atyped_decl id td =
 
     | APredicate_def (_,_,_, af) 
     | AFunction_def (_,_,_,_, af) 
-    | AAxiom (_, _, af) ->
+    | AAxiom (_, _, _, af) ->
 	find_line_id_aform id af
 
     | AGoal (_,_,_, aaf) ->
@@ -1669,7 +1670,7 @@ let findbyid_atyped_decl  stop_decl id (td, tyenv) =
 
     | APredicate_def (_,_,_, af) 
     | AFunction_def (_,_,_,_, af) 
-    | AAxiom (_, _, af) ->
+    | AAxiom (_, _, _, af) ->
 	findbyid_aform id af
 
     | AGoal (_,_,_, aaf) ->
@@ -1692,6 +1693,6 @@ let compute_resulting_ids =
     | ATypeDecl (_, _, name, _)
     | APredicate_def (_, name, _, _) 
     | AFunction_def (_, name, _, _, _) 
-    | AAxiom (_, name, _)
+    | AAxiom (_, name, _, _)
     | AGoal (_,_, name, _) -> (name, td.id)::acc)
     []

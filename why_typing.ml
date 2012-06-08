@@ -1171,7 +1171,7 @@ let axioms_of_rules keep_triggers loc name lf acc env =
       (fun acc (f, _) ->
         let f = Triggers.make keep_triggers false f in
         let name = (Common.fresh_string ()) ^ "_" ^ name in
-        let td = {c = TAxiom(loc,name,f); annot = new_id () } in
+        let td = {c = TAxiom(loc,name,false,f); annot = new_id () } in
 	(td, env)::acc
       ) acc lf
   in 
@@ -1184,7 +1184,8 @@ let type_hypothesis keep_triggers acc env_f loc sort f =
   let f = monomorphize_form f in
   let f = Triggers.make keep_triggers false f in
   let td = 
-    {c = TAxiom(loc, fresh_hypothesis_name sort, f); annot = new_id () } in
+    {c = TAxiom(loc, fresh_hypothesis_name sort, false,f); 
+     annot = new_id () } in
   (td, env_f)::acc
   
 
@@ -1228,11 +1229,11 @@ let type_decl keep_triggers (acc, env) d =
 	  let td = {c = TLogic(loc,lp,pp_ty); annot = new_id () } in
 	  (td, env)::acc, env'
 
-      | Axiom(loc,name,f) -> 
+      | Axiom(loc,name,inv,f) -> 
 	  if rules () = 1 then fprintf fmt "[rule] TR-Typing-AxiomDecl$_F$@.";
 	  let f, _ = type_form env f in 
 	  let f = Triggers.make keep_triggers false f in
-	  let td = {c = TAxiom(loc,name,f); annot = new_id () } in
+	  let td = {c = TAxiom(loc,name,inv,f); annot = new_id () } in
 	  (td, env)::acc, env
 
       | Rewriting(loc, name, lr) -> 
@@ -1336,10 +1337,10 @@ let split_goals l =
 	   | TGoal (_, _, _, _) -> 
 	       ctx, [], [], (x::(local_hyp@global_hyp@ctx))::ret
 		 
-	   | TAxiom (_, s, _) when is_global_hyp s ->
+	   | TAxiom (_, s, _, _) when is_global_hyp s ->
 	       ctx, x::global_hyp, local_hyp, ret
 
-	   | TAxiom (_, s, _) when is_local_hyp s ->
+	   | TAxiom (_, s, _, _) when is_local_hyp s ->
 	       ctx, global_hyp, x::local_hyp, ret
 
 	   | _ -> x::ctx, global_hyp, local_hyp, ret

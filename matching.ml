@@ -106,7 +106,7 @@ module Make (X : X) = struct
     with Not_found -> g , b
 
   let add_term info t env =
-    eprintf ">>>> %d@." (MT.cardinal env.info);
+    (*eprintf ">>>> %d@." (MT.cardinal env.info);*)
     !Options.timer_start Timers.TMatch;
     let rec add_rec env t = 
       if MT.mem t env.info then env
@@ -154,11 +154,11 @@ module Make (X : X) = struct
   let deja_vu lem1 lems = 
     List.exists (fun lem2 -> F.compare lem1 lem2 = 0) lems
 
-  let matching_loop_bound = 2
+  let matching_loop_bound = 5
 
   module HF = Hashtbl.Make(F)
   let matching_loop lems orig =
-    List.length lems > 4 ||
+    List.length lems > 3*matching_loop_bound ||
     match lems with
       | [] | [_] -> false
       | f :: l -> 
@@ -174,7 +174,6 @@ module Make (X : X) = struct
 	      (1, f) l
 	  in 
 	  max > matching_loop_bound 
-	  (*|| (try !(HF.find h orig) > 20 with Not_found -> false)*)
 
   let all_terms 
       f ty env pinfo 

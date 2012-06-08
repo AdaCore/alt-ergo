@@ -28,7 +28,7 @@ type lemma = {
   qvars: Sy.Set.t;
   triggers : (T.t list * Literal.LT.t option) list;
   main : t;
-  name : string
+  name : string;
 }
 
 and llet = {
@@ -301,7 +301,9 @@ let mk_forall up bv trs f name id =
 (* forall upbv.  name: (exists bv [trs]. f) *)
 let mk_exists up bv trs f name id= 
   let sy = symbols_of_terms bv in
-  let lem = {qvars = sy; triggers = trs; main = mk_not f; name=name} in
+  let lem = 
+    {qvars = sy; triggers = trs; main = mk_not f; name=name} 
+  in
   let sko = {sko_subst = (mk_skolem_subst up bv, Ty.esubst); sko_f = f} in
   make (Skolem(sko)) (Lemma(lem)) (size f) id
 

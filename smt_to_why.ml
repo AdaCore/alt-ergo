@@ -258,7 +258,7 @@ let bench_to_why = function
   | Pbformula (pos,f) -> 
       [Goal (pos, "", formula f)]
   | Pbassumption (pos,f) -> 
-      [Axiom (pos, "", formula f)]
+      [Axiom (pos, "", false, formula f)]
   | Pbrewriting (pos, lf) -> 
       [Rewriting (pos, "", List.map formula lf)]
   | Pannotation  -> []

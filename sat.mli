@@ -26,6 +26,7 @@ type gformula = {
   from_terms : Term.t list;
   mf : bool;
   gf : bool;
+  inv : bool;
 }
 
 exception Sat of t

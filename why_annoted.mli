@@ -136,7 +136,7 @@ and aform =
   | AFnamed of Hstring.t * aform annoted
 
 type atyped_decl = 
-  | AAxiom of loc * string * aform
+  | AAxiom of loc * string * inversion * aform
   | ARewriting of loc * string * ((aterm rwt_rule) annoted) list
   | AGoal of loc * goal_sort * string * aform annoted
   | ALogic of loc * string list * plogic_type

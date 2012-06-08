@@ -48,6 +48,7 @@
       [ "ac", AC;
 	"and", AND;
 	"axiom", AXIOM;
+	"inversion", INVERSION;
 	"bitv", BITV;
         "bool", BOOL;
 	"check", CHECK;

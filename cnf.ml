@@ -221,9 +221,9 @@ let make_form name f =
   in
   make_form [] f.c f.annot
 
-let push_assume f name loc match_flag = 
+let push_assume f name loc match_flag inversion = 
   let ff , _ = make_form name f in
-  Queue.push {st_decl=Assume(ff, match_flag) ; st_loc=loc} queue
+  Queue.push {st_decl=Assume(ff, match_flag,inversion) ; st_loc=loc} queue
 
 let push_preddef f name loc match_flag = 
   let ff , _ = make_form name f in
@@ -244,14 +244,14 @@ let make l =
   (* Formula.clear_htbl (); (* Why that was needed? *) *)
   List.iter
     (fun (d,b) -> match d.c with
-       | TAxiom(loc, name, f) -> push_assume f name loc b
+       | TAxiom(loc, name, inversion, f) -> push_assume f name loc b inversion
        | TRewriting(loc, name, lr) -> 
 	   Queue.push 
 	     {st_decl=RwtDef(List.map make_rule lr); st_loc=loc} queue
        | TGoal(loc, sort, n, f) -> push_query n f loc sort
-       | TPredicate_def(loc, n, [], f) -> push_assume f n loc b
+       | TPredicate_def(loc, n, [], f) -> push_assume f n loc b false
        | TPredicate_def(loc, n, _, f) -> push_preddef f n loc b
-       | TFunction_def(loc, n, _, _, f) -> push_assume f n loc b
+       | TFunction_def(loc, n, _, _, f) -> push_assume f n loc b false
        | TTypeDecl _ | TLogic _  -> ()) l;
   queue
 
@@ -404,19 +404,19 @@ let make_theory l =
   clear();
   List.iter
     (fun (d,b) -> match d.c with
-       | TAxiom(loc, name, f) -> 
+       | TAxiom(loc, name, inversion, f) -> 
          let ff = make_form_theory name f in
-         Queue.push {st_decl=Assume(ff, b) ; st_loc=loc} queue
+         Queue.push {st_decl=Assume(ff, b,inversion) ; st_loc=loc} queue
        | TRewriting(loc, name, lr) -> assert false
        | TGoal(loc, _, n, f) -> assert false
        | TPredicate_def(loc, n, [], f) -> 
          let ff = make_form_theory n f in
-         Queue.push {st_decl=Assume(ff, b) ; st_loc=loc} queue
+         Queue.push {st_decl=Assume(ff, b, false) ; st_loc=loc} queue
        | TPredicate_def(loc, n, _, f) ->
          let ff = make_form_theory n f in
          Queue.push {st_decl=PredDef ff ; st_loc=loc} queue
        | TFunction_def(loc, n, _, _, f) -> 
          let ff = make_form_theory n f in
-         Queue.push {st_decl=Assume(ff, b) ; st_loc=loc} queue
+         Queue.push {st_decl=Assume(ff, b, false) ; st_loc=loc} queue
        | TTypeDecl _ | TLogic _  -> ()) l;
   queue

@@ -29,9 +29,10 @@ let replay_addinstance id aname entries env =
     | AD (ad, _) ->
       begin
 	match ad.c with
-	  | AAxiom (_, aname, af)
+	  | AAxiom (_, aname, inv, af) -> 
+	      add_instance ~register:false env id af aname inv entries
 	  | APredicate_def (_, aname,_ , af) ->
-	    add_instance ~register:false env id af aname entries
+	      add_instance ~register:false env id af aname false entries
 	  | _ -> assert false
       end
     | _ -> assert false

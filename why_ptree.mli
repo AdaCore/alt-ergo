@@ -86,8 +86,10 @@ type body_type_decl =
   | Enum of string list
   | Abstract
 
+type inversion = bool
+
 type decl = 
-  | Axiom of loc * string * lexpr
+  | Axiom of loc * string * inversion * lexpr
   | Rewriting of loc * string * lexpr list
   | Goal of loc * string * lexpr
   | Logic of loc * name_kind * (string * string) list * plogic_type
@@ -176,7 +178,7 @@ type 'a rwt_rule = {
 type goal_sort = Cut | Check | Thm
 
 type 'a tdecl = 
-  | TAxiom of loc * string * ('a tform, 'a) annoted
+  | TAxiom of loc * string * inversion * ('a tform, 'a) annoted
   | TRewriting of loc * string * (('a tterm, 'a) annoted rwt_rule) list
   | TGoal of loc * goal_sort * string * ('a tform, 'a) annoted
   | TLogic of loc * string list * plogic_type
@@ -192,7 +194,7 @@ type 'a tdecl =
 (* Sat entry *)
 
 type sat_decl_aux = 
-  | Assume of Formula.t * bool 
+  | Assume of Formula.t * bool * inversion
   | PredDef of Formula.t
   | RwtDef of (Term.t rwt_rule) list
   | Query of string *  Formula.t * Literal.LT.t list * goal_sort

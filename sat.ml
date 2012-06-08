@@ -38,6 +38,7 @@ type gformula = {
   from_terms : Term.t list;
   mf: bool;
   gf: bool;
+  inv : bool;
 }
 
 module H = Hashtbl.Make(Formula)
@@ -48,6 +49,7 @@ type t = {
     tbox : CcX.t;
     lemmas : (int * Ex.t) MF.t;
     definitions : (int * Ex.t) MF.t;
+    inversions :  (int * Ex.t) MF.t;
     matching : MM.t;
     add_inst: Formula.t -> unit;
 }
@@ -213,7 +215,7 @@ let add_instance_info env orig =
     | F.Lemma _ -> env.add_inst orig
     | _ -> ()
 
-let new_facts mode env = 
+let new_facts goal_directed env = 
   List.fold_left
     (fun acc ({Matching.trigger_formula=f; trigger_query = guard; 
 	       trigger_age=age; trigger_dep=dep; trigger_orig=orig }, 
@@ -229,7 +231,7 @@ let new_facts mode env =
 	      | Some a when 
 		  CcX.query (Literal.LT.apply_subst s a) env.tbox = No -> acc
 	      | _ ->
-		  if mode && not b then acc
+		  if goal_directed && not b then acc
 		  else
 		    try
 		      let nf = F.apply_subst s f in
@@ -240,7 +242,8 @@ let new_facts mode env =
 			    mf = true;
 			    gf = b;
 			    name = Some lorig;
-			    from_terms = torig
+			    from_terms = torig;
+			    inv = false
 			  } in
 			add_instance_info env orig;
 			(p,dep)::acc
@@ -251,23 +254,26 @@ let new_facts mode env =
     [] (MM.query env.matching env.tbox)
 
 
-let mround predicate mode env max_size =
+(* 
+   predicate = true : consider only predicates for matching
+   goal_directed = true : match only with terms from goal
+*)
+
+type select = Select_predicates | Select_lemmas | Select_inversions 
+ 
+let mround select ~goal_directed env max_size =
   if rules () = 2 then fprintf fmt "[rule] TR-Sat-Mround@.";
-  let round mode =
-    Print.mround max_size;
-    let axioms = if predicate then env.definitions else env.lemmas in
-    let env, max_size = mtriggers env axioms max_size in
-    let lf = new_facts mode env in
-    max_size, lf 
-  in
   !Options.timer_start Timers.TMatch;
-  let max_size, lf = round (mode || Options.goal_directed ()) in 
-  let res = 
-    if Options.goal_directed () && lf = [] then round false 
-    else max_size, lf
+  Print.mround max_size;
+  let axs = match select with
+    | Select_predicates -> env.definitions
+    | Select_lemmas -> env.lemmas
+    | Select_inversions -> env.inversions
   in
+  let env, max_size = mtriggers env axs max_size in
+  let lf = new_facts goal_directed env in
   !Options.timer_pause Timers.TMatch;
-  res
+  max_size, lf 
 
 let is_literal f = match F.view f with F.Literal _ -> true | _ -> false
 
@@ -349,7 +355,7 @@ let red {f=f} env =
 	
 
 let pred_def env f = 
-  let ff = {f=f;age=0;name=None;mf=false;gf=false; from_terms=[]} in
+  let ff = {f=f;age=0;name=None;mf=false;gf=false; from_terms=[]; inv=false} in
   Print.assume ff Explanation.empty;
   { env with definitions = MF.add f (0,Ex.empty) env.definitions }
 
@@ -374,7 +380,7 @@ let rec add_dep_of_formula f dep =
     | _ -> dep
 
 
-let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
+let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf;inv=inv} as ff ,dep) =
   refresh_model_handler env;
   !Options.thread_yield ();
   try
@@ -413,7 +419,7 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		let p2 = { ff with f=f2 } in
 		bcp { env with delta = (p1,p2,dep)::env.delta }
 
-	    | F.Lemma _ ->
+	    | F.Lemma l ->
 	      if rules () = 2 then fprintf fmt "[rule] TR-Sat-Assume-Ax@.";
 		let age , dep = 
 		  try 
@@ -421,7 +427,13 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 		    min age age' , Ex.union dep dep' 
 		  with Not_found -> age , dep 
 		in
-		bcp { env with lemmas=MF.add f (age,dep) env.lemmas }
+		let env = 
+		  if inv then 
+		    { env with inversions=MF.add f (age,dep) env.inversions }
+		  else
+		    { env with lemmas=MF.add f (age,dep) env.lemmas }
+		in
+		bcp env
 
 	    | F.Literal a ->
 		if rules () = 2 then fprintf fmt "[rule] TR-Sat-Assume-Lit@.";
@@ -445,7 +457,7 @@ let rec assume env ({f=f;age=age;name=lem;mf=mf;gf=gf} as ff ,dep) =
 	    | F.Skolem{F.sko_subst=sigma; sko_f=f} -> 
 	      if rules () = 2 then fprintf fmt "[rule] TR-Sat-Assume-Sko@.";
 		let f' = F.apply_subst sigma f in
-		assume env ({ ff with f=f' },dep)
+		assume env ({ ff with f=f'},dep)
 
             | F.Let {F.let_var=lvar; let_term=lterm; let_subst=s; let_f=lf} ->
 	      if rules () = 2 then fprintf fmt "[rule] TR-Sat-Assume-Let@.";
@@ -496,11 +508,14 @@ let rec unsat_rec env fg stop max_size =
     d
 
 and back_tracking env stop max_size = match env.delta with
-    | []  when stop >= 0  -> 
-      let _ , l2 = mround true false env max_max_size in 
+  | []  when stop >= 0  -> 
+      let _ , l2 = 
+	mround Select_predicates ~goal_directed:false env max_max_size in 
       let env = List.fold_left assume env l2 in
 
-      let max_size , l1 = mround false false env max_size in 
+      let max_size , l1 = 
+	mround Select_lemmas ~goal_directed:false env max_size in 
+
       let env = List.fold_left assume env l1 in
 
       let env = 
@@ -548,10 +563,17 @@ let unsat env fg =
       if not fg.mf then env
       else add_terms env (F.terms fg.f) fg.gf fg.age fg.name fg.from_terms
     in
-    let _ , l = mround true false env max_max_size in
+
+    let _ , l = 
+      mround Select_inversions ~goal_directed:false env max_max_size in
     let env = List.fold_left assume env l in
 
-    let _ , l = mround false true env max_max_size in
+    let _ , l = 
+      mround Select_predicates ~goal_directed:false env max_max_size in
+    let env = List.fold_left assume env l in
+
+    let _ , l = 
+      mround Select_lemmas ~goal_directed:true env max_max_size in
     let env = List.fold_left assume env l in
 
     back_tracking env (stopb ()) 100
@@ -596,6 +618,7 @@ let empty () = {
   delta = [] ;
   tbox = CcX.empty (); 
   lemmas = MF.empty ; 
+  inversions = MF.empty ; 
   matching = MM.empty;
   definitions = MF.empty;
   add_inst = fun _ -> ();
