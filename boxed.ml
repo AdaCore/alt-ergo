@@ -36,7 +36,13 @@ end
 
 module Set = Set.Make (Boxed)
 
-module Map = Map.Make (Boxed)
+module Map = struct
+  include Map.Make (Boxed)
+  let choose m = 
+    let r = ref None in
+    try iter (fun k v -> r := Some (k, v); raise Exit) m; raise Not_found
+    with Exit -> match !r with Some res -> res | None -> assert false
+end
 
 let mk_not b = { formula = Formula.mk_not b.formula;
                  subst = b.subst;

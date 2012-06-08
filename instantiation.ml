@@ -28,7 +28,10 @@ struct
 
   module MM = Incr_match.Make (Uf) (Use)
 
-  module RMap = Map.Make (struct type t = Use.r let compare = Uf.R.compare end)
+  module RMap = struct
+    include Map.Make (struct type t = Use.r let compare = Uf.R.compare end)
+    let singleton r v = add r v empty
+  end
   
   module KSet = Set.Make (struct
     type t = Boxed.t * Term.subst
