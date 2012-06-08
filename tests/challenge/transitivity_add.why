@@ -74,7 +74,7 @@ axiom Cons_proj_2_def :
   (forall u:'a. forall u1:'a list. (Cons_proj_2(Cons(u, u1)) = u1))
 
 
-inversion list_inversion :
+axiom list_inversion :
   (forall u:'a list. ((u = Nil) or (u = Cons(Cons_proj_1(u),
   Cons_proj_2(u)))))
 
@@ -201,7 +201,7 @@ logic Aadd_proj_2 : aexpr -> aexpr
 axiom Aadd_proj_2_def :
   (forall u:aexpr. forall u1:aexpr. (Aadd_proj_2(Aadd(u, u1)) = u1))
 
-inversion aexpr_inversion :
+axiom aexpr_inversion :
   (forall u:aexpr. ((u = Anum(Anum_proj_1(u))) or (u = Aadd(Aadd_proj_1(u),
   Aadd_proj_2(u)))))
 
@@ -251,7 +251,7 @@ logic Iconst_proj_1 : instr -> int
 axiom Iconst_proj_1_def : (forall u:int. (Iconst_proj_1(Iconst(u)) = u))
 
 
-inversion instr_inversion :
+axiom instr_inversion :
   (forall u:instr. ((u = Iconst(Iconst_proj_1(u))) or (u = Iadd)))
 
 type code
@@ -263,7 +263,7 @@ axiom codeseq :
   codeseq_at(infix_plpl(infix_plpl(c1, c2), c3), length(c1), c2))
 
 
-inversion codeseq_at_inversion :
+axiom codeseq_at_inversion :
   (forall z:instr list. forall z1:int. forall z2:instr list. (codeseq_at(z,
   z1, z2) ->
   (exists c1:instr list. exists c2:instr list. exists c3:instr list.
@@ -290,7 +290,7 @@ axiom trans_const :
   VMS_proj_2 = s; VMS_proj_3 = m }, { VMS_proj_1 = (p + 1); VMS_proj_2 =
   Cons(n, s); VMS_proj_3 = m }))))
 
-inversion transition_inversion :
+axiom transition_inversion :
   (forall z:instr list. forall z1:vm_state. forall z2:vm_state.
   (transition(z, z1, z2) ->
   ((exists c:instr list. exists p:int. exists n:int. (codeseq_at(c, p,
@@ -316,7 +316,7 @@ axiom StepTransRefl :
   transition_star(p, x, z))))
 
 
-inversion transition_star_inversion :
+axiom transition_star_inversion :
   (forall z:instr list. forall z1:vm_state. forall z2:vm_state.
   (transition_star(z, z1, z2) ->
   ((exists p:instr list. exists x:vm_state. (((z = p) and (z1 = x)) and
