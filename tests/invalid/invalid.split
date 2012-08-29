@@ -28,6 +28,8 @@ logic x:int
 goal g5 : x*x = 25 -> x = 5
 
 
+
+
 $$$arith_div
 
 logic x,y:int
@@ -80,6 +82,23 @@ $
 logic x,y:int
 goal g12 :
      x = 5 -> y - (x / 10) = y - 1
+
+$
+
+logic x:int
+
+goal g13:
+ ((2 * x) - 1) % 2) - (((2 * x) - 1) % 2) <> 0
+
+$
+
+logic x,y:int
+
+goal g14:
+     (x / y) - (x / y) = 0 ->
+     x / y = 1 ->
+     false
+
 
 
 $$$arith
