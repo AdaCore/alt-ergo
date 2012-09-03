@@ -139,7 +139,7 @@ module Make
               if approx then mk_euc_division p p2 t1 t2 ctx
               else p, ctx
 	    with Division_by_zero | Polynome.Maybe_zero -> 
-              P.create [coef, X.term_embed t] (Int 0) ty, ctx
+              P.create [Int 1, X.term_embed t] (Int 0) ty, ctx
 	  in
 	  P.add p (P.mult (P.create [] coef ty) p3), ctx
 		
@@ -163,7 +163,7 @@ module Make
                 | Polynome.Not_a_num -> mk_modulo t t1 t2 ctx
                 | _ -> assert false 
               in 
-              P.create [coef, X.term_embed t] (Int 0) ty, ctx 
+              P.create [Int 1, X.term_embed t] (Int 0) ty, ctx 
 	  in         
 	  P.add p (P.mult (P.create [] coef ty) p3), ctx
 	    
@@ -173,6 +173,7 @@ module Make
 	match C.extract a with
 	  | Some p' -> P.add p (P.mult (P.create [] coef ty) p'), ctx
 	  | _ -> P.add p (P.create [coef, a] (Int 0) ty), ctx
+
 
   let arith_to_ac p = p
 (*
