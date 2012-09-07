@@ -488,6 +488,12 @@ let decls_of_command (acc, predicates) = function
       else PFunction (pptl, ppt)
     in
     let s = string_of_symbol sy in
+    begin 
+      try 
+	ignore (infix_of_string s); 
+	Common.error (Common.SymbAlreadyDefined s) pos
+      with Not_found -> ()
+    end;
     let predicates = if ppt = PPTbool then S.add s predicates else predicates in
     (Logic (pos, Symbols.Other, [s, ""], logic_type))::acc, predicates
   | CDefineFun (pos, sy, (pos2, svl), so, t) ->
