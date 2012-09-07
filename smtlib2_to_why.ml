@@ -489,10 +489,9 @@ let decls_of_command (acc, predicates) = function
     in
     let s = string_of_symbol sy in
     begin 
-      try 
-	ignore (infix_of_string s); 
-	Common.error (Common.SymbAlreadyDefined s) pos
-      with Not_found -> ()
+      match infix_of_string s with
+	| Some _ -> Common.error (Common.SymbAlreadyDefined s) pos
+	| _ -> ()
     end;
     let predicates = if ppt = PPTbool then S.add s predicates else predicates in
     (Logic (pos, Symbols.Other, [s, ""], logic_type))::acc, predicates
