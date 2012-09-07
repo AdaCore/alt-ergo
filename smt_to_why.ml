@@ -94,8 +94,8 @@ let infix = function
   | "+" -> PPadd
   | "-" -> PPsub
   | "*" -> PPmul
-  | "/" | "int___div" -> PPdiv
-  | "int___mod" -> PPmod
+  | "/" | "div" -> PPdiv
+  | "mod" -> PPmod
   | _ -> assert false
 
 let product f_map l1 l2 = 
@@ -138,7 +138,7 @@ let rec term_to_desc env = function
   | Rat str -> assert false (*[None,PPconst (ConstReal str)]*)
   | Var str ->  (try StringMap.find str env.uterm
                 with Not_found -> [None,PPvar str])
-  | Fun ("+" | "-" | "*" | "/" | "int___mod" | "int___div" as s, [a;b]) -> 
+  | Fun ("+" | "-" | "*" | "/" | "mod" | "div" as s, [a;b]) -> 
       let ta = term env a and tb = term env b in
       (*PPinfix (ta, infix s, tb)*)
       product (fun x y -> PPinfix (x, infix s, y)) ta tb
