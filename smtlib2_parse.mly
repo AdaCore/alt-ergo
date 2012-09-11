@@ -49,6 +49,7 @@
 %token DECLARESORT
 %token DEFINESORT
 %token DECLAREFUN
+%token DECLARECONST
 %token DEFINEFUN
 %token PUSH
 %token POP
@@ -167,6 +168,8 @@ command:
     { CDefineSort(loc (), $3, $5, $7) }
 | LPAREN DECLAREFUN symbol LPAREN sort_list0 RPAREN sort RPAREN 
     { CDeclareFun(loc (), $3, $5, $7) }
+| LPAREN DECLARECONST symbol sort RPAREN 
+    { CDeclareFun(loc (), $3, (loc (), []), $4) }
 | LPAREN DEFINEFUN symbol LPAREN sortedvar_list RPAREN sort term RPAREN
     { CDefineFun(loc (), $3, $5, $7, $8) }
 | LPAREN PUSH NUMERAL RPAREN

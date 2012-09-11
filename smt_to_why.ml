@@ -53,7 +53,7 @@ let make_exists f bl =
   let f = 
     List.fold_left 
       (fun f x -> pexp f.pp_loc 
-        (PPexists ([x.var], sort_to_type f.pp_loc x.sort, f))) f bl
+        (PPexists ([x.var], sort_to_type f.pp_loc x.sort, [], f))) f bl
   in f.pp_desc
 
 let make_infix op = function
@@ -96,7 +96,7 @@ let infix = function
   | "*" -> PPmul
   | "/" | "div" -> PPdiv
   | "mod" -> PPmod
-  | _ -> assert false
+  | _ -> raise Not_found
 
 let product f_map l1 l2 = 
   List.fold_left 
@@ -234,10 +234,18 @@ and envformula env f = pexp f.floc (form_to_desc env f.formula)
 let formula  = envformula {uterm = StringMap.empty ; uformula = StringMap.empty}
 
 let psig_to_pdef (pos,psig) =
+  try 
+    ignore (infix psig.pname); 
+    Common.error (Common.SymbAlreadyDefined psig.pname) pos
+  with Not_found -> ();
   Logic (pos, Symbols.Other, [psig.pname, ""],
 	 PPredicate (List.map curry_sort_to_type psig.pargs))
 
 let fsig_to_fdef (pos,fsig) =
+  try 
+    ignore (infix fsig.fname); 
+    Common.error (Common.SymbAlreadyDefined fsig.fname) pos
+  with Not_found -> ();
   Logic (pos, Symbols.Other, [fsig.fname, ""],
 	 PFunction ((List.map curry_sort_to_type fsig.fargs),
                     curry_sort_to_type fsig.fres ))
@@ -258,7 +266,7 @@ let bench_to_why = function
   | Pbformula (pos,f) -> 
       [Goal (pos, "", formula f)]
   | Pbassumption (pos,f) -> 
-      [Axiom (pos, "", formula f)]
+      [Axiom (pos, "", false, formula f)]
   | Pbrewriting (pos, lf) -> 
       [Rewriting (pos, "", List.map formula lf)]
   | Pannotation  -> []

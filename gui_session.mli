@@ -30,3 +30,5 @@ val resulting_ids : (action, int) Hashtbl.t
 val save : action Stack.t -> action -> unit
 
 val read_actions : (string * int) list -> in_channel option -> action Stack.t
+
+val safe_session : action Stack.t -> bool

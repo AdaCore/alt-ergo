@@ -21,7 +21,10 @@ open Why_ptree
 
 type env
 
-val file : file -> ((int tdecl, int) annoted * env) list 
+val empty_env : env
+
+val file : bool -> env -> file -> 
+  ((int tdecl, int) annoted * env) list * env
 
 val split_goals : 
   ((int tdecl, int) annoted * env) list -> 

@@ -20,11 +20,13 @@
 type t
 
 type gformula = { 
-  f:Formula.t; 
-  age: int; 
-  name: Formula.t option; 
-  mf: bool;
-  gf: bool;
+  f : Formula.t; 
+  age : int; 
+  name : Formula.t option; 
+  from_terms : Term.t list;
+  mf : bool;
+  gf : bool;
+  inv : bool;
 }
 
 exception Sat of t
@@ -32,7 +34,7 @@ exception Unsat of Explanation.t
 exception I_dont_know of t
 
 (* the empty sat-solver context *)
-val empty : t
+val empty : unit -> t
 val empty_with_inst : (Formula.t -> unit) -> t
 
 (* [assume env f] assume a new formula [f] in [env]. Raises Unsat if
@@ -47,7 +49,7 @@ val pred_def : t -> Formula.t -> t
    [size]. Raises Sat if [f] is satisfiable in [env] *)
 val unsat : t -> gformula -> Explanation.t
 
-val print_model : Format.formatter -> t -> unit
+val print_model : header:bool -> Format.formatter -> t -> unit
 
 val start : unit -> unit
 val stop : unit -> int64

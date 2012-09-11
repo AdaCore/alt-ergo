@@ -357,7 +357,7 @@ module Make ( R : Sig.X ) = struct
       !Options.thread_yield ();
       try MapR.find r env.repr with Not_found -> normal_form env r
 
-    let init_leaf env p = 
+    let init_leaf env p =
       if debug_uf () then fprintf fmt "init_leaf: %a@." R.print p;
       let in_repr = MapR.mem p env.repr in
       let in_neqs = MapR.mem p env.neqs in
@@ -503,6 +503,7 @@ module Make ( R : Sig.X ) = struct
 	  
     let apply_sigma eqs env tch ((p, v, dep) as sigma) = 
       let env = init_leaf env p in
+      let env = init_leaf env v in
       let env = apply_sigma_ac eqs env sigma in
       let env, touched = apply_sigma_uf env sigma in 
       up_uf_rs dep env ((p, touched, v) :: tch)
@@ -627,15 +628,28 @@ module Make ( R : Sig.X ) = struct
       No
     with Inconsistent (ex, classes) -> Yes (ex, classes)
 
-  let already_distinct env lr = 
+  let already_distinct env lr =
     let d = Lit.make (Literal.Distinct (false,lr)) in
-    try 
-      List.iter (fun r -> 
-	let mdis = MapR.find r env.neqs in
-	ignore (MapL.find d mdis)
+    try
+      List.iter (fun r ->
+  	let mdis = MapR.find r env.neqs in
+  	ignore (MapL.find d mdis)
       ) lr;
       true
     with Not_found -> false
+
+  (* let already_distinct env lr = *)
+  (*   let _, common = *)
+  (*     List.fold_left (fun (first, acc) r -> *)
+  (* 	try  *)
+  (* 	  let dis = *)
+  (* 	    MapL.fold (fun d _ acc -> Lit.Set.add d acc)  *)
+  (* 	      (MapR.find r env.neqs) Lit.Set.empty  *)
+  (* 	  in *)
+  (* 	  if first then false, dis else false, Lit.Set.inter acc dis *)
+  (* 	with Not_found -> false, Lit.Set.empty *)
+  (*     ) (true, Lit.Set.empty) lr *)
+  (*   in not (Lit.Set.is_empty common) *)
 
   let class_of env t = 
     try 
@@ -656,15 +670,15 @@ module Make ( R : Sig.X ) = struct
   let model env =
     let eqs =
       MapR.fold (fun r cl acc ->
-	let l, to_rel =
-	  List.fold_left (fun (l, to_rel) t ->
-	    let rt = MapT.find t env.make in
-	    if complete_model () || T.is_in_model t then
-	      if rt <> r then t::l, (t,rt)::to_rel
-	      else l, (t,rt)::to_rel
-	    else l, to_rel
-	  ) ([], []) (SetT.elements cl) in
-	(r, l, to_rel)::acc
+    	let l, to_rel =
+    	  List.fold_left (fun (l, to_rel) t ->
+    	    let rt = MapT.find t env.make in
+    	    if complete_model () || T.is_in_model t then
+    	      if rt <> r then t::l, (t,rt)::to_rel
+    	      else l, (t,rt)::to_rel
+    	    else l, to_rel
+    	  ) ([], []) (SetT.elements cl) in
+    	(r, l, to_rel)::acc
       ) env.classes []
     in
     let rec extract_neqs acc makes =
@@ -675,7 +689,8 @@ module Make ( R : Sig.X ) = struct
 	  if complete_model () || T.is_in_model x then
 	    MapT.fold (fun y ry acc ->
 	      if (complete_model () || T.is_in_model y)
-		&& already_distinct env [rx; ry]
+		&& (already_distinct env [rx; ry] 
+		    || already_distinct env [ry; rx])
 	      then [y; x]::acc
 	      else acc
 	    ) makes acc

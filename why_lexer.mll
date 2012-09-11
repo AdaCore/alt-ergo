@@ -48,8 +48,11 @@
       [ "ac", AC;
 	"and", AND;
 	"axiom", AXIOM;
+	"inversion", INVERSION;
 	"bitv", BITV;
         "bool", BOOL;
+	"check", CHECK;
+	"cut", CUT;
         "distinct", DISTINCT;
         "else", ELSE;
 	"exists", EXISTS;
@@ -59,6 +62,7 @@
 	"goal", GOAL;
 	"if", IF;
 	"in", IN; 
+	"include", INCLUDE;
 	"int", INT;
 	"let", LET;
 	"logic", LOGIC;
@@ -73,7 +77,7 @@
 	"type", TYPE;
 	"unit", UNIT;
 	"void", VOID;
-	"with", WITH
+	"with", WITH;
       ]
 	       
   let newline lexbuf =

@@ -19,6 +19,7 @@
     <style id="real" _name="Real" map-to="def:floating-point"/>
     <style id="integer" _name="Interger" map-to="def:decimal"/>
     <style id="keyword" _name="Keyword" map-to="def:keyword"/>
+    <style id="toplevel" _name="Toplevel"  map-to="def:identifier"/>
     <style id="operator" _name="Operator" map-to="def:operator"/>
     <style id="type" _name="Data Type" map-to="def:type"/>
     <style id="label" _name="Labeled argument" map-to="def:type"/>
@@ -27,6 +28,7 @@
     <style id="type-var" _name="Type Variable" map-to="def:type"/>
     <style id="boolean" _name="Boolean value" map-to="def:boolean"/>
     <style id="error" _name="Error" map-to="def:error"/>
+    <style id="trigger" _name="Trigger" map-to="def:doc-comment-element"/>
   </styles>
 
   <definitions>
@@ -54,27 +56,34 @@
 	</context>
 	<!-- Flow control & common keywords -->
 	<context id="keywords" style-ref="keyword">
-	  <keyword>ac</keyword>
 	  <keyword>and</keyword>
-	  <keyword>axiom</keyword>
 	  <keyword>distinct</keyword>
 	  <keyword>else</keyword>
 	  <keyword>exists</keyword>
 	  <keyword>forall</keyword>
+	  <keyword>if</keyword>
+	  <keyword>not</keyword>
+	  <keyword>or</keyword>
+	  <keyword>reach</keyword>
+	  <keyword>then</keyword>
+	  <keyword>with</keyword>
+	</context>
+	<context id="toplevel" style-ref="toplevel">
+	  <keyword>ac</keyword>
+	  <keyword>axiom</keyword>
+	  <keyword>check</keyword>
+	  <keyword>cut</keyword>
 	  <keyword>function</keyword>
 	  <keyword>goal</keyword>
 	  <keyword>hypothesis</keyword>
-	  <keyword>if</keyword>
+	  <keyword>include</keyword>
 	  <keyword>instance</keyword>
+	  <keyword>inversion</keyword>
 	  <keyword>logic</keyword>
-	  <keyword>not</keyword>
-	  <keyword>or</keyword>
 	  <keyword>predicate</keyword>
-	  <keyword>reach</keyword>
 	  <keyword>rewriting</keyword>
-	  <keyword>then</keyword>
-	  <keyword>type</keyword>
-	</context>
+	  <keyword>type</keyword>	
+        </context>
 	<context id="types" style-ref="type">
 	  <!-- pervasives types -->
 	  <keyword>bool</keyword>
@@ -117,12 +126,9 @@
 	  <match>[\%\*+-]</match>
 	</context>
 
-	<context id="trigger">
+	<context id="trigger" style-ref="trigger">
 	  <start>\[</start>
 	  <end>\]</end>
-	  <include>
-	    <context ref="alt-ergo"/>
-	  </include>
 	</context>
 
 	<context id="badtrigger" style-ref="error" extend-parent="false">

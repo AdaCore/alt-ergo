@@ -81,16 +81,23 @@ let search_using t sbuf env =
     
 (* let arrow_cursor () = Gdk.Cursor.create `ARROW *)
 
-let set_select env sbuf = 
-  match env.start_select, env.stop_select with
-    | Some b, Some e ->
-	  sbuf#select_range 
-	    (sbuf#get_iter (`OFFSET b)) (sbuf#get_iter (`OFFSET e))
-    (* | None, Some e -> *)
-    (* 	if sbuf#has_selection then *)
-    (* 	  let ib, _ = sbuf#selection_bounds in *)
-    (* 	  sbuf#select_range ib (sbuf#get_iter (`OFFSET e)) *)
-    | _ -> ()
+let set_select env sbuf = ()
+  (* match env.start_select, env.stop_select with *)
+  (*   | Some b, Some e -> *)
+  (* 	  sbuf#select_range *)
+  (* 	    (sbuf#get_iter (`OFFSET b)) (sbuf#get_iter (`OFFSET e)) *)
+  (*   (\* | None, Some _ -> *\) *)
+  (*   (\* 	if sbuf#has_selection then *\) *)
+  (*   (\* 	  let ib, _ = sbuf#selection_bounds in *\) *)
+  (*   (\* 	  env.start_select <- Some ib#offset; *\) *)
+  (*   (\*       set_select env sbuf *\) *)
+  (*   (\* | Some _, None -> *\) *)
+  (*   (\* 	if sbuf#has_selection then *\) *)
+  (*   (\* 	  let _, ie = sbuf#selection_bounds in *\) *)
+  (*   (\* 	  env.stop_select <- Some ie#offset; *\) *)
+  (*   (\*       set_select env sbuf *\) *)
+	  
+  (*   | _ -> () *)
 
 let tag_callback t env sbuf ~origin:y z i =
   let ofs = (new GText.iter i)#offset in
@@ -154,7 +161,7 @@ let tag_callback t env sbuf ~origin:y z i =
 	  begin
 	    let tyt = match find t sbuf env.ast with
 	      | Some (AT at) ->
-		  fprintf str_formatter ": %a" Ty.print at.c.at_ty;
+		  fprintf str_formatter ": %a" Ty.print_full at.c.at_ty;
 		  flush_str_formatter ()
 	      | Some (AF _) -> ": formula"
 	      | Some (QF _) -> ": quantified formula"
@@ -462,7 +469,7 @@ let rec least_nested_form used_vars af =
     | _, AFnamed (_, af) -> 
 	least_nested_form used_vars af
 
-let rec add_instance_aux ?(register=true) env id af aname vars entries =
+let rec add_instance_aux ?(register=true) env id af aname inv vars entries =
   let ptag =  (tag env.inst_buffer) in
   let goal_form, tyenv, loc =
     let rec find_goal = function
@@ -471,7 +478,7 @@ let rec add_instance_aux ?(register=true) env id af aname vars entries =
       | x::r -> find_goal r in
     let g, tyenv = find_goal env.ast in
     match g.c with
-      | AGoal (loc, _, f) -> f, tyenv, loc
+      | AGoal (loc, _, _, f) -> f, tyenv, loc
       | _ -> raise Not_found
   in
   let instance, used_vars =
@@ -479,7 +486,8 @@ let rec add_instance_aux ?(register=true) env id af aname vars entries =
   let ln_form = least_nested_form used_vars goal_form in
   env.inst_buffer#place_cursor  ~where:env.inst_buffer#end_iter;
   if ln_form = Exists goal_form then begin
-    let hy = AAxiom (loc, (sprintf "%s%s" "_instance_" aname), instance.c) in
+    let hy = 
+      AAxiom (loc, (sprintf "%s%s" "_instance_" aname), inv, instance.c) in
     let ahy = new_annot env.inst_buffer hy instance.id ptag in
     let rev_ast = List.rev env.ast in
     let rev_ast = match rev_ast with 
@@ -495,15 +503,15 @@ let rec add_instance_aux ?(register=true) env id af aname vars entries =
     let instance = new_annot env.inst_buffer instance.c instance.id ptag in
     begin match ln_form with 
       | Exists lnf ->
-	lnf.c <- 
-	  AFop 
-	  (AOPand, 
-	   [instance; {lnf with c = lnf.c}])
+	  lnf.c <- 
+	    AFop 
+	    (AOPand, 
+	     [instance; {lnf with c = lnf.c}])
       | Forall lnf ->
-	lnf.c <- 
-	  AFop 
-	  (AOPimp, 
-	   [instance; {lnf with c = lnf.c}])
+	  lnf.c <- 
+	    AFop 
+	    (AOPimp, 
+	     [instance; {lnf with c = lnf.c}])
     end;
     env.inst_buffer#insert ~tags:[instance.tag] ("instance "^aname^": \n");
     connect_aaform env env.inst_buffer instance;
@@ -514,21 +522,24 @@ let rec add_instance_aux ?(register=true) env id af aname vars entries =
   if register then save env.actions (AddInstance (id, aname, entries))
 
 
-and add_instance_entries ?(register=true) env id af aname vars (entries:GEdit.entry list) =
-  let entries = List.map (fun e -> e#text) entries in
-  add_instance_aux ~register env id af aname vars entries
+and add_instance_entries ?(register=true) env id af aname inv 
+    vars (entries:GEdit.entry list) =
 
-and add_instance ?(register=true) env id af aname entries =
-  add_instance_aux ~register env id af aname (list_uquant_vars_in_form af) entries
+  let entries = List.map (fun e -> e#text) entries in
+  add_instance_aux ~register env id af aname inv vars entries
+
+and add_instance ?(register=true) env id af aname inv entries =
+  add_instance_aux ~register env id af aname inv
+    (list_uquant_vars_in_form af) entries
 
 
 and popup_axiom t env offset () =
-    let pop_w = GWindow.dialog
+  let pop_w = GWindow.dialog
     ~title:"Instantiate axiom"
     ~allow_grow:true
     ~width:400 ()
     (* ~icon:(GdkPixbuf.from_xpm_data Logo.xpm_logo) ()  *)
-    in
+  in
   let bbox = GPack.button_box `HORIZONTAL ~border_width:5 ~layout:`END
     ~child_height:20 ~child_width:85 ~spacing:10
     ~packing:pop_w#action_area#add () in
@@ -542,46 +553,51 @@ and popup_axiom t env offset () =
   let phbox = GPack.hbox ~packing:button_cancel#add () in
   ignore(GMisc.image ~stock:`CANCEL ~packing:phbox#add ());
   ignore(GMisc.label ~text:"Cancel" ~packing:phbox#add ());
-  
-  let vars, entries, id, af, aname = (match find t env.buffer env.ast with
-    | Some (AD (atd, tyenv)) -> 
-      begin
-	  match atd.c with
-	    | AAxiom (_, aname, af) ->
-		pop_w#set_title ("Instantiate axiom "^aname)
-	    | APredicate_def (_, aname,_ , af) ->
-		pop_w#set_title ("Instantiate predicate "^aname)
-	    | _ -> assert false
-      end;
-      begin
-	  match atd.c with
-	    | AAxiom (_, aname, af)
-	    | APredicate_def (_, aname,_ , af) ->
-		let vars = list_uquant_vars_in_form af in
-		let rows = List.length vars in
-		let table = GPack.table ~rows ~columns:2 ~homogeneous:false
-		  ~border_width:5 ~packing:pop_w#vbox#add () in
-		let entries,_ = List.fold_left
-		  (fun (entries,i) (s,ty) ->
-		     fprintf str_formatter "%a : %a = " 
-		       Symbols.print s Ty.print ty;
-		     let text = flush_str_formatter () in
-		     ignore(
-		       GMisc.label ~text ~xalign:1.0
-			 ~packing:(table#attach ~left:0 ~top:i) ());
-		     let entries =
-		       (GEdit.entry ~text:""
-			  ~packing:(table#attach ~left:1 ~top:i
-				      ~expand:`BOTH ~shrink:`BOTH) ()
-		       )::entries in
-		     entries, i+1
-		  ) ([],0) vars in
-		vars, entries, atd.id, af, aname
-	    | _ -> assert false
-	end
-    | _ -> assert false)
+
+  let vars, entries, id, af, aname, inv = 
+    match find t env.buffer env.ast with
+      | Some (AD (atd, tyenv)) -> 
+	  begin
+	    match atd.c with
+	      | AAxiom (_, aname, _, af) ->
+		  pop_w#set_title ("Instantiate axiom "^aname)
+	      | APredicate_def (_, aname,_ , af) ->
+		  pop_w#set_title ("Instantiate predicate "^aname)
+	      | _ -> assert false
+	  end;
+	  begin
+	    match atd.c with
+	      | AAxiom (_, aname, _, af)
+	      | APredicate_def (_, aname,_ , af) ->
+		  let vars = list_uquant_vars_in_form af in
+		  let rows = List.length vars in
+		  let table = GPack.table ~rows ~columns:2 ~homogeneous:false
+		    ~border_width:5 ~packing:pop_w#vbox#add () in
+		  let entries,_ = List.fold_left
+		    (fun (entries,i) (s,ty) ->
+		       fprintf str_formatter "%a : %a = " 
+			 Symbols.print s Ty.print ty;
+		       let text = flush_str_formatter () in
+		       ignore(
+			 GMisc.label ~text ~xalign:1.0
+			   ~packing:(table#attach ~left:0 ~top:i) ());
+		       let entries =
+			 (GEdit.entry ~text:""
+			    ~packing:(table#attach ~left:1 ~top:i
+					~expand:`BOTH ~shrink:`BOTH) ()
+			 )::entries in
+		       entries, i+1
+		    ) ([],0) vars in
+		  let inv = 
+		    match atd.c with 
+		      | AAxiom(_, _, inv, _ ) -> inv | _ -> false
+		  in
+		  vars, entries, atd.id, af, aname, inv
+	      | _ -> assert false
+	  end
+      | _ -> assert false
   in
-    		
+
   let errors_l = GMisc.label ~text:"" ~packing:pop_w#vbox#pack () in
   errors_l#misc#modify_fg [`NORMAL, `NAME "red"];
   errors_l#misc#hide ();
@@ -589,7 +605,7 @@ and popup_axiom t env offset () =
   ignore(button_ok#connect#clicked ~callback:
 	   (fun () ->
 	      try
-		add_instance_entries env id af aname vars entries;
+		add_instance_entries env id af aname inv vars entries;
 		pop_w#destroy ()
 		  
 	      with 
@@ -641,51 +657,52 @@ and add_trigger ?(register=true) t qid env str offset (sbuf:sbuffer) =
   let iter = sbuf#get_iter (`OFFSET offset) in
   match sbuf#forward_iter_to_source_mark 
     ~category:(sprintf "trigger_%d" qid) iter with
-    | true ->
-      begin
-	match find_decl t sbuf env.ast, find t sbuf env.ast with
-	  | Some (AD (_, tyenv)), Some (QF qf) ->
-	    let tags = iter#tags in
-	    let iter = sbuf#get_iter (`OFFSET (iter#offset - 2)) in
-	    let lb = Lexing.from_string str in
-	    let lexprs = Why_parser.trigger Why_lexer.token lb in
-	    let atl = List.fold_right
-	      (fun lexpr l->
-		let tt = Why_typing.term tyenv
-		  (qf.c.aqf_upvars@qf.c.aqf_bvars) lexpr in
-		let at = annot_of_tterm sbuf tt in
-		at.tag#set_priority (t#priority - 1);
-		connect_aaterm env sbuf connect_tag at;
-		at::l
-	      ) lexprs [] in
-	    if qf.c.aqf_triggers <> [] then
-	      sbuf#insert ~iter ~tags " | ";
-	    add_aaterm_list_at sbuf tags iter "," atl;
-	    qf.c.aqf_triggers <- qf.c.aqf_triggers@[atl];
-	    if register then 
-	      save env.actions (AddTrigger (qf.id, sbuf=env.inst_buffer, str));
-	  | _ -> assert false
-      end
-    | false -> ()
+      | true ->
+	  begin
+	    match find_decl t sbuf env.ast, find t sbuf env.ast with
+	      | Some (AD (_, tyenv)), Some (QF qf) ->
+		  let tags = iter#tags in
+		  let iter = sbuf#get_iter (`OFFSET (iter#offset - 2)) in
+		  let lb = Lexing.from_string str in
+		  let lexprs = Why_parser.trigger Why_lexer.token lb in
+		  let atl = List.fold_right
+		    (fun lexpr l->
+		       let tt = Why_typing.term tyenv
+			 (qf.c.aqf_upvars@qf.c.aqf_bvars) lexpr in
+		       let at = annot_of_tterm sbuf tt in
+		       at.tag#set_priority (t#priority - 1);
+		       connect_aaterm env sbuf connect_tag at;
+		       at::l
+		    ) lexprs [] in
+		  if qf.c.aqf_triggers <> [] then
+		    sbuf#insert ~iter ~tags " | ";
+		  add_aaterm_list_at sbuf tags iter "," atl;
+		  qf.c.aqf_triggers <- qf.c.aqf_triggers@[atl];
+		  if register then 
+		    save env.actions (AddTrigger (qf.id, sbuf=env.inst_buffer, str));
+	      | _ -> assert false
+	  end
+      | false -> ()
 
 and readd_trigger ?(register=true) env id str inst_buf =
   try
     match findbyid id env.ast with
       | QF qf ->
-	let sbuf = 
-	  if inst_buf then env.inst_buffer else env.buffer in
-	add_trigger ~register qf.tag id env str 0 sbuf
+	  let sbuf = 
+	    if inst_buf then env.inst_buffer else env.buffer in
+	  add_trigger ~register qf.tag id env str 0 sbuf
       | _ -> assert false
   with Not_found -> ()
 
 
 and popup_trigger t qid env (sbuf:sbuffer) offset () =
-    let pop_w = GWindow.dialog
+  let pop_w = GWindow.dialog
     ~title:"Add new (multi) trigger"
     ~allow_grow:true
-    ~width:400 ()
+    ~width:400 
+    ~height:100 ()
     (* ~icon:(GdkPixbuf.from_xpm_data Logo.xpm_logo) ()  *)
-    in
+  in
   let bbox = GPack.button_box `HORIZONTAL ~border_width:5 ~layout:`END
     ~child_height:20 ~child_width:85 ~spacing:10
     ~packing:pop_w#action_area#add () in
@@ -711,33 +728,33 @@ and popup_trigger t qid env (sbuf:sbuffer) offset () =
     ~hpolicy:`AUTOMATIC
     ~packing:pop_w#vbox#add () in
   let tv1 = GSourceView2.source_view ~source_buffer:buf1 ~packing:(sw1#add) 
-	 ~show_line_numbers:true ~wrap_mode:`CHAR() in
+    ~show_line_numbers:true ~wrap_mode:`CHAR() in
   let _ = tv1#misc#modify_font monospace_font in
   let _ = tv1#set_editable true in
-		
+  
   let errors_l = GMisc.label ~text:"" ~packing:pop_w#vbox#pack () in
   errors_l#misc#modify_fg [`NORMAL, `NAME "red"];
   errors_l#misc#hide ();
-    
+  
   ignore(button_ok#connect#clicked
-    ~callback: 
-    (fun () ->
-      try 
-	let str = buf1#get_text () in
-	add_trigger t qid env str offset sbuf;
-	pop_w#destroy ()
-      with 
-	| Why_lexer.Lexical_error s -> 
-	  errors_l#set_text ("Lexical error");
-	  errors_l#misc#show ()
-	| Parsing.Parse_error ->
-	  errors_l#set_text ("Syntax error");
-	  errors_l#misc#show ()
-	| Common.Error (e,_) ->
-	  fprintf str_formatter "Typing error : %a" Common.report e;
-	  errors_l#set_text (flush_str_formatter ());
-	  errors_l#misc#show ()
-    ));
+	   ~callback: 
+	   (fun () ->
+	      try 
+		let str = buf1#get_text () in
+		add_trigger t qid env str offset sbuf;
+		pop_w#destroy ()
+	      with 
+		| Why_lexer.Lexical_error s -> 
+		    errors_l#set_text ("Lexical error");
+		    errors_l#misc#show ()
+		| Parsing.Parse_error ->
+		    errors_l#set_text ("Syntax error");
+		    errors_l#misc#show ()
+		| Common.Error (e,_) ->
+		    fprintf str_formatter "Typing error : %a" Common.report e;
+		    errors_l#set_text (flush_str_formatter ());
+		    errors_l#misc#show ()
+	   ));
   ignore(button_cancel#connect#clicked ~callback: pop_w#destroy);
   pop_w#show ()
 
@@ -771,7 +788,7 @@ and triggers_callback t qid env sbuf ~origin:y z i =
 (*   ignore (t#connect#event ~callback:(set_mark t buffer)); *)
 (*   (\* ignore (t#connect#event ~callback:(fetch_text t buffer)); *\) *)
 (*   t *)
-  
+      
 
 and connect_tag env sbuf t =
   ignore (t#connect#event ~callback:(tag_callback t env sbuf))
@@ -801,21 +818,21 @@ and connect_aaterm_list env sbuf
   List.iter (connect_aaterm env sbuf connect_tag) aatl
 
 and connect_at_desc env sbuf = function
-    | ATconst _ | ATvar _ -> ()
-    | ATapp (s, atl) -> connect_aterm_list env sbuf atl
-    | ATinfix (t1, _, t2) | ATget (t1, t2)
-    | ATconcat (t1, t2) | ATlet (_, t1, t2) ->
-	connect_aterm env sbuf t1;
-	connect_aterm env sbuf t2
-    | ATdot (t, _) | ATprefix (_, t) | ATnamed (_, t) ->
-	connect_aterm env sbuf t
-    | ATset (t1,t2,t3) | ATextract (t1,t2,t3) ->
-	connect_aterm env sbuf t1;
-	connect_aterm env sbuf t2;
-	connect_aterm env sbuf t3
-    | ATrecord r -> 
-	let atl = List.map snd r in
-	connect_aterm_list env sbuf atl
+  | ATconst _ | ATvar _ -> ()
+  | ATapp (s, atl) -> connect_aterm_list env sbuf atl
+  | ATinfix (t1, _, t2) | ATget (t1, t2)
+  | ATconcat (t1, t2) | ATlet (_, t1, t2) ->
+      connect_aterm env sbuf t1;
+      connect_aterm env sbuf t2
+  | ATdot (t, _) | ATprefix (_, t) | ATnamed (_, t) ->
+      connect_aterm env sbuf t
+  | ATset (t1,t2,t3) | ATextract (t1,t2,t3) ->
+      connect_aterm env sbuf t1;
+      connect_aterm env sbuf t2;
+      connect_aterm env sbuf t3
+  | ATrecord r -> 
+      let atl = List.map snd r in
+      connect_aterm_list env sbuf atl
 	
 and connect_aatom env sbuf aa =
   match aa with
@@ -838,7 +855,7 @@ and connect_quant_form env sbuf
 
 and connect_triggers env sbuf trs =
   List.iter (connect_aaterm_list env sbuf connect_tag) trs
-      
+    
 and connect_aform env sbuf = function
   | AFatom a -> connect_aatom env sbuf a
   | AFop (op, afl) -> connect_aaform_list env sbuf afl
@@ -862,13 +879,13 @@ and connect_aaform env sbuf aaf =
 let connect_atyped_decl env td =
   match td.c with
     | APredicate_def (_, _, _, af)
-    | AAxiom (_, _, af) ->
+    | AAxiom (_, _, _, af) ->
 	connect_axiom_tag env td.tag;
 	connect_aform env env.buffer af
     | ARewriting (_, _, arwtl) ->
 	connect_tag env env.buffer td.tag
 	(* TODO *)
-    | AGoal (_, _, aaf) ->
+    | AGoal (_, _, _, aaf) ->
 	connect_tag env env.buffer td.tag;
 	connect_aform env env.buffer aaf.c
     | AFunction_def (_, _, _, _, af) ->

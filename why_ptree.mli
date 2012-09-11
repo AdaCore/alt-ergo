@@ -63,13 +63,15 @@ and pp_desc =
   | PPconcat of lexpr * lexpr
   | PPif of lexpr * lexpr * lexpr
   | PPforall of string list * ppure_type * lexpr list list * lexpr
-  | PPexists of string list * ppure_type * lexpr
+  | PPexists of string list * ppure_type * lexpr list list * lexpr
   | PPforall_named of 
       (string * string) list * ppure_type * lexpr list list * lexpr
   | PPexists_named of
-      (string * string) list * ppure_type * lexpr
+      (string * string) list * ppure_type * lexpr list list * lexpr
   | PPnamed of string * lexpr
   | PPlet of string * lexpr * lexpr
+  | PPcheck of lexpr
+  | PPcut of lexpr
 
 (* Declarations. *)
 
@@ -84,8 +86,10 @@ type body_type_decl =
   | Enum of string list
   | Abstract
 
+type inversion = bool
+
 type decl = 
-  | Axiom of loc * string * lexpr
+  | Axiom of loc * string * inversion * lexpr
   | Rewriting of loc * string * lexpr list
   | Goal of loc * string * lexpr
   | Logic of loc * name_kind * (string * string) list * plogic_type
@@ -171,10 +175,12 @@ type 'a rwt_rule = {
   rwt_right : 'a
 }
 
+type goal_sort = Cut | Check | Thm
+
 type 'a tdecl = 
-  | TAxiom of loc * string * ('a tform, 'a) annoted
+  | TAxiom of loc * string * inversion * ('a tform, 'a) annoted
   | TRewriting of loc * string * (('a tterm, 'a) annoted rwt_rule) list
-  | TGoal of loc * string * ('a tform, 'a) annoted
+  | TGoal of loc * goal_sort * string * ('a tform, 'a) annoted
   | TLogic of loc * string list * plogic_type
   | TPredicate_def of 
       loc * string *
@@ -188,10 +194,10 @@ type 'a tdecl =
 (* Sat entry *)
 
 type sat_decl_aux = 
-  | Assume of Formula.t * bool 
+  | Assume of Formula.t * bool * inversion
   | PredDef of Formula.t
   | RwtDef of (Term.t rwt_rule) list
-  | Query of string * Formula.t * Literal.LT.t list
+  | Query of string *  Formula.t * Literal.LT.t list * goal_sort
 
 type sat_tdecl = {
   st_loc : loc;

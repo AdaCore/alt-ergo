@@ -349,12 +349,12 @@ module Make
       with Not_found -> monomes)
       monomes lp
 
-  let update_polynomes env expl =
+  let update_polynomes ?(force=false) env expl =
     let polynomes, monomes, improved = MP.fold
       (fun p ip (polynomes, monomes, improved) ->
 	 let new_i = intervals_from_monomes env p in
 	 let i = Intervals.intersect new_i ip in
-	 if Intervals.is_strict_smaller i ip then
+	 if force || Intervals.is_strict_smaller i ip then
 	   let monomes = update_monomes_from_poly p i polynomes monomes in
 	   let improved = SP.add p improved in
 	   MP.add p i polynomes, monomes, improved
@@ -543,9 +543,8 @@ module Make
 	       env, eqs
 
 	   | Other            -> 
+	       (* let env = update_polynomes env expl in *)
 	       env, eqs
-	       (*t env,eqs = update_polynomes env eqs ineq in
-	       env, pers_ineqs, eqs*)
 
 	       
       ) acc lin
@@ -918,7 +917,7 @@ module Make
 	   | Some s when s >/ (Int 1) ->
 	       begin
 		 match o with
-		   | Some (s', _, _, _) when s' <=/ s -> o
+		   | Some (s', p', _, _) when s' </ s -> o
 		   | _ -> 
 		       let n, ex = Intervals.borne_inf i in
 		       Some (s, p, n, ex)
@@ -943,7 +942,7 @@ module Make
 	   | Some s when s >/ (Int 1) ->
 	       begin
 		 match o with
-		   | Some (s', _, _, _) when s' <=/ s -> o
+		   | Some (s', _, _, _) when s' </ s -> o
 		   | _ -> 
 		       let n, ex = Intervals.borne_inf i in
 		       Some (s, x, n, ex)
@@ -978,23 +977,32 @@ module Make
 
 
   let print_model fmt env rs =
+    (* let env = update_polynomes ~force:true env Explanation.empty in *)
     let zero = ref true in
     List.iter (fun (t, r) ->
       let p = P.poly_of r in
-      let p', c, d = P.normal_form_pos p in
-      try 		 
-	let u' = MP.find p' env.polynomes in
-	if Intervals.is_point u' = None then
+      let ty = P.type_info p in
+      if ty = Ty.Tint || ty = Ty.Treal then
+	let p', c, d = P.normal_form_pos p in
+	let pu' = 
+	  try MP.find p' env.polynomes 
+	  with Not_found -> Intervals.undefined ty 
+	in
+	let pm' = 
+	  try intervals_from_monomes env p'
+	  with Not_found -> Intervals.undefined ty 
+	in
+	let u' = Intervals.intersect pu' pm' in
+	if Intervals.is_point u' = None && u' <> Intervals.undefined ty then
 	  let u = 
 	    Intervals.scale d
 	      (Intervals.add u' 
-		 (Intervals.point c (P.type_info p) Explanation.empty)) in
+		 (Intervals.point c ty Explanation.empty)) in
 	  if !zero then begin 
 	    fprintf fmt "Relation:";
 	    zero := false;
 	  end;
 	  fprintf fmt "\n %a ∈ %a" Term.print t Intervals.pretty_print u
-      with Not_found -> ()
     ) rs;
     if not !zero then fprintf fmt "\n@."
 

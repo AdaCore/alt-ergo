@@ -67,6 +67,7 @@ module type S_Term = sig
 
   val terms_of : t -> Term.Set.t
   val vars_of : t -> Symbols.Set.t
+  val is_in_model : t -> bool
 
 end
 

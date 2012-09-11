@@ -88,3 +88,20 @@ let read_actions res = function
       with End_of_file -> Stack.create ()
     end
   | None -> Stack.create ()
+
+
+module SI = Set.Make (struct type t = int let compare = compare end)
+
+let safe_session actions =
+  let l = ref [] in
+  Stack.iter (fun a -> l := a::!l) actions;
+  let list_actions = !l in
+  let _, incorrect_prunes = 
+    List.fold_left (fun (prunes, incorrect_prunes) -> function
+      | Prune id -> SI.add id prunes, incorrect_prunes
+      | IncorrectPrune id -> prunes, SI.add id incorrect_prunes
+      | Unprune id -> SI.remove id prunes, SI.remove id incorrect_prunes
+      | _ -> prunes, incorrect_prunes)
+      (SI.empty, SI.empty) list_actions
+  in
+  SI.is_empty incorrect_prunes

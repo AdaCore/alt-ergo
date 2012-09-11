@@ -10,6 +10,7 @@
 (*     Mohamed Iguernelala                                                *)
 (*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
+(*     Claire Dross                                                       *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
 (*                                                                        *)
@@ -87,7 +88,10 @@ let timelimit = ref 0.
 let show_version () = Format.printf "%s@." Version.version; exit 0
 let show_libdir () = Format.printf "%s@." Version.libdir; exit 0
 
-let set_max_split s = max_split := Num.num_of_string s
+let set_max_split s = 
+  max_split := 
+    try Num.num_of_string s 
+    with Failure _ -> Num.Int (-1)
 
 let set_proof b = proof := b
 
@@ -99,4 +103,11 @@ let set_rules = function
   | "arith" -> rules := 4
   | _ -> rules := -1
 
+let set_limit t =
+  match Sys.os_type with
+    | "Win32" -> Format.eprintf "timelimit not supported on Win32 (ignored)@."
+    | _ -> timelimit := t
+
 let replay = ref false
+
+let debug_custom = ref false

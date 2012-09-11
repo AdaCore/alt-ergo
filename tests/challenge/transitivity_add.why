@@ -1,0 +1,455 @@
+logic addterm : 'a -> prop
+
+(* this is a prelude for Alt-Ergo*)
+(* this is a prelude for Alt-Ergo integer arithmetic *)
+type tuple0 = Tuple0
+
+type unit1
+
+type qtmark
+
+logic at : 'a, qtmark -> 'a
+
+logic old : 'a -> 'a
+
+type bool1 = True | False
+
+logic match_bool : bool, 'a, 'a -> 'a
+
+axiom match_bool_True :
+  (forall z:'a. forall z1:'a. (match_bool(true, z, z1) = z))
+
+axiom match_bool_False :
+  (forall z:'a. forall z1:'a. (match_bool(false, z, z1) = z1))
+
+function andb(x: bool, y: bool) : bool = match_bool(y, match_bool(x, true,
+  false), false)
+
+function orb(x: bool, y: bool) : bool = match_bool(y, true, match_bool(x,
+  true, false))
+
+function xorb(x: bool, y: bool) : bool = match_bool(y, match_bool(x, false,
+  true), match_bool(x, true, false))
+
+function notb(x: bool) : bool = match_bool(x, false, true)
+
+function implb(x: bool, y: bool) : bool = match_bool(y, true, match_bool(x,
+  false, true))
+
+axiom CompatOrderMult :
+  (forall x:int. forall y:int. forall z:int. ((x <= y) -> ((0 <= z) ->
+  ((x * z) <= (y * z)))))
+
+type 'a list
+
+logic Nil : 'a list
+
+logic Cons : 'a, 'a list -> 'a list
+
+logic match_list : 'a list, 'a1, 'a1 -> 'a1
+
+axiom match_list_Nil :
+  (forall z:'a. forall z1:'a. (match_list(Nil, z, z1) = z))
+
+axiom match_list_Cons :
+  (forall z:'a. forall z1:'a. forall u:'a1. forall u1:'a1 list.
+  (match_list(Cons(u, u1), z, z1) = z1))
+
+logic index_list : 'a list -> int
+
+axiom index_list_Nil : (index_list(Nil) = 0)
+
+axiom index_list_Cons :
+  (forall u:'a. forall u1:'a list [Cons(u, u1)]. (index_list(Cons(u,
+  u1)) = 1))
+
+logic Cons_proj_1 : 'a list -> 'a
+
+axiom Cons_proj_1_def :
+  (forall u:'a. forall u1:'a list. (Cons_proj_1(Cons(u, u1)) = u))
+
+logic Cons_proj_2 : 'a list -> 'a list
+
+axiom Cons_proj_2_def :
+  (forall u:'a. forall u1:'a list. (Cons_proj_2(Cons(u, u1)) = u1))
+
+
+axiom list_inversion :
+  (forall u:'a list. ((u = Nil) or (u = Cons(Cons_proj_1(u),
+  Cons_proj_2(u)))))
+
+logic length : 'a list -> int
+
+axiom length_def : (length(Nil) = 0)
+
+axiom length_def1 :
+  (forall x:'a. forall x1:'a list. (length(Cons(x, x1)) = (1 + length(x1))))
+
+axiom Length_nonnegative : (forall l:'a list. (0 <= length(l)))
+
+axiom Length_nil : (forall l:'a list. ((length(l) = 0) -> (l = Nil)))
+
+axiom Length_nil1 : (forall l:'a list. ((l = Nil) -> (length(l) = 0)))
+
+logic infix_plpl : 'a list, 'a list -> 'a list
+
+axiom infix_plpl_def : (forall l2:'a list. (infix_plpl(Nil, l2) = l2))
+
+axiom infix_plpl_def1 :
+  (forall l2:'a list.
+  (forall x:'a. forall x1:'a list. (infix_plpl(Cons(x, x1), l2) = Cons(x,
+  infix_plpl(x1, l2)))))
+
+axiom Append_assoc :
+  (forall l1:'a list. forall l2:'a list. forall l3:'a list. (infix_plpl(l1,
+  infix_plpl(l2, l3)) = infix_plpl(infix_plpl(l1, l2), l3)))
+
+axiom Append_l_nil : (forall l:'a list. (infix_plpl(l, Nil) = l))
+
+axiom Append_length :
+  (forall l1:'a list. forall l2:'a list. (length(infix_plpl(l1,
+  l2)) = (length(l1) + length(l2))))
+
+logic mem : 'a, 'a list -> prop
+
+axiom mem_def : (forall x:'a. (not mem(x, Nil)))
+
+axiom mem_def1 :
+  (forall x:'a.
+  (forall x1:'a. forall x2:'a list. (mem(x, Cons(x1, x2)) -> ((x = x1) or
+  mem(x, x2)))))
+
+axiom mem_def2 :
+  (forall x:'a.
+  (forall x1:'a. forall x2:'a list. (((x = x1) or mem(x, x2)) -> mem(x,
+  Cons(x1, x2)))))
+
+axiom mem_append :
+  (forall x:'a. forall l1:'a list. forall l2:'a list. (mem(x, infix_plpl(l1,
+  l2)) -> (mem(x, l1) or mem(x, l2))))
+
+axiom mem_append1 :
+  (forall x:'a. forall l1:'a list. forall l2:'a list. ((mem(x, l1) or mem(x,
+  l2)) -> mem(x, infix_plpl(l1, l2))))
+
+axiom mem_decomp :
+  (forall x:'a. forall l:'a list. (mem(x, l) ->
+  (exists l1:'a list. exists l2:'a list. (l = infix_plpl(l1, Cons(x, l2))))))
+
+type ('a, 'b) map
+
+logic get : ('a, 'b) map, 'a -> 'b
+
+logic set : ('a, 'b) map, 'a, 'b -> ('a, 'b) map
+
+axiom Select_eq :
+  (forall m:('a, 'b) map.
+  (forall a1:'a. forall a2:'a.
+  (forall b:'b [get(set(m, a1, b), a2)]. ((a1 = a2) -> (get(set(m, a1, b),
+  a2) = b)))))
+
+axiom Select_neq :
+  (forall m:('a, 'b) map.
+  (forall a1:'a. forall a2:'a.
+  (forall b:'b [get(set(m, a1, b), a2)]. ((not (a1 = a2)) -> (get(set(m, a1,
+  b), a2) = get(m, a2))))))
+
+logic const : 'b -> ('a, 'b) map
+
+axiom Const : (forall b:'b. forall a:'a. (get(const(b), a) = b))
+
+type id = { Id_proj_1 : int
+}
+
+type state
+
+type aexpr
+
+logic Anum : int -> aexpr
+
+logic Aadd : aexpr, aexpr -> aexpr
+
+logic match_aexpr : aexpr, 'a, 'a -> 'a
+
+axiom match_aexpr_Anum :
+  (forall z:'a. forall z1:'a. forall u:int. (match_aexpr(Anum(u), z,
+  z1) = z))
+
+axiom match_aexpr_Aadd :
+  (forall z:'a. forall z1:'a. forall u:aexpr. forall u1:aexpr.
+  (match_aexpr(Aadd(u, u1), z, z1) = z1))
+
+logic index_aexpr : aexpr -> int
+
+axiom index_aexpr_Anum : (forall u:int [Anum(u)]. (index_aexpr(Anum(u)) = 0))
+
+axiom index_aexpr_Aadd :
+  (forall u:aexpr. forall u1:aexpr [Aadd(u, u1)]. (index_aexpr(Aadd(u,
+  u1)) = 1))
+
+logic Anum_proj_1 : aexpr -> int
+
+axiom Anum_proj_1_def : (forall u:int. (Anum_proj_1(Anum(u)) = u))
+
+logic Aadd_proj_1 : aexpr -> aexpr
+
+axiom Aadd_proj_1_def :
+  (forall u:aexpr. forall u1:aexpr. (Aadd_proj_1(Aadd(u, u1)) = u))
+
+logic Aadd_proj_2 : aexpr -> aexpr
+
+axiom Aadd_proj_2_def :
+  (forall u:aexpr. forall u1:aexpr. (Aadd_proj_2(Aadd(u, u1)) = u1))
+
+axiom aexpr_inversion :
+  (forall u:aexpr. ((u = Anum(Anum_proj_1(u))) or (u = Aadd(Aadd_proj_1(u),
+  Aadd_proj_2(u)))))
+
+
+logic aeval : (id, int) map, aexpr -> int
+
+axiom aeval_def :
+  (forall st:(id, int) map. (forall x:int. (aeval(st, Anum(x)) = x)))
+
+axiom aeval_def1 :
+  (forall st:(id, int) map.
+  (forall x:aexpr. forall x1:aexpr. (aeval(st, Aadd(x, x1)) = (aeval(st,
+  x) + aeval(st, x1)))))
+
+type pos
+
+type stack
+
+type vm_state = { VMS_proj_1 : int; VMS_proj_2 : int list; VMS_proj_3 : (id,
+int) map
+}
+
+type instr
+
+logic Iconst : int -> instr
+
+logic Iadd : instr
+
+logic match_instr : instr, 'a, 'a -> 'a
+
+axiom match_instr_Iconst :
+  (forall z:'a. forall z1:'a. forall u:int. (match_instr(Iconst(u), z,
+  z1) = z))
+
+axiom match_instr_Iadd :
+  (forall z:'a. forall z1:'a. (match_instr(Iadd, z, z1) = z1))
+
+logic index_instr : instr -> int
+
+axiom index_instr_Iconst :
+  (forall u:int [Iconst(u)]. (index_instr(Iconst(u)) = 0))
+
+axiom index_instr_Iadd : (index_instr(Iadd) = 1)
+
+logic Iconst_proj_1 : instr -> int
+
+axiom Iconst_proj_1_def : (forall u:int. (Iconst_proj_1(Iconst(u)) = u))
+
+
+axiom instr_inversion :
+  (forall u:instr. ((u = Iconst(Iconst_proj_1(u))) or (u = Iadd)))
+
+type code
+
+logic codeseq_at : instr list, int, instr list -> prop
+
+axiom codeseq :
+  (forall c1:instr list. forall c2:instr list. forall c3:instr list.
+  codeseq_at(infix_plpl(infix_plpl(c1, c2), c3), length(c1), c2))
+
+
+axiom codeseq_at_inversion :
+  (forall z:instr list. forall z1:int. forall z2:instr list. (codeseq_at(z,
+  z1, z2) ->
+  (exists c1:instr list. exists c2:instr list. exists c3:instr list.
+  (((z = infix_plpl(infix_plpl(c1, c2), c3)) and (z1 = length(c1))) and
+  (z2 = c2)))))
+
+
+axiom codeseq_at_app_right :
+  (forall c:instr list. forall c1:instr list. forall c2:instr list.
+  forall p:int. (codeseq_at(c, p, infix_plpl(c1, c2)) -> codeseq_at(c,
+  (p + length(c1)), c2)))
+
+axiom codeseq_at_app_left :
+  (forall c:instr list. forall c1:instr list. forall c2:instr list.
+  forall p:int. (codeseq_at(c, p, infix_plpl(c1, c2)) -> codeseq_at(c, p,
+  c1)))
+
+logic transition : instr list, vm_state, vm_state -> prop
+
+axiom trans_const :
+  (forall c:instr list. forall p:int. forall n:int. (codeseq_at(c, p,
+  Cons(Iconst(n), Nil)) ->
+  (forall s:int list. forall m:(id, int) map. transition(c, { VMS_proj_1 = p;
+  VMS_proj_2 = s; VMS_proj_3 = m }, { VMS_proj_1 = (p + 1); VMS_proj_2 =
+  Cons(n, s); VMS_proj_3 = m }))))
+
+axiom transition_inversion :
+  (forall z:instr list. forall z1:vm_state. forall z2:vm_state.
+  (transition(z, z1, z2) ->
+  ((exists c:instr list. exists p:int. exists n:int. (codeseq_at(c, p,
+   Cons(Iconst(n), Nil)) and
+   (exists s:int list. exists m:(id, int) map. (((z = c) and (z1 = {
+   VMS_proj_1 = p; VMS_proj_2 = s; VMS_proj_3 = m })) and (z2 = {
+   VMS_proj_1 = (p + 1); VMS_proj_2 = Cons(n, s); VMS_proj_3 = m }))))) or
+  (exists c:instr list. exists p:int. exists n1:int. exists n2:int.
+  (codeseq_at(c, p, Cons(Iadd, Nil)) and
+  (exists m:(id, int) map. exists s:int list. (((z = c) and (z1 = {
+  VMS_proj_1 = p; VMS_proj_2 = Cons(n2, Cons(n1, s)); VMS_proj_3 = m })) and
+  (z2 = { VMS_proj_1 = (p + 1); VMS_proj_2 = Cons((n1 + n2), s); VMS_proj_3 =
+  m }))))))))
+
+logic transition_star : instr list, vm_state, vm_state -> prop
+
+axiom BaseTransRefl :
+  (forall p:instr list. forall x:vm_state. transition_star(p, x, x))
+
+axiom StepTransRefl :
+  (forall p:instr list. forall x:vm_state. forall y:vm_state.
+  forall z:vm_state. (transition(p, x, y) -> (transition_star(p, y, z) ->
+  transition_star(p, x, z))))
+
+
+axiom transition_star_inversion :
+  (forall z:instr list. forall z1:vm_state. forall z2:vm_state.
+  (transition_star(z, z1, z2) ->
+  ((exists p:instr list. exists x:vm_state. (((z = p) and (z1 = x)) and
+   (z2 = x))) or
+  (exists p:instr list. exists x:vm_state. exists y:vm_state.
+  exists z3:vm_state. (transition(p, x, y) and (transition_star(p, y, z3) and
+  (((z = p) and (z1 = x)) and (z2 = z3))))))))
+
+
+axiom transition_star_one :
+  (forall p:instr list. forall x:vm_state. forall y:vm_state
+  [transition(p,x, y)]. (transition(p,x, y) -> transition_star(p, x, y)))
+
+axiom transition_star_transitive :
+  (forall p:instr list. forall x:vm_state. forall y:vm_state.
+  forall z:vm_state 
+  [transition_star(p, x, y), transition_star(p, y, z) | 
+  transition_star(p, x, z), transition_star(p, x, y) |
+  transition_star(p, x, z), transition_star(p, y, z)]. 
+
+  (transition_star(p, x, y) -> (transition_star(p, y,
+  z) -> transition_star(p, x, z))))
+
+
+axiom trans_add :
+  (forall c:instr list. forall p:int [codeseq_at(c, p, Cons(Iadd, Nil))]. 
+  (codeseq_at(c, p, Cons(Iadd, Nil)) ->
+   forall n1:int. forall n2:int.
+   (forall m:(id, int) map. forall s:int list 
+   [Cons((n1 + n2), s),m]. 
+
+   transition(c, 
+    { VMS_proj_1 = p; 
+      VMS_proj_2 = Cons(n2, Cons(n1, s)); VMS_proj_3 = m }, 
+    { VMS_proj_1 = (p + 1); 
+      VMS_proj_2 = Cons((n1 + n2), s); VMS_proj_3 = m }))))
+
+goal WP_parameter_compile_aexpr :
+  (forall x:aexpr. forall x1:aexpr.
+  (forall result:instr list.
+  (
+
+  (forall m:(id, int) map. forall s:int list. forall c:instr list.
+   forall p:int [Cons(aeval(m, x), s), codeseq_at(c, p, result)]. 
+   (codeseq_at(c, p, result) -> 
+   transition_star(c, 
+    {VMS_proj_1 = p; VMS_proj_2 = s; VMS_proj_3 = m }, 
+    {VMS_proj_1 = (p + length(result)); 
+     VMS_proj_2 = Cons(aeval(m, x), s); 
+     VMS_proj_3 = m}
+   )))
+
+    ->
+
+  (forall result1:instr list.
+  ((forall m:(id, int) map. forall s:int list. forall c:instr list.
+   forall p:int [Cons(aeval(m, x1), s), codeseq_at(c, p, result1)]. 
+  (codeseq_at(c, p, result1) -> 
+  transition_star(c, 
+   {VMS_proj_1 = p; VMS_proj_2 = s; VMS_proj_3 = m }, 
+   {VMS_proj_1 = (p + length(result1)); 
+    VMS_proj_2 = Cons(aeval(m, x1), s); VMS_proj_3 = m })))
+
+   ->
+  (forall m:(id, int) map. forall s:int list. forall c:instr list.
+   forall p:int. 
+
+ (codeseq_at(c, p, infix_plpl(infix_plpl(result, result1), Cons(Iadd, Nil))) 
+
+  -> 
+(*  
+  check(codeseq_at(c, p, result)) ->
+
+  check(
+    transition_star(c, 
+   {VMS_proj_1 = p; VMS_proj_2 = s; VMS_proj_3 = m }, 
+   {VMS_proj_1 = (p + length(result)); 
+    VMS_proj_2 = Cons(aeval(m, x), s); VMS_proj_3 = m })
+ ) ->
+
+ check(codeseq_at(c, p + length(result), result1)) ->
+
+ check(
+   transition_star(c, 
+   {VMS_proj_1 = p+length(result);
+    VMS_proj_2 = Cons(aeval(m, x), s); VMS_proj_3 = m }, 
+   {VMS_proj_1 = (p + length(result)) + length(result1); 
+    VMS_proj_2 = Cons(aeval(m,x1),Cons(aeval(m, x), s)); VMS_proj_3 = m })
+ ) ->
+
+
+ check(
+   transition_star(c, 
+   {VMS_proj_1 = p;VMS_proj_2 = s; VMS_proj_3 = m }, 
+   {VMS_proj_1 = (p + length(result)) + length(result1); 
+    VMS_proj_2 = Cons(aeval(m,x1),Cons(aeval(m, x), s)); VMS_proj_3 = m })
+) ->
+
+ check(codeseq_at(c, (p + length(result)) + length(result1), Cons(Iadd, Nil))) ->
+
+check(
+   transition(c, 
+    { VMS_proj_1 = (p + length(result))+length(result1); 
+      VMS_proj_2 = Cons(aeval(m,x1),Cons(aeval(m, x), s)); VMS_proj_3 = m }, 
+    { VMS_proj_1 = ((p + length(result))+length(result1)) + 1; 
+      VMS_proj_2 = Cons(aeval(m,x)+aeval(m,x1), s); VMS_proj_3 = m }
+      )
+) ->
+
+check(
+   transition_star(c, 
+    { VMS_proj_1 = (p + length(result))+length(result1); 
+      VMS_proj_2 = Cons(aeval(m,x1),Cons(aeval(m, x), s)); VMS_proj_3 = m }, 
+    { VMS_proj_1 = ((p + length(result))+length(result1)) + 1; 
+      VMS_proj_2 = Cons(aeval(m,x)+aeval(m,x1), s); VMS_proj_3 = m }
+      )
+) ->
+
+check(
+   transition_star(c, 
+    { VMS_proj_1 = p; VMS_proj_2 = s; VMS_proj_3 = m }, 
+    { VMS_proj_1 = ((p + length(result))+length(result1)) + 1; 
+      VMS_proj_2 = Cons(aeval(m,x)+aeval(m,x1), s); VMS_proj_3 = m }
+      )
+) ->
+*)
+
+  transition_star(c, 
+  { VMS_proj_1 = p; VMS_proj_2 = s; VMS_proj_3 = m }, 
+  { VMS_proj_1 = 
+    (p + length(infix_plpl(infix_plpl(result, result1), Cons(Iadd, Nil)))); 
+    VMS_proj_2 = Cons(aeval(m, Aadd(x, x1)), s);
+    VMS_proj_3 = m })
+
+  )))))))
+

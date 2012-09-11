@@ -47,11 +47,20 @@ let save_session envs =
   close_out session_cout
 
 let save_dialog cancel envs () =
-  if GToolbox.question_box 
-    ~title:"Save session" ~buttons:[cancel; "Save"] 
-    ~default:2 ~icon:(GMisc.image ~stock:`SAVE  ~icon_size:`DIALOG ())
-    "Would you like to save the current session ?" = 2 then save_session envs
-  else ()
+  if List.exists (fun env -> env.actions <> env.saved_actions) envs then
+    if List.exists 
+      (fun env -> not (Gui_session.safe_session env.actions)) envs then
+      GToolbox.message_box 
+	~title:"Unsafe session" 
+	~icon:(GMisc.image ~stock:`DIALOG_ERROR  ~icon_size:`DIALOG ())
+	~ok:"OK"
+	"Your current session is unsafe: satifiability is not preserved.\nPlease ensure you haven't performed any incorrect prunings before saving."
+    else
+      if GToolbox.question_box 
+	~title:"Save session" ~buttons:[cancel; "Save"] 
+	~default:2 ~icon:(GMisc.image ~stock:`SAVE  ~icon_size:`DIALOG ())
+	"Would you like to save the current session ?" = 2 then
+	save_session envs
     
 let quit envs () =
   save_dialog "Quit" envs ();
@@ -59,7 +68,6 @@ let quit envs () =
 
 
 let show_about () =
-  (* let v = Format.sprintf "Alt-Ergo version %s" Version.version in *)
   let v = "Alt-Ergo" in
   let aw = GWindow.about_dialog ~name:v 
     ~authors:["Sylvain Conchon"; 
@@ -100,6 +108,29 @@ let pop_error ?(error=false) ~message () =
   ignore(GMisc.label ~text:message
 	   ~xalign:0. ~xpad:10 ~packing:hbox#add ());
   ignore(button_ok#connect#clicked ~callback: pop_w#destroy);
+  pop_w#show ()
+
+
+let pop_model sat_env () =
+  let pop_w = GWindow.dialog
+    ~title:"Model"
+    ~allow_grow:true
+    ~destroy_with_parent:true
+    ~width:400
+    ~height:300 ()
+  in
+  let sw1 = GBin.scrolled_window
+    ~vpolicy:`AUTOMATIC
+    ~hpolicy:`AUTOMATIC
+    ~packing:pop_w#vbox#add () in
+  let buf1 = GSourceView2.source_buffer () in
+  let tv1 = GSourceView2.source_view ~source_buffer:buf1 ~packing:(sw1#add) 
+    ~wrap_mode:`CHAR() in
+  let _ = tv1#misc#modify_font monospace_font in
+  let _ = tv1#set_editable false in
+  fprintf str_formatter "%a" (Sat.print_model ~header:false) sat_env;
+  let model_text = (flush_str_formatter()) in
+  buf1#set_text model_text;
   pop_w#show ()
 
 
@@ -243,8 +274,6 @@ let refresh_timers t () =
     tsat +. tmatch +. tcc +. tarith +. tarrays +. tsum +. trecords +. tac in
 
   let total = if total = 0. then 1. else total in
-  (* eprintf "%f@.%f@.%f@.%f@." *)
-  (*   tsat total (tsat /. total) (tsat *. 100. /. total); *)
 
   t.tl_sat#set_text (sprintf "%3.2f s" tsat);
   t.tl_match#set_text (sprintf "%3.2f s" tmatch);
@@ -289,7 +318,6 @@ let reset_timers timers_model =
 
 
 let refresh_instances ({istore=istore} as inst_model) () =
-  (* eprintf "refresh@."; *)
   Hashtbl.iter (fun id (r, n, name, limit) -> 
     let row, upd_info = 
       match !r with
@@ -299,7 +327,6 @@ let refresh_instances ({istore=istore} as inst_model) () =
 	  r := Some row;
 	  row, true in
     let nb = !n in
-    (* eprintf "refresh: %s %d@." name nb; *)
     inst_model.max <- max inst_model.max nb;
     if upd_info then begin
       istore#set ~row ~column:inst_model.icol_icon `INFO;
@@ -316,7 +343,6 @@ let refresh_instances ({istore=istore} as inst_model) () =
     
 
 let add_inst ({h=h} as inst_model) orig =
-  (* eprintf "guisafe:%b@." (GtkThread.gui_safe ()); *)
   let id = Formula.id orig in
   let name = 
     match Formula.view orig with 
@@ -346,6 +372,10 @@ let empty_sat_inst inst_model =
   reset_inst inst_model;
   Sat.empty_with_inst (add_inst inst_model)
 
+
+exception Abort_thread
+exception Timeout
+
 let update_status image label buttonclean env d s steps =
   let satmode = !smtfile or !smt2file or !satmode in 
   match s with
@@ -372,24 +402,81 @@ let update_status image label buttonclean env d s steps =
 	image#set_stock `EXECUTE;
 	label#set_text "  Inconsistent assumption"
 	  
-    | Frontend.Unknown ->
+    | Frontend.Unknown t ->
 	if not satmode then
 	  (Loc.report std_formatter d.st_loc; printf "I don't know.@.")
 	else printf "unknown@.";
 	image#set_stock `NO;
-	label#set_text (sprintf "  I don't know (%2.2f s)" (Frontend.Time.get()))
+	label#set_text (sprintf "  I don't know (%2.2f s)" 
+			  (Frontend.Time.get()));
+	if model () then pop_model t ()
 	  
-    | Frontend.Sat  ->
+    | Frontend.Sat t ->
 	if not satmode then Loc.report std_formatter d.st_loc;
 	if satmode then printf "unknown (sat)@." 
 	else printf "I don't know@.";
 	image#set_stock `NO;
 	label#set_text
-	  (sprintf "  I don't know (sat) (%2.2f s)" (Frontend.Time.get()))
+	  (sprintf "  I don't know (sat) (%2.2f s)" (Frontend.Time.get()));
+	if model () then pop_model t ()
+
+let update_aborted image label buttonstop buttonrun timers_model = function
+  | Abort_thread ->
+      Frontend.Time.unset_timeout ();
+      Timers.update timers_model.timers;
+      if debug () then fprintf fmt "alt-ergo thread terminated@.";
+      image#set_stock `DIALOG_QUESTION;
+      label#set_text "  Process aborted";
+      buttonstop#misc#hide ();
+      buttonrun#misc#show ()
+  | Timeout ->
+      Frontend.Time.unset_timeout ();
+      Timers.update timers_model.timers;
+      if debug () then 
+	fprintf fmt "alt-ergo thread terminated (timeout)@.";
+      image#set_stock `CUT;
+      label#set_text "  Timeout";
+      buttonstop#misc#hide ();
+      buttonrun#misc#show ()
+  | e -> 
+      Frontend.Time.unset_timeout ();
+      Timers.update timers_model.timers;
+      let message = sprintf "Error: %s" (Printexc.to_string e) in
+      if debug () then fprintf fmt "alt-ergo thread terminated@.";
+      image#set_stock `DIALOG_ERROR;
+      label#set_text (" "^message);
+      buttonstop#misc#hide ();
+      buttonrun#misc#show ();
+      fprintf fmt "%s@." message;
+      pop_error ~error:true ~message ()
 
 
-exception Abort_thread
-exception Timeout
+
+let wrapper_update_status image label buttonclean env d s steps =
+  GtkThread.sync (fun () ->
+    update_status image label buttonclean env d s steps 
+  ) ()
+
+let wrapper_update_aborted image label buttonstop buttonrun timers_model e =
+  GtkThread.async (fun () ->
+    update_aborted image label buttonstop buttonrun timers_model e
+  ) ()
+
+let wrapper_reset buttonstop buttonrun =
+  GtkThread.async (fun () ->
+    buttonstop#misc#hide ();
+    buttonrun#misc#show ()
+  ) ()
+
+let wrapper_refresh_instances inst_model =
+  GtkThread.async (fun () ->
+    ignore (refresh_instances inst_model ())
+  )
+
+let wrapper_refresh_timers timers_model =
+  GtkThread.async (fun () ->
+    ignore (refresh_timers timers_model ())
+  )
 
 let interrupt = ref None
 
@@ -437,7 +524,7 @@ let run_replay env =
   Frontend.Time.unset_timeout ()
 
 
-let rec run buttonrun buttonstop buttonclean inst_model timers_model 
+let run buttonrun buttonstop buttonclean inst_model timers_model 
     image label thread env () =
   
   (* Install the signal handler: *)
@@ -459,18 +546,7 @@ let rec run buttonrun buttonstop buttonclean inst_model timers_model
   let ast_pruned =
     if select () > 0 then Pruning.split_and_prune (select ()) ast
     else [List.map (fun f -> f,true) ast] in
-
-  (* let chan = Event.new_channel () in *)
   
-  (* ignore (Thread.create *)
-  (*   (fun () -> *)
-  (*      (\* Thread.yield (); *\) *)
-  (*      ignore (Event.sync (Event.receive chan)); *)
-  (*      if debug then fprintf fmt "Waiting thread : signal recieved@."; *)
-  (*      buttonstop#misc#hide (); *)
-  (*      buttonrun#misc#show () *)
-  (*   ) ()); *)
-
   (* refresh instances *)
   let to_id = 
     GMain.Timeout.add ~ms:300 ~callback:(refresh_instances inst_model)
@@ -496,56 +572,25 @@ let rec run buttonrun buttonstop buttonclean inst_model timers_model
 	       let cnf = Cnf.make dcl in
 	       ignore (Queue.fold
 			 (Frontend.process_decl 
-			    (update_status image label buttonclean env))
-			 (empty_sat_inst inst_model, true, Explanation.empty) cnf)
+			    (wrapper_update_status image label buttonclean env))
+			 (empty_sat_inst inst_model, true, Explanation.empty)
+			 cnf)
 	    ) ast_pruned;
 	  
 	  Frontend.Time.unset_timeout ()
-	with 
-	  | Abort_thread ->
-	      Frontend.Time.unset_timeout ();
-	      Timers.update timers_model.timers;
-	      if debug () then fprintf fmt "alt-ergo thread terminated@.";
-	      image#set_stock `DIALOG_QUESTION;
-	      label#set_text "  Process aborted";
-	      buttonstop#misc#hide ();
-	      buttonrun#misc#show ()
-	  | Timeout ->
-	      Frontend.Time.unset_timeout ();
-	      Timers.update timers_model.timers;
-	      if debug () then 
-		fprintf fmt "alt-ergo thread terminated (timeout)@.";
-	      image#set_stock `CUT;
-	      label#set_text "  Timeout";
-	      buttonstop#misc#hide ();
-	      buttonrun#misc#show ()
-	  | e -> 
-	      Frontend.Time.unset_timeout ();
-	      Timers.update timers_model.timers;
-	      let message = sprintf "Error: %s" (Printexc.to_string e) in
-	      if debug () then fprintf fmt "alt-ergo thread terminated@.";
-	      image#set_stock `DIALOG_ERROR;
-	      label#set_text (" "^message);
-	      buttonstop#misc#hide ();
-	      buttonrun#misc#show ();
-	      fprintf fmt "%s@." message;
-	      pop_error ~error:true ~message ()
+	with e -> 
+	  wrapper_update_aborted image label buttonstop buttonrun timers_model e
        );
        if debug () then fprintf fmt "Send done signal to waiting thread@.";
-       buttonstop#misc#hide ();
-       buttonrun#misc#show ();
-       (* Event.sync (Event.send chan true) *)
+       wrapper_reset buttonstop buttonrun;
        Thread.delay 0.001;
        GMain.Timeout.remove to_id;
        GMain.Timeout.remove ti_id;
-       ignore (refresh_instances inst_model ());
-       ignore (refresh_timers timers_model ())
+       wrapper_refresh_instances inst_model ();
+       wrapper_refresh_timers timers_model ();
     ) ());
 
-
    Thread.yield ()
-  (* ignore (Thread.create (fun () ->  *)
-  (* match !thread with Some s -> Thread.join s | _ -> assert false) ()) *)
 
 let remove_context env () =
   List.iter
@@ -553,7 +598,7 @@ let remove_context env () =
        match td.c with
 	 | APredicate_def (_, _, _, _) ->
 	     toggle_prune env td
-	 | AAxiom (_, s, _) 
+	 | AAxiom (_, s, _, _) 
 	     when String.length s = 0 || (s.[0] <> '_'  && s.[0] <> '@') ->
 	     toggle_prune env td
 	 | _ -> ()
@@ -839,7 +884,7 @@ let start_gui () =
       ~enable_popup:true 
       ~scrollable:true
       ~packing:main_vbox#add () in
-
+       
   let note_search = Hashtbl.create 7 in
 
 
@@ -873,7 +918,9 @@ let start_gui () =
        let text = List.fold_left
 	 (fun _ (td,_) ->
 	    match td.c with
-	      | AGoal (_, s, _) -> "goal "^s
+	      | AGoal (_, Thm, s, _) -> "goal "^s
+	      | AGoal (_, Check, s, _) -> "check "^s
+	      | AGoal (_, Cut, s, _) -> "cut "^s
 	      | _ -> "Empty"
 	 ) "" annoted_ast in
 
@@ -943,16 +990,6 @@ let start_gui () =
        let resulting_ids = compute_resulting_ids annoted_ast in
        let actions = Gui_session.read_actions resulting_ids session_cin in
 
-
-       let env = create_env buf1 buf2 error_model inst_model st_ctx annoted_ast
-	 dep actions resulting_ids in
-       connect env;
-
-       ignore (toolbar#insert_toggle_button
-	 ~text:" Remove context"
-	 ~icon:(GMisc.image ~stock:`CUT ~icon_size:`LARGE_TOOLBAR ())#coerce
-	 ~callback:(remove_context env) ());
-
        let sw1 = GBin.scrolled_window
 	    ~vpolicy:`AUTOMATIC 
 	    ~hpolicy:`AUTOMATIC
@@ -976,6 +1013,16 @@ let start_gui () =
        in
        let _ = tv2#misc#modify_font monospace_font in
        let _ = tv2#set_editable false in
+
+
+       let env = create_env buf1 buf2 error_model inst_model st_ctx annoted_ast
+	 dep actions resulting_ids in
+       connect env;
+
+       ignore (toolbar#insert_toggle_button
+	 ~text:" Remove context"
+	 ~icon:(GMisc.image ~stock:`CUT ~icon_size:`LARGE_TOOLBAR ())#coerce
+	 ~callback:(remove_context env) ());
 
        let buttonrun = toolbar#insert_button
 	 ~text:" Run Alt-Ergo"
@@ -1012,7 +1059,6 @@ let start_gui () =
        ignore(GMisc.image ~icon_size:`LARGE_TOOLBAR
 	 ~stock:`FIND ~packing:search_box#add ());
        let search_entry = GEdit.entry ~packing:search_box#add () in
-       Hashtbl.add note_search !nb_page search_entry;
 
        ignore(toolsearch#insert_widget search_box#coerce);
 
@@ -1090,6 +1136,11 @@ let start_gui () =
        ignore(eventBox#event#connect#key_release
 		~callback:(set_ctrl env false));
        
+       Hashtbl.add note_search !nb_page 
+	 (search_entry,
+	  run buttonrun buttonstop buttonclean inst_model 
+	    timers_model result_image result_label thread env);
+
        env::acc
 
     ) [] typed_ast in
@@ -1179,23 +1230,35 @@ let start_gui () =
   
   let focus_search () =
     let p = notebook#current_page in
-    let e = Hashtbl.find note_search p in
+    let e, _ = Hashtbl.find note_search p in
     e#misc#grab_focus ()    
   in
 
-
-  let shortcuts =
-    [
-      GdkKeysyms._q, [`CONTROL], "Ctrl-q", "Quit", quit envs;
-      GdkKeysyms._s, [`CONTROL], "Ctrl-s", "Save", save_dialog "Cancel" envs;
-      GdkKeysyms._f, [`CONTROL], "Ctrl-f", "Search", focus_search;
-    ] in
-
-  let _ = List.iter
-    (fun (k,mods,_,_,f) -> Okey.add w ~mods k f)
-    shortcuts
+  let launch_run () =
+    let p = notebook#current_page in
+    let _, r = Hashtbl.find note_search p in
+    r ()
   in
-    
+
+  let mod_mask = [`MOD2 ; `MOD3 ; `MOD4 ; `MOD5 ; `LOCK] in
+
+  let key_press ev =
+    let key_ev = GdkEvent.Key.keyval ev in
+    let mods_ev = List.filter 
+      (fun m -> not (List.mem m mod_mask)) (GdkEvent.Key.state ev) in
+    match mods_ev with
+      |	[`CONTROL] ->
+	(match key_ev with
+	  | k when k = GdkKeysyms._q -> quit envs (); true
+	  | k when k = GdkKeysyms._s -> save_dialog "Cancel" envs (); true
+	  | k when k = GdkKeysyms._f -> focus_search (); true
+	  | k when k = GdkKeysyms._r -> launch_run (); true
+	  | _ -> false)
+      | _ -> false
+  in
+
+  ignore (w#event#connect#key_press ~callback:(key_press));
+
   ignore(w#connect#destroy ~callback:(quit envs));
   w#show ();
 
@@ -1217,7 +1280,7 @@ let start_replay () =
 	  let  loc = (lexeme_start_p lb, lexeme_end_p lb) in
 	  Loc.report err_formatter loc;
           printf "syntax error\n@.";
-	exit 1
+	  exit 1
       | Common.Error(e,l) -> 
 	  Loc.report err_formatter l; 
 	  printf "typing error: %a\n@." Common.report e;

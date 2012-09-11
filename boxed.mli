@@ -10,6 +10,7 @@
 (*     Mohamed Iguernelala                                                *)
 (*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
+(*     Claire Dross                                                       *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
 (*                                                                        *)
@@ -17,10 +18,25 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Why_ptree
+type t = { formula : Formula.t; (* Formula *)
+           subst : Term.subst;  (* Substitution to be applied 
+                                   (with known terms) *)
+           polarity : bool;     (* Polarity of the formula *)
+           view : Formula.t     (* apply_subst subst formula *)
+         }
 
-(* make k b f computes the triggers for a formula f
-   if k is true existing triggers are checked
-   if b is true then variables are authorized in multi-triggers *)
-val make : bool -> bool -> (int tform, int) annoted -> (int tform, int) annoted
+val print : Format.formatter -> t -> unit
 
+val compare : t -> t -> int
+
+val mk_not : t -> t
+
+val apply_subst : Term.subst -> t -> t
+
+val from_formula : Formula.t -> bool -> t
+
+module Set : Set.S with type elt = t
+
+module Map : Map.S with type key = t
+
+val check_free_vars : t -> unit

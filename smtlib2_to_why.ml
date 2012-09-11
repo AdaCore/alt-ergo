@@ -180,9 +180,10 @@ and inline_ppdesc s ({ pp_desc = descb } as leb) excl = function
     let excl = sl@excl in
     PPforall (sl, pt, List.map (List.map (inline_lexpr s leb excl)) lll,
 	      inline_lexpr s leb excl le)
-  | PPexists (sl, pt, le) ->
+  | PPexists (sl, pt, lll, le) ->
     let excl = sl@excl in
-    PPexists (sl, pt, inline_lexpr s leb excl le)
+    PPexists (sl, pt, List.map (List.map (inline_lexpr s leb excl)) lll,
+              inline_lexpr s leb excl le)
   | PPnamed (n, le) ->
     PPnamed (n, inline_lexpr s leb excl le)
   | PPlet (n, le1, le2) ->
@@ -364,13 +365,13 @@ and forall_of_sortedvarlist pos t triggers = function
 
 and exists_of_sortedvarlist pos t = function
   | [] -> raise Not_Implemented
-  | [sv] -> 
+  | [sv] -> (* Triggers for existentials could be accepted in SMTlib2 *)
     let (s, ppt) = stringppt_of_sortedvar sv in
-    PPexists ([s], ppt, lexpr_of_term predicates t)
+    PPexists ([s], ppt, [], lexpr_of_term predicates t)
   | sv::l -> 
     let (s, ppt) = stringppt_of_sortedvar sv in
     let le2 = { pp_loc = pos; pp_desc = exists_of_sortedvarlist pos t l } in
-    PPexists ([s], ppt, le2)
+    PPexists ([s], ppt, [], le2)
 
 and ppapp_of_string pos s tl predicates =
   match prefix_of_string s with
@@ -464,8 +465,8 @@ let rec last_axiom_to_goal pos acc = function
   | [] -> 
     let true_lexpr = { pp_loc = pos; pp_desc = PPconst ConstTrue } in
     (Goal (pos, "", true_lexpr))::(List.rev acc)
-  | (Axiom (pos', n, a))::r ->
-    (Axiom (pos', n, a))::(Goal (pos, n, a))::(List.rev_append acc r)
+  | (Axiom (pos', n, inv, a))::r ->
+    (Axiom (pos', n, inv, a))::(Goal (pos, n, a))::(List.rev_append acc r)
   | d::r -> last_axiom_to_goal pos (d::acc) r
 
 let decls_of_command (acc, predicates) = function
@@ -487,6 +488,11 @@ let decls_of_command (acc, predicates) = function
       else PFunction (pptl, ppt)
     in
     let s = string_of_symbol sy in
+    begin 
+      match infix_of_string s with
+	| Some _ -> Common.error (Common.SymbAlreadyDefined s) pos
+	| _ -> ()
+    end;
     let predicates = if ppt = PPTbool then S.add s predicates else predicates in
     (Logic (pos, Symbols.Other, [s, ""], logic_type))::acc, predicates
   | CDefineFun (pos, sy, (pos2, svl), so, t) ->
@@ -500,7 +506,7 @@ let decls_of_command (acc, predicates) = function
       (Predicate_def (pos, (s, ""), spl, le))::acc, S.add s predicates
     else (Function_def (pos, (s, ""), spl, ppt, le))::acc, predicates
   | CAssert (pos, t) ->
-    (Axiom (pos, "", lexpr_of_term predicates t))::acc, predicates
+    (Axiom (pos, "", false, lexpr_of_term predicates t))::acc, predicates
   | CCheckSat pos -> 
     (*let true_lexpr = { pp_loc = pos; pp_desc = PPconst ConstTrue } in
     (Goal (pos, "check-sat", true_lexpr))::*)

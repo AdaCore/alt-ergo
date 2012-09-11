@@ -10,6 +10,7 @@
 (*     Mohamed Iguernelala                                                *)
 (*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
+(*     Claire Dross                                                       *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
 (*                                                                        *)
@@ -80,6 +81,7 @@ val show_libdir : unit -> unit
 val set_max_split : string -> unit
 val set_proof : bool -> unit
 val set_rules : string -> unit
+val set_limit : float -> unit
 
 val restricted : bool ref
 
@@ -87,3 +89,5 @@ val bottom_classes : bool ref
 
 val replay : bool ref
 val timelimit : float ref
+
+val debug_custom : bool ref

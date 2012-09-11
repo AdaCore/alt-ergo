@@ -74,3 +74,5 @@ val fake_eq : Symbols.t
 val fake_neq : Symbols.t
 val fake_lt : Symbols.t
 val fake_le : Symbols.t
+
+val label_model : Hstring.t -> bool

@@ -10,6 +10,7 @@
 (*     Mohamed Iguernelala                                                *)
 (*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
+(*     Claire Dross                                                       *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
 (*                                                                        *)
@@ -145,6 +146,7 @@ let set_restricted b = Preoptions.restricted := b
 let set_bottom_classes b = Preoptions.bottom_classes := b
 let set_timelimit b = Preoptions.timelimit := b
 
+
 let scale_steps steps = Int64.div steps (Int64.of_int 50)
 
 let steps = ref 0L
@@ -157,3 +159,6 @@ let incr_steps cpt =
 	printf "Steps limit reached: %Ld@." (scale_steps !steps);
 	exit 1
       end
+
+let debug_custom () = !debug_custom
+let set_debug_custom b = Preoptions.debug_custom := b

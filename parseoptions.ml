@@ -10,6 +10,7 @@
 (*     Mohamed Iguernelala                                                *)
 (*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
+(*     Claire Dross                                                       *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
 (*                                                                        *)
@@ -48,6 +49,7 @@ let spec = [
   "-darrays", Arg.Set debug_arrays, "  sets the debugging flag of arrays";
   "-dcombine", Arg.Set debug_combine, "  sets the debugging flag of combine";
   "-dsplit", Arg.Set debug_split, "  sets the debugging flag of case-split analysis";
+  "-dtheory", Arg.Set debug_custom, "  sets the debugging flag of user-defined theories";
    "-v", Arg.Set verbose, "  sets the verbose mode";
   "-version", Arg.Unit show_version, "  prints the version number";
   "-where", Arg.Unit show_libdir, "  prints the directory of the library";
@@ -92,7 +94,7 @@ let spec = [
   " restrict set of decision procedures (equality, arithmetic and AC)";
   "-bottom-classes", Arg.Set bottom_classes, "show equivalence classes at each bottom of the sat";
   "-replay", Arg.Set replay, "replay session saved in .agr";
-  "-timelimit", Arg.Set_float timelimit, "n set the time limit to n seconds";
+  "-timelimit", Arg.Float set_limit, "n set the time limit to n seconds (not supported on Windows)";
 ]
 
 let _ =

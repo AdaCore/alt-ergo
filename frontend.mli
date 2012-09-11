@@ -10,6 +10,7 @@
 (*     Mohamed Iguernelala                                                *)
 (*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
+(*     Claire Dross                                                       *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
 (*                                                                        *)
@@ -29,7 +30,8 @@ module Time : sig
 
 end
 
-type output = Unsat of Explanation.t | Inconsistent | Sat | Unknown
+type output = Unsat of Explanation.t | Inconsistent 
+	      | Sat of Sat.t | Unknown of Sat.t
 
 
 val process_decl:

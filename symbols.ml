@@ -111,7 +111,7 @@ let dummy = Name (Hstring.make "_one", Other)
 
 let fresh = 
   let cpt = ref 0 in
-  fun s -> incr cpt; name (Format.sprintf "__%s%i" s (!cpt))
+  fun s -> incr cpt; name (Format.sprintf "%s%i" s (!cpt))
 
 let is_get f = equal f (Op Get) 
 let is_set f = equal f (Op Set)

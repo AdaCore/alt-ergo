@@ -53,6 +53,7 @@ rule token = parse
 | "declare-sort"   { DECLARESORT }
 | "define-sort"    { DEFINESORT }
 | "declare-fun"    { DECLAREFUN }
+| "declare-const"  { DECLARECONST }
 | "define-fun"     { DEFINEFUN }
 | "push"           { PUSH }
 | "pop"            { POP }

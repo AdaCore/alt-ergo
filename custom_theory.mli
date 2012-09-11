@@ -10,6 +10,7 @@
 (*     Mohamed Iguernelala                                                *)
 (*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
+(*     Claire Dross                                                       *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
 (*                                                                        *)
@@ -17,10 +18,17 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Why_ptree
+(* Add the axiomatization *)
+val add_theory : Formula.t list -> unit
 
-(* make k b f computes the triggers for a formula f
-   if k is true existing triggers are checked
-   if b is true then variables are authorized in multi-triggers *)
-val make : bool -> bool -> (int tform, int) annoted -> (int tform, int) annoted
-
+module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r)
+  (CC : Sig.CC with type Rel.r = Use.r
+  with type 'a accumulator = 
+                      ('a Sig.literal * Explanation.t) list * 
+                        ('a * 'a * Explanation.t) list 
+  with type use = Use.t
+  with type uf = Uf.t): 
+  Sig.CC with type Rel.r = Use.r
+  with type 'a accumulator = ('a Sig.literal * Explanation.t) list 
+  with type use = Use.t
+  with type uf = Uf.t

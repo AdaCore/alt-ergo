@@ -32,8 +32,27 @@ module SA = Set.Make(struct
 end)
 
 type elt = ST.t * SA.t
+
+module type S = 
+sig
+  
+  type t
+  type r
+  val empty : t
+  val find : r -> t -> elt
+  val add : r -> elt -> t -> t
+  val mem : r -> t -> bool
+  val print : t -> unit
+  val up_add : t -> ST.elt -> r -> r list -> t
+      
+  val congr_add : t -> r list -> ST.t
+  
+  val up_close_up :t -> r -> r -> t
+  val congr_close_up : t -> r -> r list -> elt
+end
   
 module Make (X : Sig.X) = struct
+  type r = X.r
 
   let inter_tpl (x1,y1) (x2,y2) = 
     !Options.thread_yield (); ST.inter x1 x2, SA.inter y1 y2

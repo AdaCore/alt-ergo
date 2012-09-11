@@ -10,6 +10,7 @@
 (*     Mohamed Iguernelala                                                *)
 (*     Stephane Lescuyer                                                  *)
 (*     Alain Mebsout                                                      *)
+(*     Claire Dross                                                       *)
 (*                                                                        *)
 (*     CNRS - INRIA - Universite Paris Sud                                *)
 (*                                                                        *)
@@ -140,6 +141,7 @@ val set_restricted : bool -> unit
 val set_bottom_classes : bool -> unit
 val set_timelimit : float -> unit
 
+
 val scale_steps : Int64.t -> Int64.t
   (* Return a value of steps suitably scaled for user, to allow further
      modifications of the definition of steps without impacting the external
@@ -150,3 +152,6 @@ val incr_steps : int -> unit
      of steps for the run, then exit. *)
 
 val steps : Int64.t ref
+
+val debug_custom : unit -> bool
+val set_debug_custom : bool -> unit

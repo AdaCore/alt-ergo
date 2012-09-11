@@ -256,7 +256,7 @@ let analyze_formula s g f =
 let analyze_deps decl_list =
   List.fold_left
     (fun (g, gls) d -> match d.c with
-       | TAxiom (_, s, f) ->
+       | TAxiom (_, s, _, f) ->
 	   analyze_formula s g f, gls
        | TPredicate_def (_, s, _, 
 			 {c = TFforall {qf_form = ff; qf_bvars = lvars}}) 
@@ -271,7 +271,7 @@ let analyze_deps decl_list =
 	   analyze_formula s g ff, gls
 (*	   (g, gls)*)
 
-       | TGoal (l,s,f) -> (g, (s,f)::gls)
+       | TGoal (l, _, s, f) -> (g, (s,f)::gls)
        | _ -> (g,gls))
     (GF.empty, []) decl_list
 
@@ -357,14 +357,14 @@ let split_and_prune depth decl_list =
 	       end;
 	     List.fold_right
 	       (fun f acc -> match f.c with
-		  | TAxiom(_, s',{c=TFforall {qf_bvars=_::_}}) -> 
+		  | TAxiom(_, s',_, {c=TFforall {qf_bvars=_::_}}) -> 
 		      if SetS.mem s' df then (f,true)::acc else acc
-		  | TAxiom(loc,s',f') -> 
+		  | TAxiom(loc,s',inv, f') -> 
 		      if SetS.mem s' df then (f,true)::acc
 		      else 
-			let f = { c = TAxiom(loc,s',f'); annot = f.annot} in
+			let f = { c = TAxiom(loc,s',inv,f'); annot = f.annot} in
 			(f,false)::acc
-		  | TGoal (_,s',_) -> if s = s' then (f,true)::acc else acc
+		  | TGoal (_, _, s',_) -> if s = s' then (f,true)::acc else acc
 		  | _ -> (f,true)::acc) decl_list [])
 	  goals
 

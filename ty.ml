@@ -46,7 +46,7 @@ exception Shorten of t
 
 
 (*** pretty print ***)
-let print fmt ty = 
+let print full fmt ty = 
   let h = Hashtbl.create 17 in
   let rec print fmt = function
     | Tint -> fprintf fmt "int"
@@ -70,11 +70,18 @@ let print fmt ty =
     | Tnext t -> fprintf fmt "%a next" print t
     | Tsum(s, _) -> fprintf fmt "%s" (Hstring.view s)
     | Trecord {args=lv; name=n; lbs=lbls} -> 
-	fprintf fmt "%a%s = {" printl lv (Hstring.view n);
-	List.iter 
-	  (fun (s, t) -> 
-	     fprintf fmt "%s : %a; " (Hstring.view s) print t) lbls;
-	fprintf fmt "}"
+	fprintf fmt "%a%s" printl lv (Hstring.view n);
+        if full then begin
+	  fprintf fmt " = {";
+	  let first = ref true in
+	  List.iter 
+	    (fun (s, t) -> 
+	      fprintf fmt "%s%s : %a" (if !first then "" else "; ") 
+		(Hstring.view s) print t;
+	      first := false
+	    ) lbls;
+	  fprintf fmt "}"
+	end
 	  
   and printl fmt = function
       [] -> ()
@@ -82,6 +89,9 @@ let print fmt ty =
     | t::l -> fprintf fmt "%a,%a" print t printl l
   in 
   print fmt ty
+
+let print_full = print true
+let print = print false
 
 
 (* smart constructors *)

@@ -46,6 +46,7 @@ module type T = sig
   val div : t -> t -> t * bool
   val modulo : t -> t -> t
 
+  val is_num : t -> num option
   val is_empty : t -> bool
   val find : r -> t -> num
   val choose : t -> num * r

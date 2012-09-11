@@ -10,6 +10,7 @@
 /*     Mohamed Iguernelala                                                */
 /*     Stephane Lescuyer                                                  */
 /*     Alain Mebsout                                                      */
+/*     Claire Dross                                                       */
 /*                                                                        */
 /*     CNRS - INRIA - Universite Paris Sud                                */
 /*                                                                        */
@@ -69,11 +70,12 @@
 %token <string> FLOAT
 %token <Num.num> NUM
 %token <string> STRING
+%token INCLUDE
 %token WITH
-%token AND LEFTARROW ARROW AC AT AXIOM REWRITING
+%token AND LEFTARROW ARROW AC AT AXIOM INVERSION REWRITING
 %token BAR HAT
 %token BOOL COLON COMMA PV DISTINCT DOT ELSE EOF EQUAL
-%token EXISTS FALSE VOID FORALL FUNCTION GE GOAL GT
+%token EXISTS FALSE VOID FORALL FUNCTION GE GOAL GT CHECK CUT ADDTERM
 %token IF IN INT BITV
 %token LE LET LEFTPAR LEFTSQ LEFTBR LOGIC LRARROW LT MINUS 
 %token NOT NOTEQ OR PERCENT PLUS PREDICATE PROP 
@@ -85,6 +87,7 @@
 
 /* Precedences */
 
+%nonassoc INCLUDE
 %nonassoc WITH
 %nonassoc IN
 %nonassoc prec_forall prec_exists
@@ -99,6 +102,7 @@
 %nonassoc uminus
 %nonassoc NOT DOT
 %right prec_named
+%nonassoc CHECK CUT ADDTERM
 %left LEFTSQ
 %nonassoc LIDENT
 
@@ -108,18 +112,27 @@
 %start trigger
 %type <Why_ptree.lexpr> lexpr
 %start lexpr
-%type <Why_ptree.file> file
+%type <string list * Why_ptree.file> file
 %start file
 %%
 
 file:
+| includes list1_decl EOF 
+   { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
+     $1, $2 }
 | list1_decl EOF 
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
-     $1 }
+     [], $1 }
 | EOF 
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
-     [] }
+     [], [] }
 ;
+
+includes:
+| INCLUDE STRING { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
+     [$2]}
+| INCLUDE STRING includes{ if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
+     $2::$3}
 
 list1_decl:
 | decl 
@@ -153,7 +166,14 @@ decl:
      Predicate_def (loc (), $2, $4, $7) }
 | AXIOM ident COLON lexpr
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-decl@.";
-     Axiom (loc (), $2, $4) }
+     let b = 
+       try String.sub $2 (String.length $2 - 9) 9 = "inversion" 
+       with Invalid_argument _ -> false 
+     in
+     Axiom (loc (), $2, b, $4) }
+| INVERSION ident COLON lexpr
+   { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-decl@.";
+     Axiom (loc (), $2, true, $4) }
 | REWRITING ident COLON list1_lexpr_sep_pv
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-decl@.";
      Rewriting(loc (), $2, $4) }
@@ -315,23 +335,15 @@ lexpr:
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
      mk_pp (PPif ($2, $4, $6)) }
 
-| FORALL list1_ident_sep_comma COLON primitive_type triggers 
-  DOT lexpr %prec prec_forall
-   { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
-     mk_pp (PPforall ($2, $4, $5, $7)) }
-
-| EXISTS list1_ident_sep_comma COLON primitive_type DOT lexpr %prec prec_exists
-   { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
-     mk_pp (PPexists ($2, $4, $6)) }
-
 | FORALL list1_named_ident_sep_comma COLON primitive_type triggers 
   DOT lexpr %prec prec_forall
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
      mk_pp (PPforall_named ($2, $4, $5, $7)) }
 
-| EXISTS list1_named_ident_sep_comma COLON primitive_type DOT lexpr %prec prec_exists
+| EXISTS list1_named_ident_sep_comma COLON primitive_type triggers 
+  DOT lexpr %prec prec_exists
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
-     mk_pp (PPexists_named ($2, $4, $6)) }
+     mk_pp (PPexists_named ($2, $4, $5, $7)) }
 
 | ident_or_string COLON lexpr %prec prec_named
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
@@ -340,6 +352,12 @@ lexpr:
 | LET ident EQUAL lexpr IN lexpr
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
      mk_pp (PPlet ($2, $4, $6)) }
+
+| CHECK lexpr
+    { mk_pp (PPcheck $2) } 
+
+| CUT lexpr
+    { mk_pp (PPcut $2) } 
 ;
 
 simple_expr : 
@@ -508,11 +526,6 @@ ident:
 | IDENT { $1 }
 ;
 
-list1_ident_sep_comma:
-| ident                             { [$1] }
-| ident COMMA list1_ident_sep_comma { $1 :: $3 }
-;
-
 list1_named_ident_sep_comma:
 | named_ident                                   { [$1] }
 | named_ident COMMA list1_named_ident_sep_comma { $1 :: $3 }
@@ -524,7 +537,7 @@ ident_or_string:
 ;
 
 named_ident:
-| IDENT  { $1, "" }
+| IDENT { $1, "" }
 | IDENT STRING { $1, $2 }
 ;
 

@@ -47,6 +47,7 @@ module type T = sig
   val div : t -> t -> t * bool
   val modulo : t -> t -> t
 
+  val is_num : t -> num option
   val is_empty : t -> bool
   val find : r -> t -> num
   val choose : t -> num * r
@@ -79,6 +80,10 @@ module Make (X : S) = struct
       
   type t = { m : num M.t; c : num; ty : Ty.t }
 
+
+  let num_0 = Int 0
+  let num_1 = Int 1
+  let num_minus_1 = Int (-1)
 
   let map_to_list m = List.rev (M.fold (fun x a aliens -> (a, x)::aliens) m [])
 
@@ -118,7 +123,7 @@ module Make (X : S) = struct
            | Int 1  -> (if !zero then "" else "+"), "", ""
            | Int -1 -> "-", "", ""
            | n ->   
-               if n >/ Int 0 then 
+               if n >/ num_0 then 
 		 (if !zero then "" else "+"), string_of_num n, "*" 
                else "-", string_of_num (minus_num n), "*" 
          in
@@ -126,8 +131,8 @@ module Make (X : S) = struct
          fprintf fmt "%s%s%s%a" s n op X.print x
       ) p.m;
     let s, n = 
-      if p.c >/ Int 0 then (if !zero then "" else "+"), string_of_num p.c 
-      else if p.c </ Int 0 then "-", string_of_num (minus_num p.c)
+      if p.c >/ num_0 then (if !zero then "" else "+"), string_of_num p.c 
+      else if p.c </ num_0 then "-", string_of_num (minus_num p.c)
       else (if !zero then "","0" else "","") in
     fprintf fmt "%s%s" s n
 
@@ -143,16 +148,16 @@ module Make (X : S) = struct
 
 
 
-  let is_num p = M.is_empty p.m
+  let is_num p = if M.is_empty p.m then Some p.c else None
 
-  let find x m = try M.find x m with Not_found -> Int 0
+  let find x m = try M.find x m with Not_found -> num_0
 
   let create l c ty = 
     let m = 
       List.fold_left 
 	(fun m (n, x) -> 
 	   let n' = n +/ (find x m) in
-	   if n' =/ (Int 0) then M.remove x m else M.add x n' m) M.empty l
+	   if n' =/ (num_0) then M.remove x m else M.add x n' m) M.empty l
     in
     { m = m; c = c; ty = ty }
       
@@ -162,17 +167,17 @@ module Make (X : S) = struct
       M.fold 
 	(fun x a m -> 
 	   let a' = (find x m) +/ a in
-	   if a' =/ (Int 0) then M.remove x m  else M.add x a' m)
+	   if a' =/ (num_0) then M.remove x m  else M.add x a' m)
 	p2.m p1.m
     in 
     { m = m; c = p1.c +/ p2.c; ty = p1.ty }
 
   let mult_const n p = 
-    if n =/ (Int 0) then { m = M.empty; c = Int 0; ty = p.ty }
+    if n =/ (num_0) then { m = M.empty; c = num_0; ty = p.ty }
     else { p with m = M.map (mult_num n) p.m; c =  n */ p.c }
 
   let mult_monome a x p  = 
-    let ax = { m = M.add x a M.empty; c = (Int 0); ty = p.ty} in
+    let ax = { m = M.add x a M.empty; c = (num_0); ty = p.ty} in
     let acx = mult_const p.c ax in
     let m = 
       M.fold
@@ -187,14 +192,14 @@ module Make (X : S) = struct
 
   let sub p1 p2 =
     if rules () = 4 then fprintf fmt "[rule] TR-Arith-Poly moins@."; 
-    add p1 (mult (create [] (Int (-1)) p1.ty) p2)
+    add p1 (mult (create [] num_minus_1 p1.ty) p2)
 
   let div p1 p2 =
     if rules () = 4 then fprintf fmt "[rule] TR-Arith-Poly div@.";
     if M.is_empty p2.m then
-      if p2.c =/ Int 0 then raise Division_by_zero
+      if p2.c =/ num_0 then raise Division_by_zero
       else 
-        let p = mult_const ((Int 1) // p2.c) p1 in
+        let p = mult_const (num_1 // p2.c) p1 in
         match M.is_empty p.m, p.ty with
           | true, Ty.Tint  -> {p with c = floor_num p.c}, false 
           | true, Ty.Treal  ->  p, false
@@ -207,9 +212,12 @@ module Make (X : S) = struct
   let modulo p1 p2 =
     if rules () = 4 then fprintf fmt "[rule] TR-Arith-Poly mod@.";
     if M.is_empty p2.m then
-      if p2.c =/ Int 0 then raise Division_by_zero
+      if p2.c =/ num_0 then raise Division_by_zero
       else 
-        if M.is_empty p1.m then { p1 with c = mod_num p1.c p2.c }
+        if M.is_empty p1.m then
+	  let c = mod_num p1.c p2.c in
+	  let c = if c </ (num_0) then abs_num (p2.c) +/ c else c in
+	  { p1 with c = c }
         else raise Not_a_num
     else raise Maybe_zero
       
@@ -284,19 +292,19 @@ module Make (X : S) = struct
 
   let normal_form ({ m = m; c = c } as p) =
     if M.is_empty m then 
-      { p with c = Int 0 }, p.c, (Int 1)
+      { p with c = num_0 }, p.c, num_1
     else
       let ppcm = ppmc_denominators p in
       let pgcd = pgcd_numerators p in
       let p = mult_const (ppcm // pgcd) p in
-      { p with c = Int 0 }, p.c, (pgcd // ppcm)
+      { p with c = num_0 }, p.c, (pgcd // ppcm)
 
   let normal_form_pos p =
     let p, c, d = normal_form p in
     try
       let a,x = choose p in
-      if a >/ (Int 0) then p, c, d
-      else mult_const (Int (-1)) p, minus_num c, minus_num d
+      if a >/ num_0 then p, c, d
+      else mult_const num_minus_1 p, minus_num c, minus_num d
     with Not_found -> p, c, d
 
 end

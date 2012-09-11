@@ -136,9 +136,9 @@ and aform =
   | AFnamed of Hstring.t * aform annoted
 
 type atyped_decl = 
-  | AAxiom of loc * string * aform
+  | AAxiom of loc * string * inversion * aform
   | ARewriting of loc * string * ((aterm rwt_rule) annoted) list
-  | AGoal of loc * string * aform annoted
+  | AGoal of loc * goal_sort * string * aform annoted
   | ALogic of loc * string list * plogic_type
   | APredicate_def of loc * string * (string * ppure_type) list * aform
   | AFunction_def 
@@ -173,6 +173,7 @@ type env = {
   mutable stop_select : int option;
   dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t;
   actions : action Stack.t;
+  saved_actions : action Stack.t;
   resulting_ids : (string * int) list;
 }
 

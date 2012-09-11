@@ -61,6 +61,23 @@ let rec print fmt t =
     | Sy.Op Sy.Extract, [e1; e2; e3] ->
 	fprintf fmt "%a^{%a,%a}" print e1 print e2 print e3
 
+    | Sy.Op (Sy.Access field), [e] ->
+	fprintf fmt "%a.%s" print e (Hstring.view field)
+
+    | Sy.Op (Sy.Record), _ ->
+        begin match ty with
+	  | Ty.Trecord {Ty.lbs=lbs} ->
+	      assert (List.length l = List.length lbs);
+	      fprintf fmt "{";
+	      ignore (List.fold_left2 (fun first (field,_) e -> 
+		fprintf fmt "%s%s = %a"  (if first then "" else "; ")
+		  (Hstring.view field) print e;
+		false
+	      ) true lbs l);
+	      fprintf fmt "}";
+	  | _ -> assert false
+	end
+
     | Sy.Op op, [e1; e2] -> 
 	fprintf fmt "(%a %a %a)" print e1 Sy.print x print e2
 
@@ -158,9 +175,28 @@ let vty_of t =
   in
   vty_of Ty.Svty.empty t
 
+module Hsko = Hashtbl.Make(H)
+let gen_sko ty = make (Sy.fresh "@sko") [] ty
+
+let is_skolem_cst v = 
+  try
+    String.sub (Sy.to_string v.f) 0 4 = "_sko"
+  with Invalid_argument _ -> false
+
+let find_skolem = 
+  let hsko = Hsko.create 17 in
+  fun v ty ->
+    if is_skolem_cst v then
+      try Hsko.find hsko v
+      with Not_found -> 
+	let c = gen_sko ty in Hsko.add hsko v c; c
+    else v
+
 let rec apply_subst ((s_t,s_ty) as s) t = 
   let {f=f;xs=xs;ty=ty} = view t in
-  try Sy.Map.find f s_t
+  try 
+    let v = Sy.Map.find f s_t in
+    find_skolem v ty
   with Not_found -> 
     make f (List.map (apply_subst s) xs) (Ty.apply_subst s_ty ty)
 
@@ -194,23 +230,19 @@ let add_label lbl t =
 let label t = try Labels.find labels t with Not_found -> Hstring.empty
 
 
-let label_model h =
-  try String.sub (Hstring.view h) 0 6 = "model:"
-  with Invalid_argument _ -> false
-
 let rec is_in_model_rec depth { f = f; xs = xs } =
   let lb = Symbols.label f in
-  (label_model lb
+  (Common.label_model lb
    &&
      (try
 	let md = Scanf.sscanf (Hstring.view lb) "model:%d" (fun x -> x) in
 	depth <= md
-      with Scanf.Scan_failure _ -> true))
+      with Scanf.Scan_failure _ | End_of_file-> true))
   || 
     List.exists (is_in_model_rec (depth +1)) xs
 
 let is_in_model t =
-  label_model (label t) || is_in_model_rec 0 t
+  Common.label_model (label t) || is_in_model_rec 0 t
 
 
 let is_labeled t = not (Hstring.equal (label t) Hstring.empty)

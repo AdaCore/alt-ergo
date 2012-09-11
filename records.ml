@@ -45,10 +45,13 @@ module Make (X : ALIEN) = struct
 
   let rec print fmt = function
     | Record (lbs, _) -> 
-	fprintf fmt "{ ";
-	List.iter 
-	  (fun (lb, e) -> 
-	     fprintf fmt "%s = %a; " (Hstring.view lb) print e) lbs;
+	fprintf fmt "{";
+        let _ = List.fold_left
+	  (fun first (lb, e) -> 
+	    fprintf fmt "%s%s = %a"
+	       (if first then "" else "; ") (Hstring.view lb) print e;
+	    false
+	  ) true lbs in
 	fprintf fmt "}"
     | Access(a, e, _) -> 
 	fprintf fmt "%a.%s" print e (Hstring.view a)
@@ -124,7 +127,12 @@ module Make (X : ALIEN) = struct
 	    let l, ctx = 
 	      List.fold_right2 
 		(fun x (lb, _) (l, ctx) -> 
-		   let r, ctx = make_rec x ctx in (lb, r)::l, ctx) 
+		   let r, ctx = make_rec x ctx in 
+		   let dlb = 
+		     Term.make (Symbols.Op (Symbols.Access lb)) [t] ty in
+		   let c = Literal.LT.make (Literal.Eq (dlb, dlb)) in
+		   (lb, r)::l, c::ctx
+		) 
 		xs lbs ([], ctx)
 	    in
 	    Record (l, ty), ctx
@@ -136,6 +144,7 @@ module Make (X : ALIEN) = struct
 		    Access (a, r, ty), ctx
 		| _ -> assert false
 	    end
+
 	| _, _ -> 
 	    let r, ctx' = X.make t in
 	    Other (r, ty), ctx'@ctx

@@ -28,7 +28,7 @@ type lemma = {
   qvars: Sy.Set.t;
   triggers : (T.t list * Literal.LT.t option) list;
   main : t;
-  name : string
+  name : string;
 }
 
 and llet = {
@@ -217,17 +217,22 @@ let rec print fmt f =
       Literal.LT.print fmt a
   | Lemma {triggers = trs; main = f; name = n} -> 
       if verbose () then
-	fprintf fmt "(lemma: %s)[%a] %a" 
+	let first = ref true in
+	fprintf fmt "(lemma: %s)[%a]@  %a" 
 	  n
 	  (fun fmt -> 
-	     List.iter (fun (l, _) -> fprintf fmt "%a@ |" T.print_list l)) 
+	     List.iter (fun (l, _) -> 
+	       fprintf fmt "%s%a"
+		 (if !first then "" else " | ") T.print_list l;
+	       first := false;
+	     ))
 	  trs print f
       else 
 	fprintf fmt "lem %s" n
 
-  | Unit(f1, f2) -> fprintf fmt "@[(%a &@ %a)@]" print f1 print f2
+  | Unit(f1, f2) -> fprintf fmt "@[(%a /\\@ %a)@]" print f1 print f2
 
-  | Clause(f1, f2) -> fprintf fmt "@[(%a v@ %a)@]" print f1 print f2
+  | Clause(f1, f2) -> fprintf fmt "@[(%a \\/@ %a)@]" print f1 print f2
 
   | Skolem{sko_f=f} -> fprintf fmt "<sko> (%a)" print f
 
@@ -272,7 +277,7 @@ let mk_skolem_subst bv v =
     (fun x m -> 
        let {T.f=x;ty=ty} = T.view x in
        let bv = T.Set.fold (fun y acc-> y::acc) bv [] in
-       let t = T.make (Sy.fresh "sko") bv ty in
+       let t = T.make (Sy.fresh "_sko") bv ty in
        Sy.Map.add x t m) 
     v Sy.Map.empty
 
@@ -296,10 +301,9 @@ let mk_forall up bv trs f name id =
 (* forall upbv.  name: (exists bv [trs]. f) *)
 let mk_exists up bv trs f name id= 
   let sy = symbols_of_terms bv in
-  let lem = {qvars = sy; triggers = trs; main = mk_not f; name=name} in
-(*  let sko = {ssubst = mk_skolem_subst up bv;
-             ssubst_ty = Ty.esubst;
-             sf = f} in*)
+  let lem = 
+    {qvars = sy; triggers = trs; main = mk_not f; name=name} 
+  in
   let sko = {sko_subst = (mk_skolem_subst up bv, Ty.esubst); sko_f = f} in
   make (Skolem(sko)) (Lemma(lem)) (size f) id
 
@@ -308,7 +312,7 @@ let mk_let _up bv t f id =
   let {Term.ty=ty} = Term.view t in
   let up = Term.vars_of_as_term t in
   let up = T.Set.fold (fun y acc-> y::acc) up [] in
-  let subst = Sy.Map.add bv (T.make (Sy.fresh "let") up ty) Sy.Map.empty in
+  let subst = Sy.Map.add bv (T.make (Sy.fresh "_let") up ty) Sy.Map.empty in
   make
     (Let{let_var=bv; let_subst=(subst, Ty.esubst); let_term=t; let_f=f})
     (Let{let_var=bv; let_subst=(subst, Ty.esubst); let_term=t; let_f=mk_not f})
@@ -360,9 +364,6 @@ and iapply_subst ((s_t,s_ty) as subst) p n = match p, n with
       let trs =
 	List.map (fun (l, r) -> List.map (T.apply_subst subst) l, r) trs in
       let slem = Lemma({lem with triggers = trs; main = f}) in
-(*      let ssko = Skolem {sko with 
-	    ssubst = union_subst sko.ssubst subst;
-            ssubst_ty = Ty.union_subst sko.ssubst_ty s_ty} in*)
       let sigma = T.union_subst sko.sko_subst subst in
       let ssko = Skolem {sko with sko_subst = sigma } in
       (match p,n with
@@ -386,15 +387,6 @@ and iapply_subst ((s_t,s_ty) as subst) p n = match p, n with
      let sne = { se with let_f = mk_not lf } in
      Let se, Let sne
 
-(*  | Let ({lsubst=lsubst;lsubst_ty=lsubst_ty;
-	  let_term=lterm;let_f=lf} as e), Let _ ->
-     let lterm = T.apply_subst subst lterm in
-     let lsubst = union_subst lsubst subst in
-     let se = { e with 
-		  lsubst = lsubst; lsubst_ty = Ty.union_subst lsubst_ty s_ty;
-		  let_term=lterm} in
-     let sne = { se with let_f = mk_not lf } in
-     Let se, Let sne*)
   | _ -> assert false
 
 let add_label lbl f =
@@ -408,6 +400,12 @@ let label f =
   match view f with
     | Literal l -> Literal.LT.label l
     | _ -> Hstring.empty
+
+let is_in_model f =
+  match view f with
+    | Literal l -> 
+        Common.label_model (Literal.LT.label l) || Literal.LT.is_in_model l
+    | _ -> false
 	
 let free_vars =
   let rec free_rec acc f = 

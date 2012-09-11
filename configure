@@ -1709,7 +1709,7 @@ fi
 # we extract Ocaml version number and library path
 OCAMLVERSION=`$OCAMLC -v | sed -n -e 's|.*version *\(.*\)$|\1|p' `
 echo "ocaml version is $OCAMLVERSION"
-OCAMLLIB=`$OCAMLC -v | tail -1 | cut -f 4 -d " "`
+OCAMLLIB=`$OCAMLC -v | tail -1 | cut -f 4 -d " " | tr -d '\\r'`
 echo "ocaml library path is $OCAMLLIB"
 SMTPRELUDE="/usr/local/lib/ergo/smt_prelude.mlw"
 
@@ -2142,35 +2142,7 @@ if test "$LABLGTK2" = no ; then
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: Will not be able to compile GUI. Please install the *liblablgtksourceview2-ocaml-dev* Debian package - or use the GODI caml package system *http://godi.ocaml-programming.de/* - or compile from sources *http://wwwfun.kurims.kyoto-u.ac.jp/soft/lsl/lablgtk.html*" >&5
 $as_echo "Will not be able to compile GUI. Please install the *liblablgtksourceview2-ocaml-dev* Debian package - or use the GODI caml package system *http://godi.ocaml-programming.de/* - or compile from sources *http://wwwfun.kurims.kyoto-u.ac.jp/soft/lsl/lablgtk.html*" >&6; }
 else
-	as_ac_File=`$as_echo "ac_cv_file_$OCAMLLIB/lablgtk-extras/okey.cmx" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $OCAMLLIB/lablgtk-extras/okey.cmx" >&5
-$as_echo_n "checking for $OCAMLLIB/lablgtk-extras/okey.cmx... " >&6; }
-if eval \${$as_ac_File+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  test "$cross_compiling" = yes &&
-  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$OCAMLLIB/lablgtk-extras/okey.cmx"; then
-  eval "$as_ac_File=yes"
-else
-  eval "$as_ac_File=no"
-fi
-fi
-eval ac_res=\$$as_ac_File
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  LABLGTK2=yes
-else
-  LABLGTK2=no
-fi
-
-	if test "$LABLGTK2" = no ; then
-      	   { $as_echo "$as_me:${as_lineno-$LINENO}: result: Will not be able to compile GUI. Please install the *liblablgtk-extras-ocaml-dev* Debian package - or use the GODI caml package system *http://godi.ocaml-programming.de/*" >&5
-$as_echo "Will not be able to compile GUI. Please install the *liblablgtk-extras-ocaml-dev* Debian package - or use the GODI caml package system *http://godi.ocaml-programming.de/*" >&6; }
-	else
-   	   LABLGTK2LIB="-I +lablgtk2 -I +lablgtk-extras -I +threads"
-	fi
+      LABLGTK2LIB="-I +lablgtk2 -I +threads"
 fi
 
 # Extract the first word of "ocamlweb", so it can be a program name with args.

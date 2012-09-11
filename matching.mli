@@ -17,7 +17,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type gsubst = { sbt : Term.subst ; gen : int ; goal : bool}
+type gsubst = { 
+  sbt : Term.subst ; 
+  gen : int ; 
+  goal : bool; 
+  s_term_orig : Term.t list;
+  s_lem_orig : Formula.t;
+}
 
 type trigger_info = {
   trigger_query : Literal.LT.t option; 
@@ -30,7 +36,8 @@ type trigger_info = {
 type term_info = {
   term_age : int ; 
   term_from_goal : bool ;
-  term_orig : Formula.t option
+  term_from_formula : Formula.t option;
+  term_from_terms : Term.t list;
 }
 
 module type X = sig
@@ -48,7 +55,7 @@ module type S = sig
   val add_term : term_info -> Term.t -> t -> t 
   val add_trigger : trigger_info -> Term.t list -> t -> t
   val query : t -> uf -> (trigger_info * gsubst list) list
-
+    
 end
 
 module Make (X : X) : S with type uf = X.t
