@@ -68,7 +68,7 @@ module Make ( R : Sig.X ) = struct
   module SetF = Formula.Set
     
   module Lit = Literal.Make(struct type t = R.r include R end)
-  module MapL = Lit.Map  
+  module MapL = Lit.Map
 
   module MapR = Map.Make(struct type t = R.r let compare = R.compare end)
     
@@ -136,8 +136,41 @@ module Make ( R : Sig.X ) = struct
     ac_rs = RS.empty
   }
 
+  exception Found_term of T.t
+
+  (* hack: would need an inverse map from semantic values to terms *)
+  let terms_of_distinct env l = match Lit.view l with
+    | Literal.Distinct (false, rl) ->
+        let lt =
+          List.fold_left (fun acc r -> 
+	    try 
+	      let cl = MapR.find r env.classes in
+	      SetT.iter (fun t -> 
+		if R.equal (MapT.find t env.make) r then
+		  raise (Found_term t)) cl;
+	      acc
+	    with 
+	      | Found_term t -> t :: acc
+	      | Not_found -> acc) [] rl
+	in
+	let rec distrib = function
+	  | x :: r -> (distrib r) @ 
+	    (List.map (fun y -> SetT.add x (SetT.singleton y)) r)  
+	  | [] -> []
+	in
+	distrib lt
+
+    | _ -> assert false
+
+
   let cl_extract env =
-    MapR.fold (fun _ cl acc -> cl :: acc) env.classes []
+    if bottom_classes () then
+      let classes = MapR.fold (fun _ cl acc -> cl :: acc) env.classes [] in
+      MapR.fold (fun _ ml acc -> 
+	MapL.fold (fun l _ acc -> (terms_of_distinct env l) @ acc) ml acc
+      ) env.neqs classes
+    else []
+	
 
   module Print = struct
 

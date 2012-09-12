@@ -35,21 +35,39 @@ let rec find_eq x eqs f = match f.c with
 let find_equalities lv f = 
   List.fold_left 
     (fun eqs (x,_) -> 
-       let l = find_eq x [] f in 
+       let l = find_eq x [] f in
        if l = [] then raise Not_found; l::eqs ) [] lv
 
 let rec apply_subst_term env t = 
   let tt = match t.c.tt_desc with
     | TTvar x as tt -> 
-	(try (List.assoc x env).c.tt_desc with Not_found -> tt)
+      (try (List.assoc x env).c.tt_desc with Not_found -> tt)
     | TTapp(s,l) -> TTapp(s,List.map (apply_subst_term env) l)
+    | TTget(t1,t2) -> TTget(apply_subst_term env t1, apply_subst_term env t2)
+    | TTset(t1,t2,t3) -> TTset(apply_subst_term env t1,
+			       apply_subst_term env t2,
+			       apply_subst_term env t3)
     | TTinfix(t1,s,t2) -> 
-	TTinfix(apply_subst_term env t1,s,apply_subst_term env t2)
+      TTinfix(apply_subst_term env t1,s,apply_subst_term env t2)
+    | TTextract (t1,t2,t3) ->
+      TTextract (apply_subst_term env t1,
+		 apply_subst_term env t2,
+		 apply_subst_term env t3)
+    | TTconcat (t1,t2) -> 
+      TTconcat(apply_subst_term env t1,
+	       apply_subst_term env t2)
+    | TTdot (t, l) -> TTdot (apply_subst_term env t, l)
+    | TTrecord r -> 
+      TTrecord (List.map (fun (l,t) -> l, apply_subst_term env t) r)
+    | TTlet (s, t1, t2) -> 
+      TTlet (s, apply_subst_term env t1,
+	     apply_subst_term env t2)
+    | TTnamed (n, t) -> TTnamed (n, apply_subst_term env t)
     | tt -> tt
   in
   { t with c = { t.c with tt_desc = tt }}
 
-let rec apply_subst_formula env f = 
+let rec apply_subst_formula env f =
   let c = match f.c with
     | TFatom e -> 
 	let a = match e.c with
@@ -69,7 +87,7 @@ let rec apply_subst_formula env f =
   in
   { f with c = c }
 	
-let make_instance f = 
+let make_instance f =
   let lt = find_equalities f.qf_bvars f.qf_form in
   apply_subst_formula (List.map List.hd lt) f.qf_form
 

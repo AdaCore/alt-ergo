@@ -127,14 +127,13 @@
 	</context>
 
 	<context id="trigger" style-ref="trigger">
-	  <start>\[</start>
-	  <end>\]</end>
+	  <match>\[.*\]\.</match>
 	</context>
-
+<!--
 	<context id="badtrigger" style-ref="error" extend-parent="false">
 	  <match>\]</match>
 	</context>
-
+-->
       </include>
     </context>
   </definitions>
