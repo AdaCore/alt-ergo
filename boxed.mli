@@ -37,6 +37,10 @@ val from_formula : Formula.t -> bool -> t
 
 module Set : Set.S with type elt = t
 
-module Map : Map.S with type key = t
+module Map :
+   sig
+      include Map.S with type key = t
+      val choose : 'a t -> key * 'a
+   end
 
 val check_free_vars : t -> unit
