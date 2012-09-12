@@ -506,11 +506,11 @@ module Make (X : Sig.X) = struct
 	  aux ch bad_last (a::dl) base_env l
 
         (** This optimisation is not correct with the current explanation *)
-        (* | [(c, size, CPos exp, ex_c)], Yes dep -> *)
-        (*     let neg_c = LR.neg (LR.make c) in *)
-        (* 	  let ex_c = Ex.union ex_c dep in *)
+        (* | [(c, size, CPos exp, ex_c)], Yes (dep,_) -> *)
+        (*     let neg_c = Env.Rel.choice_mk_not c in *)
+        (*     let ex_c = Ex.union ex_c dep in *)
         (*     Print.split_backtrack neg_c ex_c; *)
-        (*     aux No dl base_env [LR.view neg_c, Num.Int 1, CNeg, ex_c] *)
+        (*     aux ch No dl base_env [neg_c, Num.Int 1, CNeg, ex_c] *)
 
         | ((c, size, CPos exp, ex_c_exp) as a)::l, _ ->
 	  try
@@ -535,7 +535,10 @@ module Make (X : Sig.X) = struct
                 (* The choice participates to the inconsistency *)
                 let neg_c = Env.Rel.choice_mk_not c in
 	        Print.split_backtrack neg_c dep;
-	        aux ch No dl base_env [neg_c, Num.Int 1, CNeg, dep]
+		if bottom_classes () then
+		  printf "bottom (case-split):%a\n@." 
+		    Term.print_taged_classes classes;
+		aux ch No dl base_env [neg_c, Num.Int 1, CNeg, dep]
     in
     aux ch bad_last (List.rev t.choices) base_env l
 
