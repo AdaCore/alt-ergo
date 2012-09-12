@@ -860,7 +860,7 @@ let fresh_var =
   let cpt = ref 0 in
   fun x -> incr cpt; ("_"^x^(string_of_int !cpt))
 
-let rec alpha_renaming s f =
+let rec alpha_renaming_b s f =
   { f with pp_desc = alpha_rec s f.pp_desc }
 and alpha_rec ((up, m) as s) f = 
   match f with
@@ -872,41 +872,41 @@ and alpha_rec ((up, m) as s) f =
 	  with Not_found -> f 
 	end
     | PPapp(k, l) -> 
-	PPapp(k, List.map (alpha_renaming s) l)
+	PPapp(k, List.map (alpha_renaming_b s) l)
     | PPdistinct l -> 
-	PPdistinct (List.map (alpha_renaming s) l)
+	PPdistinct (List.map (alpha_renaming_b s) l)
     | PPconst _ -> f
     | PPinfix(f1, op, f2) -> 
-	let ff1 = alpha_renaming s f1 in
-	let ff2 = alpha_renaming s f2 in
+	let ff1 = alpha_renaming_b s f1 in
+	let ff2 = alpha_renaming_b s f2 in
 	PPinfix(ff1, op, ff2)
     | PPprefix(op, f1) ->
-	PPprefix(op, alpha_renaming s f1)
+	PPprefix(op, alpha_renaming_b s f1)
     | PPget(f1,f2) ->
-	let ff1 = alpha_renaming s f1 in
-	let ff2 = alpha_renaming s f2 in
+	let ff1 = alpha_renaming_b s f1 in
+	let ff2 = alpha_renaming_b s f2 in
 	PPget(ff1, ff2)
     | PPset(f1, f2, f3) ->
-	let ff1 = alpha_renaming s f1 in
-	let ff2 = alpha_renaming s f2 in
-	let ff3 = alpha_renaming s f3 in
+	let ff1 = alpha_renaming_b s f1 in
+	let ff2 = alpha_renaming_b s f2 in
+	let ff3 = alpha_renaming_b s f3 in
 	PPset(ff1, ff2, ff3)
     | PPextract(f1, f2, f3) ->
-	let ff1 = alpha_renaming s f1 in
-	let ff2 = alpha_renaming s f2 in
-	let ff3 = alpha_renaming s f3 in
+	let ff1 = alpha_renaming_b s f1 in
+	let ff2 = alpha_renaming_b s f2 in
+	let ff3 = alpha_renaming_b s f3 in
 	PPextract(ff1, ff2, ff3)
     | PPconcat(f1, f2) ->
-	let ff1 = alpha_renaming s f1 in
-	let ff2 = alpha_renaming s f2 in
+	let ff1 = alpha_renaming_b s f1 in
+	let ff2 = alpha_renaming_b s f2 in
 	PPconcat(ff1, ff2)
     | PPif(f1, f2, f3) ->
-	let ff1 = alpha_renaming s f1 in
-	let ff2 = alpha_renaming s f2 in
-	let ff3 = alpha_renaming s f3 in
+	let ff1 = alpha_renaming_b s f1 in
+	let ff2 = alpha_renaming_b s f2 in
+	let ff3 = alpha_renaming_b s f3 in
 	PPif(ff1, ff2, ff3)
     | PPnamed(n, f1) ->
-	PPnamed(n, alpha_renaming s f1)
+	PPnamed(n, alpha_renaming_b s f1)
     | PPforall(xs, ty, trs, f1) ->
 	let xs1, xs2 = List.partition (fun x -> S.mem x up) xs in
 	let nv = List.map fresh_var xs1 in
@@ -915,8 +915,8 @@ and alpha_rec ((up, m) as s) f =
 	let xs = nv@xs2 in
 	let up = List.fold_left (fun up x -> S.add x up) up xs in
 	let s = (up, m) in
-	let ff1 = alpha_renaming s f1 in
-	let trs = List.map (List.map (alpha_renaming s)) trs in
+	let ff1 = alpha_renaming_b s f1 in
+	let trs = List.map (List.map (alpha_renaming_b s)) trs in
 	PPforall(xs, ty, trs, ff1)
     | PPforall_named (xs, ty, trs, f1) ->
 	let xs1, xs2 = List.partition (fun (x, _) -> S.mem x up) xs in
@@ -926,18 +926,18 @@ and alpha_rec ((up, m) as s) f =
 	let xs = nv@xs2 in
 	let up = List.fold_left (fun up (x, _) -> S.add x up) up xs in
 	let s = (up, m) in
-	let ff1 = alpha_renaming s f1 in
-	let trs = List.map (List.map (alpha_renaming s)) trs in
+	let ff1 = alpha_renaming_b s f1 in
+	let trs = List.map (List.map (alpha_renaming_b s)) trs in
 	PPforall_named (xs, ty, trs, ff1)
     | PPdot(f1, a) ->
-	PPdot(alpha_renaming s f1, a)
+	PPdot(alpha_renaming_b s f1, a)
     | PPrecord l ->
-	PPrecord (List.map (fun (a,e) -> a, alpha_renaming s e) l)
+	PPrecord (List.map (fun (a,e) -> a, alpha_renaming_b s e) l)
     | PPwith(e, l) ->
-	let l = List.map (fun (a,e) -> a, alpha_renaming s e) l in
-	PPwith(alpha_renaming s e, l)
+	let l = List.map (fun (a,e) -> a, alpha_renaming_b s e) l in
+	PPwith(alpha_renaming_b s e, l)
     | PPlet(x, f1, f2) ->
-	let ff1 = alpha_renaming s f1 in
+	let ff1 = alpha_renaming_b s f1 in
 	let s, x = 
 	  if S.mem x up then
 	    let nx = fresh_var x in
@@ -947,7 +947,7 @@ and alpha_rec ((up, m) as s) f =
 	  else
 	    (S.add x up, m), x
 	in
-	let ff2 = alpha_renaming s f2 in
+	let ff2 = alpha_renaming_b s f2 in
 	PPlet(x, ff1, ff2)
 	
     | PPexists(lx, ty, trs, f1) ->
@@ -963,8 +963,8 @@ and alpha_rec ((up, m) as s) f =
 		 (S.add x up, m), x :: lx)
 	    (s, []) lx
 	in
-	let trs = List.map (List.map (alpha_renaming s)) trs in
-	let ff1 = alpha_renaming s f1 in
+	let trs = List.map (List.map (alpha_renaming_b s)) trs in
+	let ff1 = alpha_renaming_b s f1 in
 	PPexists(lx, ty, trs, ff1)
     | PPexists_named (lx, ty, trs, f1) ->
 	let s, lx = 
@@ -979,13 +979,21 @@ and alpha_rec ((up, m) as s) f =
 		 (S.add x up, m), (x, lbl) :: lx)
 	    (s, []) lx
 	in
-	let ff1 = alpha_renaming s f1 in
-	let trs = List.map (List.map (alpha_renaming s)) trs in
+	let ff1 = alpha_renaming_b s f1 in
+	let trs = List.map (List.map (alpha_renaming_b s)) trs in
 	PPexists_named (lx, ty, trs, ff1)
-    | PPcheck f' -> PPcheck (alpha_renaming s f')
-    | PPcut f' -> PPcut (alpha_renaming s f')
+    | PPcheck f' -> PPcheck (alpha_renaming_b s f')
+    | PPcut f' -> PPcut (alpha_renaming_b s f')
  
-let alpha_renaming = alpha_renaming (S.empty, MString.empty)
+let alpha_renaming = alpha_renaming_b (S.empty, MString.empty)
+
+
+let alpha_renaming_env env =
+  let up = MString.fold (fun s _ up -> S.add s up) 
+    env.Env.logics S.empty in
+  let up = MString.fold (fun s _ up -> S.add s up) env.Env.var_map up in
+  alpha_renaming_b (up, MString.empty)
+  
 
 let inv_infix = function 
   | PPand -> PPor | PPor -> PPand | _ -> assert false
@@ -993,28 +1001,32 @@ let inv_infix = function
 let rec elim_toplevel_forall env bnot f = 
   (* bnot = true : nombre impaire de not *)
   match f.pp_desc with
-    | PPforall (lv, pp_ty, _, f) when bnot-> 
-	elim_toplevel_forall (Env.add_names env lv pp_ty f.pp_loc) bnot f
+    | PPforall (lv, pp_ty, _, f) when bnot->
+    	elim_toplevel_forall (Env.add_names env lv pp_ty f.pp_loc) bnot f
 
-    | PPforall_named (lvb, pp_ty, _, f) when bnot-> 
-	elim_toplevel_forall (Env.add_names_lbl env lvb pp_ty f.pp_loc) bnot f
+    | PPforall_named (lvb, pp_ty, _, f) when bnot->
+    	elim_toplevel_forall (Env.add_names_lbl env lvb pp_ty f.pp_loc) bnot f
 
     | PPinfix (f1, PPand, f2) when not bnot -> 
 	let f1 , env = elim_toplevel_forall env false f1 in
-	let f2 , env = elim_toplevel_forall env false f2 in
+	let f2 , env = elim_toplevel_forall env false
+	  (alpha_renaming_env env f2) in
 	{ f with pp_desc = PPinfix(f1, PPand , f2)}, env
 	
     | PPinfix (f1, PPor, f2) when bnot -> 
 	let f1 , env = elim_toplevel_forall env true f1 in
-	let f2 , env = elim_toplevel_forall env true f2 in
+	let f2 , env = elim_toplevel_forall env true 
+	  (alpha_renaming_env env f2) in
         { f with pp_desc = PPinfix(f1, PPand , f2)}, env
 
     | PPinfix (f1, PPimplies, f2) when bnot -> 
         let f1 , env = elim_toplevel_forall env false f1 in
-	let f2 , env = elim_toplevel_forall env true f2 in
+	let f2 , env = elim_toplevel_forall env true
+	  (alpha_renaming_env env f2) in
 	{ f with pp_desc = PPinfix(f1,PPand,f2)}, env
 	
     | PPprefix (PPnot, f) -> elim_toplevel_forall env (not bnot) f
+
 
     | _ when bnot -> 
 	{ f with pp_desc = PPprefix (PPnot, f) }, env
@@ -1027,16 +1039,17 @@ let rec intro_hypothesis env valid_mode f =
     | PPinfix(f1,PPimplies,f2) when valid_mode ->
 	let ((f1, env) as f1_env) =
 	  elim_toplevel_forall env (not valid_mode) f1 in
-	let axioms, goal = intro_hypothesis env valid_mode f2 in
+	let axioms, goal = intro_hypothesis env valid_mode
+	  (alpha_renaming_env env f2) in
 	f1_env::axioms, goal
-    | PPforall (lv, pp_ty, _, f) when valid_mode ->  
-	intro_hypothesis (Env.add_names env lv pp_ty f.pp_loc) valid_mode f
-    | PPexists (lv, pp_ty, _, f) when not valid_mode-> 
-	intro_hypothesis (Env.add_names env lv pp_ty f.pp_loc) valid_mode f
-    | PPforall_named (lvb, pp_ty, _, f) when valid_mode ->  
-	intro_hypothesis (Env.add_names_lbl env lvb pp_ty f.pp_loc) valid_mode f
-    | PPexists_named (lvb, pp_ty, _, f) when not valid_mode-> 
-	intro_hypothesis (Env.add_names_lbl env lvb pp_ty f.pp_loc) valid_mode f
+    | PPforall (lv, pp_ty, _, f) when valid_mode ->
+    	intro_hypothesis (Env.add_names env lv pp_ty f.pp_loc) valid_mode f
+    | PPexists (lv, pp_ty, _, f) when not valid_mode->
+    	intro_hypothesis (Env.add_names env lv pp_ty f.pp_loc) valid_mode f
+    | PPforall_named (lvb, pp_ty, _, f) when valid_mode ->
+    	intro_hypothesis (Env.add_names_lbl env lvb pp_ty f.pp_loc) valid_mode f
+    | PPexists_named (lvb, pp_ty, _, f) when not valid_mode->
+    	intro_hypothesis (Env.add_names_lbl env lvb pp_ty f.pp_loc) valid_mode f
     | _ -> 
 	let f_env = elim_toplevel_forall env valid_mode f in
 	[] , f_env
@@ -1249,7 +1262,7 @@ let type_decl keep_triggers (acc, env) d =
       | Goal(loc, n, f) ->
 	  if rules () = 1 then fprintf fmt "[rule] TR-Typing-GoalDecl$_F$@.";
 	  (*let f = move_up f in*)
-	  let f = alpha_renaming f in
+	  let f = alpha_renaming_env env f in
 	  type_and_intro_goal keep_triggers acc env loc Thm n f, env
 
       | Predicate_def(loc,n,l,e) 

@@ -224,7 +224,6 @@ module Labels = Hashtbl.Make(H)
 let labels = Labels.create 100007
   
 let add_label lbl t = 
-  (* eprintf "add %s: %a@." (Hstring.view lbl) print t; *)
   Labels.replace labels t lbl
   
 let label t = try Labels.find labels t with Not_found -> Hstring.empty
