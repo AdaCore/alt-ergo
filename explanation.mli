@@ -44,6 +44,11 @@ val ids_of : t -> int list option
 
 val formulas_of : t -> Formula.Set.t
 
+module MI : Map.S with type key = int
+
+val literals_ids_of : t -> int MI.t
+
+
 (** Fresh *)
 
 type exp

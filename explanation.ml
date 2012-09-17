@@ -17,6 +17,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module F = Formula
+
 type e = Dep of Formula.t | BJ of Formula.t | Fresh of int
 
 module ES = Set.Make(struct 
@@ -99,13 +101,41 @@ let ids_of = function
       id::acc) s [])
 
 let formulas_of = function
-  | None  -> Formula.Set.empty
+  | None  -> F.Set.empty
   | Some s -> 
       ES.fold (fun e acc -> 
                  match e with 
-	             Dep f | BJ f -> Formula.Set.add f acc
+	           | Dep f | BJ f -> F.Set.add f acc
                    | Fresh _ -> acc
-              )s Formula.Set.empty
+              ) s F.Set.empty
+
+
+let rec literals_of_acc lit fs f acc = match F.view f with
+    | F.Literal _ ->
+        if lit || F.Set.exists (fun f' -> F.id f' = F.id f) fs 
+	then f :: acc else acc
+    | F.Unit (f1,f2) ->
+        let acc = literals_of_acc false fs f1 acc in
+	literals_of_acc false fs f2 acc
+    | F.Clause (f1, f2) -> 
+        let acc = literals_of_acc true fs f1 acc in
+	literals_of_acc true fs f2 acc
+    | F.Lemma {F.main = f1} | F.Skolem {F.sko_f = f1} | F.Let {F.let_f = f1} ->
+        literals_of_acc true fs f1 acc
+
+let literals_of ex =
+  let fs  = formulas_of ex in   
+  F.Set.fold (literals_of_acc true fs) fs []
+
+
+module MI = Map.Make (struct type t = int let compare = compare end)
+
+let literals_ids_of ex =
+    List.fold_left (fun acc f ->
+      let i = F.id f in
+      let m = try MI.find i acc with Not_found -> 0 in
+      MI.add i (m + 1) acc
+    ) MI.empty (literals_of ex)
 
 
 type exp = int
