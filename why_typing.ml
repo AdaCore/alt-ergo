@@ -994,10 +994,8 @@ and alpha_rec ((up, m) as s) f =
 	let trs = List.map (List.map (alpha_renaming_b s)) trs in
 	PPexists_named (lx, ty, trs, ff1)
     | PPcheck f' -> PPcheck (alpha_renaming_b s f')
-
     | PPcut f' -> PPcut (alpha_renaming_b s f')
-      
-    | PPcast (f',ty) -> PPcast (alpha_renaming_b s f',ty) 
+    | PPcast (f',ty) -> PPcast (alpha_renaming_b s f',ty)
 
 let alpha_renaming = alpha_renaming_b (S.empty, MString.empty)
 

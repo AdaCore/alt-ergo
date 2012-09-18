@@ -101,7 +101,7 @@
 %nonassoc HAT
 %nonassoc uminus
 %nonassoc NOT DOT
-%right prec_named prec_type
+%right prec_named
 %nonassoc CHECK CUT ADDTERM
 %left LEFTSQ
 %nonassoc LIDENT
@@ -264,7 +264,10 @@ list1_constructors_sep_bar:
 
 
 lexpr:
-
+| LT lexpr COLON primitive_type GT
+    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
+      mk_pp (PPcast($2,$4)) }
+    
 | simple_expr { $1 }
 
 /* binary operators */
@@ -345,7 +348,7 @@ lexpr:
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
      mk_pp (PPexists_named ($2, $4, $5, $7)) }
 
-| ident_or_string COLON lexpr %prec prec_named
+| STRING COLON lexpr %prec prec_named
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
      mk_pp (PPnamed ($1, $3)) }
 
@@ -358,13 +361,9 @@ lexpr:
 
 | CUT lexpr
     { mk_pp (PPcut $2) } 
-
 ;
 
 simple_expr : 
-
-| LT lexpr WITH primitive_type GT
-    { mk_pp (PPcast($2,$4)) } 
 
 /* constants */
 | INTEGER
@@ -421,9 +420,7 @@ simple_expr :
 | LEFTPAR lexpr RIGHTPAR
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
      $2 }
-
 ;
-
 
 array_assignements:
 | array_assignement { [$1] }
@@ -535,11 +532,6 @@ ident:
 list1_named_ident_sep_comma:
 | named_ident                                   { [$1] }
 | named_ident COMMA list1_named_ident_sep_comma { $1 :: $3 }
-;
-
-ident_or_string:
-| IDENT  { $1 }
-| STRING { $1 }
 ;
 
 named_ident:
