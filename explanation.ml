@@ -112,8 +112,7 @@ let formulas_of = function
 
 let rec literals_of_acc lit fs f acc = match F.view f with
     | F.Literal _ ->
-        if lit || F.Set.exists (fun f' -> F.id f' = F.id f) fs 
-	then f :: acc else acc
+        if lit then f :: acc else acc
     | F.Unit (f1,f2) ->
         let acc = literals_of_acc false fs f1 acc in
 	literals_of_acc false fs f2 acc
