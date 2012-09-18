@@ -264,9 +264,6 @@ list1_constructors_sep_bar:
 
 
 lexpr:
-| LT lexpr COLON primitive_type GT
-    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
-      mk_pp (PPcast($2,$4)) }
     
 | simple_expr { $1 }
 
@@ -420,6 +417,11 @@ simple_expr :
 | LEFTPAR lexpr RIGHTPAR
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
      $2 }
+
+| simple_expr COLON primitive_type
+    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
+      mk_pp (PPcast($1,$3))
+    }
 ;
 
 array_assignements:
