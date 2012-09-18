@@ -101,7 +101,7 @@
 %nonassoc HAT
 %nonassoc uminus
 %nonassoc NOT DOT
-%right prec_named
+%right prec_named prec_type
 %nonassoc CHECK CUT ADDTERM
 %left LEFTSQ
 %nonassoc LIDENT
@@ -358,9 +358,13 @@ lexpr:
 
 | CUT lexpr
     { mk_pp (PPcut $2) } 
+
 ;
 
 simple_expr : 
+
+| LT lexpr WITH primitive_type GT
+    { mk_pp (PPcast($2,$4)) } 
 
 /* constants */
 | INTEGER
@@ -417,7 +421,9 @@ simple_expr :
 | LEFTPAR lexpr RIGHTPAR
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-expr@.";
      $2 }
+
 ;
+
 
 array_assignements:
 | array_assignement { [$1] }
