@@ -119,7 +119,9 @@ let rec literals_of_acc lit fs f acc = match F.view f with
     | F.Clause (f1, f2) -> 
         let acc = literals_of_acc true fs f1 acc in
 	literals_of_acc true fs f2 acc
-    | F.Lemma {F.main = f1} | F.Skolem {F.sko_f = f1} | F.Let {F.let_f = f1} ->
+    | F.Lemma _ ->
+        acc
+    | F.Skolem {F.sko_f = f1} | F.Let {F.let_f = f1} ->
         literals_of_acc true fs f1 acc
 
 let literals_of ex =
