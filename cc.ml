@@ -54,11 +54,12 @@ module Make (X : Sig.X) = struct
     | CPos of Ex.exp (* The explication of this choice *)
     | CNeg (* The choice has been already negated *)
 
-  module NoCustom : Sig.CC with type Rel.r = X.r
+  module NoCustom : Sig.CC
+    with type Rel.r = X.r
     with type 'a accumulator =
     ('a Sig.literal * Ex.t) list * ('a * 'a * Ex.t) list 
-      with type use = Use.t
-        with type uf = Uf.t = struct
+    with type use = Use.t
+    with type uf = Uf.t = struct
 
           module Print = struct
 
@@ -592,8 +593,9 @@ module Make (X : Sig.X) = struct
     let t = { t with gamma = gamma } in
     let t, ch = try_it (fun env -> Env.assume_literal env ch [a, ex] ) t  in 
     let choices = extract_terms_from_choices SetT.empty t.choices in
-    let all_terms = extract_terms_from_assumed choices ch in
-    t, all_terms, 1
+    let choices_terms = extract_terms_from_assumed choices ch in
+    let new_terms = Env.Rel.new_terms t.gamma.Env.relation in
+    t, T.Set.union choices_terms new_terms, 1
 
   let class_of t term = Uf.class_of t.gamma.Env.uf term
     

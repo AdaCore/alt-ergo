@@ -470,6 +470,19 @@ struct
       X3.Rel.print_model fmt env.r3 rs;
       X4.Rel.print_model fmt env.r4 rs;
       X5.Rel.print_model fmt env.r5 rs
+
+
+    let new_terms env = 
+      let t1 = X1.Rel.new_terms env.r1 in
+      let t2 = X2.Rel.new_terms env.r2 in
+      let t3 = X3.Rel.new_terms env.r3 in
+      let t4 = X4.Rel.new_terms env.r4 in
+      let t5 = X5.Rel.new_terms env.r5 in
+      Term.Set.union t1
+        (Term.Set.union t2
+           (Term.Set.union t3 
+              (Term.Set.union t4 t5)))
+
   end
 
 end

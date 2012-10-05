@@ -30,7 +30,8 @@ module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r)
                       ('a Sig.literal * Explanation.t) list * 
                         ('a * 'a * Explanation.t) list 
   with type use = Use.t
-  with type uf = Uf.t) = struct
+  with type uf = Uf.t
+  ) = struct
     type use = Use.t
     type uf = Uf.t
     module I = Instantiation.Make (Uf) (Use) (CC)
@@ -80,6 +81,8 @@ module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r)
       let print_model fmt (t, _) = CC.Rel.print_model fmt t
 
       let query (t, _) = CC.Rel.query t
+
+      let new_terms t = CC.Rel.new_terms (fst t)
 
     end
 

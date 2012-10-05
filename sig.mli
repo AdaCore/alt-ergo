@@ -64,6 +64,9 @@ module type RELATION = sig
     (** add a representant to take into account *)
 
   val print_model : Format.formatter -> t -> (Term.t * r) list -> unit
+  
+  val new_terms : t -> Term.Set.t
+
 
 end
 
@@ -154,7 +157,7 @@ module type X = sig
   val term_embed : Term.t -> r
 
   val term_extract : r -> Term.t option 
-  
+
   val ac_embed : r ac -> r
   
   val ac_extract : r -> (r ac) option
@@ -205,6 +208,8 @@ module type CC =  sig
     val case_split : t -> (choice * Explanation.t * Num.num) list
 
     val print_model : Format.formatter -> t -> (Term.t * r) list -> unit
+
+    val new_terms : t -> Term.Set.t
   end
 
   type use

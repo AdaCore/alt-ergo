@@ -363,5 +363,6 @@ module Make (X : ALIEN) = struct
     let case_split env = []
     let add env _ = env
     let print_model _ _ _ = ()
+    let new_terms env = Term.Set.empty
   end
 end

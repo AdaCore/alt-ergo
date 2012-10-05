@@ -358,7 +358,7 @@ configure: configure.in
 #######
 
 clean:: 
-	@rm -f *.cm[iox] *.o *~ *.annot *.owz *mlocamlwizard_tmp_file*
+	@rm -f *.cm[ioxt] *.cmti *.o *~ *.annot *.owz *mlocamlwizard_tmp_file*
 	@rm -f $(GENERATED) *.output
 	@rm -f $(NAME).byte $(NAME).opt
 	@rm -f unittest/*.cm[iox] unittest/*.o unittest/*.annot
