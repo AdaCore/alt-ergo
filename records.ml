@@ -111,7 +111,7 @@ module Make (X : ALIEN) = struct
 
   let compare_mine t u = raw_compare (normalize t) (normalize u)
 	
-  let compare x y = compare (embed x) (embed y)
+  let compare x y = compare_mine (embed x) (embed y)
 
   let is_mine t =
     match normalize t with
