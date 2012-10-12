@@ -147,3 +147,4 @@ let set_timelimit b = Preoptions.timelimit := b
 
 let debug_custom () = !debug_custom
 let set_debug_custom b = Preoptions.debug_custom := b
+let dmatching = !debug_matching

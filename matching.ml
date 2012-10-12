@@ -225,6 +225,8 @@ module Make (X : X) = struct
 	
   let rec matchterm env uf ( {sbt=(s_t,s_ty);gen=g;goal=b} as sg) pat t =
     !Options.thread_yield ();
+    if dmatching then 
+      fprintf fmt "[matchterm] I match %a against %a@." T.print pat T.print t;
     let {T.f=f_pat;xs=pats;ty=ty_pat} =  T.view pat in
     match f_pat with
       |	Symbols.Var _ -> 
@@ -238,9 +240,14 @@ module Make (X : X) = struct
           in 
           [sb]
       | _ -> 
-	  let l = List.map T.view (X.class_of uf t) in
-	  let s_ty, l = 
-	    List.fold_left
+        let cl = X.class_of uf t in
+        if dmatching then 
+          fprintf fmt "%a <=> { %a }@."
+            T.print t
+            (fun fmt -> List.iter (fprintf fmt "%a , " T.print)) cl;
+	let l = List.map T.view cl in
+	let s_ty, l = 
+	  List.fold_left
 	      (fun (s_ty,l) ({T.f=f; ty=ty_t} as t) -> 
 		 if Symbols.compare f_pat f = 0 then 
 		   try
@@ -277,7 +284,11 @@ module Make (X : X) = struct
 		   try (MT.find t env.info).lem_orig with Not_found -> []
 		 in
 		 if matching_loop lems pat_info.trigger_orig then lsbt
-		 else
+		 else begin
+                   if dmatching then
+                     fprintf fmt 
+                       "[matchpat] I consider the pattern %a against %a@."
+                       T.print pat T.print t;
 		   try
 		     let s_ty = 
 		       try Ty.matching sty ty (T.view t).T.ty 
@@ -286,17 +297,22 @@ module Make (X : X) = struct
 		     let aux = 
                        matchterms env uf 
 			 { sg with 
-			     sbt = st, s_ty; 
-			     gen = gen; 
-			     goal = but; 
-			     s_term_orig = t::sg.s_term_orig } 
+			   sbt = st, s_ty; 
+			   gen = gen; 
+			   goal = but; 
+			   s_term_orig = t::sg.s_term_orig } 
 			 pats xs in
                      List.rev_append aux lsbt
 		   with Echec -> lsbt
+                 end
               ) (SubstT.find f env.fils) lsbt_acc
 	  with Not_found -> lsbt_acc
 	    
   let matchpats env uf pat_info lsubsts pat = 
+    if dmatching then begin
+      fprintf fmt "@.[matchpats] I consider a new trigger@.";
+      fprintf fmt "====================================@."
+    end;
     List.fold_left
       (fun acc sg -> 
          matchpat env uf pat_info acc (sg, T.apply_subst sg.sbt pat)) [] lsubsts

@@ -143,3 +143,4 @@ val set_timelimit : float -> unit
 
 val debug_custom : unit -> bool
 val set_debug_custom : bool -> unit
+val dmatching : bool
