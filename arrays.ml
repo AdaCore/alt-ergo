@@ -236,27 +236,21 @@ module Make(X : ALIEN) = struct
              let {T.f=f;xs=xs;ty=sty} = T.view set in 
              match Sy.is_set f, xs with
                | true , [stab;si;sv] -> 
-                   List.fold_left (fun (env,acc) gi' ->
-                     List.fold_left (fun (env,acc) si' ->
-                       List.fold_left (fun (env,acc) sv' ->
-                         let xi, _ = X.make gi in
-                         let xj, _ = X.make si in
-                         let get_stab  = T.make (Sy.Op Sy.Get) [stab;gi] gty in
-                         let p       = LR.make (A.Eq(xi,xj)) in
-                         let p_ded   = A.LT.make (A.Eq(get,sv)) in
-                         let n     = LR.make (A.Distinct(false, [xi;xj])) in
-                         let n_ded = A.LT.make (A.Eq(get,get_stab)) in
-                         let dep = match are_eq gtab set with
-                             Yes (dep, _) -> dep | No -> assert false
-                         in
-                         let env = 
-                           {env with new_terms = 
-                               T.Set.add get_stab env.new_terms } in
-                         update_env
-                           are_eq are_dist dep env acc gi si p p_ded n n_ded
-                       ) (env,acc) (class_of sv)
-                     ) (env,acc) (class_of si)
-                   ) (env,acc) (class_of gi)
+                 let xi, _ = X.make gi in
+                 let xj, _ = X.make si in
+                 let get_stab  = T.make (Sy.Op Sy.Get) [stab;gi] gty in
+                 let p       = LR.make (A.Eq(xi,xj)) in
+                 let p_ded   = A.LT.make (A.Eq(get,sv)) in
+                 let n     = LR.make (A.Distinct(false, [xi;xj])) in
+                 let n_ded = A.LT.make (A.Eq(get,get_stab)) in
+                 let dep = match are_eq gtab set with
+                     Yes (dep, _) -> dep | No -> assert false
+                 in
+                 let env = 
+                   {env with new_terms = 
+                       T.Set.add get_stab env.new_terms } in
+                 update_env
+                   are_eq are_dist dep env acc gi si p p_ded n n_ded
                | _ -> (env,acc)
         ) (env,acc) (class_of gtab)
 
@@ -274,19 +268,15 @@ module Make(X : ALIEN) = struct
       in
 
       S.fold (fun stab' (env,acc) ->
-        List.fold_left (fun (env,acc) sv' ->
-          List.fold_left (fun (env,acc) si' ->
-            let get = T.make (Sy.Op Sy.Get) [set; si'] ty_si in
-            if Tmap.splited get set env.seen then (env,acc)
-            else
-              let env = {env with
-                seen = Tmap.update get set env.seen;
-                new_terms = T.Set.add get env.new_terms }
-              in
-              let p_ded = A.LT.make (A.Eq (get,sv)) in
-              env, Conseq.add (p_ded, Ex.empty) acc
-          ) (env,acc) (class_of si)
-        ) (env,acc) (class_of sv)
+        let get = T.make (Sy.Op Sy.Get) [set; si] ty_si in
+        if Tmap.splited get set env.seen then (env,acc)
+        else
+          let env = {env with
+            seen = Tmap.update get set env.seen;
+            new_terms = T.Set.add get env.new_terms }
+          in
+          let p_ded = A.LT.make (A.Eq (get,sv)) in
+          env, Conseq.add (p_ded, Ex.empty) acc
       ) stabs (env,acc)
 
     (*----------------------------------------------------------------------
@@ -306,27 +296,21 @@ module Make(X : ALIEN) = struct
           else 
             begin
               let env = {env with seen = Tmap.update get set env.seen} in
-              List.fold_left (fun (env,acc) gi' ->
-                List.fold_left (fun (env,acc) si' ->
-                  List.fold_left (fun (env,acc) sv' ->
-                    let xi, _ = X.make gi' in
-                    let xj, _ = X.make si' in
-                    let get_stab  = T.make (Sy.Op Sy.Get) [stab;gi'] gty in
-                    let gt_of_st  = T.make (Sy.Op Sy.Get) [set;gi'] gty in
-                    let p       = LR.make (A.Eq(xi,xj)) in
-                    let p_ded   = A.LT.make (A.Eq(gt_of_st,sv')) in
-                    let n     = LR.make (A.Distinct(false, [xi;xj])) in
-                    let n_ded = A.LT.make (A.Eq(gt_of_st,get_stab)) in
-                    let dep = match are_eq gtab stab with
-                        Yes (dep, _) -> dep | No -> assert false
-                    in 
-                    let env = 
-                      {env with new_terms = 
-                          T.Set.add get_stab (T.Set.add gt_of_st env.new_terms) } in
-                    update_env are_eq are_dist dep env acc gi si p p_ded n n_ded
-                  ) (env,acc) (class_of sv)
-                ) (env,acc) (class_of si)
-              ) (env,acc) (class_of gi)
+              let xi, _ = X.make gi in
+              let xj, _ = X.make si in
+              let get_stab  = T.make (Sy.Op Sy.Get) [stab;gi] gty in
+              let gt_of_st  = T.make (Sy.Op Sy.Get) [set;gi] gty in
+              let p       = LR.make (A.Eq(xi,xj)) in
+              let p_ded   = A.LT.make (A.Eq(gt_of_st,sv)) in
+              let n     = LR.make (A.Distinct(false, [xi;xj])) in
+              let n_ded = A.LT.make (A.Eq(gt_of_st,get_stab)) in
+              let dep = match are_eq gtab stab with
+                  Yes (dep, _) -> dep | No -> assert false
+              in 
+              let env = 
+                {env with new_terms = 
+                    T.Set.add get_stab (T.Set.add gt_of_st env.new_terms) } in
+              update_env are_eq are_dist dep env acc gi si p p_ded n n_ded
             end
         ) suff_sets (env,acc)
         
