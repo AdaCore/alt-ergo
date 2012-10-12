@@ -2972,6 +2972,20 @@ goal g84_loops_without_ac_rpo_or_v_abst:
     u(a,u(b,c)) = v(u(a,u(b,c)),a) ->
   f(u(a,u(b,c))) = f(v(u(a,u(b,c)),a))
 
+$
+
+type t
+
+logic P: t -> prop
+
+logic ac u: t, t -> t
+
+axiom a: forall x, i:t [P(u (x, x))]. P(u(x, x))
+
+logic a, b, c: t
+
+goal g85_bug_cea: a = b  ->  c = u(a, b)  ->  P(c)
+
 $$$ac_bitv
 
 logic ac u : bitv[4],bitv[4] -> bitv[4]
