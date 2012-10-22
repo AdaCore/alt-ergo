@@ -3,6 +3,8 @@
 *.annot
 *.o
 *.cmi
+*.cmt
+*.cmti
 smt_lex.ml
 smt_parser.ml
 smt_parser.mli
