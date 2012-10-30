@@ -28,6 +28,8 @@ module Sy = Symbols.Set
 module MString = 
   Map.Make(struct type t = string let compare = Pervasives.compare end)
 
+let implicite_tyvars = ref MString.empty
+
 module Types = struct
 
   (* environment for user-defined types *)
@@ -75,8 +77,16 @@ module Types = struct
     | PPTreal -> Ty.Treal
     | PPTbitv n -> Ty.Tbitv n
     | PPTvarid (s, _) -> 
-	(try MString.find s env.to_ty 
-	 with Not_found -> error (UnboundedVar s) loc)
+      begin
+        try MString.find s env.to_ty 
+	with Not_found -> 
+          (*error (UnboundedVar s) loc*)
+          try MString.find s !implicite_tyvars
+          with Not_found ->
+            let nty = Ty.Tvar (Ty.fresh_var ()) in
+	    implicite_tyvars := MString.add s nty !implicite_tyvars;
+            nty
+      end
     | PPTexternal (l, s, loc) when s = "farray" ->
 	let t1,t2 = match l with
           | [t2] -> PPTint,t2
@@ -1245,6 +1255,7 @@ let rec type_and_intro_goal keep_triggers acc env loc sort n f =
 
 
 let type_decl keep_triggers (acc, env) d = 
+  implicite_tyvars := MString.empty;
   try
     match d with
       | Logic (loc, ac, lp, pp_ty) -> 
