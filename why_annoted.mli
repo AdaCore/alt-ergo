@@ -153,8 +153,9 @@ type annoted_node =
   | QF of aquant_form annoted
 
 
-module MDep : (Map.S with type key = atyped_decl annoted)
+module MDep : Map.S with type key = atyped_decl annoted
 
+module MTag : Map.S with type key = GText.tag
 
 
 type env = {
@@ -167,7 +168,7 @@ type env = {
   mutable ctrl : bool;
   mutable last_tag : GText.tag;
   mutable search_tags : GText.tag list;
-  mutable proof_tags : GText.tag list;
+  mutable proof_tags : int MTag.t;
   mutable proof_toptags : GText.tag list;
   mutable start_select : int option;
   mutable stop_select : int option;
@@ -257,7 +258,7 @@ val findtags_dep :
 
 val findtags_proof : 
   Explanation.t -> (atyped_decl annoted * Why_typing.env) list ->
-  GText.tag list * GText.tag list 
+  GText.tag list * int MTag.t
 
 val find_line : 
   int -> (atyped_decl annoted * 'a) list -> int * GText.tag

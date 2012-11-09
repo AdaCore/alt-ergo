@@ -172,6 +172,12 @@ module MDep = Map.Make (
   end)
 
 
+module MTag = Map.Make (struct 
+  type t = GText.tag 
+  let compare t1 t2 = compare t1#get_oid t2#get_oid 
+end)
+
+
 type env = {
   buffer : sbuffer;
   inst_buffer : sbuffer;
@@ -182,7 +188,7 @@ type env = {
   mutable ctrl : bool;
   mutable last_tag : GText.tag;
   mutable search_tags : GText.tag list;
-  mutable proof_tags : GText.tag list;
+  mutable proof_tags : int MTag.t;
   mutable proof_toptags : GText.tag list;
   mutable start_select : int option;
   mutable stop_select : int option;
@@ -208,7 +214,7 @@ let create_env buf1 (buf2:sbuffer) errors insts st_ctx ast dep
     ctrl = false;
     last_tag = GText.tag ();
     search_tags = [];
-    proof_tags = [];
+    proof_tags = MTag.empty;
     proof_toptags = [];
     start_select = None;
     stop_select = None;
@@ -229,7 +235,7 @@ let create_replay_env buf1 errors insts ast actions resulting_ids =
     ctrl = false;
     last_tag = GText.tag ();
     search_tags = [];
-    proof_tags = [];
+    proof_tags = MTag.empty;
     proof_toptags = [];
     start_select = None;
     stop_select = None;
@@ -1521,29 +1527,45 @@ let findtags_dep at l =
   let sl = listsymbols at [] in
   List.fold_left (fun acc (td, _) -> findtags_atyped_delc_dep sl td acc) [] l
   
-let rec findproof_aform ids af acc found =
+let rec findproof_aform ids af acc depth found =
   match af with
     | AFatom at -> acc, found
+    | AFop ((AOPand), aafl) ->
+      List.fold_left
+    	(fun (acc, found) aaf -> findproof_aaform ids aaf acc depth found)
+    	(acc,found) aafl
     | AFop (_, aafl) ->
       List.fold_left
-	(fun (acc, found) aaf -> findproof_aaform ids aaf acc found)
+	(fun (acc, found) aaf -> 
+	  findproof_aaform ids aaf acc depth found)
 	(acc,found) aafl
     | AFforall aaqf | AFexists aaqf ->
-      let acc, found = 
-	if List.mem aaqf.id ids then aaqf.ptag::acc, true 
-	else acc, found in
-      findproof_aaform ids aaqf.c.aqf_form acc found
+      let acc, found =
+	try 
+	  let m = Explanation.MI.find aaqf.id ids in
+	  MTag.add aaqf.ptag m acc, true
+	with Not_found -> acc, found
+      in
+      findproof_aaform ids aaqf.c.aqf_form acc depth found
     | AFlet (_,_,_, aaf) | AFnamed (_, aaf) ->
-      findproof_aaform ids aaf acc found
+      findproof_aaform ids aaf acc depth found
 
-and findproof_aaform ids aaf acc found =
-  let acc, found = 
-    if List.mem aaf.id ids then aaf.ptag::acc, true 
-    else acc, found in
-  findproof_aform ids aaf.c acc found
+and findproof_aaform ids aaf acc depth found =
+  let acc, found =
+    try 
+      let m = Explanation.MI.find aaf.id ids in
+      MTag.add aaf.ptag m acc, true
+    with Not_found -> acc, found
+  in
+  findproof_aform ids aaf.c acc (depth) found
 
 let findproof_atyped_decl ids td (ax,acc) =
-  let acc = if List.mem td.id ids then td.ptag::acc else acc in
+  let acc =
+    try 
+      let m = Explanation.MI.find td.id ids in
+      MTag.add td.ptag m acc
+    with Not_found -> acc
+  in
   match td.c with
     | ARewriting (_,_, arwtl) -> assert false
 
@@ -1552,19 +1574,17 @@ let findproof_atyped_decl ids td (ax,acc) =
     | APredicate_def (_,_,_, af) 
     | AFunction_def (_,_,_,_, af) 
     | AAxiom (_, _, _, af) -> 
-      let acc, found = findproof_aform ids af acc false in
+      let acc, found = findproof_aform ids af acc 1 false in
       if found then td.ptag::ax, acc else ax,acc
 
     | AGoal (_,_,_, aaf) ->
-      let acc, found = findproof_aaform ids aaf acc false in
+      let acc, found = findproof_aaform ids aaf acc 1 false in
       if found then td.ptag::ax, acc else ax,acc
 
 let findtags_proof expl l =
-  match Explanation.ids_of expl with
-    | None -> [],[]
-    | Some ids -> 
-      List.fold_left (fun acc (td, _) ->
-	findproof_atyped_decl ids td acc) ([],[]) l
+  let ids = Explanation.literals_ids_of expl in
+  List.fold_left (fun acc (td, _) ->
+    findproof_atyped_decl ids td acc) ([], MTag.empty) l
 
 
 exception FoundLine of int * GText.tag

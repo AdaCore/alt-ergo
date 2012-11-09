@@ -50,6 +50,7 @@ let spec = [
   "-dcombine", Arg.Set debug_combine, "  sets the debugging flag of combine";
   "-dsplit", Arg.Set debug_split, "  sets the debugging flag of case-split analysis";
   "-dtheory", Arg.Set debug_custom, "  sets the debugging flag of user-defined theories";
+  "-dmatching", Arg.Set debug_matching, "  sets the debugging flag of E-matching";
    "-v", Arg.Set verbose, "  sets the verbose mode";
   "-version", Arg.Unit show_version, "  prints the version number";
   "-where", Arg.Unit show_libdir, "  prints the directory of the library";

@@ -111,7 +111,7 @@ module Make (X : ALIEN) = struct
 
   let compare_mine t u = raw_compare (normalize t) (normalize u)
 	
-  let compare x y = compare (embed x) (embed y)
+  let compare x y = compare_mine (embed x) (embed y)
 
   let is_mine t =
     match normalize t with
@@ -363,5 +363,6 @@ module Make (X : ALIEN) = struct
     let case_split env = []
     let add env _ = env
     let print_model _ _ _ = ()
+    let new_terms env = Term.Set.empty
   end
 end

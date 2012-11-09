@@ -71,7 +71,7 @@ let no_rm_eq_existential = ref false
 let nocontracongru = ref false
 let arrays = ref false
 let pairs = ref false
-let term_like_pp = ref true
+let term_like_pp = ref false
 let debug_types = ref false 
 let all_models = ref false
 let model = ref false
@@ -84,6 +84,7 @@ let max_split = ref (Num.Int 1000000)
 let restricted = ref false
 let bottom_classes = ref false
 let timelimit = ref 0.
+let debug_matching = ref false
 
 let show_version () = Format.printf "%s@." Version.version; exit 0
 let show_libdir () = Format.printf "%s@." Version.libdir; exit 0

@@ -899,17 +899,23 @@ let connect env =
   List.iter (fun (t, _) -> connect_atyped_decl env t) env.ast
 
 let clear_used_lemmas_tags env =
-  List.iter (fun t -> t#set_property (`BACKGROUND_SET false)) env.proof_tags;
+  MTag.iter (fun t _ -> t#set_property (`BACKGROUND_SET false)) env.proof_tags;
   List.iter (fun t -> t#set_property (`BACKGROUND_SET false)) env.proof_toptags;
-  env.proof_tags <- [];
+  env.proof_tags <- MTag.empty;
   env.proof_toptags <- []
   
-
 let show_used_lemmas env expl =
+  let colormap = Gdk.Color.get_system_colormap () in
   let atags,ftags = findtags_proof expl env.ast in
   clear_used_lemmas_tags env;
-  List.iter (fun t -> t#set_property (`BACKGROUND "pale green")) atags;
-  List.iter (fun t -> t#set_property (`BACKGROUND "green")) ftags;
+  let max_mul = MTag.fold (fun _ m acc -> max acc m) ftags 0 in
+  let green_0 = Gdk.Color.alloc colormap (`RGB (65535*3/4, 65535, 65535*3/4)) in
+  List.iter (fun t -> t#set_property (`BACKGROUND_GDK green_0)) atags;
+  MTag.iter (fun t m ->
+    let perc = ((max_mul - m) * 65535) / max_mul in
+    let green_n = Gdk.Color.alloc colormap 
+      (`RGB (perc*1/2, (perc + 2*65535) /3, perc*1/2)) in
+    t#set_property (`BACKGROUND_GDK green_n)) ftags;
   env.proof_tags <- ftags;
   env.proof_toptags <- atags
   
@@ -949,6 +955,6 @@ let prune_unused env =
   in
   List.iter (fun (d, _) -> 
     if not (List.mem d.ptag env.proof_toptags) 
-      && not (List.mem d.ptag env.proof_tags) 
+      && not (MTag.mem d.ptag env.proof_tags) 
     then prune_top d
   ) env.ast

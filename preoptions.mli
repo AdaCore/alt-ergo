@@ -91,3 +91,4 @@ val replay : bool ref
 val timelimit : float ref
 
 val debug_custom : bool ref
+val debug_matching : bool ref

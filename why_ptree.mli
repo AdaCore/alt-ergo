@@ -72,6 +72,7 @@ and pp_desc =
   | PPlet of string * lexpr * lexpr
   | PPcheck of lexpr
   | PPcut of lexpr
+  | PPcast of lexpr * ppure_type
 
 (* Declarations. *)
 

@@ -779,6 +779,7 @@ module Make(X : ALIEN) = struct
     let case_split _ = []    
     let query _ _ ~are_eq ~are_neq ~class_of ~classes = Sig.No
     let print_model _ _ _ = ()
+    let new_terms env = Term.Set.empty
   end
 
 end

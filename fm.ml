@@ -1006,4 +1006,6 @@ module Make
     ) rs;
     if not !zero then fprintf fmt "\n@."
 
+    let new_terms env = Term.Set.empty
+
 end

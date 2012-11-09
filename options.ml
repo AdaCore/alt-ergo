@@ -162,3 +162,4 @@ let incr_steps cpt =
 
 let debug_custom () = !debug_custom
 let set_debug_custom b = Preoptions.debug_custom := b
+let dmatching = !debug_matching

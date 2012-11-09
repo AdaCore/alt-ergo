@@ -7,7 +7,8 @@
 <language id="alt-ergo" _name="Alt-Ergo" version="2.0" _section="Sources">
   <metadata>
     <property name="mimetypes">text/x-alt-ergo</property>
-    <property name="globs">*.mlw;*.why</property>
+    <!-- Conflict with Why3 -->
+    <!-- <property name="globs">*.mlw;*.why</property> -->
     <property name="block-comment-start">(*</property>
     <property name="block-comment-end">*)</property>
   </metadata>
