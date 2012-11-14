@@ -99,7 +99,7 @@ struct
           
   let compare_tag a b = theory_num a - theory_num b
 
-  let compare a b = 
+  (*let compare a b = 
     let c = Ty.compare (type_info a) (type_info b) in
     if c <> 0 then c
     else match a, b with
@@ -113,29 +113,20 @@ struct
       | X4 _, (Term _ | Ac _ | X4 _) | (Term _ | Ac _ ), X4 _ -> X4.compare a b
       | X5 _, (Term _ | Ac _ | X5 _) | (Term _ | Ac _ ), X5 _ -> X5.compare a b
       | _                 -> compare_tag a b
-          
+  *)      
     
-  (* ancienne version 
-     let rec compare a b = 
-     let c = compare_tag a b in 
-     if c = 0 then comparei a b else c
-     
-     and compare_tag a b = 
-     Pervasives.compare (theory_num a) (theory_num b)
-     
-     and comparei a b = 
-     match a, b with
-     | X1 x, X1 y -> X1.compare a b
-     | X2 x, X2 y -> X2.compare a b
-     | X3 x, X3 y -> X3.compare a b
-     | X4 x, X4 y -> X4.compare a b
-     | X5 x, X5 y -> X5.compare a b
-     | Term x  , Term y  -> Term.compare x y
-     | Ac x    , Ac    y -> AC.compare x y
-     | _                 -> assert false
-     
-     and theory_num x = Obj.tag (Obj.repr x)
-  *)
+  (* ancienne version *)
+
+  let compare a b = 
+    match a, b with
+      | X1 x, X1 y -> X1.compare a b
+      | X2 x, X2 y -> X2.compare a b
+      | X3 x, X3 y -> X3.compare a b
+      | X4 x, X4 y -> X4.compare a b
+      | X5 x, X5 y -> X5.compare a b
+      | Term x  , Term y  -> Term.compare x y
+      | Ac x    , Ac    y -> AC.compare x y
+      | _                 -> compare_tag a b
     
   let equal a b = compare a b = 0
 
