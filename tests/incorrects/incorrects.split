@@ -69,3 +69,14 @@ goal g1: forall x:int. forall y:real. x=y
 $
 
 goal g2: forall x:int. forall y:real. x<>y
+
+$$$records
+
+
+type rc = { c : int }
+type rd = { d : int }
+    
+logic f : 'a -> int
+
+goal g: f({c=1}) = f({d=1})
+    
