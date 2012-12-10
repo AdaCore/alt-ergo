@@ -402,7 +402,8 @@ struct
     let original = List.fold_right SX.add (CX.leaves b) original in
     let sbs = List.filter (fun (p,v) -> SX.mem p original) sbs in
     print_sbt "Triangular and cleaned" sbs;
-    assert (equal (apply_subst a sbs) (apply_subst b sbs));
+    assert 
+      (!Preoptions.no_asserts || equal (apply_subst a sbs) (apply_subst b sbs));
     sbs
 
   let solve  a b =

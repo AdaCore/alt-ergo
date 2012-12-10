@@ -128,7 +128,7 @@ module Make (X : ALIEN) = struct
       let { Term.f = f; xs = xs; ty = ty} = Term.view t in
       match f, ty with
 	| Symbols.Op (Symbols.Record), Ty.Trecord {Ty.lbs=lbs} ->
-	    assert (List.length xs = List.length lbs);
+	    assert (!Preoptions.no_asserts || List.length xs = List.length lbs);
 	    let l, ctx = 
 	      List.fold_right2 
 		(fun x (lb, _) (l, ctx) -> 
