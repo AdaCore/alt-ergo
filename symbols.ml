@@ -114,7 +114,7 @@ let fresh =
   fun s ->
     incr cpt;
     (* garder le suffixe "__" car cela influence l'ordre *)
-    name (Format.sprintf "__%s%i" s (!cpt))
+    name (Format.sprintf "!?__%s%i" s (!cpt))
 
 let is_get f = equal f (Op Get) 
 let is_set f = equal f (Op Set)
