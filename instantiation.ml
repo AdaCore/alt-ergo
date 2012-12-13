@@ -356,7 +356,7 @@ struct
                        let cc, lt = cc_add lt cc t2 in
                        cc, (t1, t2) :: l, lt) (cc, [], (lt, repr))
                      trs.equalities in
-                   assert (repr = []);
+                   assert (!Preoptions.no_asserts || repr = []);
                    lt, cc, (eqs, kns, f, ex) :: acc, seen)
                  with Exception.Inconsistent _ -> assert false))
             (lt, cc, acc, seen) subst) (lt, cc, [], seen) insts in
