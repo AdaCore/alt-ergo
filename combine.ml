@@ -99,7 +99,7 @@ struct
           
   let compare_tag a b = theory_num a - theory_num b
 
-  (*let compare a b = 
+  let compare a b = 
     let c = Ty.compare (type_info a) (type_info b) in
     if c <> 0 then c
     else match a, b with
@@ -113,20 +113,29 @@ struct
       | X4 _, (Term _ | Ac _ | X4 _) | (Term _ | Ac _ ), X4 _ -> X4.compare a b
       | X5 _, (Term _ | Ac _ | X5 _) | (Term _ | Ac _ ), X5 _ -> X5.compare a b
       | _                 -> compare_tag a b
-  *)      
+          
     
-  (* ancienne version *)
-
-  let compare a b = 
-    match a, b with
-      | X1 x, X1 y -> X1.compare a b
-      | X2 x, X2 y -> X2.compare a b
-      | X3 x, X3 y -> X3.compare a b
-      | X4 x, X4 y -> X4.compare a b
-      | X5 x, X5 y -> X5.compare a b
-      | Term x  , Term y  -> Term.compare x y
-      | Ac x    , Ac    y -> AC.compare x y
-      | _                 -> compare_tag a b
+  (* ancienne version 
+     let rec compare a b = 
+     let c = compare_tag a b in 
+     if c = 0 then comparei a b else c
+     
+     and compare_tag a b = 
+     Pervasives.compare (theory_num a) (theory_num b)
+     
+     and comparei a b = 
+     match a, b with
+     | X1 x, X1 y -> X1.compare a b
+     | X2 x, X2 y -> X2.compare a b
+     | X3 x, X3 y -> X3.compare a b
+     | X4 x, X4 y -> X4.compare a b
+     | X5 x, X5 y -> X5.compare a b
+     | Term x  , Term y  -> Term.compare x y
+     | Ac x    , Ac    y -> AC.compare x y
+     | _                 -> assert false
+     
+     and theory_num x = Obj.tag (Obj.repr x)
+  *)
     
   let equal a b = compare a b = 0
 
@@ -371,45 +380,18 @@ struct
       (solve_rec  MR.empty [a,b]) []
 
 
-
-  module SX = Set.Make(struct type t = r let compare = CX.compare end)
-
-  let print_sbt msg sbs =
-    if debug_combine () then begin
-      let c = ref 0 in
-      fprintf fmt "%s subst:@." msg;
-      List.iter 
-        (fun (p,v) -> 
-          incr c;
-          fprintf fmt " %d) %a |-> %a@." !c print p print v) sbs;
-      fprintf fmt "@."
-    end
-    
-  let apply_subst r l =
-    List.fold_left (fun r (p,v) -> CX.subst p v r) r l
-      
-  let triangular_down sbs = 
-    List.fold_right
-      (fun (p,v) nsbs -> (p, apply_subst v nsbs) :: nsbs) sbs []
-
-  let triangular_up sbs = triangular_down (List.rev sbs)
-
-  let make_triangular a b sbs = 
-    print_sbt "Non triangular" sbs;
-    let sbs = triangular_down sbs in
-    let sbs = triangular_down (List.rev sbs) in (* triangular up *)
-    let original = List.fold_right SX.add (CX.leaves a) SX.empty in
-    let original = List.fold_right SX.add (CX.leaves b) original in
-    let sbs = List.filter (fun (p,v) -> SX.mem p original) sbs in
-    print_sbt "Triangular and cleaned" sbs;
-    assert 
-      (!Preoptions.no_asserts || equal (apply_subst a sbs) (apply_subst b sbs));
-    sbs
-
   let solve  a b =
     if debug_combine () then 
       fprintf fmt "[combine] solving %a = %a yields:@." print a print b;
-    make_triangular a b (solve  a b)
+    let sbs = solve  a b in
+    if debug_combine () then begin
+      let c = ref 0 in
+      List.iter 
+        (fun (p,v) -> 
+           incr c;
+           fprintf fmt " %d) %a |-> %a@." !c print p print v) sbs
+    end;
+    sbs
 
 
   module Rel =

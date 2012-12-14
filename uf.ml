@@ -489,7 +489,7 @@ module Make ( R : Sig.X ) = struct
 	set env
 
     let apply_sigma_uf env (p, v, dep) =
-      assert (!Preoptions.no_asserts || MapR.mem p env.gamma);
+      assert (MapR.mem p env.gamma);
       let use_p = MapR.find p env.gamma in
       try 
 	let env, tch, neqs_to_up = SetR.fold 
@@ -550,15 +550,9 @@ module Make ( R : Sig.X ) = struct
     (* pourquoi recuperer le representant de rv? r = rv d'apres testopt *)
     if debug_uf () then 
       printf "[uf] ac-solve: %a |-> %a %a@." R.print p R.print v Ex.print dep;
-    assert(
-      !Preoptions.no_asserts ||
-        let rp, _ = Env.find_or_normal_form env p in R.equal p rp
-    );
+    assert ( let rp, _ = Env.find_or_normal_form env p in R.equal p rp);
     let rv, ex_rv = Env.find_or_normal_form env v in
-    assert (
-      !Preoptions.no_asserts ||
-        let rv, _ = Env.find_or_normal_form env v in R.equal v rv
-    );
+    assert ( let rv, _ = Env.find_or_normal_form env v in R.equal v rv);
     let dep = Ex.union ex_rv dep in
     Env.apply_sigma eqs env tch (p, rv, dep)
 
