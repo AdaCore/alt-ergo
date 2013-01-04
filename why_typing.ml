@@ -38,8 +38,7 @@ module Types = struct
     from_labels : string MString.t
   }
 
-  let empty = { to_ty = MString.empty;
-                from_labels = MString.empty }
+  let empty = { to_ty = MString.empty; from_labels = MString.empty }
 
   let fresh_vars vars loc =
     List.map
@@ -151,6 +150,13 @@ module Types = struct
 	    check_labels lbs ty loc
 	  with Not_found -> error (NoRecordType l) loc
 
+  let rec monomorphized env = function
+    | PPTvarid (x, _) when not (MString.mem x env.to_ty) -> 
+	{ env with to_ty = MString.add x (Ty.fresh_empty_text ()) env.to_ty } 
+    | PPTexternal (args, _, _) ->
+	List.fold_left monomorphized env args
+    | pp_ty -> env
+
   let init_labels fl id loc = function
     | Record lbs ->
 	List.fold_left 
@@ -189,10 +195,12 @@ module Env = struct
     add env lv Symbols.var ty
 
   let add_names env lv pp_ty loc = 
+    let env = { env with types = Types.monomorphized env.types pp_ty } in
     let ty = Types.ty_of_pp loc env.types None pp_ty in
     add env lv Symbols.name ty
 
   let add_names_lbl env lv pp_ty loc = 
+    let env = { env with types = Types.monomorphized env.types pp_ty } in
     let ty = Types.ty_of_pp loc env.types None pp_ty in
     let rlv = 
       List.fold_left (fun acc (x, lbl) ->
