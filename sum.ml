@@ -112,7 +112,8 @@ module Make(X : ALIEN) = struct
       | Cons(c1,_) , Cons(c2,_) -> raise Unsolvable
       | Cons _     , Alien r2   -> [r2,a]
       | Alien r1   , Cons _     -> [r1,b]
-      | Alien _    , Alien _    -> assert false
+      | Alien _    , Alien _    -> 
+        if X.compare a b > 0 then [a,b] else [b,a]
     
   let solve a b =
     if debug_sum () then fprintf fmt "[Sum] we solve %a = %a@."  
@@ -128,6 +129,9 @@ module Make(X : ALIEN) = struct
       if debug_sum () then fprintf fmt "\tthe equation is unsolvable@.";
       raise Unsolvable
 
+
+  let abstract_selectors v acc = is_mine v, acc
+
   let solve a b =
     if !profiling then
       try 
@@ -142,7 +146,7 @@ module Make(X : ALIEN) = struct
 
 
   let term_extract _ = None
-
+  
   module Rel = struct
     type r = X.r
 

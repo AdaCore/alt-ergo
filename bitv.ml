@@ -767,6 +767,8 @@ module Make(X : ALIEN) = struct
 
   let term_extract _ = None
 
+  let abstract_selectors v acc = is_mine v, acc
+
   module Rel = struct
 
     type r = X.r
