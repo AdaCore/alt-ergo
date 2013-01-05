@@ -28,7 +28,6 @@ module type S = sig
   val term_embed : Term.t -> r
   val mult : r -> r -> r
   val print : Format.formatter -> r -> unit
-  val abstract_selectors : r -> (r * r) list -> r * (r * r) list
 end
 
 module type T = sig
@@ -69,8 +68,6 @@ module type T = sig
   val normal_form : t -> t * num * num
   (* comme normal_form mais le signe est aussi normalise *)
   val normal_form_pos : t -> t * num * num
-
-  val abstract_selectors : t -> (r * r) list -> t * (r * r) list
 end
 
 module Make (X : S) : T with type r = X.r

@@ -545,10 +545,6 @@ module Make
 
   let term_extract _ = None
 
-  let abstract_selectors p acc =
-    let p, acc = P.abstract_selectors p acc in
-    is_mine p, acc
-
   module Rel = Fm.Make (X) 
     (struct
        include P 

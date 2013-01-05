@@ -56,7 +56,7 @@ module Make(X : ALIEN) = struct
   let make _         = assert false
   let solve _ _      = assert false
   let term_extract _ = None
-  let abstract_selectors p acc = assert false
+
 
 
   module Rel = struct

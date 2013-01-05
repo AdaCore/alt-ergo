@@ -30,7 +30,6 @@ module type S = sig
   val term_embed : Term.t -> r
   val mult : r -> r -> r
   val print : Format.formatter -> r -> unit
-  val abstract_selectors : r -> (r * r) list -> r * (r * r) list
 end
 
 module type T = sig
@@ -64,7 +63,6 @@ module type T = sig
   val pgcd_numerators : t -> num
   val normal_form : t -> t * num * num
   val normal_form_pos : t -> t * num * num
-  val abstract_selectors : t -> (r * r) list -> t * (r * r) list
 end
 
 module Make (X : S) = struct
@@ -308,24 +306,6 @@ module Make (X : S) = struct
       if a >/ num_0 then p, c, d
       else mult_const num_minus_1 p, minus_num c, minus_num d
     with Not_found -> p, c, d
-
-  let abstract_selectors p acc =
-    let mp, acc = 
-      M.fold
-        (fun r i (mp, acc) ->
-          let r, acc = X.abstract_selectors r acc in
-          let mp =
-            try 
-              let j = M.find r mp in
-              let k = i +/ j in
-              if k =/ Int 0 then M.remove r mp else M.add r k mp
-            with Not_found -> M.add r i mp
-          in 
-          mp, acc
-        )p.m (M.empty, acc)
-    in
-    {p with m=mp}, acc
-      
 
 end
 

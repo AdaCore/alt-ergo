@@ -371,17 +371,6 @@ struct
       (solve_rec  MR.empty [a,b]) []
 
 
-  let abstract_selectors a acc = 
-    if false then fprintf fmt "abstract selectors of %a@." CX.print a;
-    match a with
-      | X1 a   -> X1.abstract_selectors a acc
-      | X2 a   -> X2.abstract_selectors a acc
-      | X3 a   -> X3.abstract_selectors a acc
-      | X4 a   -> X4.abstract_selectors a acc
-      | X5 a   -> X5.abstract_selectors a acc
-      | Term _ -> a, acc
-      | Ac a   -> AC.abstract_selectors a acc
-
 
   module SX = Set.Make(struct type t = r let compare = CX.compare end)
 

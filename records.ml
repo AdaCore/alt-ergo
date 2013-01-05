@@ -20,14 +20,12 @@
 open Format
 open Options
 open Sig
-module Hs = Hstring
-module T = Term
 
 type ('a, 'b) mine = Yes of 'a | No of 'b
 
 type 'a abstract = 
-  | Record of (Hs.t * 'a abstract) list * Ty.t
-  | Access of Hs.t * 'a abstract * Ty.t
+  | Record of (Hstring.t * 'a abstract) list * Ty.t
+  | Access of Hstring.t * 'a abstract * Ty.t
   | Other of 'a * Ty.t
 
 module type ALIEN = sig
@@ -51,12 +49,12 @@ module Make (X : ALIEN) = struct
         let _ = List.fold_left
 	  (fun first (lb, e) -> 
 	    fprintf fmt "%s%s = %a"
-	       (if first then "" else "; ") (Hs.view lb) print e;
+	       (if first then "" else "; ") (Hstring.view lb) print e;
 	    false
 	  ) true lbs in
 	fprintf fmt "}"
     | Access(a, e, _) -> 
-	fprintf fmt "%a.%s" print e (Hs.view a)
+	fprintf fmt "%a.%s" print e (Hstring.view a)
     | Other(t, _) -> X.print fmt t
 
   let rec raw_compare r1 r2 =
@@ -70,7 +68,7 @@ module Make (X : ALIEN) = struct
         let c = Ty.compare ty1 ty2 in
         if c <> 0 then c 
         else 
-	  let c = Hs.compare s1 s2 in
+	  let c = Hstring.compare s1 s2 in
 	  if c <> 0 then c
 	  else raw_compare u1 u2
       | Access _, _ -> -1
@@ -93,11 +91,11 @@ module Make (X : ALIEN) = struct
 	  begin
 	    let lbs_n = List.map (fun (lb, x) -> lb, normalize x) lbs in
 	    match lbs_n with
-	      | (lb1, Access(lb2, x, _)) :: l when Hs.equal lb1 lb2 ->
+	      | (lb1, Access(lb2, x, _)) :: l when Hstring.equal lb1 lb2 ->
 		  if List.for_all 
 		    (function 
 		       | (lb1, Access(lb2, y, _)) -> 
-			   Hs.equal lb1 lb2 && raw_compare x y = 0
+			   Hstring.equal lb1 lb2 && raw_compare x y = 0
 		       | _ -> false) l 
 		  then x
 		  else Record (lbs_n, ty)
@@ -106,7 +104,7 @@ module Make (X : ALIEN) = struct
       | Access (a, x, ty) ->
 	  begin 
 	    match normalize x with 
-	      | Record (lbs, _) -> Hs.list_assoc a lbs
+	      | Record (lbs, _) -> Hstring.list_assoc a lbs
 	      | x_n -> Access (a, x_n, ty)
 	  end
       | Other _ -> v
@@ -127,7 +125,7 @@ module Make (X : ALIEN) = struct
 
   let make t = 
     let rec make_rec t ctx = 
-      let { T.f = f; xs = xs; ty = ty} = T.view t in
+      let { Term.f = f; xs = xs; ty = ty} = Term.view t in
       match f, ty with
 	| Symbols.Op (Symbols.Record), Ty.Trecord {Ty.lbs=lbs} ->
 	    assert (!Preoptions.no_asserts || List.length xs = List.length lbs);
@@ -136,7 +134,7 @@ module Make (X : ALIEN) = struct
 		(fun x (lb, _) (l, ctx) -> 
 		   let r, ctx = make_rec x ctx in 
 		   let dlb = 
-		     T.make (Symbols.Op (Symbols.Access lb)) [t] ty in
+		     Term.make (Symbols.Op (Symbols.Access lb)) [t] ty in
 		   let c = Literal.LT.make (Literal.Eq (dlb, dlb)) in
 		   (lb, r)::l, c::ctx
 		) 
@@ -182,10 +180,10 @@ module Make (X : ALIEN) = struct
   let rec hash  = function
     | Record (lbs, ty) ->
 	List.fold_left 
-	  (fun h (lb, x) -> 17 * hash x + 13 * Hs.hash lb + h) 
+	  (fun h (lb, x) -> 17 * hash x + 13 * Hstring.hash lb + h) 
 	  (Ty.hash ty) lbs
     | Access (a, x, ty) ->
-	19 * hash x + 17 * Hs.hash a + Ty.hash ty 
+	19 * hash x + 17 * Hstring.hash a + Ty.hash ty 
     | Other (x, ty) -> 
 	Ty.hash ty + 23 * X.hash x
 
@@ -210,45 +208,6 @@ module Make (X : ALIEN) = struct
   let type_info = function
     | Record (_, ty) | Access (_, _, ty) | Other (_, ty) -> ty
 
-  let abstract_access field e ty acc =
-    let xe = is_mine e in
-    let abs_right_xe, acc =
-      try List.assoc xe acc, acc
-      with Not_found ->
-        let left_abs_xe2, acc = X.abstract_selectors xe acc in
-        match X.type_info left_abs_xe2 with
-          | (Ty.Trecord { Ty.args=args; name=name; lbs=lbs }) as tyr ->
-            let flds = 
-              List.map
-                (fun (lb,ty) -> lb, embed (X.term_embed (T.fresh_name ty))) lbs
-            in
-            let record = is_mine (Record (flds, tyr)) in
-            record, (left_abs_xe2, record) :: acc
-          | _ -> assert false
-    in
-    let abs_access = normalize (Access (field, embed abs_right_xe, ty)) in
-    is_mine abs_access, acc
-
-  let abstract_selectors v acc =
-    match v with
-      (* Handled by combine. Should not happen! *)
-      | Other (r, ty) -> assert false 
-        
-      (* This is not a selector *)
-      | Record (fields,ty) -> 
-        let flds, acc = 
-          List.fold_left
-            (fun (flds,acc) (lbl,e) ->
-              let e, acc = X.abstract_selectors (is_mine e) acc in
-              (lbl, embed e)::flds, acc
-            )([], acc) fields
-        in
-        is_mine (Record (List.rev flds, ty)), acc
-          
-      (* Selector ! Interesting case !*)
-      | Access (field, e, ty) -> abstract_access field e ty acc
-        
-
   (* Shostak'pair solver adapted to records *)
 
   let mk_fresh_record x info = 
@@ -258,8 +217,8 @@ module Make (X : ALIEN) = struct
       List.map 
 	(fun (lb, ty) -> 
 	   match info with
-	     | Some (a, v) when Hs.equal lb a -> lb, v 
-	     | _ -> let n = embed (X.term_embed (T.fresh_name ty)) in lb, n)
+	     | Some (a, v) when Hstring.equal lb a -> lb, v 
+	     | _ -> let n = embed (X.term_embed (Term.fresh_name ty)) in lb, n)
 	lbs
     in
     Record (lbs, ty), lbs
@@ -277,7 +236,7 @@ module Make (X : ALIEN) = struct
       | Record (lbs, ty) -> 
 	  Record (List.map (fun (n,e') -> n, subst_access x s e') lbs, ty)
       | Access (lb, e', _) when compare_mine e e' = 0 -> 
-	  Hs.list_assoc lb s
+	  Hstring.list_assoc lb s
       | Access (lb', e', ty) -> Access (lb', subst_access x s e', ty)
       | Other _ -> e
 
@@ -383,7 +342,7 @@ module Make (X : ALIEN) = struct
 		       match term_extract (is_mine r) with 
 			 | None -> raise Not_found
 			 | Some t -> t) lbs in
-		Some (T.make (Symbols.Op Symbols.Record) lbs ty)
+		Some (Term.make (Symbols.Op Symbols.Record) lbs ty)
 	      with Not_found -> None
 	      end
 	  | Access (a, r, ty) ->
@@ -391,7 +350,7 @@ module Make (X : ALIEN) = struct
 		match X.term_extract (is_mine r) with
 		  | None -> None
 		  | Some t -> 
-		      Some (T.make (Symbols.Op (Symbols.Access a)) [t] ty)
+		      Some (Term.make (Symbols.Op (Symbols.Access a)) [t] ty)
 	      end
 	  | Other (r, _) -> X.term_extract r
 	end
@@ -404,12 +363,11 @@ module Make (X : ALIEN) = struct
     type t = unit
     exception Inconsistent    
     let empty _ = ()
-    let assume _ _ ~are_eq ~are_neq ~class_of ~classes = 
-      (), { assume = []; remove = []}
+    let assume _ _ ~are_eq ~are_neq ~class_of ~classes = (), { assume = []; remove = []}
     let query _ _ ~are_eq ~are_neq ~class_of ~classes = Sig.No
     let case_split env = []
     let add env _ = env
     let print_model _ _ _ = ()
-    let new_terms env = T.Set.empty
+    let new_terms env = Term.Set.empty
   end
 end

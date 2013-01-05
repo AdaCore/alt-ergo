@@ -114,8 +114,6 @@ module type THEORY = sig
 
   val fully_interpreted : Symbols.t -> bool
 
-  val abstract_selectors : t -> (r * r) list -> r * (r * r) list
-
   module Rel : RELATION with type r = r
 end
 
@@ -172,8 +170,6 @@ module type X = sig
   
   val print : Format.formatter -> r -> unit
   
-  val abstract_selectors : r -> (r * r) list -> r * (r * r) list
-    
   module Rel : RELATION with type r = r
 
 end
