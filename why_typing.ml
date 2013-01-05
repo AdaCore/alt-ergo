@@ -165,14 +165,6 @@ module Types = struct
 	List.fold_left monomorphized env args
     | pp_ty -> env
 
-  let rec rename_vars env = function
-    | PPTvarid (x, _) when not (MString.mem x env.to_ty) -> 
-	{ env with 
-	    to_ty = MString.add x (Ty.Tvar (Ty.fresh_var ())) env.to_ty } 
-    | PPTexternal (args, _, _) ->
-	List.fold_left rename_vars env args
-    | pp_ty -> env
-
   let init_labels fl id loc = function
     | Record lbs ->
 	List.fold_left 
@@ -207,7 +199,6 @@ module Env = struct
     { env with var_map = vmap }
 
   let add_var env lv pp_ty loc  = 
-    let env = { env with types = Types.rename_vars env.types pp_ty } in
     let ty = Types.ty_of_pp loc env.types None pp_ty in
     add env lv Symbols.var ty
 
@@ -233,16 +224,13 @@ module Env = struct
     let profile = 
       match pp_profile with
 	| PPredicate args -> 
-	    let types = List.fold_left Types.rename_vars env.types args in
-	    { args = List.map (Types.ty_of_pp loc types None) args; 
+	    { args = List.map (Types.ty_of_pp loc env.types None) args; 
 	    result = Ty.Tbool }
 	(*| PFunction ([], PPTvarid (_, loc)) -> 
 	    error CannotGeneralize loc*)
 	| PFunction(args, res) -> 
-	    let types = List.fold_left Types.rename_vars env.types args in
-	    let types = Types.rename_vars types res in
-	    let args = List.map (Types.ty_of_pp loc types None) args in
-	    let res = Types.ty_of_pp loc types None res in
+	    let args = List.map (Types.ty_of_pp loc env.types None) args in
+	    let res = Types.ty_of_pp loc env.types None res in
 	  { args = args; result = res }
     in
     let logics = 
