@@ -114,3 +114,7 @@ let set_limit t =
 let replay = ref false
 
 let debug_custom = ref false
+
+
+let no_asserts = ref true
+let inversions_as_axioms = ref true

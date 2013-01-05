@@ -236,8 +236,8 @@ module Env = struct
 	    let types = List.fold_left Types.rename_vars env.types args in
 	    { args = List.map (Types.ty_of_pp loc types None) args; 
 	      result = Ty.Tbool }
-	| PFunction ([], PPTvarid (_, loc)) -> 
-	    error CannotGeneralize loc
+	(*| PFunction ([], PPTvarid (_, loc)) -> 
+	    error CannotGeneralize loc*)
 	| PFunction(args, res) -> 
 	    let types = List.fold_left Types.rename_vars env.types args in
 	    let types = Types.rename_vars types res in
