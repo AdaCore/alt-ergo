@@ -81,11 +81,11 @@ module Types = struct
         try MString.find s env.to_ty 
 	with Not_found -> 
           (*error (UnboundedVar s) loc*)
-          try MString.find s !implicite_tyvars
-          with Not_found ->
-            let nty = Ty.Tvar (Ty.fresh_var ()) in
-	    implicite_tyvars := MString.add s nty !implicite_tyvars;
-            nty
+        try MString.find s !implicite_tyvars
+        with Not_found ->
+          let nty = Ty.Tvar (Ty.fresh_var ()) in
+	  implicite_tyvars := MString.add s nty !implicite_tyvars;
+          nty
       end
     | PPTexternal (l, s, loc) when s = "farray" ->
 	let t1,t2 = match l with
@@ -235,7 +235,7 @@ module Env = struct
 	| PPredicate args -> 
 	    let types = List.fold_left Types.rename_vars env.types args in
 	    { args = List.map (Types.ty_of_pp loc types None) args; 
-	      result = Ty.Tbool }
+	    result = Ty.Tbool }
 	(*| PFunction ([], PPTvarid (_, loc)) -> 
 	    error CannotGeneralize loc*)
 	| PFunction(args, res) -> 
@@ -243,7 +243,7 @@ module Env = struct
 	    let types = Types.rename_vars types res in
 	    let args = List.map (Types.ty_of_pp loc types None) args in
 	    let res = Types.ty_of_pp loc types None res in
-	    { args = args; result = res }
+	  { args = args; result = res }
     in
     let logics = 
       List.fold_left 
@@ -1178,6 +1178,8 @@ let monomorphize_atom tat =
   in 
   { tat with c = c }
 
+let monomorphize_var (s,ty) = s, Ty.monomorphize ty
+
 let rec monomorphize_form tf = 
   let c = match tf.c with
     | TFatom tat -> TFatom (monomorphize_atom tat)
@@ -1185,15 +1187,18 @@ let rec monomorphize_form tf =
         TFop(oplogic, List.map monomorphize_form tfl)
     | TFforall qf ->
         TFforall
-          {qf with
+          {  qf_bvars = List.map monomorphize_var qf.qf_bvars;
+             qf_upvars = List.map monomorphize_var qf.qf_upvars;
              qf_form = monomorphize_form qf.qf_form;
              qf_triggers = List.map (List.map mono_term) qf.qf_triggers}
     | TFexists qf ->
         TFexists 
-          {qf with
+          {  qf_bvars = List.map monomorphize_var qf.qf_bvars;
+             qf_upvars = List.map monomorphize_var qf.qf_upvars;
              qf_form = monomorphize_form qf.qf_form;
              qf_triggers = List.map (List.map mono_term) qf.qf_triggers}
     | TFlet (l, sy, tt, tf) ->
+        let l = List.map monomorphize_var l in
         TFlet(l,sy, mono_term tt, monomorphize_form tf)
     | TFnamed (hs,tf) ->
         TFnamed(hs, monomorphize_form tf)
@@ -1283,10 +1288,10 @@ let type_decl keep_triggers (acc, env) d =
 
 
       | Goal(loc, n, f) ->
-	  if rules () = 1 then fprintf fmt "[rule] TR-Typing-GoalDecl$_F$@.";
+          if rules () = 1 then fprintf fmt "[rule] TR-Typing-GoalDecl$_F$@.";
 	  (*let f = move_up f in*)
 	  let f = alpha_renaming_env env f in
-	  type_and_intro_goal keep_triggers acc env loc Thm n f, env
+ 	  type_and_intro_goal keep_triggers acc env loc Thm n f, env
 
       | Predicate_def(loc,n,l,e) 
       | Function_def(loc,n,l,_,e) ->
