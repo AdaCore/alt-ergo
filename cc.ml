@@ -215,19 +215,23 @@ module Make (X : Sig.X) = struct
               | Some t1 -> 
 	        match T.view t1 with
 	          | {T.f=f1 ; xs=[x]} -> 
+                    let ty_x = (Term.view x).Term.ty in
 	            List.fold_left 
 	              (fun acc t2 ->
 		        match T.view t2 with
 		          | {T.f=f2 ; xs=[y]} when S.equal f1 f2 ->
-		            let a = A.LT.make (A.Distinct (false, [x; y])) in
-		            let dist = LTerm a in
-		            begin match Uf.are_distinct env.uf t1 t2 with
-		              | Yes (ex', _) -> 
-			        let ex_r = Ex.union ex ex' in
-			        Print.contra_congruence a ex_r;
-			        (dist, ex_r) :: acc
-		              | No -> assert false
-		            end
+                            let ty_y = (Term.view y).Term.ty in
+                            if Ty.equal ty_x ty_y then
+		              let a = A.LT.make (A.Distinct (false, [x; y])) in
+		              let dist = LTerm a in
+		              begin match Uf.are_distinct env.uf t1 t2 with
+		                | Yes (ex', _) -> 
+			          let ex_r = Ex.union ex ex' in
+			          Print.contra_congruence a ex_r;
+			          (dist, ex_r) :: acc
+		                | No -> assert false
+		              end
+                            else acc
 		          | _ -> acc
 	              ) [] (Uf.class_of env.uf bol)
 	          | _ -> []

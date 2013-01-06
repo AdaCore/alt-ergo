@@ -460,7 +460,7 @@ struct
 
     let assert_mem_types tya tyb =
       assert (
-        !Preoptions.no_asserts ||
+        (*!Preoptions.no_asserts ||*)
           if not (Ty.compare tya tyb = 0) then (
             fprintf fmt "@.Tya = %a  and @.Tyb = %a@.@." Ty.print tya Ty.print tyb;
             false)
