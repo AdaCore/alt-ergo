@@ -33,22 +33,21 @@ module Types = struct
   (* environment for user-defined types *)
   type t = {
     to_ty : Ty.t MString.t;
-    from_labels : string MString.t;
-    mutable to_tyvars : Ty.t MString.t
-  }
+    from_labels : string MString.t; }
+
+  let to_tyvars = ref MString.empty
 
   let empty = 
     { to_ty = MString.empty; 
-      from_labels = MString.empty;
-      to_tyvars  = MString.empty }
+      from_labels = MString.empty }
 
   let fresh_vars env vars loc =
     List.map
       (fun x -> 
-	if MString.mem x env.to_tyvars then
+	if MString.mem x !to_tyvars then
           error (TypeDuplicateVar x) loc;
 	let nv = Ty.Tvar (Ty.fresh_var ()) in
-        env.to_tyvars <- MString.add x nv env.to_tyvars;
+        to_tyvars := MString.add x nv !to_tyvars;
 	nv
       ) vars
 
@@ -79,10 +78,10 @@ module Types = struct
     | PPTbitv n -> Ty.Tbitv n
     | PPTvarid (s, _) -> 
       begin
-        try MString.find s env.to_tyvars
+        try MString.find s !to_tyvars
         with Not_found ->
           let nty = Ty.Tvar (Ty.fresh_var ()) in
-	  env.to_tyvars <- MString.add s nty env.to_tyvars;
+	  to_tyvars := MString.add s nty !to_tyvars;
           nty
       end
     | PPTexternal (l, s, loc) when s = "farray" ->
@@ -118,12 +117,10 @@ module Types = struct
       | Record lbs -> 
 	  let lbs = 
 	    List.map (fun (x, pp) -> x, ty_of_pp loc env None pp) lbs in
-	  { env with
-            to_ty = MString.add id (Ty.trecord ty_vars id lbs) env.to_ty;
+	  { to_ty = MString.add id (Ty.trecord ty_vars id lbs) env.to_ty;
 	    from_labels = 
 	      List.fold_left 
-		(fun fl (l,_) -> MString.add l id fl) env.from_labels lbs
-	  }
+		(fun fl (l,_) -> MString.add l id fl) env.from_labels lbs }
 
   module SH = Set.Make(Hstring)
 
@@ -157,13 +154,14 @@ module Types = struct
 	    check_labels lbs ty loc
 	  with Not_found -> error (NoRecordType l) loc
 
-  let rec monomorphized env = function
-    | PPTvarid (x, _) when not (MString.mem x env.to_tyvars) -> 
-      let ty = Ty.fresh_empty_text () in
-      env.to_tyvars <- MString.add x ty env.to_tyvars;
-      env
-    | PPTexternal (args, _, _) -> List.fold_left monomorphized env args
-    | pp_ty -> env
+  let rec monomorphized = function
+    | PPTvarid (x, _) when not (MString.mem x !to_tyvars) -> 
+      to_tyvars := MString.add x (Ty.fresh_empty_text ()) !to_tyvars;
+      
+    | PPTexternal (args, _, _) -> 
+      List.iter monomorphized args
+    
+    | pp_ty -> ()
 
   let init_labels fl id loc = function
     | Record lbs ->
@@ -203,12 +201,12 @@ module Env = struct
     add env lv Symbols.var ty
 
   let add_names env lv pp_ty loc = 
-    let env = { env with types = Types.monomorphized env.types pp_ty } in
+    Types.monomorphized pp_ty;
     let ty = Types.ty_of_pp loc env.types None pp_ty in
     add env lv Symbols.name ty
 
   let add_names_lbl env lv pp_ty loc = 
-    let env = { env with types = Types.monomorphized env.types pp_ty } in
+    Types.monomorphized pp_ty;
     let ty = Types.ty_of_pp loc env.types None pp_ty in
     let rlv = 
       List.fold_left (fun acc (x, lbl) ->
@@ -1248,7 +1246,7 @@ let rec type_and_intro_goal keep_triggers acc env loc sort n f =
 
 
 let type_decl keep_triggers (acc, env) d = 
-  env.Env.types.Types.to_tyvars <- MString.empty;
+  Types.to_tyvars := MString.empty;
   try
     match d with
       | Logic (loc, ac, lp, pp_ty) -> 
