@@ -61,6 +61,8 @@ module type S = sig
 
   val fully_interpreted : Symbols.t -> bool
 
+  val abstract_selectors : t -> (r * r) list -> r * (r * r) list
+
 end
 
 module Make (X : Sig.X) = struct
@@ -202,6 +204,25 @@ module Make (X : Sig.X) = struct
     r
 
   let fully_interpreted sb = true 
+
+  let abstract_selectors ({l=args} as ac) acc = X.ac_embed ac, acc
+    (*
+    let args, acc = 
+      List.fold_left
+        (fun (args, acc) (r, i) ->
+          let r, acc = X.abstract_selectors r acc in
+          (r, i) :: args, acc
+        )([],acc) args
+    in
+    let xac = X.ac_embed {ac with l = compact args} in
+    xac, acc
+    *)
+(* Ne suffit pas. Il faut aussi prevoir le collapse
+    try List.assoc xac acc, acc
+    with Not_found ->
+      let v = X.term_embed (Term.fresh_name ac.t) in
+      v, (xac, v) :: acc
+*)
 
 end
 

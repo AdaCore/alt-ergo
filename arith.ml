@@ -498,6 +498,31 @@ module Make
     end;
     sbs
 
+  (*XXX*)
+  module SX = Set.Make(struct type t = r let compare = X.compare end)
+
+  let apply_subst r l =
+    List.fold_left (fun r (p,v) -> X.subst p v r) r l
+      
+  let triangular_down sbs = 
+    List.fold_right
+      (fun (p,v) nsbs -> (p, apply_subst v nsbs) :: nsbs) sbs []
+
+  let make_idemp a b sbs = 
+    let sbs = triangular_down sbs in
+    let sbs = triangular_down (List.rev sbs) in (* triangular up *)
+    let original = List.fold_right SX.add (X.leaves a) SX.empty in
+    let original = List.fold_right SX.add (X.leaves b) original in
+    let sbs = List.filter (fun (p,v) -> SX.mem p original) sbs in
+    assert (!Preoptions.no_asserts || 
+               X.equal (apply_subst a sbs) (apply_subst b sbs));
+    sbs
+
+  let new_solve r1 r2 pb = 
+    let sbt = solve r1 r2 in
+    {pb with sbt = List.rev_append (make_idemp r1 r2 sbt) pb.sbt}
+
+  (*XXX*)
 
   let make t =
     if !profiling then
@@ -544,6 +569,10 @@ module Make
 
 
   let term_extract _ = None
+
+  let abstract_selectors p acc =
+    let p, acc = P.abstract_selectors p acc in
+    is_mine p, acc
 
   module Rel = Fm.Make (X) 
     (struct

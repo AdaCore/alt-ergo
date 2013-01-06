@@ -56,6 +56,8 @@ module type S = sig
 
   val fully_interpreted : Symbols.t -> bool
 
+  val abstract_selectors : t -> (r * r) list -> r * (r * r) list
+    
 end
 
 module Make (X : Sig.X) : S with type r = X.r
