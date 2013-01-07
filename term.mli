@@ -40,7 +40,7 @@ val real : string -> t
 val bitv : string -> Ty.t -> t
 
 val fresh_name : Ty.t -> t
-
+val is_fresh : t -> bool
 val is_int : t -> bool
 val is_real : t -> bool
 

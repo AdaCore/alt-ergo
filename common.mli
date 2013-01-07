@@ -69,6 +69,7 @@ val print_binders : Format.formatter -> (Symbols.t * Ty.t) list -> unit
 val print_triggers : 
   Format.formatter -> (('a tterm, 'a) annoted list) list  -> unit
 val fresh_string : unit -> string
+val is_fresh_string : string -> bool
 
 val fake_eq : Symbols.t
 val fake_neq : Symbols.t

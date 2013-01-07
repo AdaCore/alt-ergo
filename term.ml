@@ -121,6 +121,11 @@ let make s l ty = T.hashcons {f=s;xs=l;ty=ty;tag=0 (* dumb_value *) }
 
 let fresh_name ty = make (Sy.name (Common.fresh_string())) [] ty
 
+let is_fresh t = 
+  match view t with
+    | {f=Sy.Name(hs,_);xs=[]} -> Common.is_fresh_string (Hstring.view hs)
+    | _ -> false
+
 let shorten t = 
   let {f=f;xs=xs;ty=ty} = view t in
   make f xs (Ty.shorten ty)
