@@ -248,15 +248,26 @@ module Make
 	let acc = nb_vars_in_alien x in
 	List.fold_left (fun acc (_, x) -> max acc (nb_vars_in_alien x)) acc l
 
+  let contains_a_fresh_alien xp =
+    List.exists
+      (fun x -> 
+        match X.term_extract x with
+          | Some t -> Term.is_fresh t 
+          | _ -> false
+      ) (X.leaves xp)
+
   let color ac = 
     match ac.l with
       | [(r, 1)] -> assert false
       | _ -> 
         let p = unsafe_ac_to_arith ac in 
-	let l, _ = P.to_list p in
-        let mx = max_list_ l in
-        if mx = 0 || mx = 1 || number_of_vars ac.l > mx then is_mine p 
-	else X.ac_embed ac
+        let xp = is_mine p in
+        if contains_a_fresh_alien xp then 
+	  let l, _ = P.to_list p in
+          let mx = max_list_ l in
+          if mx = 0 || mx = 1 || number_of_vars ac.l > mx then is_mine p 
+	  else X.ac_embed ac
+        else xp
 
 	(*try
           List.iter
