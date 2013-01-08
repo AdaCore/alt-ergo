@@ -1,3 +1,44 @@
+version 0.95, January 7th, 2013
+=================================
+
+  + Main changes in the solver:
+  -----------------------------
+
+    o new combination method for Shostak solvers
+
+    o improvement of non-linear multiplication distribution over addition
+
+    o input language extension: polymorphic declaration are now allowed (logic x: 'a)
+
+    o input language extension: the types of terms can now be forced in a formula using the construct <term> : <type> (see man for an example)
+
+    o input language modification: a label should be a string. The construct <label> : <term> is replaced by "<label>" : <term>
+
+    o new keywords in the syntax: inversion, check, cut and include
+
+    o experimental options for theories models generation:
+        -model option: model on labeled terms
+        -complete-model option: complete model
+
+    o -timelimit n option: set the time limit to n seconds (not supported on Windows)
+
+    o bug fixes 
+
+  + Main changes in the graphical interface:
+  ------------------------------------------
+
+    o the number of instances for each axiom are now shown on the right of the GUI
+    
+    o the number of instances of each axiom can be limited by the user
+    
+    o the modifications made in the GUI can now be saved in a session file <f>.agr
+    
+    o session files can be replayed with -replay option
+
+    o models can be displayed in the GUI
+
+    o unsat-cores (-proof option) can be used to simplify the context
+
 
 version 0.94, December 2nd, 2011
 =================================
