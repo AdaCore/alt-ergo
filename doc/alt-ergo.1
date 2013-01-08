@@ -85,9 +85,9 @@ logic nil : 'b list
 
 logic f : 'c list -> int
 
-goal g1 : f(nil) = f(nil) 
+goal g1 : f(nil) = f(nil) (* not valid because the two instances of nil may have different types *)
 
-goal g2 : f(nil:'d list) = f(nil:'d list) 
+goal g2 : f(nil:'d list) = f(nil:'d list) (* valid *)
 
 
 .SH ENVIRONMENT VARIABLES
