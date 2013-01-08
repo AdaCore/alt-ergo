@@ -188,10 +188,14 @@ challenge:$(OPT)
 testoptsel:$(OPT)
 	tests/test.sh "./$(OPT) -select 2 -glouton -triggers-var "
 
-VERSION=0.95-dev
+
+
+VERSION=0.95
+
 
 version.ml: config.status
-	@echo "let version = \""$(VERSION)"\"" > version.ml
+# set version (and possibly revision) value in version.ml
+	$(shell ./revision.sh)
 	@echo "let date = \""`date`"\"" >> version.ml
 	@echo "let libdir = \""$(LIBDIR)"\"" >> version.ml
 
