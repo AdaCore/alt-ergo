@@ -92,7 +92,7 @@ module Make
     if P.type_info p = Ty.Tint then
       let _, c = P.to_list p in
       let ppmc = P.ppmc_denominators p in
-      assert (!Preoptions.no_asserts || is_integer_num (ppmc */ c))
+      assert (is_integer_num (ppmc */ c))
       
   (* t1 % t2 = md  <-> 
      c1. 0 <= md ;
@@ -106,7 +106,7 @@ module Make
       match P.is_num p2 with
 	| Some n2 -> 
 	    let an2 = abs_num n2 in
-	    assert (!Preoptions.no_asserts || is_integer_num an2);
+	    assert (is_integer_num an2);
 	    let t2 = T.int (string_of_num an2) in
 	    A.LT.make (A.Builtin(true, alt, [md; t2]))
 	| None -> 
@@ -217,7 +217,7 @@ module Make
     is_mine (arith_to_ac p), ctx
 
   let rec expand p n acc =
-    assert (!Preoptions.no_asserts || n >=0);
+    assert (n >=0);
     if n = 0 then acc else expand p (n-1) (p::acc)
 
   let unsafe_ac_to_arith {h=sy; l=rl; t=ty} =
@@ -525,8 +525,7 @@ module Make
     let original = List.fold_right SX.add (X.leaves a) SX.empty in
     let original = List.fold_right SX.add (X.leaves b) original in
     let sbs = List.filter (fun (p,v) -> SX.mem p original) sbs in
-    assert (!Preoptions.no_asserts || 
-               X.equal (apply_subst a sbs) (apply_subst b sbs));
+    assert (X.equal (apply_subst a sbs) (apply_subst b sbs));
     sbs
 
   let new_solve r1 r2 pb = 

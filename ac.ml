@@ -168,7 +168,7 @@ module Make (X : Sig.X) = struct
     abs (List.fold_left (fun acc (x, y) -> acc + 19 * (X.hash x + y)) acc l)
 
   let rec pr_elt sep fmt (e,n) = 
-    assert (!Preoptions.no_asserts || n >=0);
+    assert (n >=0);
     if n = 0 then ()
     else F.fprintf fmt "%s%a%a" sep X.print e (pr_elt sep) (e,n-1)
 

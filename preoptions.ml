@@ -65,8 +65,7 @@ let bjmode = ref false
 let glouton = ref false
 let triggers_var = ref false
 let redondance = ref 2
-let no_asserts = ref false
-let inversions_as_axioms = ref false
+let inversion_axioms = ref false
 let astuce = ref false
 let select = ref 0
 let no_rm_eq_existential = ref false
@@ -114,7 +113,3 @@ let set_limit t =
 let replay = ref false
 
 let debug_custom = ref false
-
-
-let no_asserts = ref true
-let inversions_as_axioms = ref true

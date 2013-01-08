@@ -67,7 +67,7 @@ let rec print fmt t =
     | Sy.Op (Sy.Record), _ ->
         begin match ty with
 	  | Ty.Trecord {Ty.lbs=lbs} ->
-	    assert (!Preoptions.no_asserts || List.length l = List.length lbs);
+	    assert (List.length l = List.length lbs);
 	      fprintf fmt "{";
 	      ignore (List.fold_left2 (fun first (field,_) e -> 
 		fprintf fmt "%s%s = %a"  (if first then "" else "; ")

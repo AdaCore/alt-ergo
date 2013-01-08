@@ -419,8 +419,7 @@ struct
       )sbs 
     in
     print_sbt "Triangular and cleaned" sbs;
-    assert (!Preoptions.no_asserts || 
-               equal (apply_subst a sbs) (apply_subst b sbs));
+    assert (equal (apply_subst a sbs) (apply_subst b sbs));
     sbs
 
   module New_Solve = struct

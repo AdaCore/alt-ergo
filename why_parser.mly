@@ -166,13 +166,13 @@ decl:
      Predicate_def (loc (), $2, $4, $7) }
 | AXIOM ident COLON lexpr
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-decl@.";
-     if !Preoptions.inversions_as_axioms then Axiom (loc (), $2, false, $4)
-     else
+     if !Preoptions.inversion_axioms then 
        let b = 
          try String.sub $2 (String.length $2 - 9) 9 = "inversion" 
          with Invalid_argument _ -> false 
        in
-       Axiom (loc (), $2, b, $4) }
+       Axiom (loc (), $2, b, $4) 
+     else Axiom (loc (), $2, false, $4) }
 | INVERSION ident COLON lexpr
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-decl@.";
      Axiom (loc (), $2, true, $4) }
