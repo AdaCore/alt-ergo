@@ -852,10 +852,7 @@ and of_tform (buffer:sbuffer) f = match f.Why_ptree.c with
   | TFatom a -> AFatom (of_tatom buffer a)
   | TFop (op, tfl) ->
     let afl = List.map (annot_of_tform buffer ) tfl in
-    assert (
-      !Preoptions.no_asserts || 
-        let l = List.length afl in l >= 1 && l <= 2
-    );
+    assert (let l = List.length afl in l >= 1 && l <= 2);
     if op = OPnot || op = OPimp then 
       change_polarity_aform (List.hd afl);
     AFop (of_oplogic buffer  op, afl)

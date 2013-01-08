@@ -704,7 +704,7 @@ module Make(X : ALIEN) = struct
 
 
   (* ne resout pas quand c'est deja resolu *)
-  let solve u t = 
+  let solve_bis u t = 
     if Options.debug_bitv () then 
       eprintf "[Bitv] solve %a = %a@." X.print u X.print t;
     
@@ -769,8 +769,8 @@ module Make(X : ALIEN) = struct
 
   let abstract_selectors v acc = is_mine v, acc
 
-  let new_solve r1 r2 pb = 
-    {pb with sbt = List.rev_append (solve r1 r2) pb.sbt}
+  let solve r1 r2 pb = 
+    {pb with sbt = List.rev_append (solve_bis r1 r2) pb.sbt}
 
   module Rel = struct
 

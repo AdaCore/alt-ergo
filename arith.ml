@@ -283,18 +283,18 @@ module Make
 
   let is_int r = X.type_info r = Ty.Tint
 
-  module XS = Set.Make(struct type t = X.r let compare = X.compare end)
-    
+  module SX = Set.Make(struct type t = r let compare = X.compare end)
+
   let xs_of_list = 
-    List.fold_left (fun s x -> XS.add x s) XS.empty
+    List.fold_left (fun s x -> SX.add x s) SX.empty
       
   let rec leaves p = 
     let s = 
       List.fold_left
-	(fun s (_, a) -> XS.union (xs_of_list (X.leaves a)) s)
-	XS.empty (fst (P.to_list p))
+	(fun s (_, a) -> SX.union (xs_of_list (X.leaves a)) s)
+	SX.empty (fst (P.to_list p))
     in
-    XS.elements s
+    SX.elements s
 
   let subst x t p = 
     let p = P.subst x (embed t) p in
@@ -495,7 +495,7 @@ module Make
     let pp = safe_distribution p in
     if ty = Ty.Treal then solve_real pp else solve_int pp
 
-  let solve r1 r2 =
+  let solve_one r1 r2 =
     if rules () = 4 then fprintf fmt "[rule] TR-Arith-Solve@.";
     let sbs = solve_aux r1 r2 in
     let sbs = List.fast_sort (fun (a,_) (x,y) -> X.compare x a)sbs in
@@ -508,9 +508,6 @@ module Make
           fprintf fmt " %d) %a |-> %a@." !c X.print p X.print v) sbs
     end;
     sbs
-
-  (*XXX*)
-  module SX = Set.Make(struct type t = r let compare = X.compare end)
 
   let apply_subst r l =
     List.fold_left (fun r (p,v) -> X.subst p v r) r l
@@ -525,11 +522,12 @@ module Make
     let original = List.fold_right SX.add (X.leaves a) SX.empty in
     let original = List.fold_right SX.add (X.leaves b) original in
     let sbs = List.filter (fun (p,v) -> SX.mem p original) sbs in
-    assert (X.equal (apply_subst a sbs) (apply_subst b sbs));
+    assert (not !Preoptions.enable_assertions ||
+              X.equal (apply_subst a sbs) (apply_subst b sbs));
     sbs
 
-  let new_solve r1 r2 pb = 
-    let sbt = solve r1 r2 in
+  let solve r1 r2 pb = 
+    let sbt = solve_one r1 r2 in
     {pb with sbt = List.rev_append (make_idemp r1 r2 sbt) pb.sbt}
 
   (*XXX*)
@@ -558,17 +556,17 @@ module Make
 	raise e
     else leaves p
 
-  let solve r1 r2 = 
+  let solve r1 r2 pb = 
     if !profiling then
       try 
 	!Options.timer_start Timers.TArith;
-	let res = solve r1 r2 in
+	let res = solve r1 r2 pb in
 	!Options.timer_pause Timers.TArith;
 	res
       with e -> 
 	!Options.timer_pause Timers.TArith;
 	raise e
-    else solve r1 r2
+    else solve r1 r2 pb
 
   let print = P.print
 

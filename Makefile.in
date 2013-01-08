@@ -72,7 +72,8 @@ LIBNAME = altErgo
 BYTE=$(NAME).byte
 OPT=$(NAME).opt
 
-all: pack xpack $(OCAMLBEST) pack xpack
+all: pack xpack $(OCAMLBEST) pack xpack all
+
 
 # bytecode and native-code compilation
 ######################################
@@ -146,6 +147,7 @@ $(NAME).opt: $(PRECMX) $(OPTIONSCMX) $(MAINCMX)
 gui: $(PRECMX) $(OPTIONSCMX) $(GUICMX)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLOPT) $(OFLAGS) -o altgr-ergo.opt $(BIBOPT) $(BIBGUIOPT) $^
+
 
 guibyte: $(PRECMO) $(OPTIONSCMO) $(GUICMO)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
@@ -364,6 +366,7 @@ clean::
 	@rm -f unittest/*.cm[iox] unittest/*.o unittest/*.annot
 	@rm -f *.aux *.log $(NAME).tex $(NAME).dvi $(NAME).ps
 	@rm -f version.ml
+	@rm -f altgr-ergo.opt
 
 dist-clean distclean:: clean
 	@rm -f Makefile config.cache config.log config.status

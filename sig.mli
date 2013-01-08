@@ -110,9 +110,7 @@ module type THEORY = sig
   val hash : t -> int
   (** solve r1 r2, solve the equality r1=r2 and return the substitution *)
 
-  val solve : r -> r ->  (r * r) list
-
-  val new_solve : r -> r ->  r solve_pb -> r solve_pb
+  val solve : r -> r ->  r solve_pb -> r solve_pb
 
   val print : Format.formatter -> t -> unit
 

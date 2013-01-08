@@ -332,7 +332,7 @@ let rec unquantify_aform (buffer:sbuffer) tyenv vars_entries
 	List.fold_left (fun (nbv, used, goal_used, ve, uplet, lets) v ->
 	  let ((s, _) as v'), e = List.hd ve in
 	  let cdr_ve = List.tl ve in
-	  assert (!Preoptions.no_asserts || v = v');
+	  assert (v = v');
 	  if e = "" then 
 	    (v'::nbv, used, goal_used, cdr_ve, v'::uplet, lets)
 	  else

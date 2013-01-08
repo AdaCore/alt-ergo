@@ -17,8 +17,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let new_solvers_combination_method = true
-
 open Format
 open Options
 open Sig
@@ -269,11 +267,6 @@ struct
 	    | _ -> assert false
               
 
-  let add_mr =
-    List.fold_left 
-      (fun solved (p,v) -> 
-	 MR.add p (v::(try MR.find p solved with Not_found -> [])) solved)
-
   let unsolvable = function
     | X1 x -> X1.unsolvable x
     | X2 x -> X2.unsolvable x 
@@ -282,96 +275,6 @@ struct
     | X5 x -> X5.unsolvable x 
     | Ac _ | Term _  -> true
 	
-  let partition tag = 
-    List.partition 
-      (fun (u,t) -> 
-	 (theory_num u = tag || unsolvable u) && 
-	   (theory_num t = tag || unsolvable t))
-
-  let rec solve_list  solved l =
-    List.fold_left
-      (fun solved (a,b) -> 
-         if debug_combine () then
-           fprintf fmt "solve_list %a=%a@." print a print b;
-	 let cmp = compare a b in
-	 if cmp = 0 then solved else
-	   match a , b with
-	       (* both sides are empty *)
-	     | (Term _ | Ac _) , (Term _ | Ac _) -> 
-		 add_mr solved (unsolvable_values cmp  a b)
-		   
-	     (* only one side is empty *)
-	     | (a, b) 
-                 when unsolvable a || unsolvable b ||  compare_tag a b = 0 ->
-		 let a,b = if unsolvable a then b,a else a,b in
-		 let cp , sol = partition (theory_num a) (solvei  b a) in
-		 solve_list  (add_mr solved cp) sol
-		   
-	     (* both sides are not empty *)
-	     | a , b -> solve_theoryj  solved a b
-      ) solved l
-
-  and unsolvable_values cmp a b =
-    match a, b with
-      (* Clash entre theories: On peut avoir ces pbs ? *)
-      | X1 _, (X2 _ | X3 _ | X4 _ | X5 _) 
-      | (X2 _ | X3 _ | X4 _ | X5 _), X1 _ 
-      | X2 _, (X3 _ | X4 _ | X5 _) 
-      | (X3 _ | X4 _ | X5 _), X2 _ 
-      | X3 _, (X4 _ | X5 _)
-      | (X4 _ | X5 _) , X3 _
-      | X5 _, X4 _ -> assert false
-
-      (* theorie d'un cote, vide de l'autre *)
-      | X1 _, _ | _, X1 _ -> X1.solve a b
-      | X2 _, _ | _, X2 _ -> X2.solve a b
-      | X3 _, _ | _, X3 _ -> X3.solve a b
-      | X4 _, _ | _, X4 _ -> X4.solve a b
-      | X5 _, _ | _, X5 _ -> X5.solve a b
-      | (Ac _|Term _), (Ac _|Term _) -> [if cmp > 0 then a,b else b,a]
-
-  and solve_theoryj solved xi xj =
-    if debug_combine () then
-      fprintf fmt "solvej %a=%a@." print xi print xj;
-    let cp , sol = partition (theory_num xj) (solvei  xi xj) in
-    solve_list  (add_mr solved cp) (List.rev_map (fun (x,y) -> y,x) sol)
-
-  and solvei  a b =
-    if debug_combine () then
-      fprintf fmt "solvei %a=%a@." print a print b;
-    match b with
-      | X1 _ -> X1.solve  a b
-      | X2 _ -> X2.solve  a b
-      | X3 _ -> X3.solve  a b
-      | X4 _ -> X4.solve  a b
-      | X5 _ -> X5.solve  a b
-      | Term _ | Ac _ -> 
-          (* XXX pour Arrays *)
-          match a with
-            | X4 _  -> X4.solve  a b
-            | _ -> 
-	        fprintf fmt "solvei %a = %a @." print a print b;
-	        assert false
-
-  let rec solve_rec  mt ab = 
-    let mr = solve_list  mt ab in
-    let mr , ab = 
-      MR.fold 
-	(fun p lr ((mt,ab) as acc) -> match lr with
-	     [] -> assert false
-	   | [_] -> acc
-	   | x::lx -> 
-	       MR.add p [x] mr , List.rev_map (fun y-> (x,y)) lx)	 
-	mr (mr,[])
-    in 
-    if ab=[] then mr else solve_rec  mr ab
-      
-  let solve  a b =
-    MR.fold 
-      (fun p lr ret -> 
-	 match lr with [r] -> (p ,r)::ret | _ -> assert false) 
-      (solve_rec  MR.empty [a,b]) []
-
 
   let abstract_selectors a acc = 
     if false then fprintf fmt "abstract selectors of %a@." CX.print a;
@@ -419,7 +322,8 @@ struct
       )sbs 
     in
     print_sbt "Triangular and cleaned" sbs;
-    assert (equal (apply_subst a sbs) (apply_subst b sbs));
+    assert (not !Preoptions.enable_assertions ||
+              equal (apply_subst a sbs) (apply_subst b sbs));
     sbs
 
   module New_Solve = struct
@@ -458,12 +362,12 @@ struct
 
 
     let assert_mem_types tya tyb =
-      assert (
-        (*!Preoptions.no_asserts ||*)
-          if not (Ty.compare tya tyb = 0) then (
-            fprintf fmt "@.Tya = %a  and @.Tyb = %a@.@." Ty.print tya Ty.print tyb;
-            false)
-          else true)
+      assert (not !Preoptions.enable_assertions ||
+                if not (Ty.compare tya tyb = 0) then (
+                  fprintf fmt "@.Tya = %a  and @.Tyb = %a@.@."
+                    Ty.print tya Ty.print tyb;
+                  false)
+                else true)
 
     let merge_sbt sbt1 sbt2 = sbt1 @ sbt2
         
@@ -489,10 +393,10 @@ struct
             assert_mem_types tya tyb;
             let pb = match tya with
               | Ty.Tint 
-              | Ty.Treal     -> X1.new_solve ra rb pb
-              | Ty.Trecord _ -> X2.new_solve ra rb pb
-              | Ty.Tbitv _   -> X3.new_solve ra rb pb
-              | Ty.Tsum _    -> X5.new_solve ra rb pb
+              | Ty.Treal     -> X1.solve ra rb pb
+              | Ty.Trecord _ -> X2.solve ra rb pb
+              | Ty.Tbitv _   -> X3.solve ra rb pb
+              | Ty.Tsum _    -> X5.solve ra rb pb
               | Ty.Tbool 
               | Ty.Text _ 
               | Ty.Tfarray _ -> solve_uninterpreted ra rb pb
@@ -511,16 +415,12 @@ struct
   end
     
   let solve  a b =
-    if false then
-      fprintf fmt "@.##################################################@.";
     if debug_combine () then 
       fprintf fmt "@.[combine] I solve %a = %a:@." print a print b;
-    if new_solvers_combination_method then 
-      let a', acc = abstract_selectors a [] in
-      let b', acc = abstract_selectors b acc in
-      New_Solve.new_solve a b a' b' acc
-    else make_idemp a b (solve a b)
-
+    let a', acc = abstract_selectors a [] in
+    let b', acc = abstract_selectors b acc in
+    New_Solve.new_solve a b a' b' acc
+      
   module Rel =
   struct
     type elt = r

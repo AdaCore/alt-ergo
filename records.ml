@@ -295,81 +295,6 @@ module Make (X : ALIEN) = struct
     in
     split_rec [] l
 
-  let rec solve_one u v =
-    if compare_mine u v = 0 then [] else
-      match u, v with
-	| Access (a, x, _), v | v, Access (a, x, _) ->
-	    let nr, _ = mk_fresh_record x (Some(a,v)) in
-	    solve_one x nr
-
-	| Record (lbs1, _), Record (lbs2, _) ->
-	    let l = 
-	      List.fold_left2 
-		(fun l (_, x) (_, y) -> (solve_one x y)@l) [] lbs1 lbs2
-	    in 
-	    resolve l
-
-	| (Record (lbs, _) as w), (Other _ as x) 
-	| (Other _ as x), (Record (lbs, _) as w) ->
-	    if not (occurs x w) then [x, w]
-	    else if direct_args_of_labels x lbs then raise Exception.Unsolvable
-	    else 
-	      let nr, sigma = mk_fresh_record w None in
-	      let l = 
-		List.fold_left2
-		  (fun l (_, ai) (_, ei) -> 
-		     (solve_one ai (subst_access x sigma ei))@l) [] sigma lbs
-	      in
-	      (x, nr)::resolve l
-
-	| Other _, Other _ -> [u, v]
-	    
-  and resolve l = 
-    let s, r = split l in
-    match r with [] -> s | (u, v) :: l -> resolve (s@(solve_one u v)@l)
-
-  let solve r1 r2 =
-    let r1 = normalize (embed r1) in
-    let r2 = normalize (embed r2) in
-    List.map (fun (x, y) -> is_mine x, is_mine y) (solve_one r1 r2)
-
-
-  let leaves t =
-    if !profiling then
-      try 
-	!Options.timer_start Timers.TRecords;
-	let res = leaves t in
-	!Options.timer_pause Timers.TRecords;
-	res
-      with e -> 
-	!Options.timer_pause Timers.TRecords;
-	raise e
-    else leaves t
-
-  let make t =
-    if !profiling then
-      try 
-	!Options.timer_start Timers.TRecords;
-	let res = make t in
-	!Options.timer_pause Timers.TRecords;
-	res
-      with e -> 
-	!Options.timer_pause Timers.TRecords;
-	raise e
-    else make t
-
-  let solve a b =
-    if !profiling then
-      try 
-	!Options.timer_start Timers.TRecords;
-	let res = solve a b in
-	!Options.timer_pause Timers.TRecords;
-	res
-      with e -> 
-	!Options.timer_pause Timers.TRecords;
-	raise e
-    else solve a b
-
   let fully_interpreted _ = false
 
   let rec term_extract r = 
@@ -402,7 +327,7 @@ module Make (X : ALIEN) = struct
     if List.mem p (X.leaves v) then raise Exception.Unsolvable;
     { pb with sbt = (p,v) :: pb.sbt }
     
-  let new_solve r1 r2 pb = 
+  let solve r1 r2 pb = 
     match embed r1, embed r2 with
       | Record (l1, _), Record (l2, _) -> 
         let eqs = 
@@ -422,6 +347,42 @@ module Make (X : ALIEN) = struct
       | Record (l1, _), Other (a2,_)  -> orient_solved r2 r1 pb
       | Access _ , _ -> assert false
       | _ , Access _ -> assert false
+
+  let leaves t =
+    if !profiling then
+      try 
+	!Options.timer_start Timers.TRecords;
+	let res = leaves t in
+	!Options.timer_pause Timers.TRecords;
+	res
+      with e -> 
+	!Options.timer_pause Timers.TRecords;
+	raise e
+    else leaves t
+
+  let make t =
+    if !profiling then
+      try 
+	!Options.timer_start Timers.TRecords;
+	let res = make t in
+	!Options.timer_pause Timers.TRecords;
+	res
+      with e -> 
+	!Options.timer_pause Timers.TRecords;
+	raise e
+    else make t
+
+  let solve r1 r2 pb =
+    if !profiling then
+      try 
+	!Options.timer_start Timers.TRecords;
+	let res = solve r1 r2 pb in
+	!Options.timer_pause Timers.TRecords;
+	res
+      with e -> 
+	!Options.timer_pause Timers.TRecords;
+	raise e
+    else solve r1 r2 pb
 
   module Rel =
   struct

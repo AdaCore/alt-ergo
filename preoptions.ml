@@ -66,6 +66,7 @@ let glouton = ref false
 let triggers_var = ref false
 let redondance = ref 2
 let inversion_axioms = ref false
+let enable_assertions = ref false
 let astuce = ref false
 let select = ref 0
 let no_rm_eq_existential = ref false

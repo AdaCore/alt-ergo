@@ -115,7 +115,7 @@ module Make(X : ALIEN) = struct
       | Alien _    , Alien _    -> 
         if X.compare a b > 0 then [a,b] else [b,a]
     
-  let solve a b =
+  let solve_bis a b =
     if debug_sum () then fprintf fmt "[Sum] we solve %a = %a@."  
       X.print a X.print b;
     try
@@ -132,23 +132,22 @@ module Make(X : ALIEN) = struct
 
   let abstract_selectors v acc = is_mine v, acc
 
-  let solve a b =
+  let term_extract _ = None
+  
+  let solve r1 r2 pb = 
+    {pb with sbt = List.rev_append (solve_bis r1 r2) pb.sbt}
+
+  let solve r1 r2 pb =
     if !profiling then
       try 
 	!Options.timer_start Timers.TSum;
-	let res = solve a b in
+	let res = solve r1 r2 pb in
 	!Options.timer_pause Timers.TSum;
 	res
       with e -> 
 	!Options.timer_pause Timers.TSum;
 	raise e
-    else solve a b
-
-
-  let term_extract _ = None
-  
-  let new_solve r1 r2 pb = 
-    {pb with sbt = List.rev_append (solve r1 r2) pb.sbt}
+    else solve r1 r2 pb
 
   module Rel = struct
     type r = X.r

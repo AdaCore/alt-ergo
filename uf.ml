@@ -550,13 +550,11 @@ module Make ( R : Sig.X ) = struct
     (* pourquoi recuperer le representant de rv? r = rv d'apres testopt *)
     if debug_uf () then 
       printf "[uf] ac-solve: %a |-> %a %a@." R.print p R.print v Ex.print dep;
-    assert(
-      let rp, _ = Env.find_or_normal_form env p in R.equal p rp
-    );
+    assert (not !Preoptions.enable_assertions ||
+              let rp, _ = Env.find_or_normal_form env p in R.equal p rp);
     let rv, ex_rv = Env.find_or_normal_form env v in
-    assert (
-        let rv, _ = Env.find_or_normal_form env v in R.equal v rv
-    );
+    assert (not !Preoptions.enable_assertions ||
+              let rv, _ = Env.find_or_normal_form env v in R.equal v rv);
     let dep = Ex.union ex_rv dep in
     Env.apply_sigma eqs env tch (p, rv, dep)
 
