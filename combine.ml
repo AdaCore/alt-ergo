@@ -110,7 +110,9 @@ struct
       | Ac x    , Ac    y -> AC.compare x y
       | _                 -> compare_tag a b
     
-  let equal a b = compare a b = 0
+  let equal a b =
+    (*fprintf fmt "equal %a and %a@." CX.print a CX.print b;*)
+    compare a b = 0
 
   let hash = function
     | Term  t -> Term.hash t 
@@ -317,7 +319,24 @@ struct
       | Term _ -> a, acc
       | Ac a   -> AC.abstract_selectors a acc
 
-
+  let abstract_equality a b = 
+    let aux r acc = 
+      match r with
+        | Ac ({l=args} as ac) -> 
+          let args, acc = 
+            List.fold_left
+              (fun (args, acc) (r, i) ->
+                let r, acc = abstract_selectors r acc in
+                (r, i) :: args, acc
+              )([],acc) args
+          in
+          ac_embed {ac with l = AC.compact args}, acc
+        | _     -> abstract_selectors r acc
+    in
+    let a', acc = aux a [] in
+    let b', acc = aux b acc in
+    a', b', acc
+      
   let apply_subst r l = List.fold_left (fun r (p,v) -> CX.subst p v r) r l
       
   let triangular_down sbs = 
@@ -382,8 +401,7 @@ struct
   let solve  a b =
     if debug_combine () then 
       fprintf fmt "@.[combine] I solve %a = %a:@." print a print b;
-    let a', acc = abstract_selectors a [] in
-    let b', acc = abstract_selectors b acc in
+    let a', b', acc = abstract_equality a b in
     solve_abstracted a b a' b' acc
       
   module Rel =

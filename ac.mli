@@ -58,6 +58,8 @@ module type S = sig
 
   val abstract_selectors : t -> (r * r) list -> r * (r * r) list
     
+  val compact : (r * int) list -> (r * int) list
+
 end
 
 module Make (X : Sig.X) : S with type r = X.r

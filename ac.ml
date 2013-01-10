@@ -18,6 +18,8 @@
 (**************************************************************************)
 
 open Options
+open Format
+
 module L = List
 module HS = Hstring
 module F = Format
@@ -63,6 +65,7 @@ module type S = sig
 
   val abstract_selectors : t -> (r * r) list -> r * (r * r) list
 
+  val compact : (r * int) list -> (r * int) list
 end
 
 module Make (X : Sig.X) = struct
@@ -72,6 +75,23 @@ module Make (X : Sig.X) = struct
   type r = X.r
 
   type t = X.r Sig.ac
+
+  let rec pr_elt sep fmt (e,n) = 
+    assert (n >=0);
+    if n = 0 then ()
+    else F.fprintf fmt "%s%a%a" sep X.print e (pr_elt sep) (e,n-1)
+
+  let pr_xs sep fmt = function
+    | [] -> assert false
+    | (p,n)::l  -> 
+	F.fprintf fmt "%a" X.print p; 
+	L.iter (F.fprintf fmt "%a" (pr_elt sep))((p,n-1)::l)
+	  
+  let print fmt {h=h ; l=l} = 
+    if Sy.equal h (Sy.Op Sy.Mult) && Options.term_like_pp () then
+      F.fprintf fmt "%a" (pr_xs "'*'") l
+    else
+      F.fprintf fmt "%a(%a)" Sy.print h (pr_xs ",") l
 
   let flatten h (r,m) acc = 
     match X.ac_extract r with
@@ -85,11 +105,11 @@ module Make (X : Sig.X) = struct
     
   let compact xs =
     let rec f acc = function 
-	[] -> acc
+      | [] -> acc
       | [(x,n)] -> (x,n) :: acc
       | (x,n) :: (y,m) :: r ->
-	  if X.equal x y then f acc ((x,n+m) :: r)
-	  else f ((x,n)::acc) ((y,m) :: r) 
+	if X.equal x y then f acc ((x,n+m) :: r)
+	else f ((x,n)::acc) ((y,m) :: r) 
     in
       f [] (sort xs) (* increasing order - f's result in a decreasing order*)
 
@@ -153,37 +173,61 @@ module Make (X : Sig.X) = struct
 	
   let size = L.fold_left (fun z (rx,n) -> z + n) 0
       
+
+  module SX = Set.Make(struct type t=r let compare = X.compare end)
+    
+  let leaves_list l = 
+    let l = 
+      List.fold_left
+        (fun acc (x,n) ->
+          let sx = List.fold_right SX.add (X.leaves x) SX.empty in
+          SX.fold (fun lv acc -> (lv, n) :: acc)  sx acc
+        ) []l
+    in
+    compact l
+
+
   (* x et y are sorted in a decreasing order *)
   let compare {h=f ; l=x} {h=g ; l=y} = 
     let c = Sy.compare f g in
     if c <> 0 then c 
     else
-      let c = size x - size y in
+      let llx = leaves_list x in
+      let lly = leaves_list y in
+      let c = size llx - size lly in
       if c <> 0 then c
-      else (*mset_cmp (rev_sort x , rev_sort y)*)
-        mset_cmp (x , y)
+      else 
+        let c = mset_cmp (leaves_list x , leaves_list y) in
+        if c <> 0 then c 
+        else mset_cmp (x , y)
+
+
+  let compare a b = 
+    let c1 = compare a b in
+    let c2 = compare b a in
+    assert (
+      if not (c1 = 0 && c2 = 0 ||
+        c1 < 0 && c2 > 0 ||
+        c1 > 0 && c2 < 0) then begin
+        fprintf fmt "Ac.compare:@.%a vs @.%a@. = %d@.@." print a print b c1;
+        fprintf fmt "But@.";
+        fprintf fmt "Ac.compare:@.%a vs @.%a@. = %d@.@." print b print a c2;
+        false
+      end
+      else true
+    );
+    c1
+        
+(*
+  let mset_compare ord {h=f ; l=x} {h=g ; l=y} =
+    let c = Sy.compare f g in
+    if c <> 0 then c 
+    else assert false
+*)
 
   let hash {h = f ; l = l; t = t} = 
     let acc = Sy.hash f + 19 * Ty.hash t in
     abs (List.fold_left (fun acc (x, y) -> acc + 19 * (X.hash x + y)) acc l)
-
-  let rec pr_elt sep fmt (e,n) = 
-    assert (n >=0);
-    if n = 0 then ()
-    else F.fprintf fmt "%s%a%a" sep X.print e (pr_elt sep) (e,n-1)
-
-  let pr_xs sep fmt = function
-    | [] -> assert false
-    | (p,n)::l  -> 
-	F.fprintf fmt "%a" X.print p; 
-	L.iter (F.fprintf fmt "%a" (pr_elt sep))((p,n-1)::l)
-	  
-  let print fmt {h=h ; l=l} = 
-    if Sy.equal h (Sy.Op Sy.Mult) && Options.term_like_pp () then
-      F.fprintf fmt "%a" (pr_xs "'*'") l
-    else
-      F.fprintf fmt "%a(%a)" Sy.print h (pr_xs ",") l
-
 
 
   let subst p v ({h=h;l=l;t=t} as tm)  =
@@ -205,8 +249,7 @@ module Make (X : Sig.X) = struct
 
   let fully_interpreted sb = true 
 
-  let abstract_selectors ({l=args} as ac) acc = X.ac_embed ac, acc
-    (*
+  let abstract_selectors ({l=args} as ac) acc =
     let args, acc = 
       List.fold_left
         (fun (args, acc) (r, i) ->
@@ -216,13 +259,11 @@ module Make (X : Sig.X) = struct
     in
     let xac = X.ac_embed {ac with l = compact args} in
     xac, acc
-    *)
-(* Ne suffit pas. Il faut aussi prevoir le collapse
-    try List.assoc xac acc, acc
+    (* Ne suffit pas. Il faut aussi prevoir le collapse ? *)
+      (*try List.assoc xac acc, acc
     with Not_found ->
       let v = X.term_embed (Term.fresh_name ac.t) in
-      v, (xac, v) :: acc
-*)
+      v, (xac, v) :: acc*)
 
 end
 

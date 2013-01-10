@@ -320,7 +320,15 @@ module Make ( R : Sig.X ) = struct
 	      else raise List_minus_exn
       in di_un [] l_1 l_2
         
+    let setrl fmt rls = 
+      SetRL.iter
+        (fun (g,d,_) ->
+          fprintf fmt "%a ----> %a@." Ac.print g R.print d;
+        )rls
+
     let apply_rs r rls = 
+      (*fprintf fmt "apply_rs %a and rs is@. %a@.@." Ac.print r setrl rls;*)
+
       let fp = ref true in
       let r = ref r in
       let ex = ref Ex.empty in
@@ -447,25 +455,35 @@ module Make ( R : Sig.X ) = struct
 	      let gx = R.color g in
 	      let g2, ex_g2 = normal_form env (Ac.subst p v g) in
 	      let d2, ex_d2 = normal_form env (R.subst p v d) in
-	      if R.equal g2 gx then (* compose *)
-		begin
-		  if debug_ac () && R.equal g2 d2 then
-		    Format.eprintf "Compose : %a -> %a on %a and %a@." 
-		      R.print p R.print v
-		      Ac.print g R.print d;
-                  let ex = Ex.union ex_d2 (Ex.union dep_rl dep) in
-	          {env with ac_rs = RS.add_rule (g,d2, ex) env.ac_rs}
+              if R.compare g2 d2 <= 0 then begin
+                if true || debug_ac () then
+                  fprintf fmt "[uf] collapse forcé par *: %a = %a@."
+		    R.print g2 R.print d2;
+                let ex = Ex.union 
+		  (Ex.union ex_g2 ex_d2) (Ex.union dep_rl dep) in
+                Queue.push (g2, d2, ex) eqs;
+	        env
+              end
+              else
+	        if R.equal g2 gx then (* compose *)
+		  begin
+		    if debug_ac () && R.equal g2 d2 then
+		      Format.eprintf "Compose : %a -> %a on %a and %a@." 
+		        R.print p R.print v
+		        Ac.print g R.print d;
+                    let ex = Ex.union ex_d2 (Ex.union dep_rl dep) in
+	            {env with ac_rs = RS.add_rule (g,d2, ex) env.ac_rs}
 		  end
-	      else (* collapse *)
-                begin
-                  if debug_ac () then
-                    fprintf fmt "[uf] collapse: %a = %a@."
-		      R.print g2 R.print d2;
-                  let ex = Ex.union 
-		    (Ex.union ex_g2 ex_d2) (Ex.union dep_rl dep) in
-                  Queue.push (g2, d2, ex) eqs;
-	          env
-                end
+	        else (* collapse *)
+                  begin
+                    if debug_ac () then
+                      fprintf fmt "[uf] collapse: %a = %a@."
+		        R.print g2 R.print d2;
+                    let ex = Ex.union 
+		      (Ex.union ex_g2 ex_d2) (Ex.union dep_rl dep) in
+                    Queue.push (g2, d2, ex) eqs;
+	            env
+                  end
 	    ) rls env
 	) env.ac_rs env
 	
