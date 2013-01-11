@@ -601,7 +601,7 @@ let filter_good_triggers (bv, vty) =
 
 let make_triggers gopt vterm vtype trs = 
   match List.filter (filter_mono vterm vtype) trs with
-      [] -> 
+    | [] ->
 	multi_triggers gopt vterm vtype trs
     | trs' -> 
 	let f l = at_most (redondance ()) (List.map (fun (t, _, _) -> [t]) l) in

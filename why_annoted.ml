@@ -26,7 +26,7 @@ open Options
 open Gui_session
 
 let indent_size = 4
-let monospace_font = Pango.Font.from_string "mono"
+let monospace_font = Pango.Font.from_string "monospace"
 let general_font = Pango.Font.from_string "sans"
 
 type sbuffer = GSourceView2.source_buffer

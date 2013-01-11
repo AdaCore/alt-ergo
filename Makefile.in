@@ -304,7 +304,8 @@ FILES = exception.mli exception.ml \
 	gui.ml \
 	main.ml \
 	Makefile.in configure configure.in \
-	.depend README INSTALL COPYING CeCILL-C CHANGES
+	.depend README INSTALL COPYING CeCILL-C CHANGES\
+	revision.sh
 
 export: source binary
 	cp README COPYING CeCILL-C CHANGES doc/*.1 $(HTTP)
