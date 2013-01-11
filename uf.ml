@@ -456,7 +456,7 @@ module Make ( R : Sig.X ) = struct
 	      let g2, ex_g2 = normal_form env (Ac.subst p v g) in
 	      let d2, ex_d2 = normal_form env (R.subst p v d) in
               if R.compare g2 d2 <= 0 then begin
-                if true || debug_ac () then
+                if debug_ac () then
                   fprintf fmt "[uf] collapse forcé par *: %a = %a@."
 		    R.print g2 R.print d2;
                 let ex = Ex.union 
