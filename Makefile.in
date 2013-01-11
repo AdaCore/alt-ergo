@@ -308,6 +308,9 @@ FILES = exception.mli exception.ml \
 
 export: source binary
 	cp README COPYING CeCILL-C CHANGES doc/*.1 $(HTTP)
+	rm -rf export/$(EXPORTDIR)
+	rm -rf $(HTTP)/$(EXPORTDIR)
+	mv export $(HTTP)/$(EXPORTDIR)
 
 source: 
 	mkdir -p export/$(EXPORTDIR)
