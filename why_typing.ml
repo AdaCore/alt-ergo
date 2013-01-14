@@ -28,28 +28,28 @@ module Sy = Symbols.Set
 module MString = 
   Map.Make(struct type t = string let compare = Pervasives.compare end)
 
-let implicite_tyvars = ref MString.empty
-
 module Types = struct
 
   (* environment for user-defined types *)
   type t = {
     to_ty : Ty.t MString.t;
-    from_labels : string MString.t
-  }
+    from_labels : string MString.t; }
 
-  let empty = { to_ty = MString.empty; from_labels = MString.empty }
+  let to_tyvars = ref MString.empty
+
+  let empty = 
+    { to_ty = MString.empty; 
+      from_labels = MString.empty }
 
   let fresh_vars env vars loc =
-    let vars, env = 
-      List.fold_left 
-	(fun (vars, env) x -> 
-	   if MString.mem x env.to_ty then error (TypeDuplicateVar x) loc;
-	   let nv = Ty.Tvar (Ty.fresh_var ()) in
-	   nv::vars, { env with to_ty = MString.add x nv env.to_ty} )
-	([], env) vars
-    in 
-    List.rev vars, env
+    List.map
+      (fun x -> 
+	if MString.mem x !to_tyvars then
+          error (TypeDuplicateVar x) loc;
+	let nv = Ty.Tvar (Ty.fresh_var ()) in
+        to_tyvars := MString.add x nv !to_tyvars;
+	nv
+      ) vars
 
   let check_number_args loc lty ty = 
     match ty with
@@ -78,14 +78,11 @@ module Types = struct
     | PPTbitv n -> Ty.Tbitv n
     | PPTvarid (s, _) -> 
       begin
-        try MString.find s env.to_ty 
-	with Not_found -> 
-          (*error (UnboundedVar s) loc*)
-          try MString.find s !implicite_tyvars
-          with Not_found ->
-            let nty = Ty.Tvar (Ty.fresh_var ()) in
-	    implicite_tyvars := MString.add s nty !implicite_tyvars;
-            nty
+        try MString.find s !to_tyvars
+        with Not_found ->
+          let nty = Ty.Tvar (Ty.fresh_var ()) in
+	  to_tyvars := MString.add s nty !to_tyvars;
+          nty
       end
     | PPTexternal (l, s, loc) when s = "farray" ->
 	let t1,t2 = match l with
@@ -111,7 +108,7 @@ module Types = struct
 
   let add env vars id body loc = 
     if MString.mem id env.to_ty then error (ClashType id) loc;
-    let ty_vars, nenv = fresh_vars env vars loc in
+    let ty_vars = fresh_vars env vars loc in
     match body with
       | Abstract -> 
 	  { env with to_ty = MString.add id (Ty.text ty_vars id) env.to_ty }
@@ -119,12 +116,11 @@ module Types = struct
 	  { env with to_ty = MString.add id (Ty.tsum id lc) env.to_ty }
       | Record lbs -> 
 	  let lbs = 
-	    List.map (fun (x, pp) -> x, ty_of_pp loc nenv None pp) lbs in
+	    List.map (fun (x, pp) -> x, ty_of_pp loc env None pp) lbs in
 	  { to_ty = MString.add id (Ty.trecord ty_vars id lbs) env.to_ty;
 	    from_labels = 
 	      List.fold_left 
-		(fun fl (l,_) -> MString.add l id fl) env.from_labels lbs
-	  }
+		(fun fl (l,_) -> MString.add l id fl) env.from_labels lbs }
 
   module SH = Set.Make(Hstring)
 
@@ -158,20 +154,14 @@ module Types = struct
 	    check_labels lbs ty loc
 	  with Not_found -> error (NoRecordType l) loc
 
-  let rec monomorphized env = function
-    | PPTvarid (x, _) when not (MString.mem x env.to_ty) -> 
-	{ env with to_ty = MString.add x (Ty.fresh_empty_text ()) env.to_ty } 
-    | PPTexternal (args, _, _) ->
-	List.fold_left monomorphized env args
-    | pp_ty -> env
-
-  let rec rename_vars env = function
-    | PPTvarid (x, _) when not (MString.mem x env.to_ty) -> 
-	{ env with 
-	    to_ty = MString.add x (Ty.Tvar (Ty.fresh_var ())) env.to_ty } 
-    | PPTexternal (args, _, _) ->
-	List.fold_left rename_vars env args
-    | pp_ty -> env
+  let rec monomorphized = function
+    | PPTvarid (x, _) when not (MString.mem x !to_tyvars) -> 
+      to_tyvars := MString.add x (Ty.fresh_empty_text ()) !to_tyvars;
+      
+    | PPTexternal (args, _, _) -> 
+      List.iter monomorphized args
+    
+    | pp_ty -> ()
 
   let init_labels fl id loc = function
     | Record lbs ->
@@ -207,17 +197,16 @@ module Env = struct
     { env with var_map = vmap }
 
   let add_var env lv pp_ty loc  = 
-    let env = { env with types = Types.rename_vars env.types pp_ty } in
     let ty = Types.ty_of_pp loc env.types None pp_ty in
     add env lv Symbols.var ty
 
   let add_names env lv pp_ty loc = 
-    let env = { env with types = Types.monomorphized env.types pp_ty } in
+    Types.monomorphized pp_ty;
     let ty = Types.ty_of_pp loc env.types None pp_ty in
     add env lv Symbols.name ty
 
   let add_names_lbl env lv pp_ty loc = 
-    let env = { env with types = Types.monomorphized env.types pp_ty } in
+    Types.monomorphized pp_ty;
     let ty = Types.ty_of_pp loc env.types None pp_ty in
     let rlv = 
       List.fold_left (fun acc (x, lbl) ->
@@ -233,17 +222,14 @@ module Env = struct
     let profile = 
       match pp_profile with
 	| PPredicate args -> 
-	    let types = List.fold_left Types.rename_vars env.types args in
-	    { args = List.map (Types.ty_of_pp loc types None) args; 
-	      result = Ty.Tbool }
-	| PFunction ([], PPTvarid (_, loc)) -> 
-	    error CannotGeneralize loc
+	    { args = List.map (Types.ty_of_pp loc env.types None) args; 
+	    result = Ty.Tbool }
+	(*| PFunction ([], PPTvarid (_, loc)) -> 
+	    error CannotGeneralize loc*)
 	| PFunction(args, res) -> 
-	    let types = List.fold_left Types.rename_vars env.types args in
-	    let types = Types.rename_vars types res in
-	    let args = List.map (Types.ty_of_pp loc types None) args in
-	    let res = Types.ty_of_pp loc types None res in
-	    { args = args; result = res }
+	    let args = List.map (Types.ty_of_pp loc env.types None) args in
+	    let res = Types.ty_of_pp loc env.types None res in
+	  { args = args; result = res }
     in
     let logics = 
       List.fold_left 
@@ -1178,6 +1164,8 @@ let monomorphize_atom tat =
   in 
   { tat with c = c }
 
+let monomorphize_var (s,ty) = s, Ty.monomorphize ty
+
 let rec monomorphize_form tf = 
   let c = match tf.c with
     | TFatom tat -> TFatom (monomorphize_atom tat)
@@ -1185,15 +1173,18 @@ let rec monomorphize_form tf =
         TFop(oplogic, List.map monomorphize_form tfl)
     | TFforall qf ->
         TFforall
-          {qf with
+          {  qf_bvars = List.map monomorphize_var qf.qf_bvars;
+             qf_upvars = List.map monomorphize_var qf.qf_upvars;
              qf_form = monomorphize_form qf.qf_form;
              qf_triggers = List.map (List.map mono_term) qf.qf_triggers}
     | TFexists qf ->
         TFexists 
-          {qf with
+          {  qf_bvars = List.map monomorphize_var qf.qf_bvars;
+             qf_upvars = List.map monomorphize_var qf.qf_upvars;
              qf_form = monomorphize_form qf.qf_form;
              qf_triggers = List.map (List.map mono_term) qf.qf_triggers}
     | TFlet (l, sy, tt, tf) ->
+        let l = List.map monomorphize_var l in
         TFlet(l,sy, mono_term tt, monomorphize_form tf)
     | TFnamed (hs,tf) ->
         TFnamed(hs, monomorphize_form tf)
@@ -1255,7 +1246,7 @@ let rec type_and_intro_goal keep_triggers acc env loc sort n f =
 
 
 let type_decl keep_triggers (acc, env) d = 
-  implicite_tyvars := MString.empty;
+  Types.to_tyvars := MString.empty;
   try
     match d with
       | Logic (loc, ac, lp, pp_ty) -> 
@@ -1283,10 +1274,10 @@ let type_decl keep_triggers (acc, env) d =
 
 
       | Goal(loc, n, f) ->
-	  if rules () = 1 then fprintf fmt "[rule] TR-Typing-GoalDecl$_F$@.";
+          if rules () = 1 then fprintf fmt "[rule] TR-Typing-GoalDecl$_F$@.";
 	  (*let f = move_up f in*)
 	  let f = alpha_renaming_env env f in
-	  type_and_intro_goal keep_triggers acc env loc Thm n f, env
+ 	  type_and_intro_goal keep_triggers acc env loc Thm n f, env
 
       | Predicate_def(loc,n,l,e) 
       | Function_def(loc,n,l,_,e) ->

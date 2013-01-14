@@ -92,7 +92,7 @@ module Make
     if P.type_info p = Ty.Tint then
       let _, c = P.to_list p in
       let ppmc = P.ppmc_denominators p in
-      assert (!Preoptions.no_asserts || is_integer_num (ppmc */ c))
+      assert (is_integer_num (ppmc */ c))
       
   (* t1 % t2 = md  <-> 
      c1. 0 <= md ;
@@ -106,7 +106,7 @@ module Make
       match P.is_num p2 with
 	| Some n2 -> 
 	    let an2 = abs_num n2 in
-	    assert (!Preoptions.no_asserts || is_integer_num an2);
+	    assert (is_integer_num an2);
 	    let t2 = T.int (string_of_num an2) in
 	    A.LT.make (A.Builtin(true, alt, [md; t2]))
 	| None -> 
@@ -217,7 +217,7 @@ module Make
     is_mine (arith_to_ac p), ctx
 
   let rec expand p n acc =
-    assert (!Preoptions.no_asserts || n >=0);
+    assert (n >=0);
     if n = 0 then acc else expand p (n-1) (p::acc)
 
   let unsafe_ac_to_arith {h=sy; l=rl; t=ty} =
@@ -248,15 +248,26 @@ module Make
 	let acc = nb_vars_in_alien x in
 	List.fold_left (fun acc (_, x) -> max acc (nb_vars_in_alien x)) acc l
 
+  let contains_a_fresh_alien xp =
+    List.exists
+      (fun x -> 
+        match X.term_extract x with
+          | Some t -> Term.is_fresh t 
+          | _ -> false
+      ) (X.leaves xp)
+
   let color ac = 
     match ac.l with
       | [(r, 1)] -> assert false
       | _ -> 
         let p = unsafe_ac_to_arith ac in 
-	let l, _ = P.to_list p in
-        let mx = max_list_ l in
-        if mx = 0 || mx = 1 || number_of_vars ac.l > mx then is_mine p 
-	else X.ac_embed ac
+        let xp = is_mine p in
+        if contains_a_fresh_alien xp then 
+	  let l, _ = P.to_list p in
+          let mx = max_list_ l in
+          if mx = 0 || mx = 1 || number_of_vars ac.l > mx then is_mine p 
+	  else X.ac_embed ac
+        else xp
 
 	(*try
           List.iter
@@ -272,18 +283,18 @@ module Make
 
   let is_int r = X.type_info r = Ty.Tint
 
-  module XS = Set.Make(struct type t = X.r let compare = X.compare end)
-    
+  module SX = Set.Make(struct type t = r let compare = X.compare end)
+
   let xs_of_list = 
-    List.fold_left (fun s x -> XS.add x s) XS.empty
+    List.fold_left (fun s x -> SX.add x s) SX.empty
       
   let rec leaves p = 
     let s = 
       List.fold_left
-	(fun s (_, a) -> XS.union (xs_of_list (X.leaves a)) s)
-	XS.empty (fst (P.to_list p))
+	(fun s (_, a) -> SX.union (xs_of_list (X.leaves a)) s)
+	SX.empty (fst (P.to_list p))
     in
-    XS.elements s
+    SX.elements s
 
   let subst x t p = 
     let p = P.subst x (embed t) p in
@@ -484,7 +495,7 @@ module Make
     let pp = safe_distribution p in
     if ty = Ty.Treal then solve_real pp else solve_int pp
 
-  let solve r1 r2 =
+  let solve_one r1 r2 =
     if rules () = 4 then fprintf fmt "[rule] TR-Arith-Solve@.";
     let sbs = solve_aux r1 r2 in
     let sbs = List.fast_sort (fun (a,_) (x,y) -> X.compare x a)sbs in
@@ -498,6 +509,28 @@ module Make
     end;
     sbs
 
+  let apply_subst r l =
+    List.fold_left (fun r (p,v) -> X.subst p v r) r l
+      
+  let triangular_down sbs = 
+    List.fold_right
+      (fun (p,v) nsbs -> (p, apply_subst v nsbs) :: nsbs) sbs []
+
+  let make_idemp a b sbs = 
+    let sbs = triangular_down sbs in
+    let sbs = triangular_down (List.rev sbs) in (* triangular up *)
+    let original = List.fold_right SX.add (X.leaves a) SX.empty in
+    let original = List.fold_right SX.add (X.leaves b) original in
+    let sbs = List.filter (fun (p,v) -> SX.mem p original) sbs in
+    assert (not !Preoptions.enable_assertions ||
+              X.equal (apply_subst a sbs) (apply_subst b sbs));
+    sbs
+
+  let solve r1 r2 pb = 
+    let sbt = solve_one r1 r2 in
+    {pb with sbt = List.rev_append (make_idemp r1 r2 sbt) pb.sbt}
+
+  (*XXX*)
 
   let make t =
     if !profiling then
@@ -523,17 +556,17 @@ module Make
 	raise e
     else leaves p
 
-  let solve r1 r2 = 
+  let solve r1 r2 pb = 
     if !profiling then
       try 
 	!Options.timer_start Timers.TArith;
-	let res = solve r1 r2 in
+	let res = solve r1 r2 pb in
 	!Options.timer_pause Timers.TArith;
 	res
       with e -> 
 	!Options.timer_pause Timers.TArith;
 	raise e
-    else solve r1 r2
+    else solve r1 r2 pb
 
   let print = P.print
 
@@ -544,6 +577,10 @@ module Make
 
 
   let term_extract _ = None
+
+  let abstract_selectors p acc =
+    let p, acc = P.abstract_selectors p acc in
+    is_mine p, acc
 
   module Rel = Fm.Make (X) 
     (struct

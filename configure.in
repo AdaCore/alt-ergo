@@ -170,6 +170,7 @@ if test "$LABLGTK2" = no ; then
       AC_MSG_RESULT(Will not be able to compile GUI. Please install the *liblablgtksourceview2-ocaml-dev* Debian package - or use the GODI caml package system *http://godi.ocaml-programming.de/* - or compile from sources *http://wwwfun.kurims.kyoto-u.ac.jp/soft/lsl/lablgtk.html*)
 else
       LABLGTK2LIB="-I +lablgtk2 -I +threads"
+      ENABLEGUI="yes"
 fi
 
 AC_CHECK_PROG(OCAMLWEB,ocamlweb,ocamlweb,true)
@@ -200,6 +201,7 @@ AC_SUBST(OCAMLLIB)
 AC_SUBST(OCAMLGRAPHLIB)
 AC_SUBST(OCAMLWEB)
 AC_SUBST(LABLGTK2LIB)
+AC_SUBST(ENABLEGUI)
 AC_SUBST(INCLUDEGTK2)
 AC_SUBST(OCAMLWIN32)
 AC_SUBST(EXE)

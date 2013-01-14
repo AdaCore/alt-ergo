@@ -704,12 +704,12 @@ module Make(X : ALIEN) = struct
 
 
   (* ne resout pas quand c'est deja resolu *)
-  let solve u t = 
+  let solve_bis u t = 
     if Options.debug_bitv () then 
       eprintf "[Bitv] solve %a = %a@." X.print u X.print t;
     
     match X.extract u , X.extract t with 
-      | None   , None   -> assert false
+      | None   , None   -> if X.compare u t > 0 then [u,t] else [t,u]
       | None   , Some _ -> [u , t]
       | Some _ , None   -> [t , u]
       | Some u , Some t -> 
@@ -766,6 +766,11 @@ module Make(X : ALIEN) = struct
   let fully_interpreted sb = true
 
   let term_extract _ = None
+
+  let abstract_selectors v acc = is_mine v, acc
+
+  let solve r1 r2 pb = 
+    {pb with sbt = List.rev_append (solve_bis r1 r2) pb.sbt}
 
   module Rel = struct
 

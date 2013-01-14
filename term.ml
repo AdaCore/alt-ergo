@@ -67,7 +67,7 @@ let rec print fmt t =
     | Sy.Op (Sy.Record), _ ->
         begin match ty with
 	  | Ty.Trecord {Ty.lbs=lbs} ->
-	    assert (!Preoptions.no_asserts || List.length l = List.length lbs);
+	    assert (List.length l = List.length lbs);
 	      fprintf fmt "{";
 	      ignore (List.fold_left2 (fun first (field,_) e -> 
 		fprintf fmt "%s%s = %a"  (if first then "" else "; ")
@@ -120,6 +120,11 @@ let sort = List.sort compare
 let make s l ty = T.hashcons {f=s;xs=l;ty=ty;tag=0 (* dumb_value *) }
 
 let fresh_name ty = make (Sy.name (Common.fresh_string())) [] ty
+
+let is_fresh t = 
+  match view t with
+    | {f=Sy.Name(hs,_);xs=[]} -> Common.is_fresh_string (Hstring.view hs)
+    | _ -> false
 
 let shorten t = 
   let {f=f;xs=xs;ty=ty} = view t in

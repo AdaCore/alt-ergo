@@ -99,24 +99,6 @@ struct
           
   let compare_tag a b = theory_num a - theory_num b
 
-  (*let compare a b = 
-    let c = Ty.compare (type_info a) (type_info b) in
-    if c <> 0 then c
-    else match a, b with
-      | Term x  , Term y  -> Term.compare x y
-      | Ac x    , Ac    y -> AC.compare x y
-      | Ac _    , Term _  -> 1
-      | Term _  , Ac _    -> -1
-      | X1 _, (Term _ | Ac _ | X1 _) | (Term _ | Ac _ ), X1 _ -> X1.compare a b
-      | X2 _, (Term _ | Ac _ | X2 _) | (Term _ | Ac _ ), X2 _ -> X2.compare a b
-      | X3 _, (Term _ | Ac _ | X3 _) | (Term _ | Ac _ ), X3 _ -> X3.compare a b
-      | X4 _, (Term _ | Ac _ | X4 _) | (Term _ | Ac _ ), X4 _ -> X4.compare a b
-      | X5 _, (Term _ | Ac _ | X5 _) | (Term _ | Ac _ ), X5 _ -> X5.compare a b
-      | _                 -> compare_tag a b
-  *)      
-    
-  (* ancienne version *)
-
   let compare a b = 
     match a, b with
       | X1 x, X1 y -> X1.compare a b
@@ -128,7 +110,9 @@ struct
       | Ac x    , Ac    y -> AC.compare x y
       | _                 -> compare_tag a b
     
-  let equal a b = compare a b = 0
+  let equal a b =
+    (*fprintf fmt "equal %a and %a@." CX.print a CX.print b;*)
+    compare a b = 0
 
   let hash = function
     | Term  t -> Term.hash t 
@@ -140,7 +124,8 @@ struct
     | X5 x -> X5.hash x
 
   module MR = Map.Make(struct type t = r let compare = compare end)
-    
+  module SX = Set.Make(struct type t = r let compare = CX.compare end)
+  
   let print fmt r = 
     if term_like_pp () then 
       match r with
@@ -267,11 +252,6 @@ struct
 	    | _ -> assert false
               
 
-  let add_mr =
-    List.fold_left 
-      (fun solved (p,v) -> 
-	 MR.add p (v::(try MR.find p solved with Not_found -> [])) solved)
-
   let unsolvable = function
     | X1 x -> X1.unsolvable x
     | X2 x -> X2.unsolvable x 
@@ -280,138 +260,150 @@ struct
     | X5 x -> X5.unsolvable x 
     | Ac _ | Term _  -> true
 	
-  let partition tag = 
-    List.partition 
-      (fun (u,t) -> 
-	 (theory_num u = tag || unsolvable u) && 
-	   (theory_num t = tag || unsolvable t))
+  module Debug = struct
 
-  let rec solve_list  solved l =
-    List.fold_left
-      (fun solved (a,b) -> 
-         if debug_combine () then
-           fprintf fmt "solve_list %a=%a@." print a print b;
-	 let cmp = compare a b in
-	 if cmp = 0 then solved else
-	   match a , b with
-	       (* both sides are empty *)
-	     | (Term _ | Ac _) , (Term _ | Ac _) -> 
-		 add_mr solved (unsolvable_values cmp  a b)
-		   
-	     (* only one side is empty *)
-	     | (a, b) 
-                 when unsolvable a || unsolvable b ||  compare_tag a b = 0 ->
-		 let a,b = if unsolvable a then b,a else a,b in
-		 let cp , sol = partition (theory_num a) (solvei  b a) in
-		 solve_list  (add_mr solved cp) sol
-		   
-	     (* both sides are not empty *)
-	     | a , b -> solve_theoryj  solved a b
-      ) solved l
+    let print_sbt msg sbs =
+      if debug_combine () then begin
+        let c = ref 0 in
+        fprintf fmt "%s subst:@." msg;
+        List.iter 
+          (fun (p,v) -> 
+            incr c;
+            fprintf fmt " %d) %a |-> %a@." !c print p print v) sbs;
+        fprintf fmt "@."
+      end
 
-  and unsolvable_values cmp a b =
-    match a, b with
-      (* Clash entre theories: On peut avoir ces pbs ? *)
-      | X1 _, (X2 _ | X3 _ | X4 _ | X5 _) 
-      | (X2 _ | X3 _ | X4 _ | X5 _), X1 _ 
-      | X2 _, (X3 _ | X4 _ | X5 _) 
-      | (X3 _ | X4 _ | X5 _), X2 _ 
-      | X3 _, (X4 _ | X5 _)
-      | (X4 _ | X5 _) , X3 _
-      | X5 _, X4 _ -> assert false
+    let debug_abstraction_result oa ob a b acc =
+      if debug_combine () then begin
+        fprintf fmt "@.== debug_abstraction_result ==@.";
+        fprintf fmt "@.Initial equaliy:   %a = %a@." CX.print oa CX.print ob;
+        fprintf fmt "abstracted equality: %a = %a@." CX.print a CX.print b;
+        fprintf fmt "selectors elimination result:@.";
+        let cpt = ref 0 in
+        List.iter
+          (fun (p,v) ->
+            incr cpt;
+            fprintf fmt "\t(%d) %a |-> %a@." !cpt CX.print p CX.print v
+          )acc;
+        fprintf fmt "@."
+      end
 
-      (* theorie d'un cote, vide de l'autre *)
-      | X1 _, _ | _, X1 _ -> X1.solve a b
-      | X2 _, _ | _, X2 _ -> X2.solve a b
-      | X3 _, _ | _, X3 _ -> X3.solve a b
-      | X4 _, _ | _, X4 _ -> X4.solve a b
-      | X5 _, _ | _, X5 _ -> X5.solve a b
-      | (Ac _|Term _), (Ac _|Term _) -> [if cmp > 0 then a,b else b,a]
-
-  and solve_theoryj solved xi xj =
-    if debug_combine () then
-      fprintf fmt "solvej %a=%a@." print xi print xj;
-    let cp , sol = partition (theory_num xj) (solvei  xi xj) in
-    solve_list  (add_mr solved cp) (List.rev_map (fun (x,y) -> y,x) sol)
-
-  and solvei  a b =
-    if debug_combine () then
-      fprintf fmt "solvei %a=%a@." print a print b;
-    match b with
-      | X1 _ -> X1.solve  a b
-      | X2 _ -> X2.solve  a b
-      | X3 _ -> X3.solve  a b
-      | X4 _ -> X4.solve  a b
-      | X5 _ -> X5.solve  a b
-      | Term _ | Ac _ -> 
-          (* XXX pour Arrays *)
-          match a with
-            | X4 _  -> X4.solve  a b
-            | _ -> 
-	        fprintf fmt "solvei %a = %a @." print a print b;
-	        assert false
-
-  let rec solve_rec  mt ab = 
-    let mr = solve_list  mt ab in
-    let mr , ab = 
-      MR.fold 
-	(fun p lr ((mt,ab) as acc) -> match lr with
-	     [] -> assert false
-	   | [_] -> acc
-	   | x::lx -> 
-	       MR.add p [x] mr , List.rev_map (fun y-> (x,y)) lx)	 
-	mr (mr,[])
-    in 
-    if ab=[] then mr else solve_rec  mr ab
+    let solve_one a b =
+      if debug_combine () then 
+        fprintf fmt "solve one %a = %a@." CX.print a CX.print b
       
-  let solve  a b =
-    MR.fold 
-      (fun p lr ret -> 
-	 match lr with [r] -> (p ,r)::ret | _ -> assert false) 
-      (solve_rec  MR.empty [a,b]) []
+    let debug_abstract_selectors a =
+      if debug_combine () then 
+        fprintf fmt "abstract selectors of %a@." CX.print a
+      
+    let assert_have_mem_types tya tyb =
+      assert (
+        not !Preoptions.enable_assertions ||
+          if not (Ty.compare tya tyb = 0) then (
+            fprintf fmt "@.Tya = %a  and @.Tyb = %a@.@."
+              Ty.print tya Ty.print tyb;
+            false)
+          else true)
 
-
-
-  module SX = Set.Make(struct type t = r let compare = CX.compare end)
-
-  let print_sbt msg sbs =
-    if debug_combine () then begin
-      let c = ref 0 in
-      fprintf fmt "%s subst:@." msg;
-      List.iter 
-        (fun (p,v) -> 
-          incr c;
-          fprintf fmt " %d) %a |-> %a@." !c print p print v) sbs;
-      fprintf fmt "@."
-    end
+  end
+  open Debug
     
-  let apply_subst r l =
-    List.fold_left (fun r (p,v) -> CX.subst p v r) r l
+  let abstract_selectors a acc = 
+    debug_abstract_selectors a;
+    match a with
+      | X1 a   -> X1.abstract_selectors a acc
+      | X2 a   -> X2.abstract_selectors a acc
+      | X3 a   -> X3.abstract_selectors a acc
+      | X4 a   -> X4.abstract_selectors a acc
+      | X5 a   -> X5.abstract_selectors a acc
+      | Term _ -> a, acc
+      | Ac a   -> AC.abstract_selectors a acc
+
+  let abstract_equality a b = 
+    let aux r acc = 
+      match r with
+        | Ac ({l=args} as ac) -> 
+          let args, acc = 
+            List.fold_left
+              (fun (args, acc) (r, i) ->
+                let r, acc = abstract_selectors r acc in
+                (r, i) :: args, acc
+              )([],acc) args
+          in
+          ac_embed {ac with l = AC.compact args}, acc
+        | _     -> abstract_selectors r acc
+    in
+    let a', acc = aux a [] in
+    let b', acc = aux b acc in
+    a', b', acc
+      
+  let apply_subst r l = List.fold_left (fun r (p,v) -> CX.subst p v r) r l
       
   let triangular_down sbs = 
-    List.fold_right
-      (fun (p,v) nsbs -> (p, apply_subst v nsbs) :: nsbs) sbs []
+    List.fold_right (fun (p,v) nsbs -> (p, apply_subst v nsbs) :: nsbs) sbs []
 
-  let triangular_up sbs = triangular_down (List.rev sbs)
-
-  let make_triangular a b sbs = 
+  let make_idemp a b sbs = 
     print_sbt "Non triangular" sbs;
     let sbs = triangular_down sbs in
     let sbs = triangular_down (List.rev sbs) in (* triangular up *)
     let original = List.fold_right SX.add (CX.leaves a) SX.empty in
     let original = List.fold_right SX.add (CX.leaves b) original in
-    let sbs = List.filter (fun (p,v) -> SX.mem p original) sbs in
+    let sbs = 
+      List.filter (fun (p,v) -> 
+        match p with
+          | Ac _ -> true | Term _ -> SX.mem p original
+          | _ -> assert false
+      )sbs 
+    in
     print_sbt "Triangular and cleaned" sbs;
-    assert 
-      (!Preoptions.no_asserts || equal (apply_subst a sbs) (apply_subst b sbs));
+    assert (not !Preoptions.enable_assertions ||
+              equal (apply_subst a sbs) (apply_subst b sbs));
     sbs
+
+  let apply_subst_right r sbt = 
+    List.fold_right (fun (p,v)r  -> CX.subst p v r) sbt r
+      
+  let merge_sbt sbt1 sbt2 = sbt1 @ sbt2
+    
+  let solve_uninterpreted r1 r2 pb = (* r1 != r2*)
+    if CX.compare r1 r2 > 0 then { pb with sbt = (r1,r2)::pb.sbt }
+    else { pb with sbt = (r2,r1)::pb.sbt }
+      
+  let rec solve_list pb =
+    match pb.eqs with
+      | [] -> 
+        print_sbt "Should be triangular and cleaned" pb.sbt;
+        pb.sbt
+      | (a,b) :: eqs ->
+        let pb = {pb with eqs=eqs} in
+        solve_one a b;
+        let ra = apply_subst_right a pb.sbt in
+        let rb = apply_subst_right b pb.sbt in
+        if CX.equal ra rb then solve_list pb
+        else
+          let tya = CX.type_info ra in
+          let tyb = CX.type_info rb in
+          assert_have_mem_types tya tyb;
+          let pb = match tya with
+            | Ty.Tint | Ty.Treal -> X1.solve ra rb pb
+            | Ty.Trecord _       -> X2.solve ra rb pb
+            | Ty.Tbitv _         -> X3.solve ra rb pb
+            | Ty.Tsum _          -> X5.solve ra rb pb
+            | _                  -> solve_uninterpreted ra rb pb
+          in
+          solve_list pb
+
+  let solve_abstracted oa ob a b sbt =
+    debug_abstraction_result oa ob a b sbt;
+    let sbt = solve_list { sbt=sbt ; eqs=[a,b] } in
+    make_idemp oa ob sbt
 
   let solve  a b =
     if debug_combine () then 
-      fprintf fmt "[combine] solving %a = %a yields:@." print a print b;
-    make_triangular a b (solve  a b)
-
-
+      fprintf fmt "@.[combine] I solve %a = %a:@." print a print b;
+    let a', b', acc = abstract_equality a b in
+    solve_abstracted a b a' b' acc
+      
   module Rel =
   struct
     type elt = r

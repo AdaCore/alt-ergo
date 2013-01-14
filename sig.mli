@@ -33,6 +33,8 @@ type 'a result = {
   remove: ('a literal * Explanation.t) list;
 }
 
+type 'a solve_pb = { sbt : ('a * 'a) list; eqs : ('a * 'a) list }
+
 module type RELATION = sig
   type t
   type r
@@ -108,11 +110,13 @@ module type THEORY = sig
   val hash : t -> int
   (** solve r1 r2, solve the equality r1=r2 and return the substitution *)
 
-  val solve : r -> r ->  (r * r) list
+  val solve : r -> r ->  r solve_pb -> r solve_pb
 
   val print : Format.formatter -> t -> unit
 
   val fully_interpreted : Symbols.t -> bool
+
+  val abstract_selectors : t -> (r * r) list -> r * (r * r) list
 
   module Rel : RELATION with type r = r
 end
@@ -170,6 +174,8 @@ module type X = sig
   
   val print : Format.formatter -> r -> unit
   
+  val abstract_selectors : r -> (r * r) list -> r * (r * r) list
+    
   module Rel : RELATION with type r = r
 
 end

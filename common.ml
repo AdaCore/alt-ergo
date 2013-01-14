@@ -242,6 +242,10 @@ let fresh_string =
     incr cpt;
     "!k" ^ (string_of_int !cpt)
 
+let is_fresh_string s = 
+  try s.[0] = '!' && s.[1] = 'k'
+  with Invalid_argument "index out of bounds" -> false
+
 let fake_eq =  Symbols.name "@eq"
 let fake_neq =  Symbols.name "@neq"
 let fake_lt =  Symbols.name "@lt"

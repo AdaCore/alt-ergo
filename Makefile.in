@@ -51,6 +51,7 @@ OCAMLBEST = @OCAMLBEST@
 OCAMLVERSION = @OCAMLVERSION@
 OCAMLWIN32 = @OCAMLWIN32@
 EXE = @EXE@
+ENABLEGUI = @ENABLEGUI@
 
 INCLUDES = @OCAMLGRAPHLIB@ @LABLGTK2LIB@
 
@@ -72,7 +73,8 @@ LIBNAME = altErgo
 BYTE=$(NAME).byte
 OPT=$(NAME).opt
 
-all: pack xpack $(OCAMLBEST) pack xpack
+all: pack xpack $(OCAMLBEST) pack xpack gui
+
 
 # bytecode and native-code compilation
 ######################################
@@ -116,9 +118,17 @@ GENERATED = version.ml \
 	smt_parser.ml smt_parser.mli smt_lex.ml \
 	smtlib2_parse.ml smtlib2_parse.mli smtlib2_lex.ml
 
-GUICMO = $(CMO) $(CMOFRONT) gui_session.cmo why_annoted.cmo \
-	 why_connected.cmo gui_replay.cmo gui.cmo
+
+ifeq ($(ENABLEGUI),yes)
+	GUICMO = $(CMO) $(CMOFRONT) gui_session.cmo why_annoted.cmo \
+	   why_connected.cmo gui_replay.cmo gui.cmo
+else 
+	GUICMO = 
+endif
+
+
 GUICMX = $(GUICMO:.cmo=.cmx)
+
 
 byte: $(NAME).byte
 opt: $(NAME).opt
@@ -144,8 +154,13 @@ $(NAME).opt: $(PRECMX) $(OPTIONSCMX) $(MAINCMX)
 	$(OCAMLOPT) $(OFLAGS) -o $@ $(BIBOPT) $^
 
 gui: $(PRECMX) $(OPTIONSCMX) $(GUICMX)
+ifeq ($(ENABLEGUI),yes)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLOPT) $(OFLAGS) -o altgr-ergo.opt $(BIBOPT) $(BIBGUIOPT) $^
+else
+	@echo "gui compilation skipped (lablgtksourceview not detected)"
+endif
+
 
 guibyte: $(PRECMO) $(OPTIONSCMO) $(GUICMO)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
@@ -173,10 +188,14 @@ challenge:$(OPT)
 testoptsel:$(OPT)
 	tests/test.sh "./$(OPT) -select 2 -glouton -triggers-var "
 
-VERSION=0.95-dev
+
+
+VERSION=0.95
+
 
 version.ml: config.status
-	@echo "let version = \""$(VERSION)"\"" > version.ml
+# set version (and possibly revision) value in version.ml
+	$(shell ./revision.sh)
 	@echo "let date = \""`date`"\"" >> version.ml
 	@echo "let libdir = \""$(LIBDIR)"\"" >> version.ml
 
@@ -195,10 +214,6 @@ headers:
 
 install-indep: install-man install-pack
 
-install: install-indep 
-	mkdir -p $(BINDIR)
-	cp -f $(NAME).$(OCAMLBEST) $(BINDIR)/$(NAME)$(EXE)
-
 install-byte: install-indep
 	mkdir -p $(BINDIR)
 	cp -f $(NAME).byte $(BINDIR)/$(NAME)$(EXE)
@@ -211,10 +226,13 @@ install-man:
 	mkdir -p $(MANDIR)/man1
 	cp -f doc/*.1 $(MANDIR)/man1
 
-install-gui: install-indep
+install: install-indep
 	mkdir -p $(BINDIR)
+	cp -f $(NAME).$(OCAMLBEST) $(BINDIR)/$(NAME)$(EXE)
+ifeq ($(ENABLEGUI),yes)
 	cp -f altgr-ergo.opt $(BINDIR)/altgr-ergo$(EXE)
 	cp -f util/gtk-lang/alt-ergo.lang /usr/share/gtksourceview-2.0/language-specs/alt-ergo.lang
+endif
 
 install-pack: xpack pack
 	mkdir -p $(LIBDIR)
@@ -286,10 +304,14 @@ FILES = exception.mli exception.ml \
 	gui.ml \
 	main.ml \
 	Makefile.in configure configure.in \
-	.depend README INSTALL COPYING CeCILL-C CHANGES
+	.depend README INSTALL COPYING CeCILL-C CHANGES\
+	revision.sh
 
 export: source binary
 	cp README COPYING CeCILL-C CHANGES doc/*.1 $(HTTP)
+	rm -rf export/$(EXPORTDIR)
+	rm -rf $(HTTP)/$(EXPORTDIR)
+	mv export $(HTTP)/$(EXPORTDIR)
 
 source: 
 	mkdir -p export/$(EXPORTDIR)
@@ -364,6 +386,7 @@ clean::
 	@rm -f unittest/*.cm[iox] unittest/*.o unittest/*.annot
 	@rm -f *.aux *.log $(NAME).tex $(NAME).dvi $(NAME).ps
 	@rm -f version.ml
+	@rm -f altgr-ergo.opt
 
 dist-clean distclean:: clean
 	@rm -f Makefile config.cache config.log config.status

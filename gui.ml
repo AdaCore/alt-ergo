@@ -25,6 +25,77 @@ open Lexing
 open Format
 open Options
 
+(* type search_bar = { *)
+(*   sbar: GButton.toolbar; *)
+(*   sbox: GPack.box; *)
+(*   sentry: GEdit.entry; *)
+(*   button_forw: GButton.button; *)
+(*   button_back: GButton.button; *)
+(*   found_all_tag: GText.tag; *)
+(*   found_tag: GText.tag; *)
+(* } *)
+
+(* type page_toolbar = { *)
+(*   pbox: GPack.box; *)
+(*   pbar: GButton.toolbar; *)
+(*   button_context: GButton.button; *)
+(*   button_run: GButton.button; *)
+(*   button_stop: GButton.button; *)
+(*   result_box: GPack.box; *)
+(*   result_image: GMisc.image; *)
+(*   result_label: GMisc.label; *)
+(*   button_clean: GButton.button; *)
+(*   search_bar: search_bar; *)
+(* } *)
+
+(* type page = { *)
+(*   tab_label: GMisc.label; *)
+(*   page_nb: int; *)
+(*   event_box: GBin.event_box; *)
+(*   toolbar: page_toolbar; *)
+(*   statusbar: GMisc.statusbar; *)
+(*   st_ctx : GMisc.statusbar_context; *)
+
+(*   main_view: GSourceView2.source_view; *)
+(*   main_buffer: GSourceView2.source_buffer; *)
+(*   inst_view: GSourceView2.source_view; *)
+(*   inst_buffer: GSourceView2.source_buffer; *)
+
+(*   error_model: error_model; *)
+(*   inst_model: inst_model; *)
+(*   timers_model: timers_model; *)
+
+(*   mutable ast : (atyped_decl annoted * Why_typing.env) list; *)
+(*   dep : (atyped_decl annoted list * atyped_decl annoted list) MDep.t; *)
+
+(*   thread: Thread.t option; *)
+
+(*   mutable ctrl_toggled : bool; *)
+(*   mutable last_tag : GText.tag; *)
+(*   mutable search_tags : GText.tag list; *)
+(*   mutable proof_tags : GText.tag list; *)
+(*   mutable proof_toptags : GText.tag list; *)
+(*   mutable start_select : int option; *)
+(*   mutable stop_select : int option; *)
+
+(*   actions : Gui_session.action Stack.t; *)
+(*   saved_actions : Gui_session.action Stack.t; *)
+(*   resulting_ids : (string * int) list; *)
+(* } *)
+
+(* type gui = { *)
+(*   source_language: GSourceView2.source_language option; *)
+(*   scheme: GSourceView2.source_style_scheme option; *)
+(*   note_search: (int, GEdit.entry * (unit -> unit)) Hashtbl.t; *)
+
+(*   w: GWindow.window; *)
+(*   menubar: GMenu.menu_shell; *)
+(*   notebook: GPack.notebook; *)
+
+(*   mutable pages: page list; *)
+(* } *)
+
+
 let inf = Glib.Utf8.from_unichar 8734
 let window_width = 950
 let window_height = 700

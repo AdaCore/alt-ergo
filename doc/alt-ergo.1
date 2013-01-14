@@ -1,4 +1,4 @@
-.TH Alt-Ergo 1 "October, 2006"
+.TH Alt-Ergo 1 " (C)  2006 -- 2013"
 
 .SH NAME
 Alt-Ergo \- An automatic theorem prover dedicated to program
@@ -10,14 +10,14 @@ verification
 [
 .B options
 ]
-.B files
+.B file
 
 
 .SH DESCRIPTION
 
 .B Alt-Ergo
 is an automatic theorem prover.  It takes as inputs an arbitrary
-polymorphic and multi-sorted first-order formula written is the Why's
+polymorphic and multi-sorted first-order formula written is a why like
 syntax.
 
 .SH OPTIONS
@@ -26,10 +26,10 @@ syntax.
 .B \-h
 Help. Will give you the full list of command line options.
 
+.SH EXAMPLES
+
 .TP
-A theory of functional arrays with integer indexes . This theory
-provides a built-in type ('a,'b) farray and a built-in syntax for
-manipulating arrays.
+A theory of functional arrays with integer indexes . This theory provides a built-in type ('a,'b) farray and a built-in syntax for manipulating arrays.
 
 For instance, given an abstract datatype tau and a functional array t
 of type (int, tau) farray declared as follows:
@@ -59,25 +59,35 @@ t[0<-v, 1<-w][1]
 .TP
 A theory of enumeration types.
 
-For instance an enumeration type t with constructors A, B, C is
-defined as follows :
+For instance an enumeration type t with constructors A, B, C is defined as follows :
 
 type t = A | B | C
 
-Which means that all values of type t are equal to either A, B or
-C. And that all these constructors are distinct.
+Which means that all values of type t are equal to either A, B or C. And that all these constructors are distinct.
 
 
 .TP
 A theory of polymorphic records.
 
-For instance a polymorphic record type 'a t with two labels a and b of
-type 'a and int respectively is defined as follows:
+For instance a polymorphic record type 'a t with two labels a and b of type 'a and int respectively is defined as follows:
 
 type 'a t = { a : 'a; b : int }
 
-The expressions { a = 4; b = 5 } and { r with b = 3} denote records,
-while the dot notation r.a is used to access to labels.
+The expressions { a = 4; b = 5 } and { r with b = 3} denote records, while the dot notation r.a is used to access to labels.
+
+
+.TP
+Alt-Ergo (v. >= 0.95) allows the user to force the type of terms using the syntax <term> : <type>. The example below illustrates the use of this new feature.
+
+type 'a list
+
+logic nil : 'b list
+
+logic f : 'c list -> int
+
+goal g1 : f(nil) = f(nil) (* not valid because the two instances of nil may have different types *)
+
+goal g2 : f(nil:'d list) = f(nil:'d list) (* valid *)
 
 
 .SH ENVIRONMENT VARIABLES
@@ -88,10 +98,14 @@ Alternative path for the Alt-Ergo library
 
 
 .SH AUTHORS
-.I Sylvain Conchon <conchon@lri.fr> and Evelyne Contejean <contejea@lri.fr>
+
+Sylvain Conchon
+.I <conchon@lri.fr>
+and Evelyne Contejean
+.I <contejea@lri.fr>
 
 
 .SH SEE ALSO
 
-.I
-Alt-Ergo web site: http://alt-ergo.lri.fr
+Alt-Ergo web site:
+.I http://alt-ergo.lri.fr
