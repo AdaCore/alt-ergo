@@ -59,18 +59,23 @@ module Make (X : ALIEN) = struct
 
   let rec raw_compare r1 r2 =
     match r1, r2 with
-      | Other (u1, _), Other (u2, _) -> 
-	  X.compare u1 u2
+      | Other (u1, ty1), Other (u2, ty2) -> 
+        let c = Ty.compare ty1 ty2 in
+        if c <> 0 then c else X.compare u1 u2
       | Other _, _ -> -1
       | _, Other _ -> 1
-      | Access (s1, u1, _), Access (s2, u2, _) ->
+      | Access (s1, u1, ty1), Access (s2, u2, ty2) ->
+        let c = Ty.compare ty1 ty2 in
+        if c <> 0 then c 
+        else 
 	  let c = Hstring.compare s1 s2 in
 	  if c <> 0 then c
 	  else raw_compare u1 u2
       | Access _, _ -> -1
       | _, Access _ -> 1
-      | Record (lbs1, _), Record (lbs2, _) ->
-	  raw_compare_list lbs1 lbs2
+      | Record (lbs1, ty1), Record (lbs2, ty2) ->
+        let c = Ty.compare ty1 ty2 in
+        if c <> 0 then c else raw_compare_list lbs1 lbs2
   and raw_compare_list l1 l2 = 
     match l1, l2 with
       | [], [] -> 0
@@ -123,7 +128,7 @@ module Make (X : ALIEN) = struct
       let { Term.f = f; xs = xs; ty = ty} = Term.view t in
       match f, ty with
 	| Symbols.Op (Symbols.Record), Ty.Trecord {Ty.lbs=lbs} ->
-	    assert (List.length xs = List.length lbs);
+	    assert (!Preoptions.no_asserts || List.length xs = List.length lbs);
 	    let l, ctx = 
 	      List.fold_right2 
 		(fun x (lb, _) (l, ctx) -> 

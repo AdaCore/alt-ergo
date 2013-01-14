@@ -92,3 +92,5 @@ val timelimit : float ref
 
 val debug_custom : bool ref
 val debug_matching : bool ref
+val no_asserts : bool ref
+val inversions_as_axioms : bool ref
