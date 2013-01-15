@@ -37,6 +37,7 @@ prefix=@prefix@
 exec_prefix=@exec_prefix@
 BINDIR=$(DESTDIR)@bindir@
 LIBDIR=$(DESTDIR)@libdir@/alt-ergo
+DATADIR=$(DESTDIR)@datadir@
 
 # where to install the man page
 MANDIR=$(DESTDIR)@mandir@
@@ -231,7 +232,8 @@ install: install-indep
 	cp -f $(NAME).$(OCAMLBEST) $(BINDIR)/$(NAME)$(EXE)
 ifeq ($(ENABLEGUI),yes)
 	cp -f altgr-ergo.opt $(BINDIR)/altgr-ergo$(EXE)
-	cp -f util/gtk-lang/alt-ergo.lang /usr/share/gtksourceview-2.0/language-specs/alt-ergo.lang
+	mkdir -p $(DATADIR)/gtksourceview-2.0/language-specs
+	cp -f util/gtk-lang/alt-ergo.lang $(DATADIR)/gtksourceview-2.0/language-specs/alt-ergo.lang
 endif
 
 install-pack: xpack pack
