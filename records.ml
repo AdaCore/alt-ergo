@@ -268,7 +268,7 @@ module Make (X : ALIEN) = struct
     | Record (lbs, _) ->
 	List.exists (fun (_, v) -> occurs x v) lbs
     | Access (_, v, _) -> occurs x v
-    | Other _ as v -> compare_mine x v = 0
+    | Other _ as v -> compare_mine x v = 0 (* XXX *)
 
   let direct_args_of_labels x = List.exists (fun (_, y)-> compare_mine x y = 0)
 
@@ -276,7 +276,7 @@ module Make (X : ALIEN) = struct
     match e with
       | Record (lbs, ty) -> 
 	  Record (List.map (fun (n,e') -> n, subst_access x s e') lbs, ty)
-      | Access (lb, e', _) when compare_mine e e' = 0 -> 
+      | Access (lb, e', _) when compare_mine x e' = 0 -> 
 	  Hs.list_assoc lb s
       | Access (lb', e', ty) -> Access (lb', subst_access x s e', ty)
       | Other _ -> e
