@@ -815,7 +815,8 @@ let create_inst_view inst_model env buffer sv ~packing () =
       else 
 	begin
 	  l := -1;
-	  inst_model.istore#set ~row ~column:inst_model.icol_limit inf
+	  inst_model.istore#set ~row ~column:inst_model.icol_limit inf;
+	  Gui_session.save env.actions (Gui_session.UnlimitLemma (id, name))
 	end
     ) view#selection#get_selected_rows
   ));

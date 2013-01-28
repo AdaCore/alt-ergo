@@ -48,6 +48,7 @@ let replay env = function
   | AddTrigger (id, inst_buf, str) -> 
     readd_trigger ~register:false env id str inst_buf
   | LimitLemma (id, name, nb) -> replay_limitlemma id name nb env
+  | UnlimitLemma (id, name) -> replay_limitlemma id name (-1) env
     
 
 
@@ -62,10 +63,11 @@ let undo_action env =
     | Unprune id -> replay env (Prune id)
     | ((AddInstance _ | AddTrigger _ ) as ac) ->
       replay env (Prune (Hashtbl.find resulting_ids ac))
-    | LimitLemma (id, name, _) -> 
+    | LimitLemma (id, name, _) | UnlimitLemma (id, name) -> 
       try 
 	Stack.iter (function 
-	  | (LimitLemma (id', name', nb') as ac) when id = id' -> 
+	  | (LimitLemma (id', _, _) | UnlimitLemma (id', _) as ac)
+              when id = id' -> 
 	      replay env ac; raise Exit
 	  | _ -> ()) env.actions;
 	replay env (LimitLemma (id, name, -1))

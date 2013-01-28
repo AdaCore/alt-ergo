@@ -24,6 +24,7 @@ type action =
   | AddInstance of int * string * string list
   | AddTrigger of int * bool * string
   | LimitLemma of int * string * int
+  | UnlimitLemma of int * string
 
 let resulting_ids = Hashtbl.create 17
 
@@ -71,6 +72,8 @@ let offset_stack st offsets =
 	AddTrigger ((offset_id id offsets), inst_buf, trs)
       | LimitLemma (id, name, nb) ->
 	LimitLemma ((offset_id id offsets), name, nb)
+      | UnlimitLemma (id, name) ->
+	UnlimitLemma ((offset_id id offsets), name)
     in
     l := ac :: !l
   done;
