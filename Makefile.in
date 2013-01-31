@@ -74,7 +74,7 @@ LIBNAME = altErgo
 BYTE=$(NAME).byte
 OPT=$(NAME).opt
 
-all: pack xpack $(OCAMLBEST) pack xpack gui
+all: pack xpack $(OCAMLBEST) pack xpack gui META
 
 
 # bytecode and native-code compilation
@@ -193,13 +193,20 @@ testoptsel:$(OPT)
 
 VERSION=0.96
 
-
 version.ml: config.status
 # set version (and possibly revision) value in version.ml
-	$(shell ./revision.sh)
+	@REVISION=$(shell ./revision.sh)
+	@echo "let version = \""$(VERSION)$$REVISION"\"" > version.ml
 	@echo "let date = \""`date`"\"" >> version.ml
 	@echo "let libdir = \""$(LIBDIR)"\"" >> version.ml
 
+META: config.status
+	@REVISION=$(shell ./revision.sh)
+	@echo "description = \"API of Alt-Ergo: An automatic theorem prover dedicated to program verification\"" > META
+	@echo "version = \""$(VERSION)$$REVISION"\"" >> META
+	@echo "archive(byte) = \"altErgo.cmo\"" >> META
+	@echo "archive(native) = \"altErgo.cmx\"" >> META
+	@echo "requires = \"unix num ocamlgraph\"" >> META
 
 
 # file headers
@@ -236,12 +243,13 @@ ifeq ($(ENABLEGUI),yes)
 	cp -f util/gtk-lang/alt-ergo.lang $(DATADIR)/gtksourceview-2.0/language-specs/alt-ergo.lang
 endif
 
-install-pack: xpack pack
+install-pack: xpack pack META
 	mkdir -p $(LIBDIR)
 	cp -f $(LIBNAME).cmx $(LIBDIR)
 	cp -f $(LIBNAME).o $(LIBDIR)
 	cp -f $(LIBNAME).cmo $(LIBDIR)
 	cp -f $(LIBNAME).cmi $(LIBDIR)
+	cp -f META $(LIBDIR)
 
 # documentation
 ###############

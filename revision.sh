@@ -1,5 +1,3 @@
-VERSION=`grep "^VERSION=" Makefile | cut -d"=" -f2`
-
 revision=""
 
 svn_info=`svn info --xml 2> /dev/null`
@@ -17,5 +15,5 @@ then
     done
 fi
 
-echo "let version = \""$VERSION$revision"\""  >> version.ml
+echo $revision
 
