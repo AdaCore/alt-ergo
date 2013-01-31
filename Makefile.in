@@ -154,11 +154,16 @@ $(NAME).opt: $(PRECMX) $(OPTIONSCMX) $(MAINCMX)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLOPT) $(OFLAGS) -o $@ $(BIBOPT) $^
 
-gui: $(PRECMX) $(OPTIONSCMX) $(GUICMX)
+.PHONY: gui
+
 ifeq ($(ENABLEGUI),yes)
+gui: altgr-ergo.opt
+
+altgr-ergo.opt: $(PRECMX) $(OPTIONSCMX) $(GUICMX)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLOPT) $(OFLAGS) -o altgr-ergo.opt $(BIBOPT) $(BIBGUIOPT) $^
 else
+gui: $(PRECMX) $(OPTIONSCMX) $(GUICMX)
 	@echo "gui compilation skipped (lablgtksourceview not detected)"
 endif
 
