@@ -332,7 +332,7 @@ let remove_high_instantiated_axioms matching_result =
     | Formula.Lemma { Formula.name = n } when n <> "" -> n
     | _ -> ""
   in
-  if Options.autoselect () then
+  if Options.max_instances () > 0 then
     List.filter (fun (trig, _) ->
             let name = extract_axiom_name trig in
             if name <> "" then
@@ -344,6 +344,8 @@ let remove_high_instantiated_axioms matching_result =
     matching_result
 
 let new_facts goal_directed env = 
+  let matching_result = MM.query env.matching env.tbox in
+  let matching_result = remove_high_instantiated_axioms matching_result in
   List.fold_left
     (fun acc ({Matching.trigger_formula=f; trigger_query = guard; 
 	       trigger_age=age; trigger_dep=dep; trigger_orig=orig }, 
@@ -379,7 +381,7 @@ let new_facts goal_directed env =
 	 ) 
 	 acc subst_list
     )
-    [] (MM.query env.matching env.tbox)
+    [] matching_result
 
 
 (* 
@@ -618,6 +620,21 @@ and bcp env =
   in
   List.fold_left assume {env with delta=cl} u
     
+(* create a new environment from the list of new selected rules *)
+open Selection_sat
+let create_new_env env list_new_gf ~age =
+  let (list_pred_def, other_formulas) =
+    List.partition (fun new_gf -> new_gf.pred_def) list_new_gf in
+  let new_def = ref env.definitions in
+  List.iter (fun { new_f = ff } ->
+          new_def := MF.add ff (age, Ex.empty) !new_def) list_pred_def;
+  let new_env = { env with definitions = !new_def } in
+  let list_standard_gf = List.map (fun
+        { new_f = ff; new_name = n; new_mf = m; new_gf = g; new_from_terms = fr; new_inv = i }
+        -> ({ f = ff; age =age; name = n; mf = m; gf = g; from_terms = fr; inv = i }, Ex.empty)
+      ) other_formulas in
+  List.fold_left assume new_env list_standard_gf
+
 let rec unsat_rec env fg stop max_size = 
   try
     if stop < 0 then raise (I_dont_know env);
@@ -652,19 +669,33 @@ and back_tracking env stop max_size = match env.delta with
 		 Format.printf "%a@." print_prop_model m;
 		 raise (IUnsat (Ex.make_deps m, []))
 	       end;
+            (* if in mode '-autoselect-sat', try to add more rules and     *)
+            (* continue proving                                            *)
+            if Options.autoselect_sat () then
+             select_more_rules env max_size true
+            else
 	     raise (Sat env)
 	 | l1, l2 -> 
 	     back_tracking 
 	       (List.fold_left assume  (List.fold_left assume env l2) l1) 
 	       (stop-1) (max_size + b_max_size))
   | [] ->
+  (* if in mode '-autoselect-sat', try to add more rules and continue      *)
+  (* proving                                                               *)
+      if Options.autoselect_sat () then
+        select_more_rules env max_size false
+      else
       raise (I_dont_know env)
   | (a,b,d)::l ->
       let {f=f;age=g;name=lem;mf=mf} = a in
       Print.decide f;
+      (* backup the current depth *)
+      let current_depth = Selection_sat.get_current_depth () in
       let dep = unsat_rec {env with delta=l} (a,Ex.singleton f) stop max_size in
       if debug_sat () then fprintf fmt "unsat_rec : %a@." Ex.print dep;
       try
+      (* restore the depth before moving to this branch *)
+        Selection_sat.set_depth current_depth;
 	let dep' = Ex.remove f dep in
 	Print.backtracking (F.mk_not f);
 	if rules () = 2 then fprintf fmt "[rule] TR-Sat-Decide@.";
@@ -675,6 +706,17 @@ and back_tracking env stop max_size = match env.delta with
 	Print.backjumping (F.mk_not f);
 	if rules () = 2 then fprintf fmt "[rule] TR-Sat-Backjumping@.";
 	dep
+
+(* adding more rules and try to prove again *)
+and select_more_rules env max_size is_sat =
+  let new_rules = Selection_sat.get_new_rules () in
+  if List.length new_rules <> 0 then
+    back_tracking (create_new_env env new_rules ~age:0) (stopb ()) max_size
+  else
+  if is_sat then
+    raise (Sat env)
+  else
+    raise (I_dont_know env)
 	
 let unsat env fg =
   try
