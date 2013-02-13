@@ -23,3 +23,12 @@ val print_term : Format.formatter -> ('a tterm, 'a) annoted -> unit
 val print_term_list : Format.formatter -> ('a tterm, 'a) annoted list -> unit
 
 val print_form : Format.formatter -> ('a tform, 'a) annoted -> unit
+
+(* print all structure inside formula *)
+
+val print_typed_decl_list  :
+    Format.formatter -> ?same_order:bool 
+      -> (int tdecl, int) Why_ptree.annoted list -> unit
+
+val print_typed_decl :
+    Format.formatter -> (int tdecl, int) Why_ptree.annoted -> unit

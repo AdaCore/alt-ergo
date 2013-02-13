@@ -21,6 +21,66 @@ open Options
 open Format
 open Sig
 
+(* storing the number of instantiated axiom (count, axiom) while running SAT *)
+(* (int, string) Hashtbl.t *)
+let tab_instantiated_axiom = Hashtbl.create 50
+
+(* while running SAT, calculate the number of instantiated axioms *)
+let count_instantiated_axioms formula =
+  let name = match Formula.view formula with
+    | Formula.Lemma {Formula.name=n} when n <> "" -> n
+    | _ -> ""
+  in
+    if name <> "" then
+    begin
+      if Hashtbl.mem tab_instantiated_axiom name then
+        let count = Hashtbl.find tab_instantiated_axiom name in
+          Hashtbl.replace tab_instantiated_axiom name (count+1)
+      else
+        Hashtbl.add tab_instantiated_axiom name 1
+    end
+
+(* check if we are instantiating [axiom] too much *)
+let is_axiom_highly_instantiated axiom =
+  if Options.max_instances () = 0 then
+    false
+  else
+    let count =
+      if Hashtbl.mem tab_instantiated_axiom axiom then
+        Hashtbl.find tab_instantiated_axiom axiom
+      else -1
+    in
+      count > (Options.max_instances ())
+
+(* always reset low axiom to 0*)
+(* for high axiom, reset or keep depend on flag [reset_high_axiom] *)
+let reset_tab_instantiated_axiom ~reset_high_axiom =
+  if Options.max_instances () > 0 then
+    Hashtbl.iter (fun name count ->
+      if reset_high_axiom || count < Options.max_instances () then
+        Hashtbl.replace tab_instantiated_axiom name 0
+    ) tab_instantiated_axiom
+
+let tab2list table =
+  Hashtbl.fold (fun k v acc -> (k, v) :: acc) table []
+
+let sort_tab_axiom tab =
+  let count_list = tab2list tab in
+    List.sort (fun (_, count1) (_, count2) ->
+      if count1 = count2 then 0 else if count1 > count2 then -1 else 1
+    ) count_list
+
+let print_number_instantiated_axioms filename =
+  Format.fprintf Options.fmt "Printing to file <%s>@." filename;
+  let oc = open_out filename in
+  let fmt = Format.formatter_of_out_channel oc in
+  let sort_list = sort_tab_axiom tab_instantiated_axiom in
+    Format.fprintf fmt "Number of instantiated axioms:@.";
+    List.iter (fun (name, count) ->
+        Format.fprintf fmt "%s: %d@." name count
+      ) sort_list;
+    close_out oc
+
 module A = Literal
 module CcX = Cc.Make(Combine.CX)
 module F = Formula
@@ -56,6 +116,7 @@ exception Sat of t
 exception Unsat of Ex.t
 exception I_dont_know of t
 exception IUnsat of Ex.t * Term.Set.t list
+exception More_Hypotheses of t
 
 let max_max_size = 96
 
@@ -147,6 +208,55 @@ module Print = struct
 
 end
 
+let print_gformula fmt gf =
+  Formula.print fmt gf.f;
+  fprintf fmt "\tage: %d@." gf.age
+
+let print_MF fmt mf =
+  MF.iter (fun key (id, expl) ->
+          fprintf fmt "\tkey: %a@." Formula.print key;
+          fprintf fmt "\tvalue: %d-%a@." id Ex.print expl;
+    ) mf
+
+let cardinal m =
+  let count = ref 0 in
+  MF.iter (fun _ _ -> count := !count + 1) m;
+  !count
+
+let print_sat fmt env =
+  let size_gamma = cardinal env.gamma in
+  let size_delta = List.length env.delta in
+  let size_lemmas = cardinal env.lemmas in
+  let size_definitions = cardinal env.definitions in
+  let size_inversions = cardinal env.inversions in
+  fprintf fmt "\nSAT ENVIRONMENT:@.";
+  fprintf fmt "size_gamma = %d@." size_gamma;
+  fprintf fmt "size_delta = %d@." size_delta;
+  fprintf fmt "size_lemmas = %d@." size_lemmas;
+  fprintf fmt "size_definitions = %d@." size_definitions;
+  fprintf fmt "size_inversions = %d@." size_inversions;
+  if size_gamma <> 0 then fprintf fmt "GAMMA (Ex MF):@.";
+  MF.iter (fun key value ->
+          fprintf fmt "\tkey: %a@." Formula.print key;
+          fprintf fmt "\tvalue: %a@." Ex.print value;
+    ) env.gamma;
+  if size_delta <> 0 then fprintf fmt "DELTA (gf*gf*Ex.t list):@.";
+  List.iter (fun (gf1, gf2, expl) ->
+          fprintf fmt "\ngf1:@.";
+          print_gformula fmt gf1;
+          fprintf fmt "gf2:@.";
+          print_gformula fmt gf2;
+          fprintf fmt "Expl:@.";
+          Explanation.print fmt expl;
+          fprintf fmt "@."
+    ) env.delta;
+  fprintf fmt "\nLEMMA (int*Ex MF):@.";
+  print_MF fmt env.lemmas;
+  fprintf fmt "\nDEF (int*Ex MF):@.";
+  print_MF fmt env.definitions;
+  fprintf fmt "\nINVERS (int*Ex MF):@.";
+  print_MF fmt env.inversions
+
 (* matching part of the solver *)
 
 let add_terms env s goal age lem terms =
@@ -212,6 +322,26 @@ let add_instance_info env orig =
   match F.view orig with
     | F.Lemma _ -> env.add_inst orig
     | _ -> ()
+
+(* while running SAT, the number of instantiated axioms is stored in table *)
+(* from Module Selection, axioms with high number, greater than            *)
+(* predefine-thresold, will be removed                                     *)
+let remove_high_instantiated_axioms matching_result =
+  let extract_axiom_name { Matching.trigger_orig = orig } =
+    match Formula.view orig with
+    | Formula.Lemma { Formula.name = n } when n <> "" -> n
+    | _ -> ""
+  in
+  if Options.autoselect () then
+    List.filter (fun (trig, _) ->
+            let name = extract_axiom_name trig in
+            if name <> "" then
+              not (is_axiom_highly_instantiated name)
+            else
+              true
+      ) matching_result
+  else
+    matching_result
 
 let new_facts goal_directed env = 
   List.fold_left

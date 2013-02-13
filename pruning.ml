@@ -368,3 +368,31 @@ let split_and_prune depth decl_list =
 		  | _ -> (f,true)::acc) decl_list [])
 	  goals
 
+let create_graph decl_list = 
+  let (graph, list_goal) = analyze_deps decl_list in
+    match list_goal with
+    | [] -> failwith "There is no goal in input !!!"
+    | (goal, goal_f) :: _ -> (graph, goal, goal_f) 
+
+let pruning depth s f g =
+  let result = prune_goal depth s f g in
+    SetS.fold (fun str acc -> Selection.StringSet.add str acc
+    ) result Selection.StringSet.empty
+
+let selected_axioms decl_list selected_name =
+  let selected = ref [] in
+    List.iter (fun f -> match f.c with
+      | TAxiom(_, s', _, { c = TFforall { qf_bvars = _:: _ }}) ->
+        (* this is an axiom *)
+        if Selection.StringSet.mem s' selected_name then 
+          selected := (f, true) :: !selected 
+      | TAxiom(_, s', _, _) ->
+        (* this is an hypothesis *)
+        if Selection.StringSet.mem s' selected_name then 
+          selected := (f, true) :: !selected
+        else
+          selected := (f, false) :: !selected
+      | _ -> 
+        selected := (f, true):: !selected
+      ) decl_list;
+    List.rev !selected

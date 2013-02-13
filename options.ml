@@ -163,3 +163,10 @@ let incr_steps cpt =
 let debug_custom () = !debug_custom
 let set_debug_custom b = Preoptions.debug_custom := b
 let dmatching = !debug_matching
+
+let autoselect () = !autoselect
+let autoselect_sat () = !autoselect_sat
+let max_instances () = !max_instances
+let set_max_instances max = Preoptions.max_instances := max
+let last_selected () = !last_selected
+let simplify () = !simplify

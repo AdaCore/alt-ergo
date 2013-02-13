@@ -97,6 +97,12 @@ let spec = [
   "-bottom-classes", Arg.Set bottom_classes, "show equivalence classes at each bottom of the sat";
   "-replay", Arg.Set replay, "replay session saved in .agr";
   "-timelimit", Arg.Float set_limit, "n set the time limit to n seconds (not supported on Windows)";
+  
+  "-autoselect" , Arg.Set autoselect, "incremental selection of hypotheses and axioms";
+  "-autoselect-sat" , Arg.Set autoselect_sat, "incremental selection of hypotheses and axioms inside SAT";
+  "-max-instances" , Arg.Set_int max_instances, "maximum instances of an axiom, used with selection of hypotheses";
+  "-last-selected" , Arg.String set_last_selected, "mark axioms as selected last";
+  "-simplify" , Arg.Set simplify, "simplify and split conjunction hypothesis before proving";
 ]
 
 let _ =

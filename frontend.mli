@@ -35,6 +35,7 @@ type output = Unsat of Explanation.t | Inconsistent
 
 
 val process_decl:
+  ?last_step:bool ->
   (Why_ptree.sat_tdecl -> output -> int64 -> 'a) ->
   Sat.t * bool * Explanation.t -> sat_tdecl ->
   Sat.t * bool * Explanation.t

@@ -156,3 +156,10 @@ val steps : Int64.t ref
 val debug_custom : unit -> bool
 val set_debug_custom : bool -> unit
 val dmatching : bool
+
+val autoselect : unit -> bool
+val autoselect_sat : unit -> bool
+val max_instances : unit -> int
+val set_max_instances : int -> unit
+val last_selected : unit -> string list
+val simplify: unit -> bool

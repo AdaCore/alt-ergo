@@ -98,7 +98,7 @@ CMO = timers.cmo options.cmo exception.cmo loc.cmo \
       combine.cmo cc.cmo \
       existantial.cmo \
       triggers.cmo cnf.cmo why_typing.cmo matching.cmo \
-      sat.cmo 
+      selection.cmo selection_sat.cmo simplify.cmo sat.cmo 
 
 CMOFRONT = pruning.cmo frontend.cmo
 
@@ -278,6 +278,9 @@ FILES = exception.mli exception.ml \
 	smtlib2_util.ml smtlib2_ast.ml \
 	smtlib2_parse.mly smtlib2_lex.mll smtlib2_to_why.ml \
 	pruning.mli pruning.ml \
+	selection.mli selection.ml \
+	selection_sat.mli selection_sat.ml \
+	simplify.mli simplify.ml \
 	existantial.mli existantial.ml \
 	triggers.mli triggers.ml \
 	cnf.mli cnf.ml \

@@ -114,3 +114,14 @@ let set_limit t =
 let replay = ref false
 
 let debug_custom = ref false
+
+
+let autoselect = ref false
+let autoselect_sat  = ref false
+let max_instances = ref 0
+let last_selected = ref []
+
+let set_last_selected s =
+  last_selected := s :: (!last_selected)
+
+let simplify = ref false
