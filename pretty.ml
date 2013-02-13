@@ -69,6 +69,7 @@ and print_form_list fmt = List.iter (fprintf fmt "%a," print_form)
 (**********************************************)
 (***** print all structure inside formula *****)
 (**********************************************)
+let debug = ref false
 
 let rec print_ppure_type fmt = function
   | PPTunit -> fprintf fmt "unit"
@@ -127,21 +128,15 @@ let tconstant_to_string = function
   | Treal n -> Num.string_of_num n
   | Tbitv s -> s
 
-let rec print_var_list fmt var_list is_forall = 
-    if (is_forall) then
+let rec print_var_list fmt (var_list, string_before_var) =
+  if !debug then fprintf fmt "DEBUGGGG %s%d@." string_before_var (List.length var_list); 
     match var_list with
     | [] -> ()
-    | [s,ty] -> fprintf fmt "forall %a:%a " Symbols.print s Ty.print ty
+    | [s,ty] -> 
+      fprintf fmt "%s %a:%a " string_before_var Symbols.print s Ty.print ty
     | (s,ty)::l ->
-        fprintf fmt "forall %a:%a. %a" Symbols.print s Ty.print ty print_var_list2 l
-    else 
-    match var_list with
-    | [] -> ()
-    | [s,ty] -> fprintf fmt "%a:%a" Symbols.print s Ty.print ty
-    | (s,ty)::l ->
-        fprintf fmt "%a:%a,%a" Symbols.print s Ty.print ty print_var_list3 l
-and print_var_list2 fmt var_list = print_var_list fmt var_list true
-and print_var_list3 fmt var_list = print_var_list fmt var_list false
+      fprintf fmt "%s %a:%a. %a" string_before_var Symbols.print s Ty.print ty 
+        print_var_list (l,string_before_var)
 
 let rec print_string_sep sep fmt = function
   | [] -> ()
@@ -251,8 +246,6 @@ let get_preds_or_free_var is_pred decl = match decl.c with
 
 let get_free_var decl = uniq_pair (get_preds_or_free_var false decl)
 
-(**************** to delete *******************)
-
 
 let rec print_tterm fmt {Why_ptree.c= {tt_desc = tt_desc; tt_ty = tpe}} =
     print_tt_desc fmt tpe tt_desc
@@ -272,11 +265,8 @@ and print_record se fmt = function
 
 and print_tt_desc fmt tpe = function
   | TTconst c -> print_tconstant fmt c
-  | TTvar s -> 
-    (* fprintf fmt "[";Ty.print fmt tpe;fprintf fmt "]-"; *)
-    Symbols.print fmt s
+  | TTvar s -> Symbols.print fmt s
   | TTapp (f, ts) ->
-      (* fprintf fmt "{";Ty.print fmt tpe;fprintf fmt "}-"; *)
       fprintf fmt "%a(%a)" Symbols.print f (print_tterm_list ",") ts
   | TTinfix (t1, s, t2) ->
       fprintf fmt "(%a %a %a)" print_tterm t1 Symbols.print s print_tterm t2
@@ -324,7 +314,7 @@ let is_op_imp_iff = function
 
 let print_rwt fmt { rwt_vars = rv; rwt_left = rl; rwt_right = rr } =
   fprintf fmt "forall %a. %a = %a" 
-    print_var_list3 rv print_tterm rl print_tterm rr
+    print_var_list (rv,"") print_tterm rl print_tterm rr
 
 let rec print_rwt_list fmt = function
   | [] -> ()
@@ -332,18 +322,12 @@ let rec print_rwt_list fmt = function
   | rwt::l -> fprintf fmt "%a; %a" print_rwt rwt print_rwt_list l
 
 let rec print_quant_form fmt
-  {qf_bvars = bv; qf_upvars = uv; qf_triggers = trs; qf_form = tf } is_forall =
-    if is_forall then
-      if List.length trs <> 0 then
-        fprintf fmt "%a [%a]. %a" print_var_list2 bv 
-          print_triggers trs print_tform tf
-      else
-        fprintf fmt "%a. %a" print_var_list2 bv print_tform tf
+  ({qf_bvars = bv; qf_upvars = uv; qf_triggers = trs; qf_form = tf }, tpe_of_qf) =
+    if List.length trs <> 0 then
+      fprintf fmt "%a [%a]. %a" print_var_list (bv, tpe_of_qf)
+        print_triggers trs print_tform tf
     else
-        fprintf fmt "%a. %a" print_var_list3 bv print_tform tf
-
-and print_quant_form2 fmt qf = print_quant_form fmt qf true
-and print_quant_form3 fmt qf = print_quant_form fmt qf false
+      fprintf fmt "%a. %a" print_var_list (bv, tpe_of_qf) print_tform tf
 
 and print_triggers fmt = function
   | [] -> ()
@@ -354,8 +338,8 @@ and print_tform2 fmt f = match f.Why_ptree.c with
   | TFatom a -> print_tatom fmt a
   | TFop (OPnot, [tf]) -> fprintf fmt "not (%a)" print_tform tf 
   | TFop (op, tfl) -> print_tform_list op fmt tfl
-  | TFforall qf -> fprintf fmt "(%a)" print_quant_form2 qf
-  | TFexists qf -> fprintf fmt "(exists %a)" print_quant_form3 qf
+  | TFforall qf -> fprintf fmt "(%a)" print_quant_form (qf, "forall")
+  | TFexists qf -> fprintf fmt "(%a)" print_quant_form (qf, "exists")
   | TFlet (vs, s, t, tf) -> 
       fprintf fmt "let %a = %a in\n %a" 
     Symbols.print s print_tterm t print_tform tf
@@ -391,7 +375,8 @@ let extract_second_func tf = match tf.c with
     | _ -> failwith "matching error in extract_second_pred"
 
 let print_typed_decl fmt td = match td.Why_ptree.c with
-  | TAxiom (_, s, inv, tf) -> 
+  | TAxiom (_, s, inv, tf) ->
+    if s = "Neg" then debug := true; 
     if (String.get s 0 = '@') then
       let new_name = String.sub s 1 ((String.length s) - 1) in
       fprintf fmt "axiom %s : %a" new_name print_tform tf

@@ -315,9 +315,9 @@ let process_selection report all_decls =
 
   let rec process_next depth axioms state =
     let new_axioms, new_state = Selection.next_selection axioms state in
-    let new_axioms = StringSet.union axioms new_axioms in
+    let total_axioms = StringSet.union axioms new_axioms in
     let selected_decls = 
-      Selection.select_rules decls new_axioms ~include_logic_type:true in
+      Selection.select_rules decls total_axioms ~include_logic_type:true in
 
     print_debug_each_step new_axioms depth selected_decls;
     num_of_selection := depth;
@@ -336,7 +336,7 @@ let process_selection report all_decls =
       with Sat.More_Hypotheses env ->
         begin
           Sat.reset_tab_instantiated_axiom ~reset_high_axiom:false;
-          process_next (depth + 1) new_axioms new_state
+          process_next (depth + 1) total_axioms new_state
         end
   in
   process_next 1 (Selection.extract_goals decls) Selection.Init
