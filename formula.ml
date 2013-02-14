@@ -472,3 +472,5 @@ let terms =
 module Set = Set.Make(struct type t'=t type t=t' let compare=compare end)
 module Map = Map.Make(struct type t'=t type t=t' let compare=compare end)
 
+let set_size (f_iview, f_id) s =
+  ({f_iview with size = s}, f_id)

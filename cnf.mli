@@ -29,3 +29,7 @@ val make : ((int tdecl, int) annoted * bool) list -> sat_tdecl Queue.t
 val make_theory : ((int tdecl, int) annoted * bool) list -> sat_tdecl Queue.t
 
 val make_form : string -> (int tform, int) annoted -> Formula.t * Literal.LT.t list 
+
+val make2 : ((int tdecl, int) annoted * bool) list
+    -> (string, int) Hashtbl.t -> sat_tdecl Queue.t
+

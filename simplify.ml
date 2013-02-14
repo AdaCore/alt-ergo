@@ -135,7 +135,6 @@ let rec transform term_annoted substs lst_tpe =
                     concrete_tpe := [List.hd result];
                 end
               ) new_arguments;
-
               let new_tpe =
                 if List.length !concrete_tpe > 0 then
                   substitue_concrete_type (List.hd !concrete_tpe) old_tpe
@@ -508,5 +507,3 @@ let preprocessing decl_list =
       Format.fprintf Options.fmt "Printing to file: %s@." filename;
     end;
     new_decl_list
-  
-  
