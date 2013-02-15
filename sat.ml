@@ -118,7 +118,7 @@ exception I_dont_know of t
 exception IUnsat of Ex.t * Term.Set.t list
 exception More_Hypotheses of t
 
-let max_max_size = if Options.autoselect_sat () then 1 else 96
+let max_max_size = 96
 
 module Print = struct
 
@@ -275,15 +275,13 @@ let add_terms env s goal age lem terms =
 
 exception EnoughLemmasAlready of t * int
 
-let b_max_size = if Options.autoselect_sat () then 1 else 100
+let b_max_size = 100
 
 let rec double_until min s =
   let s2 = s + b_max_size in 
     if s2 >= min then s2 else double_until min s2
 
-
-let rec mtriggers env formulas max_size =
-  if not (Options.autoselect_sat ()) then begin
+let mtriggers env formulas max_size = 
   let stop = ref false in
   try
     MF.fold
@@ -319,38 +317,6 @@ let rec mtriggers env formulas max_size =
       )
       formulas (env, max_size)
   with EnoughLemmasAlready(env, max_size) -> env, max_size
-  end
-  else begin
-    if MF.is_empty formulas then env, max_size else
-    let env, max_size, found = MF.fold
-      (fun lem (age, dep) (env, max_size, found) ->
-       let size = F.size lem in
-       let selected = size <= max_size in
-       let env = if not selected then env else
-         match F.view lem with
-             F.Lemma {F.triggers = tgs; main = f} -> 
-           List.fold_left 
-             (fun env (tg, a) ->
-                let info = 
-              { Matching.trigger_age = age ; 
-                trigger_orig = lem ;
-                trigger_formula = f ;
-                trigger_dep = dep ; 
-                trigger_query = a }
-                in
-                { env with 
-                matching = 
-                MM.add_trigger info tg env.matching })
-             env tgs
-           | _ -> assert false         
-       in 
-       (env, max_size, selected || found)
-        )
-        formulas (env, max_size, false)
-     in 
-     if not found then mtriggers env formulas (max_size + 1)
-     else env, max_size
-  end
 
 let add_instance_info env orig = 
   match F.view orig with
@@ -703,21 +669,22 @@ and back_tracking env stop max_size = match env.delta with
 		 Format.printf "%a@." print_prop_model m;
 		 raise (IUnsat (Ex.make_deps m, []))
 	       end;
-      (* if in mode '-autoselect-sat', try to add more rules andcontinue proving *)
-      (* if Options.autoselect_sat () then                                       *)
-      (*  select_more_rules env max_size true                                    *)
-      (* else                                                                    *)
+            (* if in mode '-autoselect-sat', try to add more rules and     *)
+            (* continue proving                                            *)
+            if Options.autoselect_sat () then
+             select_more_rules env max_size true
+            else
 	     raise (Sat env)
 	 | l1, l2 -> 
 	     back_tracking 
 	       (List.fold_left assume  (List.fold_left assume env l2) l1) 
 	       (stop-1) (max_size + b_max_size))
   | [] ->
-      (* if in mode '-autoselect-sat', try to add more rules and continue *)
-      (* proving                                                          *)
-      (* if Options.autoselect_sat () then                                *)
-      (*   select_more_rules env max_size false                           *)
-      (* else                                                             *)
+  (* if in mode '-autoselect-sat', try to add more rules and continue      *)
+  (* proving                                                               *)
+      if Options.autoselect_sat () then
+        select_more_rules env max_size false
+      else
       raise (I_dont_know env)
   | (a,b,d)::l ->
       let {f=f;age=g;name=lem;mf=mf} = a in
@@ -771,9 +738,6 @@ let unsat env fg =
       mround Select_lemmas ~goal_directed:true env max_max_size in
     let env = List.fold_left assume env l in
 
-    if Options.autoselect_sat () then
-      back_tracking env (stopb ()) 1
-    else
     back_tracking env (stopb ()) 100
   with IUnsat (dep, classes) ->
     Print.bottom classes;

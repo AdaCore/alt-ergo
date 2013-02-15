@@ -367,39 +367,22 @@ let process_selection report decls =
     process_selection report decls
 *)
 
-let process_selection_in_sat report alldecls =
-  let decls = remove_last_selected_rules alldecls in
-  
-  Selection.init_selection decls;
-  let priority_table = Hashtbl.create 100 in
-  
-  let add_depth new_axioms depth = StringSet.iter (fun str ->
-(*      let depth = if depth <= 2 then depth else depth * 100 in*)
-      Hashtbl.add priority_table str depth
-    ) new_axioms in
-
-  let rec process_next depth axioms state =
-    let new_axioms, new_state = Selection.next_selection axioms state in
-    let total_axioms = StringSet.union axioms new_axioms in
-    if new_state = Selection.Last_Select then
-      begin
-        let maximum_set = Selection.extract_rules alldecls in
-        let new_axioms = StringSet.diff maximum_set axioms in
-          add_depth new_axioms depth;
-      end
-    else
-        begin
-          add_depth new_axioms depth;
-          process_next (depth + 1) total_axioms new_state
-        end
-  in
-  process_next 1 (Selection.extract_goals decls) Selection.Init;
-  if debug () then 
-   Hashtbl.iter (fun str size ->                                   
-     fprintf fmt "name: %s - size: %d@." str size) priority_table; 
-  let cnf = Cnf.make2 (List.map (fun d-> d,true) alldecls) priority_table in
-  ignore (Queue.fold (process_decl report) (Sat.empty (), true, Explanation.empty) cnf)
-  
+let process_selection_in_sat report decls =
+  let decls = remove_last_selected_rules decls in
+  let starting_depth = 3 in
+  Selection_sat.init_selection decls;
+  Selection_sat.set_depth 1;
+  ignore (Selection_sat.get_init_rules ());
+  let count = ref 2 in
+  while !count <= starting_depth do
+    ignore(Selection_sat.get_new_rules ());
+    count := !count + 1
+  done;
+  let init_decls = Selection_sat.get_rules_in_table
+        ~start_depth:1 ~end_depth:starting_depth in
+  let cnf = Cnf.make (List.map (fun d -> d, true) init_decls) in
+  ignore (Queue.fold (process_decl report)
+        (Sat.empty (), true, Explanation.empty) cnf)
 
 let pruning = 
   List.map

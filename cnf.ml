@@ -221,27 +221,16 @@ let make_form name f =
   in
   make_form [] f.c f.annot
 
-let priority_table = ref (Hashtbl.create 100)
-
-let set_size name ff =
-  if Hashtbl.mem !priority_table name then
-    Formula.set_size ff (Hashtbl.find !priority_table name)
-  else
-    ff
-
 let push_assume f name loc match_flag inversion = 
   let ff , _ = make_form name f in
-  let ff = set_size name ff in
   Queue.push {st_decl=Assume(ff, match_flag,inversion) ; st_loc=loc} queue
 
 let push_preddef f name loc match_flag = 
   let ff , _ = make_form name f in
-  let ff = set_size name ff in
   Queue.push {st_decl=PredDef ff ; st_loc=loc} queue
       
 let push_query n f loc sort = 
   let ff, lits = make_form "" f in
-  let ff = set_size n ff in
   Queue.push {st_decl=Query(n, ff, lits, sort) ; st_loc=loc} queue
 
 let make_rule ({rwt_left = t1; rwt_right = t2} as r) = 
@@ -265,10 +254,6 @@ let make l =
        | TFunction_def(loc, n, _, _, f) -> push_assume f n loc b false
        | TTypeDecl _ | TLogic _  -> ()) l;
   queue
-
-let make2 l table =
-  priority_table := table;
-  make l
 
 (* For customized theories. Formulas are simplified so that the first
    part of a disjuction is a literal or a quantifier *)
