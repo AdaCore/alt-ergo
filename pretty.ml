@@ -69,7 +69,10 @@ and print_form_list fmt = List.iter (fprintf fmt "%a," print_form)
 (**********************************************)
 (***** print all structure inside formula *****)
 (**********************************************)
-let debug = ref false
+
+let is_hypothesis name_decl = 
+  if String.length name_decl > 0 then String.get name_decl 0 = '@'
+  else false
 
 let rec print_ppure_type fmt = function
   | PPTunit -> fprintf fmt "unit"
@@ -128,8 +131,7 @@ let tconstant_to_string = function
   | Treal n -> Num.string_of_num n
   | Tbitv s -> s
 
-let rec print_var_list fmt (var_list, string_before_var) =
-  if !debug then fprintf fmt "DEBUGGGG %s%d@." string_before_var (List.length var_list); 
+let rec print_var_list fmt (var_list, string_before_var) = 
     match var_list with
     | [] -> ()
     | [s,ty] -> 
@@ -376,8 +378,7 @@ let extract_second_func tf = match tf.c with
 
 let print_typed_decl fmt td = match td.Why_ptree.c with
   | TAxiom (_, s, inv, tf) ->
-    if s = "Neg" then debug := true; 
-    if (String.get s 0 = '@') then
+    if (is_hypothesis s) then
       let new_name = String.sub s 1 ((String.length s) - 1) in
       fprintf fmt "axiom %s : %a" new_name print_tform tf
     else
@@ -410,7 +411,7 @@ let print_tdcl_lst fmt decl_lst =
 let print_typed_decl_list fmt ?(same_order = true) decl_lst =
   let all_logic_decl = ref [] in
   let (hypothesis, other_rules) = List.partition (fun d -> match d.c with 
-        | TAxiom (_, name, _, body) -> (String.get name 0) = '@'
+        | TAxiom (_, name, _, body) -> is_hypothesis name
         | TLogic (_, str_lst, _) -> 
           all_logic_decl := !all_logic_decl @ str_lst; false
         | _ -> false 

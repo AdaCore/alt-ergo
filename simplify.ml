@@ -7,7 +7,9 @@ type decl_list = (int tdecl, int) annoted list
 (* initial list of declaration *)
 let org_decl_list = ref []
 
-let is_hypothesis name_decl = String.get name_decl 0 = '@'
+let is_hypothesis name_decl = 
+  if String.length name_decl > 0 then String.get name_decl 0 = '@'
+  else false
 
 (*** helper functions for simplification process ***)
 let get_type sym lst_tpe old_tpe =
