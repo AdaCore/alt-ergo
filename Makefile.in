@@ -198,17 +198,15 @@ testoptsel:$(OPT)
 
 VERSION=0.96
 
-version.ml: config.status
+version.ml: config.status revision.sh
 # set version (and possibly revision) value in version.ml
-	@REVISION=$(shell ./revision.sh)
-	@echo "let version = \""$(VERSION)$$REVISION"\"" > version.ml
+	@echo "let version = \""$(VERSION)$(shell ./revision.sh)"\"" > version.ml
 	@echo "let date = \""`date`"\"" >> version.ml
 	@echo "let libdir = \""$(LIBDIR)"\"" >> version.ml
 
-META: config.status
-	@REVISION=$(shell ./revision.sh)
+META: config.status revision.sh
 	@echo "description = \"API of Alt-Ergo: An automatic theorem prover dedicated to program verification\"" > META
-	@echo "version = \""$(VERSION)$$REVISION"\"" >> META
+	@echo "version = \""$(VERSION)$(shell ./revision.sh)"\"" >> META
 	@echo "archive(byte) = \"altErgo.cmo\"" >> META
 	@echo "archive(native) = \"altErgo.cmx\"" >> META
 	@echo "requires = \"unix num ocamlgraph\"" >> META
