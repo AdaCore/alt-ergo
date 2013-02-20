@@ -198,15 +198,24 @@ testoptsel:$(OPT)
 
 VERSION=0.96
 
-version.ml: config.status revision.sh
+#We use the filename of a file in order to create a depency between version.ml
+#and the result of ./revision.sh
+REVISION:=$(VERSION)$(shell ./revision.sh)
+REVISIONSUFFIX:=make.revision
+REVISIONFILE:=$(REVISION).$(REVISIONSUFFIX)
+$(REVISIONFILE):
+	@rm -f *.$(REVISIONSUFFIX)
+	@touch $@
+
+version.ml: config.status $(REVISIONFILE)
 # set version (and possibly revision) value in version.ml
-	@echo "let version = \""$(VERSION)$(shell ./revision.sh)"\"" > version.ml
+	@echo "let version = \""$(REVISION)"\"" > version.ml
 	@echo "let date = \""`date`"\"" >> version.ml
 	@echo "let libdir = \""$(LIBDIR)"\"" >> version.ml
 
-META: config.status revision.sh
+META: config.status $(REVISIONFILE)
 	@echo "description = \"API of Alt-Ergo: An automatic theorem prover dedicated to program verification\"" > META
-	@echo "version = \""$(VERSION)$(shell ./revision.sh)"\"" >> META
+	@echo "version = \""$(REVISION)"\"" >> META
 	@echo "archive(byte) = \"altErgo.cmo\"" >> META
 	@echo "archive(native) = \"altErgo.cmx\"" >> META
 	@echo "requires = \"unix num ocamlgraph\"" >> META
@@ -400,6 +409,7 @@ clean::
 	@rm -f *.aux *.log $(NAME).tex $(NAME).dvi $(NAME).ps
 	@rm -f version.ml
 	@rm -f altgr-ergo.opt
+	@rm -f *.$(REVISIONSUFFIX)
 
 dist-clean distclean:: clean
 	@rm -f Makefile config.cache config.log config.status
