@@ -1279,109 +1279,66 @@ goal g:
 
 
 $$$pairs_arith
-type 'a pair
+type 'a pair = {fst : 'a ; snd : 'a}
 type elt
 
-logic pair : 'a , 'a -> 'a pair
-logic fst : 'a pair -> 'a
-logic snd : 'a pair -> 'a
-
-
-goal g1: forall a,b:elt. fst(pair(a,b))=a
+goal g1: forall a,b:elt. {fst=a;snd=b}.fst = a
 $
-type 'a pair
+type 'a pair = {fst : 'a ; snd : 'a}
 type elt
 
-logic pair : 'a , 'a -> 'a pair
-logic fst : 'a pair -> 'a
-logic snd : 'a pair -> 'a
-
-goal g2: forall a,b:elt. snd(pair(a,b))=b
+goal g2: forall a,b:elt. {fst=a;snd=b}.snd = b
 
 $
-type 'a pair
+type 'a pair = {fst : 'a ; snd : 'a}
 type elt
 
-logic pair : 'a , 'a -> 'a pair
-logic fst : 'a pair -> 'a
-logic snd : 'a pair -> 'a
-
-goal g3: forall a,b,a',b':elt. pair(a,b) = pair(a',b') -> a=a'
+goal g3: forall a,b,a',b':elt. {fst=a;snd=b} = {fst=a';snd=b'} -> a=a'
 
 $
-type 'a pair
+type 'a pair = {fst : 'a ; snd : 'a}
 type elt
 
-logic pair : 'a , 'a -> 'a pair
-logic fst : 'a pair -> 'a
-logic snd : 'a pair -> 'a
-
-goal g4: forall a,b,a',b':elt. pair(a,b) = pair(a',b') -> b=b'
+goal g4: forall a,b,a',b':elt. {fst=a;snd=b} = {fst=a';snd=b'} -> b=b'
 
 $
 
-type 'a pair
+type 'a pair = {fst : 'a ; snd : 'a}
 type elt
 
-logic pair : 'a , 'a -> 'a pair
-logic fst : 'a pair -> 'a
-logic snd : 'a pair -> 'a
-
-goal g6: forall x,y:int. fst(pair(x,y)) = 2 -> x=2
+goal g6: forall x,y:int. {fst=x; snd=y}.fst = 2 -> x=2
 
 $
-type 'a pair
+type 'a pair = {fst : 'a ; snd : 'a}
 type elt
 
-logic pair : 'a , 'a -> 'a pair
-logic fst : 'a pair -> 'a
-logic snd : 'a pair -> 'a
-
-goal g7: forall x,y:int. fst(pair(x,y)) + 1 = 2 -> x=1
+goal g7: forall x,y:int. {fst=x; snd=y}.fst + 1 = 2 -> x=1
 
 $
-type 'a pair
-type elt
+type 'a pair = {fst : 'a ; snd : 'a}
 
-logic pair : 'a , 'a -> 'a pair
-logic fst : 'a pair -> 'a
-logic snd : 'a pair -> 'a
-
-goal g8: forall x,y,z:int. fst(pair(fst(pair(x+3,y)),z)) + 2 = 5 -> x=0
+goal g8: forall x,y,z:int. {fst={fst=x+3;snd=y}.fst; snd=z}.fst + 2 = 5 -> x=0
 
 $
-type 'a pair
-type elt
+type 'a pair = {fst : 'a ; snd : 'a}
 
-logic pair : 'a , 'a -> 'a pair
-logic fst : 'a pair -> 'a
-logic snd : 'a pair -> 'a
-
-goal g9: forall x,y,z:int. fst(pair(fst(pair(x-x,y)),z)) + 2 = x -> x=2
+goal g9: forall x,y,z:int. {fst={fst=x-x;snd=y}.fst;snd=z}.fst + 2 = x -> x=2
 
 $
-type 'a pair
-type elt
-
-logic pair : 'a , 'a -> 'a pair
-logic fst : 'a pair -> 'a
-logic snd : 'a pair -> 'a
+type 'a pair = {fst : 'a ; snd : 'a}
 
 goal g10: 
  forall x : int pair. forall y : int. 
- y = snd(x) -> fst(x) + snd(x) = fst(x) + y
+ y = x.snd -> x.fst + x.snd = x.fst + y
 
 $
-type 'a pair
+type 'a pair = {fst : 'a ; snd : 'a}
 type elt
-
-logic pair : 'a , 'a -> 'a pair
-logic fst : 'a pair -> 'a
-logic snd : 'a pair -> 'a
 logic f : elt,elt  -> elt
 
-goal g18 : forall x,y,z,t,x2:elt. f(y,y)=f(t,t) -> f(z,x2)<>f(x,x2) -> pair(z,t)<>pair(x,y)
-
+goal g18 : 
+  forall x,y,z,t,x2:elt. 
+  f(y,y)=f(t,t) -> f(z,x2)<>f(x,x2) -> {fst=z;snd=t}<>{fst=x;snd=y}
 
 
 
@@ -3009,71 +2966,40 @@ goal g2:
 
 $$$ac_pairs
 
+type 'a pair = {fst : 'a ; snd : 'a}
+
 type set
-type 'a pair
 logic ac u : set, set -> set
 
 logic a,b,c,d,e,f:set
 
-logic pair : 'a,'a -> 'a pair
-
-logic fst : 'a pair -> 'a
-logic snd : 'a pair -> 'a
-
 goal g1 : 
-  pair(u(a,b),c)= pair(u(a,b),d) -> 
+  {fst=u(a,b); snd=c}= {fst=u(a,b);snd=d} -> 
   c = d
 
 $
 
 type set
-type 'a pair
+type 'a pair = {fst : 'a ; snd : 'a}
 logic ac u : set, set -> set
 
 logic a,b,c,d,e,f:set
 
-logic pair : 'a,'a -> 'a pair
-
-logic fst : 'a pair -> 'a
-logic snd : 'a pair -> 'a
-
 goal g2 : 
-  pair(u(a,d),c)= pair(u(a,c),d) -> 
+  {fst=u(a,d); snd=c}= {fst=u(a,c);snd=d} -> 
   c = d
     
 $
 
 type set
-type 'a pair
+type 'a pair = {fst : 'a ; snd : 'a}
 logic ac u : set pair, set pair -> set pair 
 logic a,b,c,d,e,f:set
 
-logic pair : 'a,'a -> 'a pair
-logic fst : 'a pair -> 'a
-logic snd : 'a pair -> 'a
-
 goal g3 : 
-  pair(u(pair(a,a),pair(a,b)),pair(a,b))= 
-  pair(u(pair(a,a),pair(a,b)),pair(a,c)) ->
+  {fst=u({fst=a;snd=a},{fst=a;snd=b});snd={fst=a;snd=b}}= 
+  {fst=u({fst=a;snd=a},{fst=a;snd=b});snd={fst=a;snd=c}} ->
   b = c 
-
-$
-
-type 'a pair
-type elt
-
-logic pair : 'a , 'a -> 'a pair
-logic fst : 'a pair -> 'a
-logic snd : 'a pair -> 'a
-
-logic a, b, d : int pair
-logic c : int
-logic ac u: int pair, int pair -> int pair
-
-
-goal g10: 
-  u(a,u(b,d)) = u(u(a,b),u(b,d)) ->
-  c = snd(u(a,b)) -> true
 
 
 $$$arith_modulo_uniquement
