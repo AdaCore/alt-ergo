@@ -56,8 +56,8 @@ ENABLEGUI = @ENABLEGUI@
 
 INCLUDES = @OCAMLGRAPHLIB@ @LABLGTK2LIB@
 
-BFLAGS = -dtypes -g $(INCLUDES) -annot
-OFLAGS = -dtypes $(INCLUDES) -annot -for-pack AltErgo
+BFLAGS = -annot -g $(INCLUDES)
+OFLAGS = -annot $(INCLUDES) -for-pack AltErgo
 
 BIBBYTE = nums.cma graph.cma unix.cma
 
@@ -84,22 +84,16 @@ PRECMO = version.cmo print_color.cmo preoptions.cmo
 
 OPTIONSCMO = parseoptions.cmo
 
-CMO = timers.cmo options.cmo exception.cmo loc.cmo \
-      hashcons.cmo hstring.cmo symbols.cmo \
-      subst.cmo ty.cmo common.cmo term.cmo literal.cmo formula.cmo \
-      boxed.cmo explanation.cmo \
-      why_parser.cmo why_lexer.cmo pretty.cmo \
-      smt_parser.cmo smt_lex.cmo smt_to_why.cmo \
-      smtlib2_util.cmo smtlib2_ast.cmo \
-      smtlib2_parse.cmo smtlib2_lex.cmo smtlib2_to_why.cmo \
-      polynome.cmo ac.cmo \
-      uf.cmo use.cmo intervals.cmo fm.cmo arith.cmo \
-      records.cmo bitv.cmo arrays.cmo sum.cmo \
-      incr_match.cmo instantiation.cmo custom_theory.cmo \
-      combine.cmo cc.cmo \
-      existantial.cmo \
-      triggers.cmo cnf.cmo why_typing.cmo matching.cmo \
-      sat.cmo 
+CMO = timers.cmo options.cmo exception.cmo loc.cmo hashcons.cmo hstring.cmo \
+      symbols.cmo subst.cmo ty.cmo common.cmo existantial.cmo \
+      why_parser.cmo why_lexer.cmo pretty.cmo smt_parser.cmo smt_lex.cmo \
+      smt_to_why.cmo smtlib2_util.cmo smtlib2_ast.cmo smtlib2_parse.cmo \
+      smtlib2_lex.cmo smtlib2_to_why.cmo triggers.cmo why_typing.cmo \
+      term.cmo literal.cmo formula.cmo cnf.cmo matching.cmo explanation.cmo \
+      polynome.cmo ac.cmo intervals.cmo fm.cmo arith.cmo \
+      records.cmo bitv.cmo arrays.cmo sum.cmo combine.cmo \
+      incr_match.cmo boxed.cmo instantiation.cmo custom_theory.cmo \
+      uf.cmo use.cmo cc.cmo sat.cmo 
 
 CMOFRONT = pruning.cmo frontend.cmo
 
