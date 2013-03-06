@@ -23,7 +23,7 @@ open Preoptions
 let usage = "usage: alt-ergo [options] file.<mlw|smt>"
 
 let spec = [
-  "-inversions-axioms", Arg.Set inversion_axioms, "  instantiate inversion axioms before the others";
+  "-inversion-axioms", Arg.Set inversion_axioms, "  instantiate inversion axioms before the others";
   "-rwt", Arg.Set rewriting, " use rewriting instead of axiomatic approach";
   "-parse-only", Arg.Set parse_only, " stop after parsing";
   "-smt-arrays", Arg.Set smt_arrays, " uses select/store symbols for Arrays";

@@ -196,33 +196,30 @@ module Make (X : S) = struct
     if rules () = 4 then fprintf fmt "[rule] TR-Arith-Poly moins@."; 
     add p1 (mult (create [] num_minus_1 p1.ty) p2)
 
+  let euc_mod_num c1 c2 = 
+    let c = mod_num c1 c2 in
+    if c </ (num_0) then c +/ abs_num c2 else c
+
+  let euc_div_num c1 c2 = (c1 -/ (euc_mod_num c1 c2)) // c2
+
   let div p1 p2 =
     if rules () = 4 then fprintf fmt "[rule] TR-Arith-Poly div@.";
-    if M.is_empty p2.m then
-      if p2.c =/ num_0 then raise Division_by_zero
-      else 
-        let p = mult_const (num_1 // p2.c) p1 in
-        match M.is_empty p.m, p.ty with
-          | true, Ty.Tint  -> {p with c = floor_num p.c}, false 
-          | true, Ty.Treal  ->  p, false
-          | false, Ty.Tint ->  p, true
-          | false, Ty.Treal ->  p, false
-          | _ -> assert false
-    else raise Maybe_zero
-
-
+    if not (M.is_empty p2.m) then raise Maybe_zero;
+    if p2.c =/ num_0 then raise Division_by_zero;
+    let p = mult_const (num_1 // p2.c) p1 in
+    match M.is_empty p.m, p.ty with
+      | _ , Ty.Treal  ->  p, false
+      | true, Ty.Tint  -> {p with c = euc_div_num p1.c p2.c}, false
+      | false, Ty.Tint ->  p, true (* XXX *)
+      | _ -> assert false
+        
   let modulo p1 p2 =
     if rules () = 4 then fprintf fmt "[rule] TR-Arith-Poly mod@.";
-    if M.is_empty p2.m then
-      if p2.c =/ num_0 then raise Division_by_zero
-      else 
-        if M.is_empty p1.m then
-	  let c = mod_num p1.c p2.c in
-	  let c = if c </ (num_0) then abs_num (p2.c) +/ c else c in
-	  { p1 with c = c }
-        else raise Not_a_num
-    else raise Maybe_zero
-      
+    if not (M.is_empty p2.m) then raise Maybe_zero;
+    if p2.c =/ num_0 then raise Division_by_zero;
+    if not (M.is_empty p1.m) then raise Not_a_num;
+    { p1 with c = euc_mod_num p1.c p2.c }
+
   let find x p = M.find x p.m
 
   let is_empty p = M.is_empty p.m

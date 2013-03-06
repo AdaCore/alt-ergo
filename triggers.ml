@@ -363,9 +363,9 @@ let at_most n l =
   List.rev (atmost [] n l)
 
 let is_var t = match t.c.tt_desc with
-  | TTvar _ -> true
-  | TTapp (_,l) -> l=[]
-  | _ -> false
+  | TTvar (Symbols.Var _) -> true
+  | _ -> false (* constant terms such as "logic nil : 'a list" 
+                  are allowed in triggers *)
 
 module SLLT = 
   Set.Make(

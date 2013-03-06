@@ -37,6 +37,7 @@ prefix=@prefix@
 exec_prefix=@exec_prefix@
 BINDIR=$(DESTDIR)@bindir@
 LIBDIR=$(DESTDIR)@libdir@/alt-ergo
+DATADIR=$(DESTDIR)@datadir@
 
 # where to install the man page
 MANDIR=$(DESTDIR)@mandir@
@@ -55,8 +56,8 @@ ENABLEGUI = @ENABLEGUI@
 
 INCLUDES = @OCAMLGRAPHLIB@ @LABLGTK2LIB@
 
-BFLAGS = -dtypes -g $(INCLUDES) -annot
-OFLAGS = -dtypes $(INCLUDES) -annot -for-pack AltErgo
+BFLAGS = -annot -g $(INCLUDES)
+OFLAGS = -annot $(INCLUDES) -for-pack AltErgo
 
 BIBBYTE = nums.cma graph.cma unix.cma
 
@@ -73,7 +74,7 @@ LIBNAME = altErgo
 BYTE=$(NAME).byte
 OPT=$(NAME).opt
 
-all: pack xpack $(OCAMLBEST) pack xpack gui
+all: pack xpack $(OCAMLBEST) pack xpack gui META
 
 
 # bytecode and native-code compilation
@@ -83,22 +84,17 @@ PRECMO = version.cmo print_color.cmo preoptions.cmo
 
 OPTIONSCMO = parseoptions.cmo
 
-CMO = timers.cmo options.cmo exception.cmo loc.cmo \
-      hashcons.cmo hstring.cmo symbols.cmo \
-      subst.cmo ty.cmo common.cmo term.cmo literal.cmo formula.cmo \
-      boxed.cmo explanation.cmo \
-      why_parser.cmo why_lexer.cmo pretty.cmo \
-      smt_parser.cmo smt_lex.cmo smt_to_why.cmo \
-      smtlib2_util.cmo smtlib2_ast.cmo \
-      smtlib2_parse.cmo smtlib2_lex.cmo smtlib2_to_why.cmo \
-      polynome.cmo ac.cmo \
-      uf.cmo use.cmo intervals.cmo fm.cmo arith.cmo \
-      records.cmo bitv.cmo arrays.cmo sum.cmo \
-      incr_match.cmo instantiation.cmo custom_theory.cmo \
-      combine.cmo cc.cmo \
-      existantial.cmo \
-      triggers.cmo cnf.cmo why_typing.cmo matching.cmo \
-      selection.cmo selection_sat.cmo simplify.cmo sat.cmo 
+CMO = timers.cmo options.cmo exception.cmo loc.cmo hashcons.cmo hstring.cmo \
+      symbols.cmo subst.cmo ty.cmo common.cmo existantial.cmo \
+      why_parser.cmo why_lexer.cmo pretty.cmo smt_parser.cmo smt_lex.cmo \
+      smt_to_why.cmo smtlib2_util.cmo smtlib2_ast.cmo smtlib2_parse.cmo \
+      smtlib2_lex.cmo smtlib2_to_why.cmo triggers.cmo why_typing.cmo \
+      term.cmo literal.cmo formula.cmo cnf.cmo matching.cmo explanation.cmo \
+      polynome.cmo ac.cmo intervals.cmo fm.cmo arith.cmo \
+      records.cmo bitv.cmo arrays.cmo sum.cmo combine.cmo \
+      incr_match.cmo boxed.cmo instantiation.cmo custom_theory.cmo \
+      uf.cmo use.cmo cc.cmo selection.cmo selection_sat.cmo simplify.cmo \
+      sat.cmo 
 
 CMOFRONT = pruning.cmo frontend.cmo
 
@@ -153,11 +149,16 @@ $(NAME).opt: $(PRECMX) $(OPTIONSCMX) $(MAINCMX)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLOPT) $(OFLAGS) -o $@ $(BIBOPT) $^
 
-gui: $(PRECMX) $(OPTIONSCMX) $(GUICMX)
+.PHONY: gui
+
 ifeq ($(ENABLEGUI),yes)
+gui: altgr-ergo.opt
+
+altgr-ergo.opt: $(PRECMX) $(OPTIONSCMX) $(GUICMX)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLOPT) $(OFLAGS) -o altgr-ergo.opt $(BIBOPT) $(BIBGUIOPT) $^
 else
+gui: $(PRECMX) $(OPTIONSCMX) $(GUICMX)
 	@echo "gui compilation skipped (lablgtksourceview not detected)"
 endif
 
@@ -190,15 +191,29 @@ testoptsel:$(OPT)
 
 
 
-VERSION=0.95
+VERSION=0.96
 
+#We use the filename of a file in order to create a depency between version.ml
+#and the result of ./revision.sh
+REVISION:=$(VERSION)$(shell ./revision.sh)
+REVISIONSUFFIX:=make.revision
+REVISIONFILE:=$(REVISION).$(REVISIONSUFFIX)
+$(REVISIONFILE):
+	@rm -f *.$(REVISIONSUFFIX)
+	@touch $@
 
-version.ml: config.status
+version.ml: config.status $(REVISIONFILE)
 # set version (and possibly revision) value in version.ml
 	@echo "let version = \""$(VERSION)"\"" > version.ml
 	@echo "let date = \""`date`"\"" >> version.ml
 	@echo "let libdir = \""$(LIBDIR)"\"" >> version.ml
 
+META: config.status $(REVISIONFILE)
+	@echo "description = \"API of Alt-Ergo: An automatic theorem prover dedicated to program verification\"" > META
+	@echo "version = \""$(REVISION)"\"" >> META
+	@echo "archive(byte) = \"altErgo.cmo\"" >> META
+	@echo "archive(native) = \"altErgo.cmx\"" >> META
+	@echo "requires = \"unix num ocamlgraph\"" >> META
 
 
 # file headers
@@ -231,15 +246,17 @@ install: install-indep
 	cp -f $(NAME).$(OCAMLBEST) $(BINDIR)/$(NAME)$(EXE)
 ifeq ($(ENABLEGUI),yes)
 	cp -f altgr-ergo.opt $(BINDIR)/altgr-ergo$(EXE)
-	cp -f util/gtk-lang/alt-ergo.lang /usr/share/gtksourceview-2.0/language-specs/alt-ergo.lang
+	mkdir -p $(DATADIR)/gtksourceview-2.0/language-specs
+	cp -f util/gtk-lang/alt-ergo.lang $(DATADIR)/gtksourceview-2.0/language-specs/alt-ergo.lang
 endif
 
-install-pack: xpack pack
+install-pack: xpack pack META
 	mkdir -p $(LIBDIR)
 	cp -f $(LIBNAME).cmx $(LIBDIR)
 	cp -f $(LIBNAME).o $(LIBDIR)
 	cp -f $(LIBNAME).cmo $(LIBDIR)
 	cp -f $(LIBNAME).cmi $(LIBDIR)
+	cp -f META $(LIBDIR)
 
 # documentation
 ###############
@@ -390,6 +407,7 @@ clean::
 	@rm -f *.aux *.log $(NAME).tex $(NAME).dvi $(NAME).ps
 	@rm -f version.ml
 	@rm -f altgr-ergo.opt
+	@rm -f *.$(REVISIONSUFFIX)
 
 dist-clean distclean:: clean
 	@rm -f Makefile config.cache config.log config.status

@@ -1,11 +1,9 @@
-VERSION=`grep "^VERSION=" Makefile | cut -d"=" -f2`
-
 revision=""
 
 svn_info=`svn info --xml 2> /dev/null`
 
-if [ $? ]
-then 
+if [ $? -eq 0 ]
+then
     for line in $svn_info
     do
         # detect revision
@@ -15,7 +13,19 @@ then
             revision="-svn-rev-$rev_attr"
         fi
     done
+else
+    svn_info=`git svn info 2> /dev/null`
+
+    if [ $? -eq 0 ]
+    then
+        rev_attr=`echo "$svn_info" | grep "Revision:" | cut -d " " -f2`
+        if [ "$rev_attr" != "" ]
+        then
+            revision="-svn-rev-$rev_attr"
+        fi
+    fi
+
 fi
 
-echo "let version = \""$VERSION$revision"\""  >> version.ml
+echo $revision
 

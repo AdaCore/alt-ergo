@@ -265,9 +265,6 @@ let hash (f, _) = f.tag
 let make pos neg size id =
   (H.hashcons {pos = pos; neg = neg; size = size; tag = -1 (* dumb *)}, id)
 
-let mk_lit a id =
-  make (Literal a) (Literal (Literal.LT.neg a)) 1 id
-
 let mk_not (f,id) =
   let f = iview f in
   make f.neg f.pos f.size id
@@ -332,10 +329,6 @@ let mk_imp f1 f2 id =
   let size = size f1 + size f2 in
   make (Clause(mk_not f1,f2)) (Unit(f1,mk_not f2)) size id
 
-let mk_if t f2 f3 id = 
-  let lit = mk_lit (Literal.LT.mk_pred t) id in
-  mk_or (mk_and lit f2 id) (mk_and (mk_not lit) f3 id) id
-    
 let mk_iff f1 f2 id = 
   let a = mk_or f1 f2 id in
   let b = mk_or (mk_not f1) (mk_not f2) id in
@@ -343,6 +336,33 @@ let mk_iff f1 f2 id =
   let d = mk_or f1 (mk_not f2) id in
   make (Unit(c,d)) (Unit(a,b)) (2*(size f1+size f2)) id
 
+(* let mk_lit a id = make (Literal a) (Literal (Literal.LT.neg a)) 1 id *)
+
+let translate_eq_to_iff s t = 
+  (T.view s).T.ty = Ty.Tbool && 
+  not 
+  (T.equal s T.vrai || T.equal s T.faux || T.equal t T.vrai ||T.equal t T.faux)
+  
+let mk_lit a id = match Literal.LT.view a with
+  | Literal.Eq(s,t) when translate_eq_to_iff s t ->
+    let a1 = Literal.LT.mk_pred s in
+    let a2 = Literal.LT.mk_pred t in
+    let f1 = make (Literal a1) (Literal (Literal.LT.neg a1)) 1 id in
+    let f2 = make (Literal a2) (Literal (Literal.LT.neg a2)) 1 id in
+    mk_iff f1 f2 id
+
+  | Literal.Distinct(false,[s;t]) when translate_eq_to_iff s t ->
+    let a1 = Literal.LT.mk_pred s in
+    let a2 = Literal.LT.mk_pred t in
+    let f1 = make (Literal a1) (Literal (Literal.LT.neg a1)) 1 id in
+    let f2 = make (Literal a2) (Literal (Literal.LT.neg a2)) 1 id in
+    mk_not (mk_iff f1 f2 id)
+      
+  | _ -> make (Literal a) (Literal (Literal.LT.neg a)) 1 id
+
+let mk_if t f2 f3 id = 
+  let lit = mk_lit (Literal.LT.mk_pred t) id in
+  mk_or (mk_and lit f2 id) (mk_and (mk_not lit) f3 id) id
 
 (* this function should only be applied with ground substitutions *)
 let rec apply_subst subst (f, id) =

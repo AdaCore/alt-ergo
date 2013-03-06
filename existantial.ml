@@ -24,11 +24,30 @@ let eq_var x t =
     | TTvar y -> Symbols.equal x y
     | _ -> false
 
+let no_occur_check x t =
+  let rec aux t = match t.c.tt_desc with
+    | TTvar y             -> if Symbols.equal x y then raise Exit
+    | TTlet (y, s, t)     -> aux s; if not (Symbols.equal x y) then aux t
+    | TTrecord l          -> List.iter (fun (_,t) -> aux t) l
+    | TTnamed (_, t)      -> aux t
+    | TTdot (t, _)        -> aux t
+    | TTconcat (s, t)     -> aux s; aux t
+    | TTextract (r, s, t) -> aux r; aux s; aux t
+    | TTset (r, s, t)     -> aux r; aux s; aux t
+    | TTget (s, t)        -> aux s; aux t
+    | TTapp (_, l)        -> List.iter aux l
+    | TTprefix (_, t)     -> aux t
+    | TTinfix (s, _, t)   -> aux s; aux t
+    | TTconst _           -> ()
+  in
+  try aux t; true
+  with Exit -> false      
+
 let rec find_eq x eqs f = match f.c with
   | TFatom ({c=TAeq [t1;t2]}) -> 
-      if eq_var x t1 then (x,t2)::eqs 
-      else if eq_var x t2 then (x,t1)::eqs
-      else eqs
+    if eq_var x t1 && no_occur_check x t2 then (x,t2)::eqs 
+    else if eq_var x t2 && no_occur_check x t1 then (x,t1)::eqs
+    else eqs
   | TFop (OPand,l) -> List.fold_left (find_eq x) eqs l
   | _ -> eqs (* XXX: TODO *)
 

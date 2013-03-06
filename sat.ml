@@ -384,13 +384,18 @@ let new_facts goal_directed env =
     [] matching_result
 
 
-(* 
-   predicate = true : consider only predicates for matching
-   goal_directed = true : match only with terms from goal
-*)
+let sort_facts =
+  let rec size f = match F.view f with
+    | F.Unit(f1,f2) -> max (size f1) (size f2)
+    | _             -> F.size f
+  in
+  fun lf -> List.fast_sort (fun (p1,_) (p2,_) -> size p1.f - size p2.f) lf
 
 type select = Select_predicates | Select_lemmas | Select_inversions 
  
+(* predicate = true : consider only predicates for matching
+   goal_directed = true : match only with terms from goal *)
+
 let mround select ~goal_directed env max_size =
   if rules () = 2 then fprintf fmt "[rule] TR-Sat-Mround@.";
   !Options.timer_start Timers.TMatch;
@@ -403,7 +408,7 @@ let mround select ~goal_directed env max_size =
   let env, max_size = mtriggers env axs max_size in
   let lf = new_facts goal_directed env in
   !Options.timer_pause Timers.TMatch;
-  max_size, lf 
+  max_size, sort_facts lf
 
 let is_literal f = match F.view f with F.Literal _ -> true | _ -> false
 

@@ -147,7 +147,7 @@ let show_about () =
 	      "Mohamed Iguernelala";
 	      "Stephane Lescuyer";
 	      "Alain Mebsout"]
-    ~copyright:"2006-2012\nCNRS - INRIA - Université Paris Sud"
+    ~copyright:"2006-2013\nCNRS - INRIA - Université Paris Sud"
     ~license:"CeCILL-C"
     ~version:Version.version
     ~website:"http://alt-ergo.lri.fr"
@@ -782,6 +782,7 @@ let set_color_inst inst_model renderer (istore:GTree.model) row =
 let create_inst_view inst_model env buffer sv ~packing () =
   let view = GTree.view ~model:inst_model.istore ~packing () in
 
+  view#selection#set_mode `MULTIPLE;
   let renderer = GTree.cell_renderer_pixbuf [] in
   let col = GTree.view_column ~title:""  
     ~renderer:(renderer, ["stock_id", inst_model.icol_icon]) () in
@@ -799,26 +800,25 @@ let create_inst_view inst_model env buffer sv ~packing () =
 
   let renderer = GTree.cell_renderer_text [`EDITABLE true] in
   ignore (renderer#connect#edited (fun path s ->
-    let row = inst_model.istore#get_iter path in
-    let id = inst_model.istore#get ~row ~column:inst_model.icol_tag in
-    let _,_,name,l = Hashtbl.find inst_model.h id in
-    try
-      let limit = int_of_string s in
+    let limit = try int_of_string s with Failure _ -> -1 in
+    List.iter (fun path ->
+      let row = inst_model.istore#get_iter path in
+      let id = inst_model.istore#get ~row ~column:inst_model.icol_tag in
+      let _, nb, name,l = Hashtbl.find inst_model.h id in
       if limit >= 0 then
-	begin
-	  l := limit;
+        begin
+          l := limit;
 	  inst_model.istore#set ~row ~column:inst_model.icol_limit 
 	    (string_of_int limit);
 	  Gui_session.save env.actions (Gui_session.LimitLemma (id, name,limit))
-	end
+        end
       else 
 	begin
 	  l := -1;
-	  inst_model.istore#set ~row ~column:inst_model.icol_limit inf
+	  inst_model.istore#set ~row ~column:inst_model.icol_limit inf;
+	  Gui_session.save env.actions (Gui_session.UnlimitLemma (id, name))
 	end
-    with Failure _ -> 
-      l := -1;
-      inst_model.istore#set ~row ~column:inst_model.icol_limit inf
+    ) view#selection#get_selected_rows
   ));
   let col = GTree.view_column ~title:"limit"  
     ~renderer:(renderer, ["text", inst_model.icol_limit]) () in

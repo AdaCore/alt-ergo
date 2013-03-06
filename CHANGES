@@ -1,3 +1,10 @@
+version 0.95.1, March 05th, 2013
+=================================
+
+  o bug fixes (existantial elimination, Euclidean division)
+  o minor enhancement (transformation of boolean equalities into equivalences)
+  o minor enhancement (sort axioms/definitions instances according to their size)
+
 version 0.95, January 11th, 2013
 =================================
 

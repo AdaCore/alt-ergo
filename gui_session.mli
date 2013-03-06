@@ -24,6 +24,7 @@ type action =
   | AddInstance of int * string * string list
   | AddTrigger of int * bool * string
   | LimitLemma of int * string * int
+  | UnlimitLemma of int * string
 
 val resulting_ids : (action, int) Hashtbl.t
 
