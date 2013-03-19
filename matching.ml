@@ -217,10 +217,16 @@ module Make (X : X) = struct
       else raise Echec
     with Not_found ->  {sg with sbt=(SubstT.add f t s_t,s_ty) }
 
+  let (-@) l1 l2 =
+    match l1, l2 with
+    | [], _  -> l2
+    | _ , [] -> l1
+    | _ -> List.fold_left (fun acc e -> e :: acc) l2 (List.rev l1)
+      
   let rec iter_exception f gsb l =
     let l = 
       List.fold_left
-        (fun acc xs -> try (f gsb xs) @ acc with Echec -> acc) [] l in
+        (fun acc xs -> try (f gsb xs) -@ acc with Echec -> acc) [] l in
     match l with [] -> raise Echec | l  -> l
 	
   let rec matchterm env uf ( {sbt=(s_t,s_ty);gen=g;goal=b} as sg) pat t =
