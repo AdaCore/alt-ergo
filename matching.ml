@@ -268,6 +268,8 @@ module Make (X : X) = struct
 	    { sg with sbt = (s_t,s_ty)} l
 	  
   and matchterms env uf sg pats xs = 
+    (* We match one pattern with one term *)
+    if pats <> [] then Options.incr_steps (1);
     try 
       List.fold_left2 
         (fun sb_l pat arg -> 
@@ -278,10 +280,16 @@ module Make (X : X) = struct
         ) [sg] pats xs 
     with Invalid_argument _ -> raise Echec
 
+  (*let matchterms env uf sg pats xs =
+    (* The matching one pattern with one term *)
+    Options.incr_steps (1);
+    matchterms env uf sg pats xs*)
+
   let matchpat env uf pat_info lsbt_acc ({sbt=st,sty;gen=g;goal=b} as sg, pat) =
     let {T.f=f;xs=pats;ty=ty} = T.view pat in
     match f with
-      |	Symbols.Var _ -> all_terms f ty env pat_info sg lsbt_acc
+      |	Symbols.Var _ -> 
+        all_terms f ty env pat_info sg lsbt_acc
       | _ -> 
 	  try  
 	    MT.fold 
