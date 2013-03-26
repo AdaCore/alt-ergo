@@ -125,6 +125,9 @@ module Make (X : ALIEN) = struct
       | Other(r, _) -> r
       | x -> X.embed x
 
+  let type_info = function
+    | Record (_, ty) | Access (_, _, ty) | Other (_, ty) -> ty
+
   let make t = 
     let rec make_rec t ctx = 
       let { T.f = f; xs = xs; ty = ty} = T.view t in
@@ -135,8 +138,8 @@ module Make (X : ALIEN) = struct
 	      List.fold_right2 
 		(fun x (lb, _) (l, ctx) -> 
 		   let r, ctx = make_rec x ctx in 
-		   let dlb = 
-		     T.make (Symbols.Op (Symbols.Access lb)) [t] ty in
+                   let tyr = type_info r in
+		   let dlb = T.make (Symbols.Op (Symbols.Access lb)) [t] tyr in
 		   let c = Literal.LT.make (Literal.Eq (dlb, dlb)) in
 		   (lb, r)::l, c::ctx
 		) 
@@ -206,9 +209,6 @@ module Make (X : ALIEN) = struct
     | _ -> false
 	
   let unsolvable _ = false
-
-  let type_info = function
-    | Record (_, ty) | Access (_, _, ty) | Other (_, ty) -> ty
 
   let abstract_access field e ty acc =
     let xe = is_mine e in
