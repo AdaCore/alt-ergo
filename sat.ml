@@ -222,11 +222,13 @@ let new_facts goal_directed env =
 	      subst_list) ->
        List.fold_left
 	 (fun acc 
-	    {Matching.sbt = s; 
+	    {Matching.sbs = sbs; 
+	     sty = sty; 
 	     gen = g; 
 	     goal = b; 
 	     s_term_orig = torig;
 	     s_lem_orig = lorig; } ->
+            let s = sbs, sty in
 	    match guard with
 	      | Some a when 
 		  CcX.query (Literal.LT.apply_subst s a) env.tbox = No -> acc

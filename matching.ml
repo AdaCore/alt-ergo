@@ -24,7 +24,8 @@ module T = Term
 module F = Formula
 
 type gsubst = { 
-  sbt : T.subst ; 
+  sbs : T.t Subst.t;
+  sty : Ty.subst;
   gen : int ;     (* l'age d'une substitution est l'age du plus vieux 
 		     terme qu'elle contient *)
   goal : bool;    (* vrai si la substitution contient un terme ayant un lien 
@@ -177,7 +178,7 @@ module Make (X : X) = struct
 
   let all_terms 
       f ty env pinfo 
-      {sbt=(s_t,s_ty); gen=g; goal=b; 
+      {sbs=s_t; sty=s_ty; gen=g; goal=b; 
        s_term_orig=s_torig; 
        s_lem_orig = s_lorig} lsbt_acc = 
     SubstT.fold 
@@ -198,7 +199,8 @@ module Make (X : X) = struct
 		      max ng g , bt or b
 		    with Not_found -> g , b
 		  in
-		  { sbt = (SubstT.add f t s_t, s_ty);
+		  { sbs = SubstT.add f t s_t;
+		    sty = s_ty;
 		    gen = ng; 
 		    goal = but;
 		    s_term_orig = t :: s_torig;
@@ -208,14 +210,14 @@ module Make (X : X) = struct
 	   ) s l
       ) env.fils lsbt_acc
 
-  let add_msymb uf f t ({sbt=(s_t,s_ty)} as sg)= 
+  let add_msymb uf f t ({sbs=s_t; sty=s_ty} as sg)= 
     try 
       let t' = SubstT.find f s_t in
       let a = Literal.LT.make (Literal.Eq (t, t')) in
       if X.query a uf (*Explanation.singleton (Formula.mk_lit a)*) <> Sig.No
       then sg 
       else raise Echec
-    with Not_found ->  {sg with sbt=(SubstT.add f t s_t,s_ty) }
+    with Not_found ->  {sg with sbs=SubstT.add f t s_t; sty=s_ty}
 
   let (-@) l1 l2 =
     match l1, l2 with
@@ -229,7 +231,7 @@ module Make (X : X) = struct
         (fun acc xs -> try (f gsb xs) -@ acc with Echec -> acc) [] l in
     match l with [] -> raise Echec | l  -> l
 	
-  let rec matchterm env uf ( {sbt=(s_t,s_ty);gen=g;goal=b} as sg) pat t =
+  let rec matchterm env uf ( {sbs=s_t; sty=s_ty;gen=g;goal=b} as sg) pat t =
     !Options.thread_yield ();
     if dmatching then 
       fprintf fmt "[matchterm] I match %a against %a@." T.print pat T.print t;
@@ -241,7 +243,7 @@ module Make (X : X) = struct
 	       let s_ty = Ty.matching s_ty ty_pat (T.view t).T.ty in
 	       let g',b' = infos max (||) t g b env in
 	       add_msymb uf f_pat t 
-		 { sg with sbt=(s_t,s_ty); gen=g'; goal=b' }
+		 { sg with sbs=s_t; sty=s_ty; gen=g'; goal=b' }
 	     with Ty.TypeClash _ -> raise Echec)
           in 
           [sb]
@@ -265,7 +267,7 @@ module Make (X : X) = struct
 	  in
 	  iter_exception (* pas sur que ce soit correct ici *)
 	    (fun m {T.xs=xs} -> matchterms env uf m pats xs) 
-	    { sg with sbt = (s_t,s_ty)} l
+	    { sg with sbs = s_t; sty=s_ty} l
 	  
   and matchterms env uf sg pats xs = 
     try 
@@ -278,7 +280,7 @@ module Make (X : X) = struct
         ) [sg] pats xs 
     with Invalid_argument _ -> raise Echec
 
-  let matchpat env uf pat_info lsbt_acc ({sbt=st,sty;gen=g;goal=b} as sg, pat) =
+  let matchpat env uf pat_info lsbt_acc ({sbs=st; sty=sty;gen=g;goal=b} as sg, pat) =
     let {T.f=f;xs=pats;ty=ty} = T.view pat in
     match f with
       |	Symbols.Var _ -> all_terms f ty env pat_info sg lsbt_acc
@@ -303,7 +305,8 @@ module Make (X : X) = struct
 		     let aux = 
                        matchterms env uf 
 			 { sg with 
-			   sbt = st, s_ty; 
+			   sbs = st;
+			   sty = s_ty; 
 			   gen = gen; 
 			   goal = but; 
 			   s_term_orig = t::sg.s_term_orig } 
@@ -321,11 +324,14 @@ module Make (X : X) = struct
     end;
     List.fold_left
       (fun acc sg -> 
-         matchpat env uf pat_info acc (sg, T.apply_subst sg.sbt pat)) [] lsubsts
+        let pat' = T.apply_subst (sg.sbs, sg.sty) pat in
+        matchpat env uf pat_info acc (sg, pat')
+      ) [] lsubsts
       
   let matching (pat_info, pats) env uf =
     let egs = 
-      { sbt=(SubstT.empty,Ty.esubst); 
+      { sbs = SubstT.empty;
+        sty = Ty.esubst; 
         gen = 0; 
 	goal = false; 
 	s_term_orig = [];
