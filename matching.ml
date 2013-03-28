@@ -328,7 +328,7 @@ module Make (X : X) = struct
         matchpat env uf pat_info acc (sg, pat')
       ) [] lsubsts
       
-  let matching (pat_info, pats) env uf =
+  let matching env uf (pat_info, pats) =
     let egs = 
       { sbs = SubstT.empty;
         sty = Ty.esubst; 
@@ -338,16 +338,12 @@ module Make (X : X) = struct
 	s_lem_orig = pat_info.trigger_orig;
       } 
     in
-    List.fold_left (matchpats env uf pat_info) [egs] pats
+    pat_info, List.fold_left (matchpats env uf pat_info) [egs] pats
 
   let query env uf = 
     !Options.timer_start Timers.TMatch;
-    let r = List.fold_left 
-      (fun r ((pat_infos, pats) as v) -> 
-	(pat_infos, matching v env uf)::r)
-      [] env.pats 
-    in
+    let res = List.rev_map (matching env uf) env.pats in
     !Options.timer_pause Timers.TMatch;
-    r
+    res
 
 end
