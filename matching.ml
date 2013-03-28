@@ -175,9 +175,15 @@ module Make (X : X) = struct
         fprintf fmt "match_pat: %a  with subst:  sbs= %a | sty= %a @."
           T.print pat0 SubstT.print sbs Ty.print_subst sty
 
-    let class_of t cl =
+    let match_term {sbs=sbs; sty=sty} t pat =
       if dmatching then 
-        fprintf fmt "%a <=> { %a }@."
+        fprintf fmt 
+          "[match_term] I match %a against %a with subst: sbs=%a | sty= %a@."
+          T.print pat T.print t SubstT.print sbs Ty.print_subst sty
+
+    let match_class_of t cl =
+      if dmatching then 
+        fprintf fmt "class_of (%a)  = { %a }@."
           T.print t
           (fun fmt -> List.iter (fprintf fmt "%a , " T.print)) cl
 
@@ -244,11 +250,9 @@ module Make (X : X) = struct
 
   let add_msymb uf f t ({sbs=s_t; sty=s_ty} as sg)= 
     try 
-      let t' = SubstT.find f s_t in
-      let a = Literal.LT.make (Literal.Eq (t, t')) in
-      if X.query a uf (*Explanation.singleton (Formula.mk_lit a)*) <> Sig.No
-      then sg 
-      else raise Echec
+      let a = Literal.LT.make (Literal.Eq (t, SubstT.find f s_t)) in
+      if X.query a uf = Sig.No then raise Echec;
+      sg 
     with Not_found ->  {sg with sbs=SubstT.add f t s_t; sty=s_ty}
 
   let (-@) l1 l2 =
@@ -256,18 +260,11 @@ module Make (X : X) = struct
     | [], _  -> l2
     | _ , [] -> l1
     | _ -> List.fold_left (fun acc e -> e :: acc) l2 (List.rev l1)
-      
-  let rec iter_exception f gsb l =
-    let l = 
-      List.fold_left
-        (fun acc xs -> try (f gsb xs) -@ acc with Echec -> acc) [] l in
-    match l with [] -> raise Echec | l  -> l
-	
-  let rec matchterm env uf ( {sbs=s_t; sty=s_ty;gen=g;goal=b} as sg) pat t =
+
+  let rec match_term env uf ( {sbs=s_t; sty=s_ty;gen=g;goal=b} as sg) pat t =
     !Options.thread_yield ();
-    if dmatching then 
-      fprintf fmt "[matchterm] I match %a against %a@." T.print pat T.print t;
-    let {T.f=f_pat;xs=pats;ty=ty_pat} =  T.view pat in
+    Debug.match_term sg t pat;
+    let {T.f=f_pat;xs=pats;ty=ty_pat} = T.view pat in
     match f_pat with
       |	Symbols.Var _ -> 
 	  let sb =
@@ -281,77 +278,70 @@ module Make (X : X) = struct
           [sb]
       | _ -> 
         let cl = X.class_of uf t in
-        if dmatching then 
-          fprintf fmt "%a <=> { %a }@."
-            T.print t
-            (fun fmt -> List.iter (fprintf fmt "%a , " T.print)) cl;
-	let l = List.map T.view cl in
-	let s_ty, l = 
+        Debug.match_class_of t cl;
+	let s_ty, cl = 
 	  List.fold_left
-	      (fun (s_ty,l) ({T.f=f; ty=ty_t} as t) -> 
-		 if Symbols.compare f_pat f = 0 then 
-		   try
-		     let s_ty = Ty.matching s_ty ty_pat ty_t in
-		     s_ty , t::l 
-		   with Ty.TypeClash _ -> s_ty , l
-		 else s_ty , l
-	      ) (s_ty,[]) l 
-	  in
-	  iter_exception (* pas sur que ce soit correct ici *)
-	    (fun m {T.xs=xs} -> matchterms env uf m pats xs) 
-	    { sg with sbs = s_t; sty=s_ty} l
+	    (fun (s_ty,l) t -> 
+              let {T.f=f; ty=ty_t;xs=xs} = T.view t in
+	      if Symbols.compare f_pat f = 0 then 
+		try
+		  let s_ty = Ty.matching s_ty ty_pat ty_t in
+		  s_ty , xs::l 
+		with Ty.TypeClash _ -> s_ty , l
+	      else s_ty , l
+	    ) (s_ty,[]) cl 
+	in
+        let gsb = { sg with sbs = s_t; sty = s_ty } in
+        (* pas sur que ce soit correct ici *)
+        let l = 
+          List.fold_left
+            (fun acc xs -> 
+              try (match_list env uf gsb pats xs) -@ acc
+              with Echec -> acc
+            ) [] cl
+        in
+        match l with [] -> raise Echec | l  -> l
 	  
-  and matchterms env uf sg pats xs = 
+  and match_list env uf sg pats xs = 
     try 
       List.fold_left2 
         (fun sb_l pat arg -> 
            List.fold_left 
              (fun acc sg -> 
-                let aux = matchterm env uf sg pat arg in
+                let aux = match_term env uf sg pat arg in
                 List.rev_append aux acc) [] sb_l
         ) [sg] pats xs 
     with Invalid_argument _ -> raise Echec
 
   let match_one_pat env uf pat_info pat0 lsbt_acc sg =
     Debug.match_one_pat sg pat0;
-    let {sbs=st; sty=sty;gen=g;goal=b} = sg in
-    let pat = T.apply_subst (st, sty) pat0 in
-    let {T.f=f;xs=pats;ty=ty} = T.view pat in
+    let pat = T.apply_subst (sg.sbs, sg.sty) pat0 in
+    let {T.f=f; xs=pats; ty=ty} = T.view pat in
     match f with
-      |	Symbols.Var _ -> all_terms f ty env pat_info sg lsbt_acc
+      | Symbols.Var _ -> all_terms f ty env pat_info sg lsbt_acc
       | _ -> 
-	  try  
-	    MT.fold 
-	      (fun t xs lsbt ->
-		 let lems = 
-		   try (MT.find t env.info).lem_orig with Not_found -> []
-		 in
-		 if matching_loop lems pat_info.trigger_orig then lsbt
-		 else begin
-                   if dmatching then
-                     fprintf fmt 
-                       "[matchpat] I consider the pattern %a against %a@."
-                       T.print pat T.print t;
-		   try
-		     let s_ty = 
-		       try Ty.matching sty ty (T.view t).T.ty 
-		       with Ty.TypeClash _ -> sty in
-		     let gen, but = infos max (||) t g b env in
-		     let aux = 
-                       matchterms env uf 
-			 { sg with 
-			   sbs = st;
-			   sty = s_ty; 
-			   gen = gen; 
-			   goal = but; 
-			   s_term_orig = t::sg.s_term_orig } 
-			 pats xs in
-                     List.rev_append aux lsbt
-		   with Echec -> lsbt
-                 end
-              ) (SubstT.find f env.fils) lsbt_acc
-	  with Not_found -> lsbt_acc
-	    
+        let {sty=sty; gen=g; goal=b} = sg in
+        let f_aux t xs lsbt = 
+	  let lems = try (MT.find t env.info).lem_orig with Not_found -> [] in
+	  if matching_loop lems pat_info.trigger_orig then lsbt
+	  else
+	    try
+	      let s_ty = 
+		try Ty.matching sty ty (T.view t).T.ty 
+		with Ty.TypeClash _ -> sty in
+	      let gen, but = infos max (||) t g b env in
+              let sg =
+                { sg with 
+                  sty = s_ty; gen = gen; goal = but; 
+                  s_term_orig = t::sg.s_term_orig }
+              in
+	      let aux = match_list env uf sg pats xs in
+              List.rev_append aux lsbt
+	    with Echec -> lsbt
+        in
+	try MT.fold f_aux (SubstT.find f env.fils) lsbt_acc
+	with Not_found -> lsbt_acc
+
   let match_pats_modulo env uf pat_info lsubsts pat = 
     Debug.match_pats_modulo pat lsubsts;
     List.fold_left (match_one_pat env uf pat_info pat) [] lsubsts
