@@ -151,6 +151,38 @@ module Make (X : X) = struct
       
   let add_trigger p trs env = { env with pats = (p, trs) ::env.pats }
 
+  module Debug = struct
+      
+    let matching pats = 
+      if dmatching then begin
+        fprintf fmt "[matching] (multi-)triggers: ";
+        List.iter (fprintf fmt "%a , " T.print) pats;
+        fprintf fmt "@.";
+      end
+          
+    let match_pats_modulo pat lsubsts = 
+      if dmatching then begin
+        fprintf fmt "match_pat_modulo: %a  with accumulated substs@."
+          T.print pat;
+        List.iter (fun {sbs=sbs; sty=sty} ->
+          fprintf fmt ">>> sbs= %a | sty= %a@." 
+            SubstT.print sbs Ty.print_subst sty
+        )lsubsts
+      end
+          
+    let match_one_pat {sbs=sbs; sty=sty} pat0 = 
+      if dmatching then
+        fprintf fmt "match_pat: %a  with subst:  sbs= %a | sty= %a @."
+          T.print pat0 SubstT.print sbs Ty.print_subst sty
+
+    let class_of t cl =
+      if dmatching then 
+        fprintf fmt "%a <=> { %a }@."
+          T.print t
+          (fun fmt -> List.iter (fprintf fmt "%a , " T.print)) cl
+
+  end
+
   exception Deja_vu
   let deja_vu lem1 lems = 
     List.exists (fun lem2 -> F.compare lem1 lem2 = 0) lems
@@ -280,7 +312,10 @@ module Make (X : X) = struct
         ) [sg] pats xs 
     with Invalid_argument _ -> raise Echec
 
-  let matchpat env uf pat_info lsbt_acc ({sbs=st; sty=sty;gen=g;goal=b} as sg, pat) =
+  let match_one_pat env uf pat_info pat0 lsbt_acc sg =
+    Debug.match_one_pat sg pat0;
+    let {sbs=st; sty=sty;gen=g;goal=b} = sg in
+    let pat = T.apply_subst (st, sty) pat0 in
     let {T.f=f;xs=pats;ty=ty} = T.view pat in
     match f with
       |	Symbols.Var _ -> all_terms f ty env pat_info sg lsbt_acc
@@ -317,18 +352,12 @@ module Make (X : X) = struct
               ) (SubstT.find f env.fils) lsbt_acc
 	  with Not_found -> lsbt_acc
 	    
-  let matchpats env uf pat_info lsubsts pat = 
-    if dmatching then begin
-      fprintf fmt "@.[matchpats] I consider a new trigger@.";
-      fprintf fmt "====================================@."
-    end;
-    List.fold_left
-      (fun acc sg -> 
-        let pat' = T.apply_subst (sg.sbs, sg.sty) pat in
-        matchpat env uf pat_info acc (sg, pat')
-      ) [] lsubsts
+  let match_pats_modulo env uf pat_info lsubsts pat = 
+    Debug.match_pats_modulo pat lsubsts;
+    List.fold_left (match_one_pat env uf pat_info pat) [] lsubsts
       
   let matching env uf (pat_info, pats) =
+    Debug.matching pats;
     let egs = 
       { sbs = SubstT.empty;
         sty = Ty.esubst; 
@@ -338,7 +367,7 @@ module Make (X : X) = struct
 	s_lem_orig = pat_info.trigger_orig;
       } 
     in
-    pat_info, List.fold_left (matchpats env uf pat_info) [egs] pats
+    pat_info, List.fold_left (match_pats_modulo env uf pat_info) [egs] pats
 
   let query env uf = 
     !Options.timer_start Timers.TMatch;
