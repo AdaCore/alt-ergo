@@ -277,31 +277,29 @@ module Make (X : X) = struct
           in 
           [sb]
       | _ -> 
-        let cl = X.class_of uf t in
-        Debug.match_class_of t cl;
-	let s_ty, cl = 
-	  List.fold_left
-	    (fun (s_ty,l) t -> 
-              let {T.f=f; ty=ty_t;xs=xs} = T.view t in
-	      if Symbols.compare f_pat f = 0 then 
-		try
-		  let s_ty = Ty.matching s_ty ty_pat ty_t in
-		  s_ty , xs::l 
-		with Ty.TypeClash _ -> s_ty , l
-	      else s_ty , l
-	    ) (s_ty,[]) cl 
-	in
-        let gsb = { sg with sbs = s_t; sty = s_ty } in
-        (* pas sur que ce soit correct ici *)
-        let l = 
-          List.fold_left
-            (fun acc xs -> 
-              try (match_list env uf gsb pats xs) -@ acc
-              with Echec -> acc
-            ) [] cl
-        in
-        match l with [] -> raise Echec | l  -> l
-	  
+        try
+          let s_ty = Ty.matching s_ty ty_pat (T.view t).T.ty in
+          let cl = X.class_of uf t in
+          Debug.match_class_of t cl;
+          let cl =
+	    List.fold_left
+	      (fun l t -> 
+                let {T.f=f; xs=xs} = T.view t in
+	        if Symbols.compare f_pat f = 0 then xs::l else l
+	      )[] cl
+          in
+          let gsb = { sg with sbs = s_t; sty = s_ty } in
+          (* pas sur que ce soit correct ici *)
+          let l = 
+            List.fold_left
+              (fun acc xs -> 
+                try (match_list env uf gsb pats xs) -@ acc
+                with Echec -> acc
+              ) [] cl
+          in
+          match l with [] -> raise Echec | l  -> l
+        with Ty.TypeClash _ -> raise Echec
+
   and match_list env uf sg pats xs = 
     try 
       List.fold_left2 
@@ -326,9 +324,7 @@ module Make (X : X) = struct
 	  if matching_loop lems pat_info.trigger_orig then lsbt
 	  else
 	    try
-	      let s_ty = 
-		try Ty.matching sty ty (T.view t).T.ty 
-		with Ty.TypeClash _ -> sty in
+	      let s_ty = Ty.matching sty ty (T.view t).T.ty in
 	      let gen, but = infos max (||) t g b env in
               let sg =
                 { sg with 
@@ -337,7 +333,7 @@ module Make (X : X) = struct
               in
 	      let aux = match_list env uf sg pats xs in
               List.rev_append aux lsbt
-	    with Echec -> lsbt
+	    with Echec | Ty.TypeClash _ -> lsbt
         in
 	try MT.fold f_aux (SubstT.find f env.fils) lsbt_acc
 	with Not_found -> lsbt_acc
