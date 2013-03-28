@@ -297,7 +297,8 @@ module Make (X : X) = struct
                 with Echec -> acc
               ) [] cl
           in
-          match l with [] -> raise Echec | l  -> l
+          (*match l with [] -> raise Echec | l  -> l*)
+          l
         with Ty.TypeClash _ -> raise Echec
 
   and match_list env uf sg pats xs = 
