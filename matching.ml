@@ -311,7 +311,8 @@ module Make (X : X) = struct
            List.fold_left 
              (fun acc sg -> 
                 let aux = match_term env uf sg pat arg in
-                match aux with [] -> raise Echec | _  -> List.rev_append aux acc
+                (*match aux with [] -> raise Echec | _  -> BUG !! *)
+                List.rev_append aux acc
              ) [] sb_l
         ) [sg] pats xs 
     with Invalid_argument _ -> raise Echec
