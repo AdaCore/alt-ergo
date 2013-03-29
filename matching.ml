@@ -290,15 +290,11 @@ module Make (X : X) = struct
           in
           let gsb = { sg with sbs = s_t; sty = s_ty } in
           (* pas sur que ce soit correct ici *)
-          let l = 
-            List.fold_left
-              (fun acc xs -> 
-                try (match_list env uf gsb pats xs) -@ acc
-                with Echec -> acc
-              ) [] cl
-          in
-          (*match l with [] -> raise Echec | l  -> l*)
-          l
+          List.fold_left
+            (fun acc xs -> 
+              try (match_list env uf gsb pats xs) -@ acc
+              with Echec -> acc
+            ) [] cl
         with Ty.TypeClash _ -> raise Echec
 
   and match_list env uf sg pats xs = 
@@ -308,7 +304,8 @@ module Make (X : X) = struct
            List.fold_left 
              (fun acc sg -> 
                 let aux = match_term env uf sg pat arg in
-                List.rev_append aux acc) [] sb_l
+                match aux with [] -> raise Echec | _  -> List.rev_append aux acc
+             ) [] sb_l
         ) [sg] pats xs 
     with Invalid_argument _ -> raise Echec
 
