@@ -162,7 +162,7 @@ module Make (X : X) = struct
           
     let match_pats_modulo pat lsubsts = 
       if dmatching then begin
-        fprintf fmt "match_pat_modulo: %a  with accumulated substs@."
+        fprintf fmt "@.match_pat_modulo: %a  with accumulated substs@."
           T.print pat;
         List.iter (fun {sbs=sbs; sty=sty} ->
           fprintf fmt ">>> sbs= %a | sty= %a@." 
@@ -172,7 +172,7 @@ module Make (X : X) = struct
           
     let match_one_pat {sbs=sbs; sty=sty} pat0 = 
       if dmatching then
-        fprintf fmt "match_pat: %a  with subst:  sbs= %a | sty= %a @."
+        fprintf fmt "@.match_pat: %a  with subst:  sbs= %a | sty= %a @."
           T.print pat0 SubstT.print sbs Ty.print_subst sty
 
     let match_term {sbs=sbs; sty=sty} t pat =
@@ -180,6 +180,12 @@ module Make (X : X) = struct
         fprintf fmt 
           "[match_term] I match %a against %a with subst: sbs=%a | sty= %a@."
           T.print pat T.print t SubstT.print sbs Ty.print_subst sty
+
+    let match_list {sbs=sbs; sty=sty} pats xs =
+      if dmatching then 
+        fprintf fmt 
+          "@.[match_list] I match %a against %a with subst: sbs=%a | sty= %a@."
+          T.print_list pats T.print_list xs SubstT.print sbs Ty.print_subst sty
 
     let match_class_of t cl =
       if dmatching then 
@@ -298,6 +304,7 @@ module Make (X : X) = struct
         with Ty.TypeClash _ -> raise Echec
 
   and match_list env uf sg pats xs = 
+    Debug.match_list sg pats xs;
     try 
       List.fold_left2 
         (fun sb_l pat arg -> 
