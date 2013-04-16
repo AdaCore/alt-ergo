@@ -198,7 +198,7 @@ if test -n "$LABLGTK2LIB";then
   LABLGTK2=yes
   ENABLEGUI="yes"
 else
-  AC_CHECK_FILE($OCAMLLIB/lablgtk2/lablgtksourceview2.cmxa,LABLGTK2=yes,LABLGTK2=no)
+  AC_CHECK_FILE($OCAMLLIB/lablgtk2/lablgtksourceview2.cma,LABLGTK2=yes,LABLGTK2=no)
   if test "$LABLGTK2" = no ; then
     AC_MSG_RESULT(Will not be able to compile GUI. Please install the *liblablgtksourceview2-ocaml-dev* Debian package - or use the GODI caml package system *http://godi.ocaml-programming.de/* - or compile from sources *http://wwwfun.kurims.kyoto-u.ac.jp/soft/lsl/lablgtk.html*)
   else
