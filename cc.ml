@@ -72,7 +72,7 @@ module Make (X : Sig.X) = struct
               if debug_cc () then 
 	        if ctx = [] then ()
 	        else begin
-                  fprintf fmt "[cc] contraints of make(%a)@." Term.print t;
+                  fprintf fmt "[cc] constraints of make(%a)@." Term.print t;
                   let c = ref 0 in
                   List.iter 
                     (fun a ->
