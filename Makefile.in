@@ -252,13 +252,21 @@ ifeq ($(ENABLEGUI),yes)
 	cp -f util/gtk-lang/alt-ergo.lang $(DATADIR)/gtksourceview-2.0/language-specs/alt-ergo.lang
 endif
 
-install-pack: xpack pack META
+install-pack-opt: xpack
 	mkdir -p $(LIBDIR)
 	cp -f $(LIBNAME).cmx $(LIBDIR)
 	cp -f $(LIBNAME).o $(LIBDIR)
+
+install-pack-byte: pack META
+	mkdir -p $(LIBDIR)
 	cp -f $(LIBNAME).cmo $(LIBDIR)
 	cp -f $(LIBNAME).cmi $(LIBDIR)
 	cp -f META $(LIBDIR)
+
+install-pack:: install-pack-byte
+ifeq ($(OCAMLBEST),opt)
+install-pack:: install-pack-opt
+endif
 
 # documentation
 ###############
