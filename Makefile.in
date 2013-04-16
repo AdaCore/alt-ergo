@@ -36,7 +36,7 @@ DESTDIR=
 prefix=@prefix@
 exec_prefix=@exec_prefix@
 BINDIR=$(DESTDIR)@bindir@
-LIBDIR=$(DESTDIR)@libdir@/alt-ergo
+LIBDIR=$(DESTDIR)@libdir@/ocaml/alt-ergo
 DATADIR=$(DESTDIR)@datadir@
 
 # where to install the man page
