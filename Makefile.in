@@ -166,11 +166,9 @@ guibyte: $(PRECMO) $(OPTIONSCMO) $(GUICMO)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLC) $(BFLAGS) -o altgr-ergo.byte $(BIBBYTE) $(BIBGUIBYTE) $^
 
-test: $(OPT)
-	./$(OPT) test.mlw
-
 testbyte:$(BYTE)
-	tests/test.sh $(BYTE) -glouton
+	make -C util/
+	tests/test.sh " ./$(BYTE) -glouton -triggers-var -arrays "
 
 testopt:$(OPT)
 	make -C util/
