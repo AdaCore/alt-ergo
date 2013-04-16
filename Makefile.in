@@ -75,7 +75,11 @@ LIBNAME = altErgo
 BYTE=$(NAME).byte
 OPT=$(NAME).opt
 
-all: pack xpack $(OCAMLBEST) pack xpack gui META
+ifeq ($(OCAMLBEST),opt)
+all: pack xpack opt gui META
+else
+all: pack byte gui META
+endif
 
 
 # bytecode and native-code compilation
