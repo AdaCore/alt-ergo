@@ -401,7 +401,7 @@ clean::
 	@rm -f $(GUINAME) $(GUINAME).opt $(GUINAME).byte
 	@rm -f unittest/*.cm[iox] unittest/*.o unittest/*.annot
 	@rm -f *.aux *.log $(NAME).tex $(NAME).dvi $(NAME).ps
-	@rm -f version.ml
+	@rm -f version.ml META
 	@rm -f *.$(REVISIONSUFFIX)
 
 dist-clean distclean:: clean
