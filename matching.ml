@@ -100,6 +100,60 @@ module Make (X : X) = struct
     (* l'age limite des termes, au dela ils ne sont pas consideres par le
        matching *)
 
+  module Debug = struct
+      
+    let add_term t = 
+      if dmatching then
+        fprintf fmt "[matching] add_term:  %a@." T.print t
+          
+    let matching pats = 
+      if dmatching then begin
+        fprintf fmt "[matching] (multi-)trigger: ";
+        List.iter (fprintf fmt "%a , " T.print) pats;
+        fprintf fmt "@.";
+      end
+          
+    let match_pats_modulo pat lsubsts = 
+      if dmatching then begin
+        fprintf fmt "@.match_pat_modulo: %a  with accumulated substs@."
+          T.print pat;
+        List.iter (fun {sbs=sbs; sty=sty} ->
+          fprintf fmt ">>> sbs= %a | sty= %a@." 
+            SubstT.print sbs Ty.print_subst sty
+        )lsubsts
+      end
+          
+    let match_one_pat {sbs=sbs; sty=sty} pat0 = 
+      if dmatching then
+        fprintf fmt "@.match_pat: %a  with subst:  sbs= %a | sty= %a @."
+          T.print pat0 SubstT.print sbs Ty.print_subst sty
+
+
+    let match_one_pat_against {sbs=sbs; sty=sty} pat0 t = 
+      if dmatching then
+        fprintf fmt "@.match_pat: %a  against term %a@.with subst:  sbs= %a | sty= %a @."
+          T.print pat0 T.print t SubstT.print sbs Ty.print_subst sty
+
+    let match_term {sbs=sbs; sty=sty} t pat =
+      if dmatching then 
+        fprintf fmt 
+          "[match_term] I match %a against %a with subst: sbs=%a | sty= %a@."
+          T.print pat T.print t SubstT.print sbs Ty.print_subst sty
+
+    let match_list {sbs=sbs; sty=sty} pats xs =
+      if dmatching then 
+        fprintf fmt 
+          "@.[match_list] I match %a against %a with subst: sbs=%a | sty= %a@."
+          T.print_list pats T.print_list xs SubstT.print sbs Ty.print_subst sty
+
+    let match_class_of t cl =
+      if dmatching then 
+        fprintf fmt "class_of (%a)  = { %a }@."
+          T.print t
+          (fun fmt -> List.iter (fprintf fmt "%a , " T.print)) cl
+
+  end
+
   let infos op_gen op_but t g b env = 
     try 
       let i = MT.find t env.info in
@@ -107,6 +161,7 @@ module Make (X : X) = struct
     with Not_found -> g , b
 
   let add_term info t env =
+    Debug.add_term t;
     (*eprintf ">>>> %d@." (MT.cardinal env.info);*)
     !Options.timer_start Timers.TMatch;
     let rec add_rec env t = 
@@ -151,49 +206,6 @@ module Make (X : X) = struct
       
   let add_trigger p trs env = { env with pats = (p, trs) ::env.pats }
 
-  module Debug = struct
-      
-    let matching pats = 
-      if dmatching then begin
-        fprintf fmt "[matching] (multi-)triggers: ";
-        List.iter (fprintf fmt "%a , " T.print) pats;
-        fprintf fmt "@.";
-      end
-          
-    let match_pats_modulo pat lsubsts = 
-      if dmatching then begin
-        fprintf fmt "@.match_pat_modulo: %a  with accumulated substs@."
-          T.print pat;
-        List.iter (fun {sbs=sbs; sty=sty} ->
-          fprintf fmt ">>> sbs= %a | sty= %a@." 
-            SubstT.print sbs Ty.print_subst sty
-        )lsubsts
-      end
-          
-    let match_one_pat {sbs=sbs; sty=sty} pat0 = 
-      if dmatching then
-        fprintf fmt "@.match_pat: %a  with subst:  sbs= %a | sty= %a @."
-          T.print pat0 SubstT.print sbs Ty.print_subst sty
-
-    let match_term {sbs=sbs; sty=sty} t pat =
-      if dmatching then 
-        fprintf fmt 
-          "[match_term] I match %a against %a with subst: sbs=%a | sty= %a@."
-          T.print pat T.print t SubstT.print sbs Ty.print_subst sty
-
-    let match_list {sbs=sbs; sty=sty} pats xs =
-      if dmatching then 
-        fprintf fmt 
-          "@.[match_list] I match %a against %a with subst: sbs=%a | sty= %a@."
-          T.print_list pats T.print_list xs SubstT.print sbs Ty.print_subst sty
-
-    let match_class_of t cl =
-      if dmatching then 
-        fprintf fmt "class_of (%a)  = { %a }@."
-          T.print t
-          (fun fmt -> List.iter (fprintf fmt "%a , " T.print)) cl
-
-  end
 
   exception Deja_vu
   let deja_vu lem1 lems = 
@@ -326,6 +338,7 @@ module Make (X : X) = struct
       | _ -> 
         let {sty=sty; gen=g; goal=b} = sg in
         let f_aux t xs lsbt = 
+          Debug.match_one_pat_against sg pat0 t;
 	  let lems = try (MT.find t env.info).lem_orig with Not_found -> [] in
 	  if matching_loop lems pat_info.trigger_orig then lsbt
 	  else
