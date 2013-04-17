@@ -22,7 +22,7 @@ open Hashcons
 
 module Sy = Symbols
 
-type view = {f: Sy.t ; xs: t list; ty: Ty.t; tag: int; w : int}
+type view = {f: Sy.t ; xs: t list; ty: Ty.t; tag: int}
 and t = view
 
 type subst = t Subst.t * Ty.subst
@@ -118,10 +118,7 @@ let compare t1 t2 =
 
 let sort = List.sort compare
 
-let make s l ty = 
-  let w = List.fold_left (fun z t -> t.w + z) 1 l in
-  let res = T.hashcons {f=s;xs=l;ty=ty;tag=0 (* dumb_value *) ; w=w} in
-  res
+let make s l ty = T.hashcons {f=s;xs=l;ty=ty;tag=0 (* dumb_value *) }
 
 let fresh_name ty = make (Sy.name (Common.fresh_string())) [] ty
 

@@ -261,17 +261,7 @@ let sort_facts =
     | F.Unit(f1,f2) -> max (size f1) (size f2)
     | _             -> F.size f
   in
-  (*
-  let rec size2 f = match F.view f with
-    | F.Unit(f1,f2) -> max (size2 f1) (size2 f2)
-    | _             ->  f
-  in*)
-  fun lf -> 
-    List.fast_sort (fun (p1,_) (p2,_) -> 
-      let c = size p1.f - size p2.f in 
-      if c <> 0 then c
-      else F.wei p1.f - F.wei p2.f
-    ) lf
+  fun lf -> List.fast_sort (fun (p1,_) (p2,_) -> size p1.f - size p2.f) lf
 
 type select = Select_predicates | Select_lemmas | Select_inversions 
  

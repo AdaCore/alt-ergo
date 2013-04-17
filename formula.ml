@@ -51,7 +51,7 @@ and view =
   | Skolem of skolem
   | Let of llet
 
-and iview = { pos : view ; neg : view ; size : int; tag : int; w : int}
+and iview = { pos : view ; neg : view ; size : int; tag : int}
 
 and t = iview * int
     
@@ -260,33 +260,10 @@ let equal (f1,_) (f2,_) = f1 == f2
 
 let hash (f, _) = f.tag
 
-let szl a =
-  let l = match Literal.LT.view a with
-    | Literal.Eq(s,t)       -> [s;t]
-    | Literal.Distinct(_,l) -> l
-    | Literal.Builtin(_,_,l) -> l
-  in
-  List.fold_left (fun z t -> (T.view t).T.w + z) 0 l
-
-let compute_w v = 
-  let rec aux v = match v with
-    | Literal a      -> szl a
-    | Lemma {main=f} -> aux (view f)
-    | Unit(f1,f2)    -> aux (view f1) + aux (view f2)
-    | Clause(f1,f2)  -> aux (view f1) + aux (view f2)
-    | Skolem{sko_f = f} -> aux (view f)
-    | Let {let_term=t; let_f=lf} -> 
-      aux (view lf) + (T.view t).T.w
-  in aux v
-  
 
 (* smart constructors *)
 let make pos neg size id =
-  let w = compute_w pos in
-  let res = (H.hashcons {pos = pos; neg = neg; size = size; tag = -1 (* dumb *); w=w}, id) in
-  (*eprintf "size of %a is %d@.@." print res w;*)
-  res
-
+  (H.hashcons {pos = pos; neg = neg; size = size; tag = -1 (* dumb *)}, id)
 
 let mk_not (f,id) =
   let f = iview f in
@@ -515,4 +492,3 @@ let terms =
 module Set = Set.Make(struct type t'=t type t=t' let compare=compare end)
 module Map = Map.Make(struct type t'=t type t=t' let compare=compare end)
 
-let wei (f,_) = f.w

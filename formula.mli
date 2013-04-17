@@ -78,7 +78,7 @@ val apply_subst : Term.subst -> t -> t
 val compare : t -> t -> int
 val equal : t -> t -> bool
 val hash : t -> int
-val wei : t -> int
+
 module Set : Set.S with type elt = t
 module Map : Map.S with type key = t
 
