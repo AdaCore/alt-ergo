@@ -111,6 +111,7 @@ module Make (X : X) = struct
         fprintf fmt "[matching] (multi-)trigger: ";
         List.iter (fprintf fmt "%a , " T.print) pats;
         fprintf fmt "@.";
+        fprintf fmt "========================================================@."
       end
           
     let match_pats_modulo pat lsubsts = 
@@ -162,7 +163,6 @@ module Make (X : X) = struct
 
   let add_term info t env =
     Debug.add_term t;
-    (*eprintf ">>>> %d@." (MT.cardinal env.info);*)
     !Options.timer_start Timers.TMatch;
     let rec add_rec env t = 
       if MT.mem t env.info then env
@@ -186,9 +186,6 @@ module Make (X : X) = struct
 	      (match info.term_from_formula with None -> [] | Some a -> [a]) 
 	      info.term_from_terms
 	  in
-	  (*eprintf "[Matching.add_term] %a : " Term.print t;
-	  List.iter (eprintf "%a " Formula.print) from_lems;
-	  eprintf "@.";*)
 	  { env with
 	      fils = SubstT.add f (MT.add t xs map_f) env.fils; 
 	      info = 
