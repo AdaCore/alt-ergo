@@ -59,7 +59,11 @@ exception Unsat of Ex.t
 exception I_dont_know of t
 exception IUnsat of Ex.t * Term.Set.t list
 
-let max_max_size = 96
+(*
+  a huge limit <~~> no limit,
+  previous value is 96, but it is not suitable for BWare VCs 
+*)
+let max_max_size = max_int 
 
 module Print = struct
 
