@@ -108,7 +108,7 @@ module Make (X : X) = struct
           
     let matching pats = 
       if dmatching then begin
-        fprintf fmt "[matching] (multi-)trigger: ";
+        fprintf fmt "@.[matching] (multi-)trigger: ";
         List.iter (fprintf fmt "%a , " T.print) pats;
         fprintf fmt "@.";
         fprintf fmt "========================================================@."
@@ -211,7 +211,8 @@ module Make (X : X) = struct
   let matching_loop_bound = 5
 
   module HF = Hashtbl.Make(F)
-  let matching_loop lems orig =
+  let matching_loop lems orig = false
+    (* This heuristic blocks a lots of VCs in BWare  
     List.length lems > 3*matching_loop_bound ||
     match lems with
       | [] | [_] -> false
@@ -228,6 +229,7 @@ module Make (X : X) = struct
 	      (1, f) l
 	  in 
 	  max > matching_loop_bound 
+    *)
 
   let all_terms 
       f ty env pinfo 
