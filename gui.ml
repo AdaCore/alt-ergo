@@ -1086,8 +1086,8 @@ let start_gui () =
        let _ = tv2#set_editable false in
 
 
-       let env = create_env buf1 buf2 error_model inst_model st_ctx annoted_ast
-	 dep actions resulting_ids in
+       let env = create_env buf1 tv1 buf2 tv2 error_model inst_model
+         st_ctx annoted_ast dep actions resulting_ids in
        connect env;
 
        ignore (toolbar#insert_toggle_button
@@ -1234,6 +1234,18 @@ let start_gui () =
   in
 
 
+  let set_wrap_lines _ =
+    List.iter (fun env ->
+      if env.goal_view#wrap_mode = `NONE then (
+        env.goal_view#set_wrap_mode `CHAR;
+        env.inst_view#set_wrap_mode `CHAR
+      ) else (
+        env.goal_view#set_wrap_mode `NONE;
+        env.inst_view#set_wrap_mode `NONE
+      )) envs
+  in
+              
+  
   let debug_entries = [
     `C ("SAT", debug_sat (), set_debug_sat);
     `S;
@@ -1268,6 +1280,8 @@ let start_gui () =
 	fun b -> set_nocontracongru (not b));
     `S;
     `C ("Restricted", restricted (), set_restricted);
+    `S;
+    `C ("Wrap lines", false, set_wrap_lines);
   ] in
   
   let help_entries = [

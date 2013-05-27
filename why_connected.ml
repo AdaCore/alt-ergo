@@ -680,6 +680,7 @@ and add_trigger ?(register=true) t qid env str offset (sbuf:sbuffer) =
 		  qf.c.aqf_triggers <- qf.c.aqf_triggers@[atl];
 		  if register then 
 		    save env.actions (AddTrigger (qf.id, sbuf=env.inst_buffer, str));
+                  commit_tags_buffer sbuf
 	      | _ -> assert false
 	  end
       | false -> ()

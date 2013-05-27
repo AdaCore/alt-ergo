@@ -160,7 +160,9 @@ module MTag : Map.S with type key = GText.tag
 
 type env = {
   buffer : sbuffer;
+  goal_view : GSourceView2.source_view;
   inst_buffer : sbuffer;
+  inst_view : GSourceView2.source_view;
   errors : error_model;
   insts : inst_model;
   st_ctx : GMisc.statusbar_context;
@@ -183,8 +185,10 @@ val monospace_font : Pango.font_description
 val general_font : Pango.font_description
 
 val create_env :
-  sbuffer -> 
   sbuffer ->
+  GSourceView2.source_view ->
+  sbuffer ->
+  GSourceView2.source_view ->
   error_model ->
   inst_model ->
   GMisc.statusbar_context ->
@@ -271,3 +275,6 @@ val findbyid_decl :
 
 val compute_resulting_ids : 
   (atyped_decl annoted * Why_typing.env) list -> (string * int) list
+
+
+val commit_tags_buffer : sbuffer -> unit
