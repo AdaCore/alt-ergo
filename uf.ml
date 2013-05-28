@@ -50,6 +50,7 @@ module type S = sig
   val model : t -> 
     (R.r * Term.t list * (Term.t * R.r) list) list * (Term.t list) list
   val print : Format.formatter -> t -> unit
+  val term_repr : t -> Term.t -> Term.t
  
 end
   
@@ -703,13 +704,6 @@ module Make ( R : Sig.X ) = struct
   (*     ) (true, Lit.Set.empty) lr *)
   (*   in not (Lit.Set.is_empty common) *)
 
-  let class_of env t = 
-    try 
-      let rt, _ = MapR.find (MapT.find t env.make) env.repr in
-      SetT.elements (MapR.find rt env.classes)
-    with Not_found -> [t]
-
-
   let mapt_choose m =
     let r = ref None in
     (try 
@@ -765,5 +759,25 @@ module Make ( R : Sig.X ) = struct
   let print = Print.all 
 
   let mem = Env.mem
+
+  let class_of env t = 
+    try 
+      let rt, _ = MapR.find (MapT.find t env.make) env.repr in
+      MapR.find rt env.classes
+    with Not_found -> SetT.singleton t
+
+  let term_repr uf t = 
+    let st = class_of uf t in
+    SetT.fold
+      (fun s t ->
+        let c = 
+          let c = (T.view s).T.depth - (T.view t).T.depth in
+          if c <> 0 then c
+          else T.compare s t
+        in
+        if c < 0 then s else t
+      ) st t
+
+  let class_of env t = SetT.elements (class_of env t)
 
 end

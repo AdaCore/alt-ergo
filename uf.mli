@@ -47,6 +47,7 @@ module type S = sig
     (R.r * Term.t list * (Term.t * R.r) list) list * (Term.t list) list
 
   val print : Format.formatter -> t -> unit
+  val term_repr : t -> Term.t -> Term.t
 
 end
 

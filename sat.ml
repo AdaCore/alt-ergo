@@ -232,6 +232,16 @@ let new_facts goal_directed env =
 	     goal = b; 
 	     s_term_orig = torig;
 	     s_lem_orig = lorig; } ->
+            let sbs = 
+              Symbols.Map.fold
+                (fun k t mp ->
+                  let t = 
+                    if List.length (CcX.class_of env.tbox t) <= 4 then t
+                    else CcX.term_repr env.tbox t
+                  in
+                  Symbols.Map.add k t mp
+                )sbs Symbols.Map.empty
+            in
             let s = sbs, sty in
 	    match guard with
 	      | Some a when 

@@ -33,6 +33,7 @@ module type S = sig
   val class_of : t -> Term.t -> Term.t list
   val print_model : Format.formatter -> t -> unit
   val cl_extract : t -> Term.Set.t list
+  val term_repr : t -> Term.t -> Term.t
 end
 
 module Make (X : Sig.X) = struct    
@@ -677,6 +678,8 @@ module Make (X : Sig.X) = struct
 
 
   let cl_extract env = Uf.cl_extract env.gamma.Env.uf
+
+  let term_repr env = Uf.term_repr env.gamma.Env.uf
 
   let assume a ex t = 
     if !profiling then
