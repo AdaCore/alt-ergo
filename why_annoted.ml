@@ -252,12 +252,15 @@ let commit_tags_buffer (buffer:sbuffer) =
   HTag.iter (fun t bounds ->
     List.iter (fun (buf, o1, o2) ->
       if buf#get_oid = buffer#get_oid then begin
-        let start = buffer#get_iter (`OFFSET o1) in
-        let stop = buffer#get_iter (`OFFSET o2) in
+        let start = buffer#get_iter_at_mark
+          (`MARK (buffer#create_mark (buffer#get_iter (`OFFSET o1)))) in
+        let stop = buffer#get_iter_at_mark
+          (`MARK (buffer#create_mark (buffer#get_iter (`OFFSET o2)))) in
         buffer#apply_tag t ~start ~stop
       end
     ) bounds
-  ) pending.tags_ranges
+  ) pending.tags_ranges;
+  HTag.clear pending.tags_ranges
     
 let create_env buf1 tv1 (buf2:sbuffer) tv2 errors insts st_ctx ast dep
     actions resulting_ids=

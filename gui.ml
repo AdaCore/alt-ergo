@@ -1351,7 +1351,7 @@ let start_gui () =
   GtkThread.main ()
 
 
-let start_replay () =
+let start_replay session_cin =
   
   let lb = from_channel cin in
   let typed_ast, _ = 
@@ -1371,10 +1371,6 @@ let start_replay () =
 	  printf "typing error: %a\n@." Common.report e;
 	  exit 1
   in
-
-  let session_cin =
-    try Some (open_in_bin !session_file)
-    with Sys_error _ -> None in
 
   List.iter
     (fun l ->
@@ -1410,6 +1406,8 @@ let start_replay () =
 
 
 
-let _ = 
-  if replay then start_replay () 
-  else start_gui ()
+let _ =
+  try
+    if replay then start_replay (Some (open_in_bin !session_file))
+    else start_gui ()
+  with Sys_error _ -> start_gui ()
