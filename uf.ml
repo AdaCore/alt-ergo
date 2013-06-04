@@ -59,7 +59,10 @@ module Make ( R : Sig.X ) = struct
   module L  = List
   module HS = Hstring
   module Ex = Explanation
-  module R = R
+  module R = struct
+    include R
+    let equal x1 x2 = Options.incr_steps (1); equal x1 x2
+  end
   module Sy= Symbols
   module T = Term
   module F = Formula

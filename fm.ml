@@ -562,7 +562,6 @@ module Make
     with Failure "big_int_of_ratio" -> a, b
 
   let cross x cpos cneg = 
-    Options.incr_steps (1);
     let rec cross_rec acc l =
       !Options.thread_yield ();
       match l with
