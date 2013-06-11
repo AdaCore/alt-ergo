@@ -1050,6 +1050,13 @@ let rec intro_hypothesis env valid_mode f =
 	let axioms, goal = intro_hypothesis env valid_mode
 	  (alpha_renaming_env env f2) in
 	f1_env::axioms, goal
+    | PPlet(var,{pp_desc=PPcast(t1,ty); pp_loc = ty_loc},f2) ->
+      let env = Env.add_names env [var] ty ty_loc in
+      let var = {pp_desc = PPvar var; pp_loc = f.pp_loc} in
+      let feq = {pp_desc = PPinfix(var,PPeq,t1); pp_loc = f.pp_loc} in
+      let axioms, goal = intro_hypothesis env valid_mode
+	(alpha_renaming_env env f2) in
+	(feq,env)::axioms, goal
     | PPforall (lv, pp_ty, _, f) when valid_mode ->
     	intro_hypothesis (Env.add_names env lv pp_ty f.pp_loc) valid_mode f
     | PPexists (lv, pp_ty, _, f) when not valid_mode->
