@@ -54,6 +54,7 @@ let union d1 d2 = match d1,d2 with
   | Some s1 , Some s2 -> Some (ES.union s1 s2)
 
 
+(* TODO : XXX : We have to choose the smallest ??? *)
 let merge d1 d2 = d1
 
 let remove f = function
