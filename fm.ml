@@ -563,6 +563,7 @@ module Make
 
   let cross x cpos cneg = 
     let rec cross_rec acc l =
+      Options.incr_steps (1);
       !Options.thread_yield ();
       match l with
       | [] -> acc
