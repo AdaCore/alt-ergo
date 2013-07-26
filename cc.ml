@@ -34,6 +34,7 @@ module type S = sig
   val print_model : Format.formatter -> t -> unit
   val cl_extract : t -> Term.Set.t list
   val term_repr : t -> Term.t -> Term.t
+  val add_theory : t -> Formula.t list -> t * Term.Set.t
 end
 
 module Make (X : Sig.X) = struct    
@@ -271,7 +272,7 @@ module Make (X : Sig.X) = struct
           let rec congruence_closure changes env r1 r2 ex = 
             !Options.thread_yield ();
             Print.cc r1 r2;
-            let uf, res = Uf.union env.uf r1 r2 ex in
+            let uf, (res, upd) = Uf.union env.uf r1 r2 ex in
             List.fold_left 
               (fun (env, (l, changes)) (p, touched, v) ->
 	        !Options.thread_yield ();
@@ -298,9 +299,9 @@ module Make (X : Sig.X) = struct
 	          (LTerm a, ex)::acc) p_a touched_atoms in
 	        let touched_atoms = SetA.fold (fun (a, ex) acc ->
 	          (LTerm a, ex)::acc) sa_others touched_atoms in
-	        env, (new_eqs @ touched_atoms, touched @ changes)
+	        env, (new_eqs @ touched_atoms, changes)
 	          
-              ) ({env with uf=uf}, ([], changes))  res
+              ) ({env with uf=uf}, ([], upd @ changes))  res
 
           let replay_atom env sa = 
             !Options.thread_yield ();
@@ -429,6 +430,8 @@ module Make (X : Sig.X) = struct
               in
               let env, l = replay_atom env lsa in
               assume_literal env (choices@l, changes) l
+
+          let add_theory _ _ _ = assert false
 
         end
 
@@ -601,6 +604,15 @@ module Make (X : Sig.X) = struct
     let choices_terms = extract_terms_from_assumed choices ch in
     let new_terms = Env.Rel.new_terms t.gamma.Env.relation in
     t, T.Set.union choices_terms new_terms, 1
+
+  let add_theory t fs =
+    let gamma, ch = Env.add_theory t.gamma [] fs in
+    let t = { t with gamma = gamma } in
+    let t, ch = try_it (fun env -> Env.add_theory env ch fs ) t  in 
+    let choices = extract_terms_from_choices SetT.empty t.choices in
+    let choices_terms = extract_terms_from_assumed choices ch in
+    let new_terms = Env.Rel.new_terms t.gamma.Env.relation in
+    t, T.Set.union choices_terms new_terms
 
   let class_of t term = Uf.class_of t.gamma.Env.uf term
     

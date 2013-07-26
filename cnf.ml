@@ -236,25 +236,6 @@ let push_query n f loc sort =
 let make_rule ({rwt_left = t1; rwt_right = t2} as r) = 
   { r with rwt_left = make_term t1; rwt_right = make_term t2 }
 
-let make l = 
-  (*  Decl.clear ();
-      Logics.clear();
-      Types.clear();*)
-  clear();
-  (* Formula.clear_htbl (); (* Why that was needed? *) *)
-  List.iter
-    (fun (d,b) -> match d.c with
-       | TAxiom(loc, name, inversion, f) -> push_assume f name loc b inversion
-       | TRewriting(loc, name, lr) -> 
-	   Queue.push 
-	     {st_decl=RwtDef(List.map make_rule lr); st_loc=loc} queue
-       | TGoal(loc, sort, n, f) -> push_query n f loc sort
-       | TPredicate_def(loc, n, [], f) -> push_assume f n loc b false
-       | TPredicate_def(loc, n, _, f) -> push_preddef f n loc b
-       | TFunction_def(loc, n, _, _, f) -> push_assume f n loc b false
-       | TTypeDecl _ | TLogic _  -> ()) l;
-  queue
-
 (* For customized theories. Formulas are simplified so that the first
    part of a disjuction is a literal or a quantifier *)
 
@@ -400,23 +381,37 @@ let make_form_theory name f =
   in
   reconstruct (make_form true f.c f.annot) f.annot
 
-let make_theory l =
+let rec make_theory acc l =
+  List.fold_left
+    (fun acc (d,b) -> match d.c with
+       | TInclude (_, _, ld) -> make_theory acc ld
+       | TRewriting(_, _, _)
+       | TGoal(_, _, _, _) -> assert false
+       | TAxiom(_, n, _, f)
+       | TPredicate_def(_, n, _, f) 
+       | TFunction_def (_, n, _, _, f) -> 
+         (make_form_theory n f) :: acc
+       | TTypeDecl _ | TLogic _  -> acc) acc l
+
+let make l = 
+  (*  Decl.clear ();
+      Logics.clear();
+      Types.clear();*)
   clear();
+  (* Formula.clear_htbl (); (* Why that was needed? *) *)
   List.iter
     (fun (d,b) -> match d.c with
-       | TAxiom(loc, name, inversion, f) -> 
-         let ff = make_form_theory name f in
-         Queue.push {st_decl=Assume(ff, b,inversion) ; st_loc=loc} queue
-       | TRewriting(loc, name, lr) -> assert false
-       | TGoal(loc, _, n, f) -> assert false
-       | TPredicate_def(loc, n, [], f) -> 
-         let ff = make_form_theory n f in
-         Queue.push {st_decl=Assume(ff, b, false) ; st_loc=loc} queue
-       | TPredicate_def(loc, n, _, f) ->
-         let ff = make_form_theory n f in
-         Queue.push {st_decl=PredDef ff ; st_loc=loc} queue
-       | TFunction_def(loc, n, _, _, f) -> 
-         let ff = make_form_theory n f in
-         Queue.push {st_decl=Assume(ff, b, false) ; st_loc=loc} queue
+       | TInclude (loc, _, ld) -> 
+         let f = make_theory [] ld in
+	   Queue.push 
+	     {st_decl=NewTheory f; st_loc=loc} queue
+       | TAxiom(loc, name, inversion, f) -> push_assume f name loc b inversion
+       | TRewriting(loc, name, lr) -> 
+	   Queue.push 
+	     {st_decl=RwtDef(List.map make_rule lr); st_loc=loc} queue
+       | TGoal(loc, sort, n, f) -> push_query n f loc sort
+       | TPredicate_def(loc, n, [], f) -> push_assume f n loc b false
+       | TPredicate_def(loc, n, _, f) -> push_preddef f n loc b
+       | TFunction_def(loc, n, _, _, f) -> push_assume f n loc b false
        | TTypeDecl _ | TLogic _  -> ()) l;
   queue

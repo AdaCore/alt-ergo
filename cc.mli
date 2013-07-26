@@ -34,6 +34,7 @@ module type S = sig
   val print_model : Format.formatter -> t -> unit
   val cl_extract : t -> Term.Set.t list
   val term_repr : t -> Term.t -> Term.t
+  val add_theory : t -> Formula.t list -> t * Term.Set.t
 end
 
 module Make (X:Sig.X) : S

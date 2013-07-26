@@ -1252,10 +1252,16 @@ let rec type_and_intro_goal keep_triggers acc env loc sort n f =
   type_goal keep_triggers acc env_g loc sort n goal
 
 
-let type_decl keep_triggers (acc, env) d = 
+let rec type_decl keep_triggers (acc, env) d = 
   Types.to_tyvars := MString.empty;
   try
     match d with
+      | Include (loc,s,l) ->
+        let fs, env' = List.fold_left (fun (fs, env) d ->
+          type_decl true (fs, env) d) ([], env) l in
+        let fs = List.map (fun (d, _) -> (d, true)) fs in
+	let td = {c = TInclude (loc,s,fs); annot = new_id () } in
+        (td, env) :: acc, env'
       | Logic (loc, ac, lp, pp_ty) -> 
 	  if rules () = 1 then fprintf fmt "[rule] TR-Typing-LogicFun$_F$@.";
 	  let env' = Env.add_logics env ac lp pp_ty loc in

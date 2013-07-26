@@ -633,6 +633,10 @@ let assume env fg =
       raise e
   else assume env fg
 
+let add_theory env fs =
+  let tbox, new_terms = CcX.add_theory env.tbox fs in
+  let env = add_terms env new_terms false 1 None [] in
+  { env with tbox = tbox }
 
 let empty () = { 
   gamma = MF.empty;

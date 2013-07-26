@@ -27,7 +27,7 @@ module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r)
 
   type t
 
-  val empty : t
+  val empty : CC.env -> t
 
   type update = Use.r * Use.r * Explanation.t
 
@@ -49,6 +49,8 @@ module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r)
 
   val add_trigger : env -> trigger -> env * (Boxed.t * Explanation.t) list
 
-  val add_quantifier : env -> quantifier -> env * (Boxed.t * Explanation.t) list
+  val add_quantifier : env -> quantifier -> env
+
+  val get_instances : env -> env * (Boxed.t * Explanation.t) list
 
 end

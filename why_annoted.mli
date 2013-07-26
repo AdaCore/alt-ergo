@@ -144,6 +144,7 @@ type atyped_decl =
   | AFunction_def 
       of loc * string * (string * ppure_type) list * ppure_type * aform
   | ATypeDecl of loc * string list * string * body_type_decl
+  | AInclude of loc * string * ((atyped_decl) annoted) list
 
 
 type annoted_node =

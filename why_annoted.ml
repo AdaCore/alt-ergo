@@ -159,6 +159,7 @@ type atyped_decl =
   | AFunction_def 
       of loc * string * (string * ppure_type) list * ppure_type * aform
   | ATypeDecl of loc * string list * string * body_type_decl
+  | AInclude of loc * string * ((atyped_decl) annoted) list
 
 
 type annoted_node =
@@ -439,6 +440,7 @@ let findin_atyped_delc tag buffer (td, env) stop_decl =
         let aaf = new_annot buffer af (-1) tag in
 	(* TODO: Change this so af is annoted *)
 	findin_aform tag buffer (Some aaf) af
+    | AInclude (_, _, _) -> None (* Is that right ? *)
     | ARewriting (_, _, rwtl) -> None
         (*List.fold_left 
 	  (fun {rwt_left = rl; rwt_right = rr} acc -> match acc with
@@ -664,7 +666,10 @@ let rec print_record_type fmt = function
   | (c, ty)::l -> 
       fprintf fmt "%s : %a; %a" c print_ppure_type ty print_record_type l
 
-let print_typed_decl fmt td = match td.Why_ptree.c with
+let rec print_typed_decl fmt td = match td.Why_ptree.c with
+  | TInclude (_, s, d) -> fprintf fmt "Theory %s\n%aend" s
+    (fun ld -> List.iter 
+      (fun (d, _) -> fprintf fmt "  %a\n" print_typed_decl d)) d
   | TAxiom (_, s, true, tf) -> fprintf fmt "inversion %s : %a" s print_tform tf
   | TAxiom (_, s, _, tf) -> fprintf fmt "axiom %s : %a" s print_tform tf
   | TRewriting (_, s, rwtl) -> 
@@ -813,9 +818,13 @@ and make_dep_aform d ex dep = function
 
 and make_dep_aaform d ex dep aaf = make_dep_aform d ex dep aaf.c
 
-let make_dep_atyped_decl dep d =
+let rec make_dep_atyped_decl dep d =
   match d.c with
   | AAxiom (loc, s, _, af) -> make_dep_aform d [] dep af
+  | AInclude (loc, _, ld) ->
+      List.fold_left
+	(fun dep d -> make_dep_atyped_decl dep d
+	) dep ld
   | ARewriting (loc, s, arwtl) ->
       List.fold_left
 	(fun dep r ->
@@ -935,9 +944,13 @@ and annot_of_tform (buffer:sbuffer) t =
   let c = of_tform buffer t in
   new_annot buffer c t.Why_ptree.annot ptag
 
-let annot_of_typed_decl (buffer:sbuffer) td = 
+let rec annot_of_typed_decl (buffer:sbuffer) td = 
   let ptag = tag buffer in
   let c = match td.Why_ptree.c with
+    | TInclude (loc, s, l) ->
+      let l = List.map
+        (fun (d, _) -> annot_of_typed_decl buffer d) l in
+      AInclude (loc, s, l)
     | TAxiom (loc, s, inv, tf) -> AAxiom (loc, s, inv, of_tform buffer tf)
     | TRewriting (loc, s, rwtl) ->
       let arwtl = List.map 
@@ -1063,8 +1076,13 @@ and from_aaform_list = function
 	try (to_tform aaf)::l
 	with Failure "Empty logic operation" -> l
 
-let to_typed_decl td =
+let rec to_typed_decl td =
   let c = match td.c with
+    | AInclude (loc, s, al) ->
+      let l = List.map (fun d ->
+	(to_typed_decl d, true)
+      ) al in
+      TInclude (loc, s, l)
     | AAxiom (loc, s, inv, af) -> 
       let af = void_to_tform af td.id in
       TAxiom (loc, s, inv, af)
@@ -1356,7 +1374,7 @@ and add_aaform errors (buffer:sbuffer) indent tags
   aaf.line <- buffer#line_count;
   add_aform errors buffer indent (tag::ptag::tags) af
 
-let add_atyped_decl errors (buffer:sbuffer) d =
+let rec add_atyped_decl errors (buffer:sbuffer) d =
   match d.c with
   | AAxiom (loc, s, inv, af) ->
       let keyword = 
@@ -1368,6 +1386,15 @@ let add_atyped_decl errors (buffer:sbuffer) d =
       append_buf buffer (String.make indent_size ' ');
       add_aform errors buffer 1 [d.tag;d.ptag] af;
       append_buf buffer "\n\n"
+
+  | AInclude (loc, s, al) ->
+      buffer#insert ~tags:[d.tag;d.ptag] (sprintf "Theory %s :" s);
+      buffer#insert "\n";
+      d.line <- buffer#line_count;
+      List.iter (fun ad ->
+        add_atyped_decl errors buffer ad;
+        buffer#insert "\n") al;
+      buffer#insert "end\n\n"
 
   | ARewriting (loc, s, arwtl) ->
       append_buf buffer ~tags:[d.tag;d.ptag] (sprintf "rewriting %s :" s);
@@ -1544,6 +1571,7 @@ let findtags_atyped_delc sl td acc =
     | AFunction_def (_, _, _, _, af) ->
 	findtags_aform sl af acc
     | ARewriting (_, _, rwtl) -> acc
+    | AInclude (_, _, l) -> acc
     | AGoal (_, _, _, aaf) ->
 	findtags_aform sl aaf.c acc
     | ALogic _
@@ -1558,6 +1586,7 @@ let findtags_using r l =
   match r with
     | AAxiom _
     | ARewriting _
+    | AInclude _
     | AGoal _
     | ATypeDecl _ -> []
 
@@ -1637,6 +1666,7 @@ let findproof_atyped_decl ids td (ax,acc) =
   in
   match td.c with
     | ARewriting (_,_, arwtl) -> assert false
+    | AInclude (_, _, _) -> assert false
 
     | ALogic _ | ATypeDecl _ -> ax,acc
 
@@ -1677,6 +1707,7 @@ let find_line_id_atyped_decl id td =
   if td.id < id then ()
   else if td.id = id then raise (FoundLine (td.line, td.tag))
   else match td.c with
+    | AInclude (_, _, _) 
     | ARewriting (_,_, _) 
     | ALogic _ | ATypeDecl _  -> ()
 
@@ -1754,6 +1785,7 @@ let findbyid_atyped_decl  stop_decl id (td, tyenv) =
   else if td.id = id then raise (Foundannot (AD (td, tyenv)))
   else if stop_decl then raise (Foundannot (AD (td, tyenv)))
   else match td.c with
+    | AInclude (_, _, _) 
     | ARewriting (_,_, _) 
     | ALogic _ | ATypeDecl _  -> ()
 
@@ -1777,6 +1809,7 @@ let findbyid_decl = findbyid_aux true
 
 let compute_resulting_ids =
   List.fold_left (fun acc (td, _) -> match td.c with
+    | AInclude (_, _, _) -> acc
     | ARewriting (_,_, _) -> acc
     | ALogic (_, names, _) -> (List.map (fun n -> n, td.id) names)@acc
     | ATypeDecl (_, _, name, _)

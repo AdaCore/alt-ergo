@@ -879,6 +879,8 @@ and connect_aaform env sbuf aaf =
 
 let connect_atyped_decl env td =
   match td.c with
+    | AInclude (_, _, _) ->
+	connect_tag env env.buffer td.tag
     | APredicate_def (_, _, _, af)
     | AAxiom (_, _, _, af) ->
 	connect_axiom_tag env td.tag;

@@ -142,6 +142,11 @@ struct
     type protected_forms = 
       (Term.t * Term.t) list * Term.t list * Boxed.t * Explanation.t
 
+    type action = Merge of Uf.R.r * Uf.R.r * Term.t
+                   | Add_trigger of
+                       (Boxed.t Incr_match.trigger_info) * Term.t list
+                   | Add_term of Explanation.t * Term.t
+
     type t = { seen : KSet.t; (* Already output formulas *)
                matching : Boxed.t MM.t; (* Incremental matching environment *)
                quantifiers : (check * Symbols.Set.t) Boxed.Map.t;
@@ -155,6 +160,7 @@ struct
                terms : (Explanation.t * Term.t * int) RMap.t;
                (* Known terms along with their explanation the round during
                   which they were produced *)
+               waiting : action list; (* Actions to be sent to MM *)
                round : int }
 
     type update = Uf.R.r * Uf.R.r * Explanation.t
@@ -173,7 +179,8 @@ struct
        true, it is stored in triggers. *)
     let rec handle_check uf terms (acc, checks) (eqs, kns, f, ex) =
       match eqs, kns with
-        | [], [] -> (f, ex) :: acc, checks
+        | [], [] -> 
+          (f, ex) :: acc, checks
         | [], t :: kns -> (* t has to be known *)
           let r, exp = Uf.find uf t in
           let ex = Explanation.union ex exp in
@@ -218,17 +225,18 @@ struct
     let handle_term uf round ex t (acc, terms, checks) =
       let r, exp = Uf.find uf t in
       let ex = Explanation.union ex exp in
-      if RMap.mem r terms then (acc, terms, checks)
+      if RMap.mem r terms then 
+        (acc, terms, checks)
       else
-        let terms = RMap.add r (ex, t, round) terms in
-        try (let eqs, trs = RMap.find r checks in
-             let (acc, checks) = List.fold_left 
-               (fun (acc, checks) (eqs, l, f, exp)  ->
-                 let ex = Explanation.union ex exp in
-                 handle_check uf terms (acc, checks) (eqs, l, f, ex)) 
-               (acc, checks) trs in
-             acc, terms, checks)
-        with Not_found -> (acc, terms, checks)
+        (let terms = RMap.add r (ex, t, round) terms in
+         try (let eqs, trs = RMap.find r checks in
+              let (acc, checks) = List.fold_left 
+                (fun (acc, checks) (eqs, l, f, exp)  ->
+                  let ex = Explanation.union ex exp in
+                  handle_check uf terms (acc, checks) (eqs, l, f, ex)) 
+                (acc, checks) trs in
+              acc, terms, checks)
+         with Not_found -> (acc, terms, checks))
 
     (* Merges two equality classes. Updates terms and triggers.
        Returns a term equal to r1 and r2 if it is known. *)
@@ -288,19 +296,30 @@ struct
                       handle_check uf terms (acc, checks) (eqs, l, f, ex))
                       (acc, checks) trs in
                   (acc, terms, checks), Some t)
-             with Not_found -> (acc, terms, checks), Some t)
+             with Not_found -> 
+               (acc, terms, checks), Some t)
         with Not_found -> (acc, terms, checks), None
 
     (* To avoid generating infinitely many instantiations, substitutions
        are normalized so that they use the oldest known term of each equality
        class. *)
-    let normalize_subst uf vars terms ((tsubst, tys), ex) =
+    let normalize_subst f uf vars terms ((tsubst, tys), ex) =
       let (tsubst, ex) = Symbols.Set.fold (fun sy (tsubst, ex) ->
         try (let t = Symbols.Map.find sy tsubst in
              let r, _ = Uf.find uf t in
              let exp, t, r = RMap.find r terms in
              (Symbols.Map.add sy t tsubst, Explanation.union ex exp))
-        with Not_found -> assert false) vars (tsubst, ex) in
+        with Not_found -> 
+          (Format.fprintf Options.fmt "Subst:@.";
+           Symbols.Map.iter (fun sy t -> Symbols.print Options.fmt sy;
+             Format.fprintf Options.fmt " -> "; Term.print Options.fmt t;
+             Format.fprintf Options.fmt "@.") tsubst);
+          Format.fprintf Options.fmt "Form:%a@." Boxed.print f;
+          RMap.iter (fun r (_,t,_) ->
+            Format.fprintf Options.fmt "%a -> %a@." Uf.R.print r Term.print t)
+            terms;
+          Uf.print Options.fmt uf;
+          assert false) vars (tsubst, ex) in
       ((tsubst, tys), ex)
 
     let cc_add lt env t =
@@ -332,10 +351,9 @@ struct
                (* update seen and compute the new check *)
                let ex = Explanation.union info.Incr_match.trigger_dep ex in
                let subst, ex = 
-                 normalize_subst cc.CC.uf vars terms (subst, ex) in
+                 normalize_subst info.Incr_match.trigger_formula
+                   cc.CC.uf vars terms (subst, ex) in
                if KSet.mem (info.Incr_match.trigger_orig, subst) seen then
-                 let seen = KSet.add (info.Incr_match.trigger_orig, subst) 
-                   seen in
                  lt, cc, acc, seen
                else
                  let seen = KSet.add (info.Incr_match.trigger_orig, subst) 
@@ -365,13 +383,6 @@ struct
         (deduced, checks) acc in
       (lt, cc, seen, checks, deduced)
 
-    let empty = { seen = KSet.empty;
-                  matching = MM.empty;
-                  quantifiers = Boxed.Map.empty;
-                  triggers = RMap.empty;
-                  terms = RMap.empty;
-                  round = 0 }
-
     let rec find_one l m =
       match l with
           [] -> Sig.No
@@ -379,6 +390,20 @@ struct
           try (let ex2, _, _ = RMap.find r m in
                 Sig.Yes (Explanation.union ex ex2, []))
           with Not_found -> find_one l m
+
+    let empty cc =
+      let terms = RMap.empty in
+      let rvrai, evrai = Uf.find cc.CC.uf Term.vrai in
+      let rfaux, efaux = Uf.find cc.CC.uf Term.faux in
+      let terms = RMap.add rvrai (evrai, Term.vrai, 0) terms in
+      let terms = RMap.add rfaux (efaux, Term.faux, 0) terms in
+      { seen = KSet.empty;
+        matching = MM.empty;
+        quantifiers = Boxed.Map.empty;
+        triggers = RMap.empty;
+        terms = terms;
+        waiting = [];
+        round = 1 }
 
     (* Determines if every subterm of t is known *)
     let is_known (lt, env, cc) (t, subst) =
@@ -395,28 +420,28 @@ struct
 
     (* Assumes a list of witnesses *)
     let add_witness (lt, env, cc) (l, s, dep) =
-      let matching, deduced, terms, checks, insts =
+      let waiting, deduced, terms, checks =
         List.fold_left
-          (fun (matching, deduced, terms, checks, insts) t ->
+          (fun (waiting, deduced, terms, checks) t ->
             let tv = Term.apply_subst s t in
             if !debug then (Format.fprintf Options.fmt "Term: ";
                             Term.print Options.fmt tv; 
                             Format.fprintf Options.fmt "@.");
-            let matching, inst = MM.add_term dep tv matching cc.CC.uf in
+            let waiting = Add_term (dep, tv) :: waiting in
             let subterms = Term.subterms Term.Set.empty t in
             let (deduced, terms, checks) = 
               Term.Set.fold (fun t -> handle_term cc.CC.uf env.round dep
                 (Term.apply_subst s t)) subterms (deduced, terms, checks) in
-            matching, deduced, terms, checks, inst::insts)
-          (env.matching, [], env.terms, env.triggers, []) l in
-      let (lt, cc, seen, checks, deduced) =
-        List.fold_left (handle_insts terms env.quantifiers)
-          (lt, cc, env.seen, checks, deduced) insts in
-      (lt, {env with matching=matching;triggers=checks;terms=terms;seen=seen},
+            waiting, deduced, terms, checks)
+          (env.waiting, [], env.terms, env.triggers) l in
+      (lt, {env with waiting=waiting;triggers=checks;terms=terms},
        cc), deduced
 
     (* Assumes a trigger *)
     let add_trigger (lt, env, cc) (l, s, dep, f) =
+       if !debug then 
+         (Format.fprintf Options.fmt "Trigger: %a@."
+          Boxed.print f);
       let l = List.fold_left (Term.subterms) Term.Set.empty l in
       let l = List.map (Term.apply_subst s) (Term.Set.elements l) in
       let deduced, checks = handle_check cc.CC.uf env.terms ([], env.triggers) 
@@ -427,44 +452,59 @@ struct
     let add_quantifier (lt, env, cc) (parent, vars, f, t, s, dep) =
       (let pats, trs = term_to_trigger vars (fst s) t in
        if !debug then 
-         (Format.fprintf Options.fmt "Quantifier: "; 
+         (Format.fprintf Options.fmt "Quantifier: %a@." Boxed.print parent;
+          Format.fprintf Options.fmt "Computed trigger: ";
           List.iter (Term.print Options.fmt) t;
           Format.fprintf Options.fmt "@."; 
           print_trigger Options.fmt (pats, trs));
        let info = { Incr_match.trigger_orig = parent;
                     Incr_match.trigger_formula = f;
                     Incr_match.trigger_dep = dep } in
-       let matching, insts = MM.add_trigger info pats env.matching cc.CC.uf in
+       let waiting = Add_trigger (info, pats) :: env.waiting in
        let quants = Boxed.Map.add parent (trs, vars) env.quantifiers in
-       let (lt, cc, seen, checks, deduced) =
-         handle_insts env.terms quants (lt, cc, env.seen, env.triggers, [])
-           insts in
-       (lt, { env with matching=matching; quantifiers=quants; triggers=checks;
-         seen=seen }, cc), deduced)
+       (lt, { env with waiting=waiting; quantifiers=quants }, cc))
 
     (* Merges a list of equivalence classes *)
     let update (lt, env, cc) modifs =
-      let matching, deduced, terms, checks, insts =
+      let waiting, deduced, terms, checks =
         List.fold_left 
-          (fun (matching, deduced, terms, checks, insts) (r1, r2, ex) ->
+          (fun (waiting, deduced, terms, checks) (r1, _, _) ->
+            let r2, ex = Uf.find_r cc.CC.uf r1 in
             let (deduced, terms, checks), t = 
               handle_update cc.CC.uf (deduced, terms, checks) (r1, r2, ex) in
             match t with
               | None ->
-                if !debug then Format.fprintf Options.fmt "Upd ignored@.";
-                (matching, deduced, terms, checks, insts)
+                if !debug then (Format.fprintf Options.fmt "Upd ignored@.";
+                                Format.fprintf Options.fmt "%a -> %a@."
+                                  Uf.R.print r1 Uf.R.print r2);
+                (waiting, deduced, terms, checks)
               | Some t ->
                 if !debug then (Format.fprintf Options.fmt "Upd: ";
                                 Term.print Options.fmt t; 
-                                Format.fprintf Options.fmt "@.");
-                let matching, inst = MM.merge r1 r2 t matching
-                  (cc.CC.uf, cc.CC.use) in
-                matching, deduced, terms, checks, inst::insts)
-          (env.matching, [], env.terms, env.triggers, []) modifs in
-      let (lt, cc, seen, checks, deduced) = 
-        List.fold_left (handle_insts terms env.quantifiers)
-        (lt, cc, env.seen, checks, deduced) insts in
-      (lt, {env with matching=matching;triggers=checks;terms=terms;seen=seen;
+                                Format.fprintf Options.fmt "@.";
+                                Format.fprintf Options.fmt "%a -> %a@."
+                                  Uf.R.print r1 Uf.R.print r2);
+                let waiting = Merge (r1, r2, t) :: waiting in
+                waiting, deduced, terms, checks)
+          (env.waiting, [], env.terms, env.triggers) modifs in
+      (lt, {env with waiting=waiting;triggers=checks;terms=terms;
         round=env.round+1}, cc), deduced
+
+    let get_instances (lt, env, cc) =
+      let matching = 
+        List.fold_left (fun matching -> function
+        | Merge (r1, r2, t) ->
+          MM.merge r1 r2 t matching (cc.CC.uf,cc.CC.use)
+        | Add_term (ex, t) -> 
+          MM.add_term ex t matching (cc.CC.uf)
+        | Add_trigger (info, trs) -> 
+          MM.add_trigger info trs matching (cc.CC.uf))
+          (env.matching) (List.rev env.waiting) in 
+      let matching, insts = MM.query cc.CC.uf matching in
+      let (lt, cc, seen, checks, deduced) = 
+        handle_insts env.terms env.quantifiers
+          (lt, cc, env.seen, env.triggers, []) insts in
+      (lt, {env with seen=seen; triggers=checks; matching=matching; waiting=[]},
+       cc), deduced
 
 end

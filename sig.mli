@@ -234,5 +234,6 @@ module type CC =  sig
     Explanation.t -> env * Rel.r accumulator
   val term_canonical_view : env -> Literal.LT.t -> Explanation.t ->
     (Rel.r Literal.view * Explanation.t)
+  val add_theory :  env -> Rel.r accumulator -> Formula.t list -> env * Rel.r accumulator
 
 end
