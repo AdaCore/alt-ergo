@@ -41,7 +41,17 @@ module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r) = struct
 
   module IMap = Map.Make (struct type t = int let compare = compare end)
 
+  module I2Map = Map.Make (struct 
+    type t = int * int 
+    let compare (i1, i2) (j1, j2) =
+      let c = compare i1 j1 in
+      if c = 0 then compare i2 j2
+      else c
+  end)
+
   module RMap = Map.Make (struct type t = Uf.R.r let compare = Uf.R.compare end)
+
+  module TyMap = Map.Make (Ty)
 
   (* A path_index is a tree. Edges are marked by a symbol and nodes contain
      a list of elements. Elements are couples (id, num) where id is the
@@ -66,7 +76,12 @@ module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r) = struct
      in p such that there is a known term s1 (... sn (..., term, ...) ...) *)
   let rec collect uf term acc p =
     let Path (path, leafs) = p in
-    let acc = List.fold_left (fun acc v -> (term, v) :: acc) acc leafs in
+    let {T.f=f;xs=xs} = T.view term in
+    let acc = List.fold_left (fun acc v -> 
+      let m = try I2Map.find v acc with Not_found -> SubstT.empty in
+      let ms = try SubstT.find f m with Not_found -> MT.empty in
+      let m = SubstT.add f (MT.add term xs ms) m in
+      I2Map.add v m acc) acc leafs in
     T.Set.fold (fun t acc ->
       let { Term.f = s } = Term.view t in
       try let p = Symbols.Map.find s path in
@@ -84,17 +99,26 @@ module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r) = struct
         let p = add symbols v p in
         Path (Symbols.Map.add sy p path, leafs)
 
-  type 'a t = { fils : T.t list MT.t Subst.t; (* s -> t -> [t1 ... tn]
-                                                 t = s (t1 ... tn) is known *)
-                info : Explanation.t MT.t; (* Explanation of known terms *)
-                pats : 'a trigger_info IMap.t; (* Triggers *)
-                seen : (T.t list * (T.subst * Explanation.t) list)
-                  IMap.t IMap.t; (* id -> num -> (triggers * (subst * exp)) *)
-                funs : Symbols.Set.t RMap.t; (* function symbols starting
-                                                terms in an eq class *)
-                pp : path_index; (* path for pp pairs *)
-                pc : path_index Symbols.Map.t; (* path for pc pairs *)
-                count : int }
+  type 'a t = { 
+    (* s -> t -> [t1 ... tn] where t = s (t1 ... tn) is known *)
+    fils : T.t list MT.t Subst.t; 
+    (* explanation of known terms *)
+    info : Explanation.t MT.t;
+    (* assumed universal quantifiers *)
+    pats : 'a trigger_info IMap.t;
+    (* id -> num -> (triggers * (subst * exp)) already matched triggers *)
+    seen : (T.t list * (T.subst * Explanation.t) list) IMap.t IMap.t;
+    (* function symbols starting terms in eq class of r *)
+    first_symbols : Symbols.Set.t RMap.t;
+    (* path for pp pairs *)
+    pp : path_index TyMap.t;
+    (* path for pc pairs *)
+    pc : path_index Symbols.Map.t;
+    (* id of the next quantifier *)
+    count : int;
+    (* id, num -> s -> t -> [t1 .. tn], trigger (id, num) should be matched
+       against t = s (t1 ... tn) *)
+    frozen : T.t list MT.t Subst.t I2Map.t }
 
   type 'a result = ('a trigger_info * (Term.subst * Explanation.t) list) list
 
@@ -102,46 +126,52 @@ module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r) = struct
                 info = MT.empty; 
                 pats = IMap.empty;
                 seen = IMap.empty;
-                funs = RMap.empty;
-                pp = empty_path;
+                first_symbols = RMap.empty;
+                pp = TyMap.empty;
                 pc = Symbols.Map.empty;
-                count = 0 }
+                count = 0;
+                frozen = I2Map.empty }
 
   exception Echec
 
   (* over-approximation of (t', (id, num)) such that t' matches the trigger
      num of formula id because t' = f1 (... fn (... t1 ...) ...),
      t2 = g1 (...) and t1 = t2 = t *)
-  let find_pc acc env uf t funs =
+  let find_pc acc pc uf t first_symbols =
     let res = Symbols.Set.fold (fun s acc ->
-      try (let path = Symbols.Map.find s env.pc in
+      try (let path = Symbols.Map.find s pc in
            if debug then 
              fprintf fmt "path from %a:\n %a@." Symbols.print s print_path path;
            collect uf t acc path)
-      with Not_found -> acc) funs acc in
-    if debug then 
-      List.iter (fun (t, _) -> fprintf fmt "New term: %a@." Term.print t) res;
+      with Not_found -> acc) first_symbols acc in
     res
 
   (* over-approximation of (t', (id, num)) such that t' matches the trigger
      num of formula id because t' = f1 (... fn (... t1 ...) ... fm (... t2 ...))
      and t1 = t2 = t *)
-  let find_pp acc env uf t =
-    collect uf t acc env.pp
+  let find_pp acc pp uf t =
+    let { T.ty = ty } = T.view t in
+    if debug then 
+      (try (fprintf fmt "path from %a:\n %a@." Ty.print ty print_path 
+        (TyMap.find ty pp))
+      with Not_found -> ());
+    try collect uf t acc (TyMap.find ty pp)
+    with Not_found -> acc
 
   (* terms that should be checked when t's equivalence class is updated *)
-  let to_check env uf t funs =
+  let to_check env uf t first_symbols =
     if debug then (fprintf fmt "Merge %a@." T.print t;
-                   Symbols.Set.iter (fprintf fmt "%a " Symbols.print) funs;
+                   Symbols.Set.iter (fprintf fmt "%a " Symbols.print) 
+                     first_symbols;
                    fprintf fmt "@.");
-    find_pc (find_pp [] env uf t) env uf t funs
+    find_pc (find_pp env.frozen env.pp uf t) env.pc uf t first_symbols
 
   let rec update_paths v l (seen, (lpp, lpc)) t =
-      let { T.f = s; T.xs = xs } = T.view t in
+      let { T.f = s; T.xs = xs; T.ty = ty } = T.view t in
       match s with
 	  Symbols.Var _ ->
             if T.Set.mem t seen then
-              (seen, ((v, l) :: lpp, lpc))
+              (seen, ((ty, v, l) :: lpp, lpc))
             else
               (T.Set.add t seen, (lpp, lpc))
         | _ -> 
@@ -152,8 +182,11 @@ module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r) = struct
   let update_paths id trs (pp, pc) =
     let (_, (lpp, lpc)), _ = List.fold_left (fun (acc, c) t ->
       update_paths (id, c) [] acc t, c+1) ((T.Set.empty, ([], [])), 0) trs in
-    let pp = List.fold_left (fun pp (v, l) -> if l = [] then pp
-      else add l v pp) pp lpp in
+    let pp = List.fold_left (fun pp (ty, v, l) -> if l = [] then pp
+      else
+        let p = try TyMap.find ty pp with Not_found -> empty_path in
+        let p = add l v p in
+        TyMap.add ty p pp) pp lpp in
     let pc = List.fold_left (fun pc (v, l) ->
       match l with
         | a :: ((_ :: _) as l) ->
@@ -165,19 +198,19 @@ module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r) = struct
 
   (************************************************************************)
 
-  let infos t ex env = 
+  let infos t ex info = 
     try 
-      MT.find t env.info
+      MT.find t info
     with Not_found -> ex
 
-  let all_terms f ty env terms (s_t,s_ty) lsbt_acc ex = 
+  let all_terms f ty info terms (s_t,s_ty) lsbt_acc ex = 
     SubstT.fold 
       (fun k s l -> 
 	 MT.fold 
 	   (fun t _ (lsbt, seen) -> 
 	      try
 		let s_ty = Ty.matching s_ty ty (T.view t).T.ty in
-		let ex = Explanation.union (MT.find t env.info) ex in
+		let ex = Explanation.union (MT.find t info) ex in
                 let s = (SubstT.add f t s_t, s_ty) in
                 if List.mem_assoc s seen then (lsbt, seen)
                 else (s, ex) :: lsbt, (s, ex) :: seen
@@ -246,10 +279,10 @@ module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r) = struct
 
   (* computes the substitution(s) containing (st,sty) such that pat is in 
      terms. Do not return sustitutions already in seen *)
-  let matchpat env terms uf (lsbt_acc, seen) ((st,sty), pat) ex = 
+  let matchpat info terms uf (lsbt_acc, seen) ((st,sty), pat) ex = 
     let {T.f=f;xs=pats;ty=ty} = T.view pat in
     match f with
-      |	Symbols.Var _ -> all_terms f ty env terms (st,sty) (lsbt_acc, seen) ex
+      |	Symbols.Var _ -> all_terms f ty info terms (st,sty) (lsbt_acc, seen) ex
       | _ -> 
 	  try  
 	    MT.fold 
@@ -259,7 +292,7 @@ module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r) = struct
 		    try Ty.matching sty ty (T.view t).T.ty 
 		    with Ty.TypeClash _ -> sty in
 		  let ex = Explanation.union ex 
-                    (infos t Explanation.empty env) in
+                    (infos t Explanation.empty info) in
 		  let aux = 
                     matchterms uf (st,s_ty) pats xs ex in
                   List.fold_left (fun (lsbt, seen) (s, ex) ->
@@ -285,25 +318,16 @@ module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r) = struct
 
   (* computes the substitution(s) containing a substitution of lsubst such that
      pat is in terms. Do not return substitutions already in seen. *)
-  let matchpats env terms uf (lsubsts, seen, id) pat =
-    if debug then
-      fprintf fmt "Pattern %a . %a in %a:@." T.print pat print_subst lsubsts
-        print_terms terms;
+  let matchpats info terms uf (lsubsts, seen, id) pat =
     let tl, s = IMap.find id seen in
     let acc, s = List.fold_left (fun acc (sg, ex) ->
-         matchpat env terms uf acc (sg, T.apply_subst sg pat) ex) 
+         matchpat info terms uf acc (sg, T.apply_subst sg pat) ex) 
       ([], s) lsubsts in
-    if debug then fprintf fmt "   %a@." print_subst acc;
+    if debug && acc <> [] then
+      (fprintf fmt "Pattern %a . %a in %a:@." T.print pat print_subst lsubsts
+        print_terms terms;
+       fprintf fmt "   %a@." print_subst acc);
     (acc, IMap.add id (tl, s) seen, id + 1)
-      
-  (* computes every possible match for a given set of patterns with known
-     terms *)
-  let matching_trigger (id, info, pats) env uf = 
-    let egs = (SubstT.empty,Ty.esubst) in
-    let seen = IMap.find id env.seen in
-    let acc = ([egs, Explanation.empty], seen, 0) in
-    let acc, seen, _ = List.fold_left (matchpats env env.fils uf) acc pats in
-    {env with seen = IMap.add id seen env.seen}, [info, acc]
 
   (* computes every possible match containing subst for a given set of patterns
      such that the first pattern is in terms *)
@@ -311,38 +335,35 @@ module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r) = struct
     match pats, subst with
       | _, [] | [], _ -> seen, forms
       | t :: pats, _ ->
-        let acc = matchpats env terms uf (subst, seen, id+1) t in
-        let acc, seen, _ = List.fold_left (matchpats env env.fils uf) 
+        let acc = matchpats env.info terms uf (subst, seen, id+1) t in
+        let acc, seen, _ = List.fold_left (matchpats env.info env.fils uf) 
           acc pats in
         seen, List.rev_append acc forms
-      
-  (* computes every possible match for every assumed patterns
-     such that the first pattern is in terms *)
-  let matching_terms terms env uf =
-    IMap.fold (fun id m (env, acc) ->
-      let info = IMap.find id env.pats in
-      let (seen, forms) = IMap.fold (matching_term terms env uf) m (m, []) in
-      {env with seen = IMap.add id seen env.seen}, (info, forms) :: acc)
-      env.seen (env, [])
 
   (* update the environment when a term is assumed. Returns the new terms *)
-  let rec add_rec ex (env, news) t = 
-    if MT.mem t env.info then (env, news)
+  let rec add_rec ex seen (info, fils, news) t = 
+    if MT.mem t info then (info, fils, news)
     else
-      let {T.f=f;xs=xs} = T.view t in
-      let map_f = try SubstT.find f env.fils with Not_found -> MT.empty in
-      let new_f = try SubstT.find f news with Not_found -> MT.empty in
-      let ex = infos t ex env in
-      let acc = { env with
-        fils = SubstT.add f (MT.add t xs map_f) env.fils; 
-        info = MT.add t ex env.info }, SubstT.add f (MT.add t xs new_f) news in
-      List.fold_left (add_rec ex) acc xs
+      (let {T.f=f;xs=xs} = T.view t in
+      let ex = infos t ex info in
+      let map_f = try SubstT.find f fils with Not_found -> MT.empty in
+      let news = IMap.fold (fun id m news ->
+        IMap.fold (fun num _ news ->
+          let new_id = try I2Map.find (id, num) news 
+            with Not_found -> SubstT.empty in
+          let new_f = try SubstT.find f new_id with Not_found -> MT.empty in
+          let new_id = SubstT.add f (MT.add t xs new_f) new_id in
+          I2Map.add (id, num) new_id news) m news) seen news in
+      let acc = (MT.add t ex info, SubstT.add f (MT.add t xs map_f) fils, 
+       news) in
+      List.fold_left (add_rec ex seen) acc xs)
 
   (* Assumes a new term for matching *)
   let add_term ex t env uf =
     if debug then fprintf fmt "Term %a@." T.print t;
-    let env, news = add_rec ex (env, SubstT.empty) t in
-    matching_terms news env uf
+    let info, fils, frozen = 
+      add_rec ex env.seen (env.info, env.fils, env.frozen) t in
+    { env with info = info; fils = fils; frozen = frozen }
 
   let rec empty_seen pats i s =
     match pats with
@@ -359,35 +380,38 @@ module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r) = struct
     let pp, pc = update_paths count trs (env.pp, env.pc) in
     let pats = IMap.add count info env.pats in
     let seen = IMap.add count (empty_seen trs) env.seen in
-    let env = 
-      {env with pats=pats; pp=pp; pc=pc; count=env.count+1; seen=seen} in
-    matching_trigger (count, info, trs) env uf
-
-  (* Checks wether a the pattern num of formula id can be matched with t
-     to give new instances *)
-  let check uf (env, acc) (t, (id, num)) =
-    let seen = IMap.find id env.seen in
-    let info = IMap.find id env.pats in
-    let {T.f=f;xs=xs} = T.view t in
-    let terms = SubstT.add f (MT.add t xs MT.empty) SubstT.empty in
-    let seen, forms = matching_term terms env uf num (IMap.find num seen)
-      (seen, []) in
-    {env with seen=IMap.add id seen env.seen}, (info, forms)::acc
+    let frozen = I2Map.add (count, 0) env.fils env.frozen in
+    { env with pats = pats; pp = pp; pc = pc; count = env.count + 1;
+      seen = seen; frozen = frozen }
 
   (* Merges the equivalence classes of r1 and r2.
      Uses to_check to find an over-approximation of possible new matches
      and checks each of them for new instances. *)
   let merge r1 r2 t env (uf, use) =
     let funs = try
-      let f1 = RMap.find r1 env.funs in
-      let f2 = RMap.find r2 env.funs in
+      let f1 = RMap.find r1 env.first_symbols in
+      let f2 = RMap.find r2 env.first_symbols in
       Symbols.Set.union f1 f2
       with Not_found ->
       List.fold_left (fun v t ->
         let { T.f = s } = T.view t in
         Symbols.Set.add s v) Symbols.Set.empty (Uf.class_of uf t) in
-    let env = {env with funs = RMap.add r2 funs env.funs} in
+    let env = {env with first_symbols = RMap.add r2 funs env.first_symbols} in
     let checks = to_check env (uf, use) t funs in
-    List.fold_left (check uf) (env, []) checks
+    { env with frozen = checks }
+
+  (* Checks wether a the pattern num of formula id can be matched with t
+     to give new instances *)
+  let check uf (id, num) terms (env, acc) =
+    let seen = IMap.find id env.seen in
+    let info = IMap.find id env.pats in
+    if debug then fprintf fmt "Using terms %a@." print_terms terms;
+    let seen, forms = matching_term terms env uf num (IMap.find num seen)
+      (seen, []) in
+    {env with seen=IMap.add id seen env.seen}, (info, forms)::acc
+
+  let query uf env =
+    let env, acc = I2Map.fold (check uf) env.frozen (env, []) in
+    { env with frozen = I2Map.empty }, acc
 
 end

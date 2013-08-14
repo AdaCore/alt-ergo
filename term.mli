@@ -22,7 +22,7 @@ type t
 module Map : Map.S with type key = t
 module Set : Set.S with type elt = t
 
-type view = private {f: Symbols.t ; xs: t list; ty: Ty.t; tag : int}
+type view = private {f: Symbols.t ; xs: t list; ty: Ty.t; depth: int; tag: int;}
 
 type subst = t Subst.t * Ty.subst
 

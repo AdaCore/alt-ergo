@@ -201,20 +201,20 @@ module Make
 	 Intervals.add (Intervals.scale a i_x) i
       ) (Intervals.point v (P.type_info p) Explanation.empty) pl
 
-  let rec add_monome expl use_x env x =
+  let rec add_monome are_eq expl use_x env x =
     try 
       let u, old_use_x = MX.find x env.monomes in
       { env with monomes = MX.add x (u, SX.union old_use_x use_x) env.monomes }
     with Not_found -> 
-      update_monome expl use_x env x
+      update_monome are_eq expl use_x env x
 
-  and init_monomes env p use_p expl = 
+  and init_monomes are_eq env p use_p expl = 
     List.fold_left
-      (fun env (_, x) -> add_monome expl use_p env x)
+      (fun env (_, x) -> add_monome are_eq expl use_p env x)
       env (fst (P.to_list p))
 
-  and init_alien expl p (normal_p, c, d) ty use_x env =
-    let env = init_monomes env p use_x expl in
+  and init_alien are_eq expl p (normal_p, c, d) ty use_x env =
+    let env = init_monomes are_eq env p use_x expl in
     let i = intervals_from_monomes env p in
     let i = 
       try 
@@ -228,7 +228,7 @@ module Make
 
       
 
-  and update_monome expl use_x env x =
+  and update_monome are_eq expl use_x env x =
     let ty = X.type_info x in
     let ui, env = match  X.ac_extract x with
       | Some {h=h; l=l } 
@@ -237,7 +237,7 @@ module Make
 	let env =
 	  List.fold_left
 	    (fun env (r,_) ->
-	      update_monome expl use_x env r) env l in
+	      update_monome are_eq expl use_x env r) env l in
 	let m = mult_bornes_vars l env.monomes ty in
 	m, env
       | _ ->
@@ -247,18 +247,31 @@ module Make
 	    begin
 	      match Term.view t with
 		| {Term.f = (Sy.Op Sy.Div); xs = [a; b]} ->
+		  
 		  let pa = P.poly_of (fst (X.make a)) in
 		  let pb = P.poly_of (fst (X.make b)) in
 		  let (pa', ca, da) as npa = P.normal_form_pos pa in
 		  let (pb', cb, db) as npb = P.normal_form_pos pb in
-		  let env, ia = init_alien expl pa npa ty use_x env in
-		  let env, ib = init_alien expl pb npb ty use_x env in
+		  let env, ia =
+		    init_alien are_eq expl pa npa ty use_x env in
+		  let env, ib =
+		    init_alien are_eq expl pb npb ty use_x env in
 		  let ia, ib = match Intervals.doesnt_contain_0 ib with
 		    | Yes (ex, _) when Num.compare_num ca cb = 0 
 			       && P.compare pa' pb' = 0 ->
 		      let expl = Explanation.union ex expl in
 		      Intervals.point da ty expl, Intervals.point db ty expl
-		    | _ -> ia, ib
+		    | Yes (ex, _) ->
+		       begin
+			 match are_eq a b with
+			 | Yes (ex_eq, _) -> 
+			    let expl = Explanation.union ex expl in
+			    let expl = Explanation.union ex_eq expl in
+			    Intervals.point (Int 1) ty expl,
+			    Intervals.point (Int 1) ty expl
+			 | No -> ia, ib
+		       end
+		    | No -> ia, ib
 		  in
 		  Intervals.div ia ib, env
 		| _ -> Intervals.undefined ty, env
@@ -271,7 +284,7 @@ module Make
     let ui = Intervals.intersect ui u in
     { env with monomes = MX.add x (ui, (SX.union use_x use_x')) env.monomes }
 
-  let rec tighten_ac x env expl =
+  let rec tighten_ac are_eq x env expl =
     let ty = X.type_info x in
     let u, use_x =
       try MX.find x env.monomes
@@ -290,7 +303,7 @@ module Make
 	  let env =
 	    (* let u =  Intervals.new_borne_inf expl (Int 0) true u in *)
 	    let env = { env with monomes = MX.add x (u, use_x) env.monomes } in
-	    tighten_non_lin x use_x env expl
+	    tighten_non_lin are_eq x use_x env expl
 	  in env
 	| Some {h=h;t=t;l=[x,n]} when Symbols.equal h (Symbols.Op Symbols.Mult)
 	    && n > 2 ->
@@ -302,7 +315,7 @@ module Make
 	    in
 	    Intervals.intersect u pu, use_px in
 	  let env = { env with monomes = MX.add x (u, use_x) env.monomes } in
-	  tighten_non_lin x use_x env expl
+	  tighten_non_lin are_eq x use_x env expl
 	| _ -> env
     with Intervals.Not_a_float -> env
       
@@ -310,8 +323,8 @@ module Make
   and tighten_div x env expl =
     env
 
-  and tighten_non_lin x use_x env expl =
-    let env' = tighten_ac x env expl in
+  and tighten_non_lin are_eq x use_x env expl =
+    let env' = tighten_ac are_eq x env expl in
     let env' = tighten_div x env' expl in
     (*let use_x = SX.union use1_x use2_x in*)
      (* let i, _ = MX.find x env.monomes in *)
@@ -319,7 +332,7 @@ module Make
       (fun x acc -> 
 	let _, use = MX.find x acc.monomes in
 	(*if Intervals.is_strict_smaller new_i i then*)
-	  update_monome expl use acc x
+	  update_monome are_eq expl use acc x
        (*else acc*))
       use_x env' 
 
@@ -432,7 +445,7 @@ module Make
     in
     { env with inequations = inqs }, eqs
 
-  let update_intervals env eqs expl (a, x, v) is_le =
+  let update_intervals are_eq env eqs expl (a, x, v) is_le =
     let uints, use_x = 
       match X.ac_extract x with
 	| Some {h=h; l=l} 
@@ -449,10 +462,10 @@ module Make
       else   
 	Intervals.new_borne_inf expl b is_le uints in
     let env = { env with monomes = MX.add x (u, use_x) env.monomes } in
-    let env =  tighten_non_lin x use_x env expl in
+    let env =  tighten_non_lin are_eq x use_x env expl in
     env, (find_eq eqs x u env)
   
-  let update_ple0 env p0 is_le expl =
+  let update_ple0 are_eq env p0 is_le expl =
     if P.is_empty p0 then env
     else 
       let ty = P.type_info p0 in
@@ -487,10 +500,11 @@ module Make
 	else env
       in
       match P.to_list p0 with
-        | [a,x], v -> fst(update_intervals env [] expl (a, x, v) is_le)
+        | [a,x], v ->
+	   fst(update_intervals are_eq env [] expl (a, x, v) is_le)
         | _ -> env
 
-  let add_inequations acc lin expl = 
+  let add_inequations are_eq acc lin expl = 
     List.fold_left
       (fun (env, eqs) ineq ->
 	(* let expl = List.fold_left 
@@ -527,14 +541,14 @@ module Make
 			    Some x -> P.compare x p = 0 | _ -> is_le && n=0 
 		      in
 		      let p' = P.sub (P.create [] (c // coef) ty) p in
-		      update_ple0 env p' is_le expl
+		      update_ple0 are_eq env p' is_le expl
 		   ) env ineq.Inequation.dep
 	       in
 	       env, eqs
 
 	   | Monome (a, x, v) ->
 	       let env, eqs = 
-		 update_intervals env eqs expl (a, x, v) ineq.Inequation.is_le
+		 update_intervals are_eq env eqs expl (a, x, v) ineq.Inequation.is_le
 	       in
                
 	       (*let env,eqs = update_bornes env eqs ((a,x),c) ineq.ple0.le in
@@ -617,7 +631,7 @@ module Make
       | Some (x, _) -> x
       | None -> raise Not_found
 
-  let rec fourier ( (env, eqs) as acc) l expl =
+  let rec fourier are_eq ( (env, eqs) as acc) l expl =
     !Options.thread_yield ();
      match l with
       | [] -> acc
@@ -628,10 +642,10 @@ module Make
 	  let cpos, cneg, others = split x l in
 	  let ninqs = cross x cpos cneg in
 	  Debug.cross x cpos cneg others ninqs;
-	  let acc = add_inequations acc cpos expl in
-	  let acc = add_inequations acc cneg expl in
-	  fourier acc (ninqs -@ others) expl
-	with Not_found -> add_inequations acc l expl
+	  let acc = add_inequations are_eq acc cpos expl in
+	  let acc = add_inequations are_eq acc cneg expl in
+	  fourier are_eq acc (ninqs -@ others) expl
+	with Not_found -> add_inequations are_eq acc l expl
 
   (*
   let fm env eqs expl = 
@@ -640,14 +654,14 @@ module Make
       (List.map snd env.new_inequations) expl
 *)
 
-  let fm env eqs expl = 
+  let fm are_eq env eqs expl = 
     if rules () = 4 then fprintf fmt "[rule] TR-Arith-Fm@.";
-    fourier (env, eqs) (List.map snd env.inequations) expl
+    fourier are_eq (env, eqs) (List.map snd env.inequations) expl
 
   let is_num r = 
     let ty = X.type_info r in ty = Ty.Tint || ty = Ty.Treal
 
-  let add_disequality env eqs p expl =
+  let add_disequality are_eq env eqs p expl =
     let ty = P.type_info p in
     match P.to_list p with
       | ([], (Int 0)) ->
@@ -664,7 +678,7 @@ module Make
 	  in
 	  let i = Intervals.exclude i1 i2 in
 	  let env ={ env with monomes = MX.add x (i,use2) env.monomes } in
-	  let env = tighten_non_lin x use2 env expl in
+	  let env = tighten_non_lin are_eq x use2 env expl in
 	  env, find_eq eqs x i env
       | _ ->
 	  let a, _ = P.choose p in
@@ -692,7 +706,7 @@ module Make
 	  in
 	  env, eqs
 					      
-  let add_equality env eqs p expl =
+  let add_equality are_eq env eqs p expl =
     let ty = P.type_info p in
     match P.to_list p with	
       | ([], Int 0) -> env, eqs
@@ -708,7 +722,7 @@ module Make
 	    with Not_found -> i, SX.empty
 	  in
 	  let env = { env with monomes = MX.add x (i, use) env.monomes} in
-	  let env = tighten_non_lin x use env expl in
+	  let env = tighten_non_lin are_eq x use env expl in
 	  env, find_eq eqs x i env
       | _ ->
 	  let a, _ = P.choose p in
@@ -822,22 +836,22 @@ module Make
 		   let p2 = P.poly_of r2 in
 		   let ineq = Inequation.create p1 p2 (is_le n) root expl in
 		   let env =
-		     init_monomes env ineq.Inequation.ple0 SX.empty expl in
+		     init_monomes are_eq env ineq.Inequation.ple0 SX.empty expl in
 		   let env =
-		     update_ple0 env ineq.Inequation.ple0 (is_le n) expl in
+		     update_ple0 are_eq env ineq.Inequation.ple0 (is_le n) expl in
 		   let env = replace_inequation env root ineq in
 		   env, eqs, true, expl
 
 	       | L.Distinct (false, [r1; r2]) when is_num r1 && is_num r2 -> 
 		   let p = P.sub (P.poly_of r1) (P.poly_of r2) in
-		   let env = init_monomes env p SX.empty expl in
-		   let env, eqs = add_disequality env eqs p expl in
+		   let env = init_monomes are_eq env p SX.empty expl in
+		   let env, eqs = add_disequality are_eq env eqs p expl in
                    env, eqs, new_ineqs, expl
 		     
 	       | L.Eq(r1, r2) when is_num r1 && is_num r2 -> 
 		   let p = P.sub (P.poly_of r1) (P.poly_of r2) in
-		   let env = init_monomes env p SX.empty expl in
-		   let env, eqs = add_equality env eqs p expl in
+		   let env = init_monomes are_eq env p SX.empty expl in
+		   let env, eqs = add_equality are_eq env eqs p expl in
                    env, eqs, new_ineqs, expl
 
 	       | _ -> (env, eqs, new_ineqs, expl) 
@@ -856,7 +870,7 @@ module Make
 	fprintf fmt "new explanations %a@." Explanation.print expl; 
     try
       (* we only call fm when new ineqs are assumed *)
-      let env, eqs = if new_ineqs then fm env eqs expl else env, eqs in
+      let env, eqs = if new_ineqs then fm are_eq env eqs expl else env, eqs in
       (* let env = oldify_inequations env in *)
       let env = update_polynomes env expl in
       let env, eqs = equalities_from_intervals env eqs in

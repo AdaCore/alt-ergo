@@ -22,7 +22,7 @@ open Hashcons
 
 module Sy = Symbols
 
-type view = {f: Sy.t ; xs: t list; ty: Ty.t; tag: int}
+type view = {f: Sy.t ; xs: t list; ty: Ty.t; depth: int; tag: int;}
 and t = view
 
 type subst = t Subst.t * Ty.subst
@@ -46,7 +46,7 @@ module T = Make(H)
   
 let view t = t
 
-let rec print fmt t = 
+let rec print_silent fmt t = 
   let {f=x;xs=l;ty=ty} = view t in
   match x, l with
     | Sy.Op Sy.Get, [e1; e2] ->
@@ -82,17 +82,18 @@ let rec print fmt t =
 	fprintf fmt "(%a %a %a)" print e1 Sy.print x print e2
 
     | _, [] -> 
-        if Options.debug () then
-          fprintf fmt "%a:%a" Sy.print x Ty.print ty
-        else
-          fprintf fmt "%a" Sy.print x
+      fprintf fmt "%a" Sy.print x
           
     | _, _ ->
-        if Options.debug () then 
-          fprintf fmt "%a(%a):%a" Sy.print x print_list l Ty.print ty
-        else 
-          fprintf fmt "%a(%a)" Sy.print x print_list l
+      fprintf fmt "%a(%a)" Sy.print x print_list l
 
+and print_verbose fmt t = 
+  fprintf fmt "(%a : %a)" print_silent t Ty.print (view t).ty
+
+and print fmt t = 
+  if Options.debug () then print_verbose fmt t 
+  else print_silent fmt t
+    
 and print_list_sep sep fmt = function
   | [] -> ()
   | [t] -> print fmt t
@@ -117,8 +118,10 @@ let compare t1 t2 =
 
 let sort = List.sort compare
 
-let make s l ty = T.hashcons {f=s;xs=l;ty=ty;tag=0 (* dumb_value *) }
-
+let make s l ty = 
+  let d = 1 + List.fold_left (fun z t -> max z t.depth) 0 l in 
+  T.hashcons {f=s; xs=l; ty=ty; depth=d; tag=0 (* dumb_value *)}
+  
 let fresh_name ty = make (Sy.name (Common.fresh_string())) [] ty
 
 let is_fresh t = 

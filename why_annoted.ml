@@ -26,9 +26,13 @@ open Options
 open Gui_session
 
 let indent_size = 4
+let max_indent = 80
 let monospace_font = Pango.Font.from_string "monospace"
 let general_font = Pango.Font.from_string "sans"
 
+let make_indent nb =
+  String.make (min max_indent (nb * indent_size)) ' '
+  
 type sbuffer = GSourceView2.source_buffer
 
 type error_model = {
@@ -155,6 +159,7 @@ type atyped_decl =
   | AFunction_def 
       of loc * string * (string * ppure_type) list * ppure_type * aform
   | ATypeDecl of loc * string list * string * body_type_decl
+  | AInclude of loc * string * ((atyped_decl) annoted) list
 
 
 type annoted_node =
@@ -180,7 +185,9 @@ end)
 
 type env = {
   buffer : sbuffer;
+  goal_view : GSourceView2.source_view;
   inst_buffer : sbuffer;
+  inst_view : GSourceView2.source_view;
   errors : error_model;
   insts : inst_model;
   st_ctx : GMisc.statusbar_context;
@@ -198,14 +205,73 @@ type env = {
   resulting_ids : (string * int) list;
 }
 
+module HTag = Hashtbl.Make (struct
+  type t = GText.tag
+  let equal t1 t2 = t1#get_oid = t2#get_oid 
+  let hash t = t#get_oid
+end)
 
-let create_env buf1 (buf2:sbuffer) errors insts st_ctx ast dep
+
+type buffer_pending = {
+  tags_ranges : ((sbuffer * int * int) list) HTag.t;
+}
+
+
+let pending = {
+  tags_ranges = HTag.create 2001;
+} 
+
+let add_tag_range (b, o1, o2) = function
+  | [] -> [b, o1, o2]
+  | (c, p1, p2) :: r
+      when b#get_oid = c#get_oid && o1 <= p2 + 1 ->
+      (c, p1, o2) :: r
+  | l -> (b, o1, o2) :: l
+
+  
+let append_buf (buffer:sbuffer)
+    ?iter:(iter=buffer#end_iter) ?tags:(tags=[]) s =
+  let o1 = iter#offset in
+  let o2 = o1 + String.length s in
+  buffer#insert ~iter s;
+  List.iter (fun t ->
+    let bounds =
+      try HTag.find pending.tags_ranges t with Not_found -> [] in
+    HTag.replace pending.tags_ranges t (add_tag_range (buffer, o1, o2) bounds);
+  ) tags
+
+let append_mark (buffer:sbuffer) id =
+  ignore(buffer#create_source_mark ~category:(sprintf "trigger_%d" id)
+           buffer#end_iter)
+  
+
+
+let tags_spaces tags =
+  if List.length tags > 40 then tags else []
+    
+let commit_tags_buffer (buffer:sbuffer) =
+  HTag.iter (fun t bounds ->
+    List.iter (fun (buf, o1, o2) ->
+      if buf#get_oid = buffer#get_oid then begin
+        let start = buffer#get_iter_at_mark
+          (`MARK (buffer#create_mark (buffer#get_iter (`OFFSET o1)))) in
+        let stop = buffer#get_iter_at_mark
+          (`MARK (buffer#create_mark (buffer#get_iter (`OFFSET o2)))) in
+        buffer#apply_tag t ~start ~stop
+      end
+    ) bounds
+  ) pending.tags_ranges;
+  HTag.clear pending.tags_ranges
+    
+let create_env buf1 tv1 (buf2:sbuffer) tv2 errors insts st_ctx ast dep
     actions resulting_ids=
   let titag = buf2#create_tag [`WEIGHT `BOLD; `UNDERLINE `SINGLE] in
   buf2#insert ~tags:[titag] "User instantiated axioms:\n\n";
   {
     buffer = buf1;
     inst_buffer = buf2;
+    goal_view = tv1;
+    inst_view = tv2;
     errors = errors;
     insts = insts;
     st_ctx = st_ctx;
@@ -227,6 +293,8 @@ let create_replay_env buf1 errors insts ast actions resulting_ids =
  {
     buffer = buf1;
     inst_buffer = GSourceView2.source_buffer ();
+    goal_view = GSourceView2.source_view ();
+    inst_view = GSourceView2.source_view ();
     errors = errors;
     insts = insts;
     st_ctx = (GMisc.statusbar ())#new_context ~name:"";
@@ -372,6 +440,7 @@ let findin_atyped_delc tag buffer (td, env) stop_decl =
         let aaf = new_annot buffer af (-1) tag in
 	(* TODO: Change this so af is annoted *)
 	findin_aform tag buffer (Some aaf) af
+    | AInclude (_, _, _) -> None (* Is that right ? *)
     | ARewriting (_, _, rwtl) -> None
         (*List.fold_left 
 	  (fun {rwt_left = rl; rwt_right = rr} acc -> match acc with
@@ -597,7 +666,10 @@ let rec print_record_type fmt = function
   | (c, ty)::l -> 
       fprintf fmt "%s : %a; %a" c print_ppure_type ty print_record_type l
 
-let print_typed_decl fmt td = match td.Why_ptree.c with
+let rec print_typed_decl fmt td = match td.Why_ptree.c with
+  | TInclude (_, s, d) -> fprintf fmt "Theory %s\n%aend" s
+    (fun ld -> List.iter 
+      (fun (d, _) -> fprintf fmt "  %a\n" print_typed_decl d)) d
   | TAxiom (_, s, true, tf) -> fprintf fmt "inversion %s : %a" s print_tform tf
   | TAxiom (_, s, _, tf) -> fprintf fmt "axiom %s : %a" s print_tform tf
   | TRewriting (_, s, rwtl) -> 
@@ -746,9 +818,13 @@ and make_dep_aform d ex dep = function
 
 and make_dep_aaform d ex dep aaf = make_dep_aform d ex dep aaf.c
 
-let make_dep_atyped_decl dep d =
+let rec make_dep_atyped_decl dep d =
   match d.c with
   | AAxiom (loc, s, _, af) -> make_dep_aform d [] dep af
+  | AInclude (loc, _, ld) ->
+      List.fold_left
+	(fun dep d -> make_dep_atyped_decl dep d
+	) dep ld
   | ARewriting (loc, s, arwtl) ->
       List.fold_left
 	(fun dep r ->
@@ -868,9 +944,13 @@ and annot_of_tform (buffer:sbuffer) t =
   let c = of_tform buffer t in
   new_annot buffer c t.Why_ptree.annot ptag
 
-let annot_of_typed_decl (buffer:sbuffer) td = 
+let rec annot_of_typed_decl (buffer:sbuffer) td = 
   let ptag = tag buffer in
   let c = match td.Why_ptree.c with
+    | TInclude (loc, s, l) ->
+      let l = List.map
+        (fun (d, _) -> annot_of_typed_decl buffer d) l in
+      AInclude (loc, s, l)
     | TAxiom (loc, s, inv, tf) -> AAxiom (loc, s, inv, of_tform buffer tf)
     | TRewriting (loc, s, rwtl) ->
       let arwtl = List.map 
@@ -996,8 +1076,13 @@ and from_aaform_list = function
 	try (to_tform aaf)::l
 	with Failure "Empty logic operation" -> l
 
-let to_typed_decl td =
+let rec to_typed_decl td =
   let c = match td.c with
+    | AInclude (loc, s, al) ->
+      let l = List.map (fun d ->
+	(to_typed_decl d, true)
+      ) al in
+      TInclude (loc, s, l)
     | AAxiom (loc, s, inv, af) -> 
       let af = void_to_tform af td.id in
       TAxiom (loc, s, inv, af)
@@ -1042,7 +1127,7 @@ and add_aterm_list_at (buffer:sbuffer) tags iter sep =
     | [at] -> add_aterm_at buffer tags iter at;
     | at::l ->
 	add_aterm_at buffer tags iter at;
-	buffer#insert ~iter ~tags sep;
+	append_buf buffer ~iter ~tags sep;
 	add_aterm_list_at buffer tags iter sep l
 
 and add_aaterm_at (buffer:sbuffer) tags iter at =
@@ -1059,7 +1144,7 @@ and add_aaterm_list_at (buffer:sbuffer) tags iter sep =
     | [at] -> add_aaterm_at buffer tags iter at;
     | at::l ->
 	add_aaterm_at buffer tags iter at;
-	buffer#insert ~iter ~tags sep;
+	append_buf buffer ~iter ~tags sep;
 	add_aaterm_list_at buffer tags iter sep l
 
 and add_aaterm_list (buffer:sbuffer) tags sep atl =
@@ -1069,12 +1154,12 @@ and add_arecord_at (buffer:sbuffer) tags iter =
   function
     | [] -> ()
     | [c, at] ->
-	buffer#insert ~iter ~tags (sprintf "%s = " (Hstring.view c));
+	append_buf buffer ~iter ~tags (sprintf "%s = " (Hstring.view c));
 	add_aterm_at buffer tags iter at;
     | (c, at)::l ->
-	buffer#insert ~iter ~tags (sprintf "%s = " (Hstring.view c));
+	append_buf buffer ~iter ~tags (sprintf "%s = " (Hstring.view c));
 	add_aterm_at buffer tags iter at;
-	buffer#insert ~iter ~tags "; ";
+	append_buf buffer ~iter ~tags "; ";
 	add_arecord_at buffer tags iter l
 
 and add_at_desc_at (buffer:sbuffer) tags iter at =
@@ -1084,76 +1169,76 @@ and add_at_desc_at (buffer:sbuffer) tags iter at =
   (* let iter = buffer#get_iter (`OFFSET off1) in *)
   match at with
     | ATconst c ->
-	buffer#insert ~iter ~tags
+	append_buf buffer ~iter ~tags
 	  (sprintf "%s" (tconstant_to_string c))
     | ATvar s  -> 
-	buffer#insert ~iter ~tags (sprintf "%s" (Symbols.to_string s))
+	append_buf buffer ~iter ~tags (sprintf "%s" (Symbols.to_string s))
     | ATapp (s, atl)  ->
-	buffer#insert ~iter ~tags 
+	append_buf buffer ~iter ~tags 
 	  (sprintf "%s(" (Symbols.to_string s));
 	add_aterm_list_at buffer tags iter "," atl;
-	buffer#insert ~iter ~tags ")"
+	append_buf buffer ~iter ~tags ")"
     | ATinfix (t1, s, t2)  ->
 	add_aterm_at buffer tags iter t1;
-	buffer#insert ~iter ~tags
+	append_buf buffer ~iter ~tags
 	  (sprintf " %s " (Symbols.to_string s));
 	add_aterm_at buffer tags iter t2
     | ATprefix (s, t) ->
-	buffer#insert ~iter ~tags
+	append_buf buffer ~iter ~tags
 	  (sprintf " %s " (Symbols.to_string s));
 	add_aterm_at buffer tags iter t
     | ATget (t1, t2) ->
 	add_aterm_at buffer tags iter t1;
-	buffer#insert ~iter ~tags "[";
+	append_buf buffer ~iter ~tags "[";
 	add_aterm_at buffer tags iter t2;
-	buffer#insert ~iter ~tags "]"
+	append_buf buffer ~iter ~tags "]"
     | ATset (t1, t2, t3) ->
 	add_aterm_at buffer tags iter t1;
-	buffer#insert ~iter ~tags "[";
+	append_buf buffer ~iter ~tags "[";
 	add_aterm_at buffer tags iter t2;
-	buffer#insert ~iter ~tags "<-";
+	append_buf buffer ~iter ~tags "<-";
 	add_aterm_at buffer tags iter t3;
-	buffer#insert ~iter ~tags "]"
+	append_buf buffer ~iter ~tags "]"
     | ATextract (t1, t2, t3) ->
 	add_aterm_at buffer tags iter t1;
-	buffer#insert ~iter ~tags "^{";
+	append_buf buffer ~iter ~tags "^{";
 	add_aterm_at buffer tags iter t2;
-	buffer#insert ~iter ~tags ",";
+	append_buf buffer ~iter ~tags ",";
 	add_aterm_at buffer tags iter t3;
-	buffer#insert ~iter ~tags "}"
+	append_buf buffer ~iter ~tags "}"
     | ATconcat (t1, t2) ->
 	add_aterm_at buffer tags iter t1;
-	buffer#insert ~iter ~tags "@";
+	append_buf buffer ~iter ~tags "@";
 	add_aterm_at buffer tags iter t2
     | ATlet (s, t1, t2) ->
-	buffer#insert ~iter ~tags 
+	append_buf buffer ~iter ~tags 
 	  (sprintf "let %s = " (Symbols.to_string s));
 	add_aterm_at buffer tags iter t1;
-	buffer#insert ~iter ~tags " in ";
+	append_buf buffer ~iter ~tags " in ";
 	add_aterm_at buffer tags iter t2
     | ATdot (t, c) ->
 	add_aterm_at buffer tags iter t;
-	buffer#insert ~iter ~tags (sprintf ".%s" (Hstring.view c))
+	append_buf buffer ~iter ~tags (sprintf ".%s" (Hstring.view c))
     | ATrecord r ->
-	buffer#insert ~iter ~tags "{ ";
+	append_buf buffer ~iter ~tags "{ ";
 	add_arecord_at buffer tags iter r;
-	buffer#insert ~iter ~tags " }"
+	append_buf buffer ~iter ~tags " }"
     | ATnamed (n, t) ->
-	buffer#insert ~iter ~tags (sprintf "%s: " (Hstring.view n));
+	append_buf buffer ~iter ~tags (sprintf "%s: " (Hstring.view n));
 	add_aterm_at buffer tags iter t
 	
 	
 let add_aatom (buffer:sbuffer) indent tags aa =
-  buffer#insert (String.make (indent * indent_size) ' ');
+  append_buf buffer (make_indent indent);
   match aa with
-  | AAtrue -> buffer#insert ~tags "true"
-  | AAfalse -> buffer#insert ~tags "false"
+  | AAtrue -> append_buf buffer ~tags "true"
+  | AAfalse -> append_buf buffer ~tags "false"
   | AAeq atl -> add_aaterm_list buffer tags " = " atl
   | AAneq atl -> add_aaterm_list buffer tags " <> " atl
   | AAdistinct atl  ->
-    buffer#insert ~tags "distinct(";
+    append_buf buffer ~tags "distinct(";
     add_aaterm_list buffer tags "," atl;
-    buffer#insert  ~tags ")"
+    append_buf buffer  ~tags ")"
   | AAle atl -> add_aaterm_list buffer tags " <= " atl
   | AAlt atl -> add_aaterm_list buffer tags " < " atl
   | AApred at -> add_aterm buffer tags at
@@ -1162,26 +1247,26 @@ let add_aatom (buffer:sbuffer) indent tags aa =
 
 let add_oplogic (buffer:sbuffer) indent tags op =
   match op with
-  | AOPand -> buffer#insert ~tags "and "
-  | AOPor -> buffer#insert ~tags "or  "
-  | AOPimp  -> buffer#insert ~tags "->  "
-  | AOPnot -> buffer#insert ~tags "not "
+  | AOPand -> append_buf buffer ~tags "and "
+  | AOPor -> append_buf buffer ~tags "or  "
+  | AOPimp  -> append_buf buffer ~tags "->  "
+  | AOPnot -> append_buf buffer ~tags "not "
   | AOPif at ->
-      buffer#insert (String.make indent ' ');
-      buffer#insert ~tags "if ";
+      append_buf buffer (String.make indent ' ');
+      append_buf buffer ~tags "if ";
       add_aterm buffer tags at;
-      buffer#insert ~tags " then "
-  | AOPiff -> buffer#insert ~tags "<-> "
+      append_buf buffer ~tags " then "
+  | AOPiff -> append_buf buffer ~tags "<-> "
 
 let add_rwt (buffer:sbuffer) indent tags r =
   let { rwt_vars = rv; rwt_left = rl; rwt_right = rr } = r.c in
   let tags = r.tag::r.ptag::tags in
-  buffer#insert (String.make (indent * indent_size) ' ');
-  buffer#insert ~tags "forall ";
+  append_buf buffer (make_indent indent);
+  append_buf buffer ~tags "forall ";
   fprintf str_formatter "%a. " print_var_list rv;
-  buffer#insert ~tags (flush_str_formatter ());
+  append_buf buffer ~tags (flush_str_formatter ());
   add_aterm buffer tags rl;
-  buffer#insert ~tags " = ";
+  append_buf buffer ~tags " = ";
   add_aterm buffer tags rr
 
 let rec add_rwt_list (buffer:sbuffer) indent tags = function
@@ -1189,8 +1274,8 @@ let rec add_rwt_list (buffer:sbuffer) indent tags = function
   | [r] -> add_rwt buffer indent tags r
   | r::l -> 
     add_rwt buffer indent tags r;
-    buffer#insert ~tags ";";
-    buffer#insert "\n";
+    append_buf buffer ~tags ";";
+    append_buf buffer "\n";
     add_rwt_list buffer indent tags l
 
 
@@ -1208,15 +1293,14 @@ let rec add_quant_form errors (buffer:sbuffer) indent tags qf =
   let {aqf_bvars = bv; aqf_upvars = uv; aqf_triggers = trs; aqf_form = aaf } =
     qf.c in
   fprintf str_formatter "%a " print_var_list bv;
-  buffer#insert ~tags (flush_str_formatter ());
+  append_buf buffer ~tags (flush_str_formatter ());
   let ntags = qf.tag::qf.ptag::tags in
-  buffer#insert ~tags:ntags "[";
+  append_buf buffer ~tags:ntags "[";
   add_triggers errors buffer ntags trs;
-  buffer#insert ~tags:ntags "].";
-  ignore(buffer#create_source_mark 
-	   ~category:(sprintf "trigger_%d" qf.id) buffer#end_iter);
-  buffer#insert "\n";
-  buffer#insert (String.make ((indent + 1)* indent_size) ' ');
+  append_buf buffer ~tags:ntags "].";
+  append_mark buffer qf.id;
+  append_buf buffer ~tags:(tags_spaces tags) "\n";
+  append_buf buffer ~tags:(tags_spaces tags) (make_indent (indent + 1));
   add_aaform errors buffer (indent+1) tags aaf
 
 and add_triggers errors (buffer:sbuffer) tags triggers =
@@ -1225,7 +1309,7 @@ and add_triggers errors (buffer:sbuffer) tags triggers =
     | [atl] -> add_aaterm_list buffer tags "," atl
     | atl::l -> 
 	add_aaterm_list buffer tags "," atl;
-	buffer#insert ~tags " | ";
+	append_buf buffer ~tags " | ";
 	add_triggers_aux l
   in
   if triggers = [] then add_empty_triggers_error errors buffer
@@ -1237,21 +1321,22 @@ and add_aform errors (buffer:sbuffer) indent tags aform =
   | AFatom a -> add_aatom buffer 0 tags a
   | AFop (op, afl) -> add_aaform_list errors buffer indent tags op afl
   | AFforall qf ->
-      buffer#insert ~tags "forall ";
+      append_buf buffer ~tags "forall ";
       add_quant_form errors buffer indent tags qf
   | AFexists qf ->
-      buffer#insert ~tags "exists ";
+      append_buf buffer ~tags "exists ";
       add_quant_form errors buffer indent tags qf
   | AFlet (vs, s, t, aaf) ->
-      buffer#insert ~tags 
+      append_buf buffer ~tags 
 	(sprintf "let %s = " (Symbols.to_string s));
       add_aterm buffer tags t;
-      buffer#insert ~tags " in";
-      buffer#insert "\n";
-      buffer#insert (String.make (indent * indent_size) ' ');
+      append_buf buffer ~tags " in";
+      append_buf buffer ~tags:(tags_spaces tags) "\n";
+      append_buf buffer ~tags:(tags_spaces tags)
+        (make_indent indent);
       add_aaform errors buffer (indent) tags aaf
   | AFnamed (n, aaf) ->
-      buffer#insert ~tags (sprintf "%s: " (Hstring.view n));
+      append_buf buffer ~tags (sprintf "%s: " (Hstring.view n));
       add_aform errors buffer indent tags aaf.c
       
 
@@ -1270,14 +1355,15 @@ and add_aaform_list_aux errors (buffer:sbuffer) indent tags op =
       add_aaform errors buffer indent tags af
   | af1::af2::l ->
       add_aaform errors buffer indent tags af1;
-      buffer#insert "\n";
-      buffer#insert (String.make (indent * indent_size) ' ');
+      append_buf buffer ~tags:(tags_spaces tags) "\n";
+      append_buf buffer ~tags:(tags_spaces tags)
+        (make_indent indent);
       add_oplogic buffer indent tags op;
       add_aaform errors buffer (indent+1) tags af2;
       add_aaform_list errors buffer (indent+1) tags op l      
   (* | af::l -> *)
-  (*     buffer#insert "\n"; *)
-  (*     buffer#insert (String.make (indent * indent_size) ' '); *)
+  (*     append_buf buffer "\n"; *)
+  (*     append_buf buffer (make_indent indent); *)
   (*     add_oplogic buffer indent tags op; *)
   (*     add_aaform buffer indent tags af; *)
   (*     add_aaform_list buffer (indent+1) tags op l *)
@@ -1288,85 +1374,95 @@ and add_aaform errors (buffer:sbuffer) indent tags
   aaf.line <- buffer#line_count;
   add_aform errors buffer indent (tag::ptag::tags) af
 
-let add_atyped_decl errors (buffer:sbuffer) d =
+let rec add_atyped_decl errors (buffer:sbuffer) d =
   match d.c with
   | AAxiom (loc, s, inv, af) ->
       let keyword = 
 	if String.length s > 0 && (s.[0] = '_'  || s.[0] = '@') 
 	then "hypothesis" else if inv then "inversion" else "axiom" in
-      buffer#insert ~tags:[d.tag;d.ptag] (sprintf "%s %s :" keyword s);
+      append_buf buffer ~tags:[d.tag;d.ptag] (sprintf "%s %s :" keyword s);
+      append_buf buffer "\n";
+      d.line <- buffer#line_count;
+      append_buf buffer (String.make indent_size ' ');
+      add_aform errors buffer 1 [d.tag;d.ptag] af;
+      append_buf buffer "\n\n"
+
+  | AInclude (loc, s, al) ->
+      buffer#insert ~tags:[d.tag;d.ptag] (sprintf "Theory %s :" s);
       buffer#insert "\n";
       d.line <- buffer#line_count;
-      buffer#insert (String.make indent_size ' ');
-      add_aform errors buffer 1 [d.tag;d.ptag] af;
-      buffer#insert "\n\n"
+      List.iter (fun ad ->
+        add_atyped_decl errors buffer ad;
+        buffer#insert "\n") al;
+      buffer#insert "end\n\n"
 
   | ARewriting (loc, s, arwtl) ->
-      buffer#insert ~tags:[d.tag;d.ptag] (sprintf "rewriting %s :" s);
-      buffer#insert "\n";
+      append_buf buffer ~tags:[d.tag;d.ptag] (sprintf "rewriting %s :" s);
+      append_buf buffer "\n";
       d.line <- buffer#line_count;
       add_rwt_list buffer 1 [d.tag;d.ptag] arwtl;
-      buffer#insert "\n\n"
+      append_buf buffer "\n\n"
 
   | AGoal (loc, gs, s, aaf) ->
       let goal_str =
 	match gs with Thm -> "goal" | Check -> "check" | Cut -> "cut" in
-      buffer#insert ~tags:[d.tag;d.ptag] (sprintf "%s %s :" goal_str s);
-      buffer#insert "\n";
+      append_buf buffer ~tags:[d.tag;d.ptag] (sprintf "%s %s :" goal_str s);
+      append_buf buffer "\n";
       d.line <- buffer#line_count;
-      buffer#insert (String.make indent_size ' ');
+      append_buf buffer (String.make indent_size ' ');
       add_aform errors buffer 1 [d.tag;d.ptag] aaf.c;
-      buffer#insert "\n\n"
+      append_buf buffer "\n\n"
 
   | ALogic (loc, ls, ty) ->
       fprintf str_formatter 
 	"logic %a : %a" print_string_list ls print_plogic_type ty;
       d.line <- buffer#line_count;
-      buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
-      buffer#insert "\n\n"
+      append_buf buffer ~tags:[d.tag;d.ptag] (flush_str_formatter());
+      append_buf buffer "\n\n"
 
   | APredicate_def (loc, p, spptl, af) ->
       fprintf str_formatter "predicate %s %a =" p print_pred_type_list spptl;
-      buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
-      buffer#insert "\n";
+      append_buf buffer ~tags:[d.tag;d.ptag] (flush_str_formatter());
+      append_buf buffer "\n";
       d.line <- buffer#line_count;
-      buffer#insert (String.make indent_size ' ');
+      append_buf buffer (String.make indent_size ' ');
       add_aform errors buffer 1 [d.tag;d.ptag] af;
-      buffer#insert "\n\n"
+      append_buf buffer "\n\n"
 
   | AFunction_def (loc, f, spptl, ty, af) ->
       fprintf str_formatter "function %s (%a) : %a =" f
 	print_string_ppure_type_list spptl print_ppure_type ty;
-      buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
-      buffer#insert "\n";
+      append_buf buffer ~tags:[d.tag;d.ptag] (flush_str_formatter());
+      append_buf buffer "\n";
       d.line <- buffer#line_count;
-      buffer#insert (String.make indent_size ' ');
+      append_buf buffer (String.make indent_size ' ');
       add_aform errors buffer 1 [d.tag;d.ptag] af;
-      buffer#insert "\n\n"
+      append_buf buffer "\n\n"
       
   | ATypeDecl (loc, ls, s, Abstract) -> 
       fprintf str_formatter "type %a %s" print_astring_list ls s;
       d.line <- buffer#line_count;
-      buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
-      buffer#insert "\n\n"
+      append_buf buffer ~tags:[d.tag;d.ptag] (flush_str_formatter());
+      append_buf buffer "\n\n"
       
   | ATypeDecl (loc, ls, s, Enum lc) -> 
       fprintf str_formatter "type %a %s = %a"
 	print_astring_list ls s (print_string_sep " | ") lc;
       d.line <- buffer#line_count;
-      buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
-      buffer#insert "\n\n"
+      append_buf buffer ~tags:[d.tag;d.ptag] (flush_str_formatter());
+      append_buf buffer "\n\n"
 
   | ATypeDecl (loc, ls, s, Record rt) -> 
       fprintf str_formatter "type %a %s = { %a }"
 	print_astring_list ls s	print_record_type rt;
       d.line <- buffer#line_count;
-      buffer#insert ~tags:[d.tag;d.ptag] (flush_str_formatter());
-      buffer#insert "\n\n"
+      append_buf buffer ~tags:[d.tag;d.ptag] (flush_str_formatter());
+      append_buf buffer "\n\n"
 
 
 let add_to_buffer errors (buffer:sbuffer) annoted_ast =
-  List.iter (fun (t, _) -> add_atyped_decl errors buffer t) annoted_ast
+  List.iter (fun (t, _) -> add_atyped_decl errors buffer t) annoted_ast;
+  commit_tags_buffer buffer
 
 
 
@@ -1475,6 +1571,7 @@ let findtags_atyped_delc sl td acc =
     | AFunction_def (_, _, _, _, af) ->
 	findtags_aform sl af acc
     | ARewriting (_, _, rwtl) -> acc
+    | AInclude (_, _, l) -> acc
     | AGoal (_, _, _, aaf) ->
 	findtags_aform sl aaf.c acc
     | ALogic _
@@ -1489,6 +1586,7 @@ let findtags_using r l =
   match r with
     | AAxiom _
     | ARewriting _
+    | AInclude _
     | AGoal _
     | ATypeDecl _ -> []
 
@@ -1568,6 +1666,7 @@ let findproof_atyped_decl ids td (ax,acc) =
   in
   match td.c with
     | ARewriting (_,_, arwtl) -> assert false
+    | AInclude (_, _, _) -> assert false
 
     | ALogic _ | ATypeDecl _ -> ax,acc
 
@@ -1608,6 +1707,7 @@ let find_line_id_atyped_decl id td =
   if td.id < id then ()
   else if td.id = id then raise (FoundLine (td.line, td.tag))
   else match td.c with
+    | AInclude (_, _, _) 
     | ARewriting (_,_, _) 
     | ALogic _ | ATypeDecl _  -> ()
 
@@ -1685,6 +1785,7 @@ let findbyid_atyped_decl  stop_decl id (td, tyenv) =
   else if td.id = id then raise (Foundannot (AD (td, tyenv)))
   else if stop_decl then raise (Foundannot (AD (td, tyenv)))
   else match td.c with
+    | AInclude (_, _, _) 
     | ARewriting (_,_, _) 
     | ALogic _ | ATypeDecl _  -> ()
 
@@ -1708,6 +1809,7 @@ let findbyid_decl = findbyid_aux true
 
 let compute_resulting_ids =
   List.fold_left (fun acc (td, _) -> match td.c with
+    | AInclude (_, _, _) -> acc
     | ARewriting (_,_, _) -> acc
     | ALogic (_, names, _) -> (List.map (fun n -> n, td.id) names)@acc
     | ATypeDecl (_, _, name, _)

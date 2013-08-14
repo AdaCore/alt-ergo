@@ -44,6 +44,10 @@ val empty_with_inst : (Formula.t -> unit) -> t
    [f] is unsatisfiable in [env] *)
 val assume : t -> gformula -> t
 
+(* [add_theory env fs] assume a new custom theory [fs] in [env]. Raises Unsat if
+   [fs] is unsatisfiable in [env] *)
+val add_theory : t -> Formula.t list -> t
+
 (* [pred_def env f] assume a new predicate definition [f] in [env]. *)
 val pred_def : t -> Formula.t -> t
 

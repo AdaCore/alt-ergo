@@ -2225,15 +2225,15 @@ if test -n "$LABLGTK2LIB";then
   LABLGTK2=yes
   ENABLEGUI="yes"
 else
-  as_ac_File=`$as_echo "ac_cv_file_$OCAMLLIB/lablgtk2/lablgtksourceview2.cmxa" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $OCAMLLIB/lablgtk2/lablgtksourceview2.cmxa" >&5
-$as_echo_n "checking for $OCAMLLIB/lablgtk2/lablgtksourceview2.cmxa... " >&6; }
+  as_ac_File=`$as_echo "ac_cv_file_$OCAMLLIB/lablgtk2/lablgtksourceview2.cma" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $OCAMLLIB/lablgtk2/lablgtksourceview2.cma" >&5
+$as_echo_n "checking for $OCAMLLIB/lablgtk2/lablgtksourceview2.cma... " >&6; }
 if eval \${$as_ac_File+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   test "$cross_compiling" = yes &&
   as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$OCAMLLIB/lablgtk2/lablgtksourceview2.cmxa"; then
+if test -r "$OCAMLLIB/lablgtk2/lablgtksourceview2.cma"; then
   eval "$as_ac_File=yes"
 else
   eval "$as_ac_File=no"

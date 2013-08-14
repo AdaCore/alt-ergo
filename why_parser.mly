@@ -112,34 +112,34 @@
 %start trigger
 %type <Why_ptree.lexpr> lexpr
 %start lexpr
-%type <string list * Why_ptree.file> file
+%type <Why_ptree.decl_or_include list> file
 %start file
 %%
 
 file:
-| includes list1_decl EOF 
-   { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
-     $1, $2 }
 | list1_decl EOF 
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
-     [], $1 }
+     $1 }
 | EOF 
    { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
-     [], [] }
+     [] }
 ;
 
-includes:
-| INCLUDE STRING { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
-     [$2]}
-| INCLUDE STRING includes{ if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
-     $2::$3}
 
 list1_decl:
-| decl 
+| decl_or_include
    { [$1] }
-| decl list1_decl 
+| decl_or_include list1_decl 
    { $1 :: $2 }
 ;
+
+decl_or_include:
+| INCLUDE STRING 
+   { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
+     Incl (loc (),$2)}
+| decl
+   { if rules () = 0 then fprintf fmt "[rule] TR-Lexical-file@.";
+     Decl ($1)}
 
 decl:
 | TYPE type_vars ident

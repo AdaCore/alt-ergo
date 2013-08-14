@@ -101,6 +101,11 @@ type decl =
       loc * (string * string) * 
 	(loc * string * ppure_type) list * ppure_type * lexpr
   | TypeDecl of loc * string list * string * body_type_decl
+  | Include of loc * string * decl list
+
+type decl_or_include =
+  | Decl of decl
+  | Incl of loc * string
 
 type file = decl list
 
@@ -190,7 +195,7 @@ type 'a tdecl =
       loc * string *
 	(string * ppure_type) list * ppure_type * ('a tform, 'a) annoted
   | TTypeDecl of loc * string list * string * body_type_decl
-
+  | TInclude of loc * string * (('a tdecl, 'a) annoted * bool) list
 
 (* Sat entry *)
 
@@ -199,6 +204,7 @@ type sat_decl_aux =
   | PredDef of Formula.t
   | RwtDef of (Term.t rwt_rule) list
   | Query of string *  Formula.t * Literal.LT.t list * goal_sort
+  | NewTheory of Formula.t list
 
 type sat_tdecl = {
   st_loc : loc;

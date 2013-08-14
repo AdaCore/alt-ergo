@@ -24,7 +24,8 @@ module T = Term
 module F = Formula
 
 type gsubst = { 
-  sbt : T.subst ; 
+  sbs : T.t Subst.t;
+  sty : Ty.subst;
   gen : int ;     (* l'age d'une substitution est l'age du plus vieux 
 		     terme qu'elle contient *)
   goal : bool;    (* vrai si la substitution contient un terme ayant un lien 
@@ -99,6 +100,61 @@ module Make (X : X) = struct
     (* l'age limite des termes, au dela ils ne sont pas consideres par le
        matching *)
 
+  module Debug = struct
+      
+    let add_term t = 
+      if dmatching then
+        fprintf fmt "[matching] add_term:  %a@." T.print t
+          
+    let matching pats = 
+      if dmatching then begin
+        fprintf fmt "@.[matching] (multi-)trigger: ";
+        List.iter (fprintf fmt "%a , " T.print) pats;
+        fprintf fmt "@.";
+        fprintf fmt "========================================================@."
+      end
+          
+    let match_pats_modulo pat lsubsts = 
+      if dmatching then begin
+        fprintf fmt "@.match_pat_modulo: %a  with accumulated substs@."
+          T.print pat;
+        List.iter (fun {sbs=sbs; sty=sty} ->
+          fprintf fmt ">>> sbs= %a | sty= %a@." 
+            SubstT.print sbs Ty.print_subst sty
+        )lsubsts
+      end
+          
+    let match_one_pat {sbs=sbs; sty=sty} pat0 = 
+      if dmatching then
+        fprintf fmt "@.match_pat: %a  with subst:  sbs= %a | sty= %a @."
+          T.print pat0 SubstT.print sbs Ty.print_subst sty
+
+
+    let match_one_pat_against {sbs=sbs; sty=sty} pat0 t = 
+      if dmatching then
+        fprintf fmt "@.match_pat: %a  against term %a@.with subst:  sbs= %a | sty= %a @."
+          T.print pat0 T.print t SubstT.print sbs Ty.print_subst sty
+
+    let match_term {sbs=sbs; sty=sty} t pat =
+      if dmatching then 
+        fprintf fmt 
+          "[match_term] I match %a against %a with subst: sbs=%a | sty= %a@."
+          T.print pat T.print t SubstT.print sbs Ty.print_subst sty
+
+    let match_list {sbs=sbs; sty=sty} pats xs =
+      if dmatching then 
+        fprintf fmt 
+          "@.[match_list] I match %a against %a with subst: sbs=%a | sty= %a@."
+          T.print_list pats T.print_list xs SubstT.print sbs Ty.print_subst sty
+
+    let match_class_of t cl =
+      if dmatching then 
+        fprintf fmt "class_of (%a)  = { %a }@."
+          T.print t
+          (fun fmt -> List.iter (fprintf fmt "%a , " T.print)) cl
+
+  end
+
   let infos op_gen op_but t g b env = 
     try 
       let i = MT.find t env.info in
@@ -106,7 +162,7 @@ module Make (X : X) = struct
     with Not_found -> g , b
 
   let add_term info t env =
-    (*eprintf ">>>> %d@." (MT.cardinal env.info);*)
+    Debug.add_term t;
     !Options.timer_start Timers.TMatch;
     let rec add_rec env t = 
       if MT.mem t env.info then env
@@ -130,9 +186,6 @@ module Make (X : X) = struct
 	      (match info.term_from_formula with None -> [] | Some a -> [a]) 
 	      info.term_from_terms
 	  in
-	  (*eprintf "[Matching.add_term] %a : " Term.print t;
-	  List.iter (eprintf "%a " Formula.print) from_lems;
-	  eprintf "@.";*)
 	  { env with
 	      fils = SubstT.add f (MT.add t xs map_f) env.fils; 
 	      info = 
@@ -150,6 +203,7 @@ module Make (X : X) = struct
       
   let add_trigger p trs env = { env with pats = (p, trs) ::env.pats }
 
+
   exception Deja_vu
   let deja_vu lem1 lems = 
     List.exists (fun lem2 -> F.compare lem1 lem2 = 0) lems
@@ -157,7 +211,8 @@ module Make (X : X) = struct
   let matching_loop_bound = 5
 
   module HF = Hashtbl.Make(F)
-  let matching_loop lems orig =
+  let matching_loop lems orig = false
+    (* This heuristic blocks a lots of VCs in BWare  
     List.length lems > 3*matching_loop_bound ||
     match lems with
       | [] | [_] -> false
@@ -174,10 +229,11 @@ module Make (X : X) = struct
 	      (1, f) l
 	  in 
 	  max > matching_loop_bound 
+    *)
 
   let all_terms 
       f ty env pinfo 
-      {sbt=(s_t,s_ty); gen=g; goal=b; 
+      {sbs=s_t; sty=s_ty; gen=g; goal=b; 
        s_term_orig=s_torig; 
        s_lem_orig = s_lorig} lsbt_acc = 
     SubstT.fold 
@@ -198,7 +254,8 @@ module Make (X : X) = struct
 		      max ng g , bt or b
 		    with Not_found -> g , b
 		  in
-		  { sbt = (SubstT.add f t s_t, s_ty);
+		  { sbs = SubstT.add f t s_t;
+		    sty = s_ty;
 		    gen = ng; 
 		    goal = but;
 		    s_term_orig = t :: s_torig;
@@ -208,32 +265,23 @@ module Make (X : X) = struct
 	   ) s l
       ) env.fils lsbt_acc
 
-  let add_msymb uf f t ({sbt=(s_t,s_ty)} as sg)= 
+  let add_msymb uf f t ({sbs=s_t; sty=s_ty} as sg)= 
     try 
-      let t' = SubstT.find f s_t in
-      let a = Literal.LT.make (Literal.Eq (t, t')) in
-      if X.query a uf (*Explanation.singleton (Formula.mk_lit a)*) <> Sig.No
-      then sg 
-      else raise Echec
-    with Not_found ->  {sg with sbt=(SubstT.add f t s_t,s_ty) }
+      let a = Literal.LT.make (Literal.Eq (t, SubstT.find f s_t)) in
+      if X.query a uf = Sig.No then raise Echec;
+      sg 
+    with Not_found ->  {sg with sbs=SubstT.add f t s_t; sty=s_ty}
 
   let (-@) l1 l2 =
     match l1, l2 with
     | [], _  -> l2
     | _ , [] -> l1
     | _ -> List.fold_left (fun acc e -> e :: acc) l2 (List.rev l1)
-      
-  let rec iter_exception f gsb l =
-    let l = 
-      List.fold_left
-        (fun acc xs -> try (f gsb xs) -@ acc with Echec -> acc) [] l in
-    match l with [] -> raise Echec | l  -> l
-	
-  let rec matchterm env uf ( {sbt=(s_t,s_ty);gen=g;goal=b} as sg) pat t =
+
+  let rec match_term env uf ( {sbs=s_t; sty=s_ty;gen=g;goal=b} as sg) pat t =
     !Options.thread_yield ();
-    if dmatching then 
-      fprintf fmt "[matchterm] I match %a against %a@." T.print pat T.print t;
-    let {T.f=f_pat;xs=pats;ty=ty_pat} =  T.view pat in
+    Debug.match_term sg t pat;
+    let {T.f=f_pat;xs=pats;ty=ty_pat} = T.view pat in
     match f_pat with
       |	Symbols.Var _ -> 
 	  let sb =
@@ -241,115 +289,94 @@ module Make (X : X) = struct
 	       let s_ty = Ty.matching s_ty ty_pat (T.view t).T.ty in
 	       let g',b' = infos max (||) t g b env in
 	       add_msymb uf f_pat t 
-		 { sg with sbt=(s_t,s_ty); gen=g'; goal=b' }
+		 { sg with sbs=s_t; sty=s_ty; gen=g'; goal=b' }
 	     with Ty.TypeClash _ -> raise Echec)
           in 
           [sb]
       | _ -> 
-        let cl = X.class_of uf t in
-        if dmatching then 
-          fprintf fmt "%a <=> { %a }@."
-            T.print t
-            (fun fmt -> List.iter (fprintf fmt "%a , " T.print)) cl;
-	let l = List.map T.view cl in
-	let s_ty, l = 
-	  List.fold_left
-	      (fun (s_ty,l) ({T.f=f; ty=ty_t} as t) -> 
-		 if Symbols.compare f_pat f = 0 then 
-		   try
-		     let s_ty = Ty.matching s_ty ty_pat ty_t in
-		     s_ty , t::l 
-		   with Ty.TypeClash _ -> s_ty , l
-		 else s_ty , l
-	      ) (s_ty,[]) l 
-	  in
-	  iter_exception (* pas sur que ce soit correct ici *)
-	    (fun m {T.xs=xs} -> matchterms env uf m pats xs) 
-	    { sg with sbt = (s_t,s_ty)} l
-	  
-  and matchterms env uf sg pats xs = 
-    (* We match one pattern with one term *)
-    if pats <> [] then Options.incr_steps (1);
+        try
+          let s_ty = Ty.matching s_ty ty_pat (T.view t).T.ty in
+          let cl = X.class_of uf t in
+          Debug.match_class_of t cl;
+          let cl =
+	    List.fold_left
+	      (fun l t -> 
+                let {T.f=f; xs=xs} = T.view t in
+	        if Symbols.compare f_pat f = 0 then xs::l else l
+	      )[] cl
+          in
+          let gsb = { sg with sbs = s_t; sty = s_ty } in
+          (* pas sur que ce soit correct ici *)
+          List.fold_left
+            (fun acc xs -> 
+              try (match_list env uf gsb pats xs) -@ acc
+              with Echec -> acc
+            ) [] cl
+        with Ty.TypeClash _ -> raise Echec
+
+  and match_list env uf sg pats xs = 
+    Debug.match_list sg pats xs;
     try 
       List.fold_left2 
         (fun sb_l pat arg -> 
            List.fold_left 
              (fun acc sg -> 
-                let aux = matchterm env uf sg pat arg in
-                List.rev_append aux acc) [] sb_l
+                let aux = match_term env uf sg pat arg in
+                (*match aux with [] -> raise Echec | _  -> BUG !! *)
+                List.rev_append aux acc
+             ) [] sb_l
         ) [sg] pats xs 
     with Invalid_argument _ -> raise Echec
 
-  (*let matchterms env uf sg pats xs =
-    (* The matching one pattern with one term *)
-    Options.incr_steps (1);
-    matchterms env uf sg pats xs*)
-
-  let matchpat env uf pat_info lsbt_acc ({sbt=st,sty;gen=g;goal=b} as sg, pat) =
-    let {T.f=f;xs=pats;ty=ty} = T.view pat in
+  let match_one_pat env uf pat_info pat0 lsbt_acc sg =
+    Debug.match_one_pat sg pat0;
+    let pat = T.apply_subst (sg.sbs, sg.sty) pat0 in
+    let {T.f=f; xs=pats; ty=ty} = T.view pat in
     match f with
-      |	Symbols.Var _ -> 
-        all_terms f ty env pat_info sg lsbt_acc
+      | Symbols.Var _ -> all_terms f ty env pat_info sg lsbt_acc
       | _ -> 
-	  try  
-	    MT.fold 
-	      (fun t xs lsbt ->
-		 let lems = 
-		   try (MT.find t env.info).lem_orig with Not_found -> []
-		 in
-		 if matching_loop lems pat_info.trigger_orig then lsbt
-		 else begin
-                   if dmatching then
-                     fprintf fmt 
-                       "[matchpat] I consider the pattern %a against %a@."
-                       T.print pat T.print t;
-		   try
-		     let s_ty = 
-		       try Ty.matching sty ty (T.view t).T.ty 
-		       with Ty.TypeClash _ -> sty in
-		     let gen, but = infos max (||) t g b env in
-		     let aux = 
-                       matchterms env uf 
-			 { sg with 
-			   sbt = st, s_ty; 
-			   gen = gen; 
-			   goal = but; 
-			   s_term_orig = t::sg.s_term_orig } 
-			 pats xs in
-                     List.rev_append aux lsbt
-		   with Echec -> lsbt
-                 end
-              ) (SubstT.find f env.fils) lsbt_acc
-	  with Not_found -> lsbt_acc
-	    
-  let matchpats env uf pat_info lsubsts pat = 
-    if dmatching then begin
-      fprintf fmt "@.[matchpats] I consider a new trigger@.";
-      fprintf fmt "====================================@."
-    end;
-    List.fold_left
-      (fun acc sg -> 
-         matchpat env uf pat_info acc (sg, T.apply_subst sg.sbt pat)) [] lsubsts
+        let {sty=sty; gen=g; goal=b} = sg in
+        let f_aux t xs lsbt = 
+          Debug.match_one_pat_against sg pat0 t;
+	  let lems = try (MT.find t env.info).lem_orig with Not_found -> [] in
+	  if matching_loop lems pat_info.trigger_orig then lsbt
+	  else
+	    try
+	      let s_ty = Ty.matching sty ty (T.view t).T.ty in
+	      let gen, but = infos max (||) t g b env in
+              let sg =
+                { sg with 
+                  sty = s_ty; gen = gen; goal = but; 
+                  s_term_orig = t::sg.s_term_orig }
+              in
+	      let aux = match_list env uf sg pats xs in
+              List.rev_append aux lsbt
+	    with Echec | Ty.TypeClash _ -> lsbt
+        in
+	try MT.fold f_aux (SubstT.find f env.fils) lsbt_acc
+	with Not_found -> lsbt_acc
+
+  let match_pats_modulo env uf pat_info lsubsts pat = 
+    Debug.match_pats_modulo pat lsubsts;
+    List.fold_left (match_one_pat env uf pat_info pat) [] lsubsts
       
-  let matching (pat_info, pats) env uf =
+  let matching env uf (pat_info, pats) =
+    Debug.matching pats;
     let egs = 
-      { sbt=(SubstT.empty,Ty.esubst); 
+      { sbs = SubstT.empty;
+        sty = Ty.esubst; 
         gen = 0; 
 	goal = false; 
 	s_term_orig = [];
 	s_lem_orig = pat_info.trigger_orig;
       } 
     in
-    List.fold_left (matchpats env uf pat_info) [egs] pats
+    pat_info, List.fold_left (match_pats_modulo env uf pat_info) [egs] pats
 
   let query env uf = 
     !Options.timer_start Timers.TMatch;
-    let r = List.fold_left 
-      (fun r ((pat_infos, pats) as v) -> 
-	(pat_infos, matching v env uf)::r)
-      [] env.pats 
-    in
+    let res = List.rev_map (matching env uf) env.pats in
     !Options.timer_pause Timers.TMatch;
-    r
+    res
 
 end

@@ -144,6 +144,7 @@ type atyped_decl =
   | AFunction_def 
       of loc * string * (string * ppure_type) list * ppure_type * aform
   | ATypeDecl of loc * string list * string * body_type_decl
+  | AInclude of loc * string * ((atyped_decl) annoted) list
 
 
 type annoted_node =
@@ -160,7 +161,9 @@ module MTag : Map.S with type key = GText.tag
 
 type env = {
   buffer : sbuffer;
+  goal_view : GSourceView2.source_view;
   inst_buffer : sbuffer;
+  inst_view : GSourceView2.source_view;
   errors : error_model;
   insts : inst_model;
   st_ctx : GMisc.statusbar_context;
@@ -183,8 +186,10 @@ val monospace_font : Pango.font_description
 val general_font : Pango.font_description
 
 val create_env :
-  sbuffer -> 
   sbuffer ->
+  GSourceView2.source_view ->
+  sbuffer ->
+  GSourceView2.source_view ->
   error_model ->
   inst_model ->
   GMisc.statusbar_context ->
@@ -271,3 +276,6 @@ val findbyid_decl :
 
 val compute_resulting_ids : 
   (atyped_decl annoted * Why_typing.env) list -> (string * int) list
+
+
+val commit_tags_buffer : sbuffer -> unit

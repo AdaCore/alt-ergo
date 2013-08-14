@@ -210,20 +210,39 @@ module Make(X : ALIEN) = struct
               env, (LSem (A.Eq(r, is_mine (Cons(h',ty)))), ex)::eqs
             else env, eqs
               
-        | Alien r1   , Alien r2   -> env, eqs
+        | Alien r1, Alien r2 -> 
+          let enum1,ex1= try MX.find r1 env.mx with Not_found -> hss,Ex.empty in
+          let enum2,ex2= try MX.find r2 env.mx with Not_found -> hss,Ex.empty in
+
+          let eqs = 
+            if HSS.cardinal enum1 = 1 then
+              let ex = Ex.union dep ex1 in
+              let h' = HSS.choose enum1 in
+              let ty = X.type_info r1 in
+              (LSem (A.Eq(r1, is_mine (Cons(h',ty)))), ex)::eqs
+            else eqs
+          in
+          let eqs = 
+            if HSS.cardinal enum2 = 1 then
+              let ex = Ex.union dep ex2 in
+              let h' = HSS.choose enum2 in
+              let ty = X.type_info r2 in
+              (LSem (A.Eq(r2, is_mine (Cons(h',ty)))), ex)::eqs
+            else eqs
+          in
+          env, eqs
+
         |  _ -> env, eqs
 
     let add_eq hss sm1 sm2 dep env eqs = 
       match sm1, sm2 with
         | Alien r, Cons(h,ty) | Cons (h,ty), Alien r  ->
-
           let enum, ex = try MX.find r env.mx with Not_found -> hss, Ex.empty in
           let ex = Ex.union ex dep in
           if not (HSS.mem h enum) then raise (Inconsistent (ex, env.classes));
 	  {env with mx = MX.add r (HSS.singleton h, ex) env.mx} , eqs
             
         | Alien r1, Alien r2   -> 
-
           let enum1,ex1 = try MX.find r1 env.mx with Not_found -> hss, Ex.empty in
           let enum2,ex2 = try MX.find r2 env.mx with Not_found -> hss, Ex.empty in
           let ex = Ex.union dep (Ex.union ex1 ex2) in
@@ -295,6 +314,7 @@ module Make(X : ALIEN) = struct
       with Inconsistent (expl, classes) -> Sig.Yes (expl, classes)
 
     let add env r =
+      if debug_sum () then fprintf fmt "Sum.Rel.add: %a@." X.print r;
       match embed r, values_of r with
 	| Alien r, Some hss -> 
           if MX.mem r env.mx then env else 

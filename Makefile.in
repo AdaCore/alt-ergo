@@ -36,7 +36,7 @@ DESTDIR=
 prefix=@prefix@
 exec_prefix=@exec_prefix@
 BINDIR=$(DESTDIR)@bindir@
-LIBDIR=$(DESTDIR)@libdir@/alt-ergo
+LIBDIR=$(DESTDIR)@libdir@/ocaml/alt-ergo
 DATADIR=$(DESTDIR)@datadir@
 
 # where to install the man page
@@ -70,12 +70,17 @@ BIBGUIOPT = threads.cmxa lablgtk.cmxa lablgtksourceview2.cmxa gtkThread.cmx
 #############
 
 NAME = alt-ergo
+GUINAME=altgr-ergo
 LIBNAME = altErgo
 BYTE=$(NAME).byte
 OPT=$(NAME).opt
 GNATPROVE_NAME=alt-ergo-gp
 
-all: pack xpack $(OCAMLBEST) pack xpack gui META
+ifeq ($(OCAMLBEST),opt)
+all: pack xpack opt gui META
+else
+all: pack byte gui META
+endif
 
 
 # bytecode and native-code compilation
@@ -150,29 +155,27 @@ $(NAME).opt: $(PRECMX) $(OPTIONSCMX) $(MAINCMX)
 	$(if $(QUIET),@echo 'Linking $@' &&) 
 	$(OCAMLOPT) $(OFLAGS) -o $@ $(BIBOPT) $^
 
-.PHONY: gui
+$(GUINAME).opt: $(PRECMX) $(OPTIONSCMX) $(GUICMX)
+	$(if $(QUIET),@echo 'Linking $@' &&) 
+	$(OCAMLOPT) $(OFLAGS) -o $(GUINAME).opt $(BIBOPT) $(BIBGUIOPT) $^
+
+$(GUINAME).byte: $(PRECMO) $(OPTIONSCMO) $(GUICMO)
+	$(if $(QUIET),@echo 'Linking $@' &&) 
+	$(OCAMLC) $(BFLAGS) -o $(GUINAME).byte $(BIBBYTE) $(BIBGUIBYTE) $^
 
 ifeq ($(ENABLEGUI),yes)
-gui: altgr-ergo.opt
-
-altgr-ergo.opt: $(PRECMX) $(OPTIONSCMX) $(GUICMX)
-	$(if $(QUIET),@echo 'Linking $@' &&) 
-	$(OCAMLOPT) $(OFLAGS) -o altgr-ergo.opt $(BIBOPT) $(BIBGUIOPT) $^
+gui: $(GUINAME).$(OCAMLBEST)
 else
-gui: $(PRECMX) $(OPTIONSCMX) $(GUICMX)
+gui:
 	@echo "gui compilation skipped (lablgtksourceview not detected)"
 endif
 
+.PHONY:: gui
 
-guibyte: $(PRECMO) $(OPTIONSCMO) $(GUICMO)
-	$(if $(QUIET),@echo 'Linking $@' &&) 
-	$(OCAMLC) $(BFLAGS) -o altgr-ergo.byte $(BIBBYTE) $(BIBGUIBYTE) $^
-
-test: $(OPT)
-	./$(OPT) test.mlw
 
 testbyte:$(BYTE)
-	tests/test.sh $(BYTE) -glouton
+	make -C util/
+	tests/test.sh " ./$(BYTE) -glouton -triggers-var -arrays "
 
 testopt:$(OPT)
 	make -C util/
@@ -246,18 +249,26 @@ install: install-indep
 	mkdir -p $(BINDIR)
 	cp -f $(NAME).$(OCAMLBEST) $(BINDIR)/$(GNATPROVE_NAME)$(EXE)
 ifeq ($(ENABLEGUI),yes)
-	cp -f altgr-ergo.opt $(BINDIR)/altgr-ergo$(EXE)
+	cp -f $(GUINAME).$(OCAMLBEST) $(BINDIR)/$(GUINAME)$(EXE)
 	mkdir -p $(DATADIR)/gtksourceview-2.0/language-specs
 	cp -f util/gtk-lang/alt-ergo.lang $(DATADIR)/gtksourceview-2.0/language-specs/alt-ergo.lang
 endif
 
-install-pack: xpack pack META
+install-pack-opt: xpack
 	mkdir -p $(LIBDIR)
 	cp -f $(LIBNAME).cmx $(LIBDIR)
 	cp -f $(LIBNAME).o $(LIBDIR)
+
+install-pack-byte: pack META
+	mkdir -p $(LIBDIR)
 	cp -f $(LIBNAME).cmo $(LIBDIR)
 	cp -f $(LIBNAME).cmi $(LIBDIR)
 	cp -f META $(LIBDIR)
+
+install-pack:: install-pack-byte
+ifeq ($(OCAMLBEST),opt)
+install-pack:: install-pack-opt
+endif
 
 # documentation
 ###############
@@ -404,10 +415,10 @@ clean::
 	@rm -f *.cm[ioxt] *.cmti *.o *~ *.annot *.owz *mlocamlwizard_tmp_file*
 	@rm -f $(GENERATED) *.output
 	@rm -f $(NAME).byte $(NAME).opt
+	@rm -f $(GUINAME) $(GUINAME).opt $(GUINAME).byte
 	@rm -f unittest/*.cm[iox] unittest/*.o unittest/*.annot
 	@rm -f *.aux *.log $(NAME).tex $(NAME).dvi $(NAME).ps
-	@rm -f version.ml
-	@rm -f altgr-ergo.opt
+	@rm -f version.ml META
 	@rm -f *.$(REVISIONSUFFIX)
 
 dist-clean distclean:: clean

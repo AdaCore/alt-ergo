@@ -1050,6 +1050,13 @@ let rec intro_hypothesis env valid_mode f =
 	let axioms, goal = intro_hypothesis env valid_mode
 	  (alpha_renaming_env env f2) in
 	f1_env::axioms, goal
+    | PPlet(var,{pp_desc=PPcast(t1,ty); pp_loc = ty_loc},f2) ->
+      let env = Env.add_names env [var] ty ty_loc in
+      let var = {pp_desc = PPvar var; pp_loc = f.pp_loc} in
+      let feq = {pp_desc = PPinfix(var,PPeq,t1); pp_loc = f.pp_loc} in
+      let axioms, goal = intro_hypothesis env valid_mode
+	(alpha_renaming_env env f2) in
+	(feq,env)::axioms, goal
     | PPforall (lv, pp_ty, _, f) when valid_mode ->
     	intro_hypothesis (Env.add_names env lv pp_ty f.pp_loc) valid_mode f
     | PPexists (lv, pp_ty, _, f) when not valid_mode->
@@ -1245,10 +1252,16 @@ let rec type_and_intro_goal keep_triggers acc env loc sort n f =
   type_goal keep_triggers acc env_g loc sort n goal
 
 
-let type_decl keep_triggers (acc, env) d = 
+let rec type_decl keep_triggers (acc, env) d = 
   Types.to_tyvars := MString.empty;
   try
     match d with
+      | Include (loc,s,l) ->
+        let fs, env' = List.fold_left (fun (fs, env) d ->
+          type_decl true (fs, env) d) ([], env) l in
+        let fs = List.map (fun (d, _) -> (d, true)) fs in
+	let td = {c = TInclude (loc,s,fs); annot = new_id () } in
+        (td, env) :: acc, env'
       | Logic (loc, ac, lp, pp_ty) -> 
 	  if rules () = 1 then fprintf fmt "[rule] TR-Typing-LogicFun$_F$@.";
 	  let env' = Env.add_logics env ac lp pp_ty loc in

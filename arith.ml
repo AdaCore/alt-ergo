@@ -88,12 +88,6 @@ module Make
     | Some p -> p
     | _ -> P.create [Int 1, r] (Int 0) (X.type_info r)  
 
-  let check_int p =
-    if P.type_info p = Ty.Tint then
-      let _, c = P.to_list p in
-      let ppmc = P.ppmc_denominators p in
-      assert (is_integer_num (ppmc */ c))
-      
   (* t1 % t2 = md  <-> 
      c1. 0 <= md ;
      c2. md < t2 ;
@@ -311,8 +305,6 @@ module Make
 	   P.add p p')
         (P.create [] c ty) l
     in 
-    (* optional *)
-    check_int p;
     is_mine p
 
 

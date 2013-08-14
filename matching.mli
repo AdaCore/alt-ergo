@@ -18,7 +18,8 @@
 (**************************************************************************)
 
 type gsubst = { 
-  sbt : Term.subst ; 
+  sbs : Term.t Subst.t;
+  sty : Ty.subst;
   gen : int ; 
   goal : bool; 
   s_term_orig : Term.t list;

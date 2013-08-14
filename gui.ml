@@ -1086,8 +1086,8 @@ let start_gui () =
        let _ = tv2#set_editable false in
 
 
-       let env = create_env buf1 buf2 error_model inst_model st_ctx annoted_ast
-	 dep actions resulting_ids in
+       let env = create_env buf1 tv1 buf2 tv2 error_model inst_model
+         st_ctx annoted_ast dep actions resulting_ids in
        connect env;
 
        ignore (toolbar#insert_toggle_button
@@ -1234,6 +1234,18 @@ let start_gui () =
   in
 
 
+  let set_wrap_lines _ =
+    List.iter (fun env ->
+      if env.goal_view#wrap_mode = `NONE then (
+        env.goal_view#set_wrap_mode `CHAR;
+        env.inst_view#set_wrap_mode `CHAR
+      ) else (
+        env.goal_view#set_wrap_mode `NONE;
+        env.inst_view#set_wrap_mode `NONE
+      )) envs
+  in
+              
+  
   let debug_entries = [
     `C ("SAT", debug_sat (), set_debug_sat);
     `S;
@@ -1268,6 +1280,8 @@ let start_gui () =
 	fun b -> set_nocontracongru (not b));
     `S;
     `C ("Restricted", restricted (), set_restricted);
+    `S;
+    `C ("Wrap lines", false, set_wrap_lines);
   ] in
   
   let help_entries = [
@@ -1337,7 +1351,7 @@ let start_gui () =
   GtkThread.main ()
 
 
-let start_replay () =
+let start_replay session_cin =
   
   let lb = from_channel cin in
   let typed_ast, _ = 
@@ -1357,10 +1371,6 @@ let start_replay () =
 	  printf "typing error: %a\n@." Common.report e;
 	  exit 1
   in
-
-  let session_cin =
-    try Some (open_in_bin !session_file)
-    with Sys_error _ -> None in
 
   List.iter
     (fun l ->
@@ -1396,6 +1406,8 @@ let start_replay () =
 
 
 
-let _ = 
-  if replay then start_replay () 
-  else start_gui ()
+let _ =
+  try
+    if replay then start_replay (Some (open_in_bin !session_file))
+    else start_gui ()
+  with Sys_error _ -> start_gui ()

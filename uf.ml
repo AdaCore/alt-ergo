@@ -37,7 +37,8 @@ module type S = sig
     
   val union : 
     t -> R.r -> R.r -> Explanation.t -> 
-    t * (R.r * (R.r * R.r * Explanation.t) list * R.r) list
+    t * ((R.r * (R.r * R.r * Explanation.t) list * R.r) list *
+           (R.r * R.r * Explanation.t) list)
 
   val distinct : t -> R.r list -> Explanation.t -> t
 
@@ -50,6 +51,7 @@ module type S = sig
   val model : t -> 
     (R.r * Term.t list * (Term.t * R.r) list) list * (Term.t list) list
   val print : Format.formatter -> t -> unit
+  val term_repr : t -> Term.t -> Term.t
  
 end
   
@@ -509,16 +511,16 @@ module Make ( R : Sig.X ) = struct
 	       classes = update_classes rr nrr env.classes})
 	set env
 
-    let apply_sigma_uf env (p, v, dep) =
+    let apply_sigma_uf env (p, v, dep) upd =
       assert (MapR.mem p env.gamma);
       let use_p = MapR.find p env.gamma in
       try 
-	let env, tch, neqs_to_up = SetR.fold 
-	  (fun r (env, touched, neqs_to_up) ->
+	let env, (tch, upd), neqs_to_up = SetR.fold 
+	  (fun r (env, (touched, upd), neqs_to_up) ->
 	    !Options.thread_yield (); 
 	     let rr, ex = MapR.find r env.repr in
 	     let nrr = R.subst p v rr in
-	     if R.equal rr nrr then env, touched, neqs_to_up
+	     if R.equal rr nrr then env, (touched, upd), neqs_to_up
 	     else 
 	       let ex  = Ex.union ex dep in
                let env = 
@@ -526,21 +528,23 @@ module Make ( R : Sig.X ) = struct
 		   repr = MapR.add r (nrr, ex) env .repr;
 		   gamma = add_to_gamma r nrr env.gamma } 
 	       in
-	       env, (r, nrr, ex)::touched, SetRR.add (rr, nrr) neqs_to_up
-	  ) use_p (env, [], SetRR.empty) in
+	       env, ((r, nrr, ex)::touched, (rr, nrr, ex)::upd),
+               SetRR.add (rr, nrr) neqs_to_up
+	  ) use_p (env, ([], upd), SetRR.empty) in
 	(* Correction : Do not update neqs twice for the same r *)
-	update_aux dep neqs_to_up env, tch 
+	update_aux dep neqs_to_up env, (tch, upd) 
 	
       with Not_found -> assert false
 
-    let up_uf_rs dep env tch =
-      if RS.is_empty env.ac_rs then env, tch
+    let up_uf_rs dep env (tch, upd) =
+      if RS.is_empty env.ac_rs then env, (tch, upd)
       else
-	let env, tch, neqs_to_up = MapR.fold
-	  (fun r (rr,ex) (env,tch,neqs_to_up) ->
+	let env, (tch, upd), neqs_to_up = MapR.fold
+	  (fun r (rr,ex) (env,(tch, upd),neqs_to_up) ->
 	    !Options.thread_yield ();
+	     let rr, exp = MapR.find r env.repr in
 	     let nrr, ex_nrr = normal_form env rr in
-	     if R.equal nrr rr then env, tch, neqs_to_up
+	     if R.equal nrr rr then env, (tch, upd), neqs_to_up
 	     else 
 	       let ex = Ex.union ex ex_nrr in
                let env = 
@@ -548,18 +552,20 @@ module Make ( R : Sig.X ) = struct
 	            repr = MapR.add r (nrr, ex) env.repr;
 	            gamma = add_to_gamma r nrr env.gamma }
                in
-               env, (r,[r, nrr, ex],nrr)::tch, SetRR.add (rr, nrr) neqs_to_up
-	  ) env.repr (env, tch, SetRR.empty)
+               env, ((r,[r, nrr, ex],nrr)::tch, 
+                     (rr, nrr, Ex.union ex exp) :: upd),
+                 SetRR.add (rr, nrr) neqs_to_up
+	  ) env.repr (env, (tch, upd), SetRR.empty)
         in 
         (* Correction : Do not update neqs twice for the same r *)
-	update_aux dep neqs_to_up env, tch 
+	update_aux dep neqs_to_up env, (tch, upd) 
 	  
-    let apply_sigma eqs env tch ((p, v, dep) as sigma) = 
+    let apply_sigma eqs env (tch, upd) ((p, v, dep) as sigma) = 
       let env = init_leaf env p in
       let env = init_leaf env v in
       let env = apply_sigma_ac eqs env sigma in
-      let env, touched = apply_sigma_uf env sigma in 
-      up_uf_rs dep env ((p, touched, v) :: tch)
+      let env, (touched, upd) = apply_sigma_uf env sigma upd in 
+      up_uf_rs dep env ((p, touched, v) :: tch, upd)
 	
   end
     
@@ -615,7 +621,7 @@ module Make ( R : Sig.X ) = struct
     if rules () = 3 then fprintf fmt "[rule] TR-UFX-Union@.";
     let equations = Queue.create () in 
     Queue.push (r1,r2, dep) equations;
-    ac_x equations env []
+    ac_x equations env ([], [])
 
   let rec distinct env rl dep =
     Print.all fmt env;
@@ -706,13 +712,6 @@ module Make ( R : Sig.X ) = struct
   (*     ) (true, Lit.Set.empty) lr *)
   (*   in not (Lit.Set.is_empty common) *)
 
-  let class_of env t = 
-    try 
-      let rt, _ = MapR.find (MapT.find t env.make) env.repr in
-      SetT.elements (MapR.find rt env.classes)
-    with Not_found -> [t]
-
-
   let mapt_choose m =
     let r = ref None in
     (try 
@@ -766,8 +765,28 @@ module Make ( R : Sig.X ) = struct
     if rules () = 3 then fprintf fmt "[rule] TR-UFX-Find@.";
     Env.find_or_normal_form
 
-  let print = Print.all 
+  let print = Print.all
 
   let mem = Env.mem
+
+  let class_of env t = 
+    try 
+      let rt, _ = MapR.find (MapT.find t env.make) env.repr in
+      MapR.find rt env.classes
+    with Not_found -> SetT.singleton t
+
+  let term_repr uf t = 
+    let st = class_of uf t in
+    SetT.fold
+      (fun s t ->
+        let c = 
+          let c = (T.view s).T.depth - (T.view t).T.depth in
+          if c <> 0 then c
+          else T.compare s t
+        in
+        if c < 0 then s else t
+      ) st t
+
+  let class_of env t = SetT.elements (class_of env t)
 
 end

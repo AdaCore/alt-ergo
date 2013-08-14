@@ -118,7 +118,11 @@ exception I_dont_know of t
 exception IUnsat of Ex.t * Term.Set.t list
 exception More_Hypotheses of t
 
-let max_max_size = 96
+(*
+  a huge limit <~~> no limit,
+  previous value is 96, but it is not suitable for BWare VCs 
+*)
+let max_max_size = max_int 
 
 module Print = struct
 
@@ -352,11 +356,23 @@ let new_facts goal_directed env =
 	      subst_list) ->
        List.fold_left
 	 (fun acc 
-	    {Matching.sbt = s; 
+	    {Matching.sbs = sbs; 
+	     sty = sty; 
 	     gen = g; 
 	     goal = b; 
 	     s_term_orig = torig;
 	     s_lem_orig = lorig; } ->
+            let sbs = 
+              Symbols.Map.fold
+                (fun k t mp ->
+                  let t = 
+                    if List.length (CcX.class_of env.tbox t) <= 4 then t
+                    else CcX.term_repr env.tbox t
+                  in
+                  Symbols.Map.add k t mp
+                )sbs Symbols.Map.empty
+            in
+            let s = sbs, sty in
 	    match guard with
 	      | Some a when 
 		  CcX.query (Literal.LT.apply_subst s a) env.tbox = No -> acc
@@ -779,6 +795,10 @@ let assume env fg =
       raise e
   else assume env fg
 
+let add_theory env fs =
+  let tbox, new_terms = CcX.add_theory env.tbox fs in
+  let env = add_terms env new_terms false 1 None [] in
+  { env with tbox = tbox }
 
 let empty () = { 
   gamma = MF.empty;

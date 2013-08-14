@@ -33,7 +33,8 @@ module type S = sig
 
   val union : 
     t -> R.r -> R.r -> Explanation.t -> 
-    t * (R.r * (R.r * R.r * Explanation.t) list * R.r) list
+    t * ((R.r * (R.r * R.r * Explanation.t) list * R.r) list *
+          (R.r * R.r * Explanation.t) list)
 
   val distinct : t -> R.r list -> Explanation.t -> t
 
@@ -47,6 +48,7 @@ module type S = sig
     (R.r * Term.t list * (Term.t * R.r) list) list * (Term.t list) list
 
   val print : Format.formatter -> t -> unit
+  val term_repr : t -> Term.t -> Term.t
 
 end
 

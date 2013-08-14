@@ -18,9 +18,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Add the axiomatization *)
-val add_theory : Formula.t list -> unit
-
 module Make (Uf : Uf.S) (Use : Use.S with type r = Uf.R.r)
   (CC : Sig.CC with type Rel.r = Use.r
   with type 'a accumulator = 
