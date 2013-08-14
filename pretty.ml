@@ -404,6 +404,8 @@ let print_typed_decl fmt td = match td.Why_ptree.c with
       (print_string_sep " | ") lc
   | TTypeDecl (_, ls, s, Record rt) -> 
     fprintf fmt "type %a %s = %a" print_astring_list ls s print_record_type rt 
+  | TInclude _ -> 
+      assert false
 
 let print_tdcl_lst fmt decl_lst =
   List.iter (fprintf fmt "%a\n@." print_typed_decl) decl_lst

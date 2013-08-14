@@ -58,7 +58,7 @@ let convert_tdecl decl =  match decl.c with
   | TFunction_def(_, name, _, _, body) ->
     let ff , _ = Cnf.make_form name body in
       create_new_gformula ff 0 None true false [] false false
-  | TRewriting _ | TTypeDecl _ | TLogic _  ->
+  | TRewriting _ | TTypeDecl _ | TLogic _ | TInclude _  ->
     failwith "error in function convert_tdecl()"
 
 let get_max_depth tab_selected_rules =
