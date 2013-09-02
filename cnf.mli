@@ -22,9 +22,4 @@ open Why_ptree
 
 val make : ((int tdecl, int) annoted * bool) list -> sat_tdecl Queue.t
 
-(* For the formulas of a theory. Simplify future handling by applying
-   DeMorgan rules. A formula is a conjuction of disjunctions of a literal
-   and a formula or a quantified formula. The order of the input is preserved.
-*)
-
 val make_form : string -> (int tform, int) annoted -> Formula.t * Literal.LT.t list 
