@@ -279,6 +279,7 @@ module Make (X : X) = struct
     | _ -> List.fold_left (fun acc e -> e :: acc) l2 (List.rev l1)
 
   let rec match_term env uf ( {sbs=s_t; sty=s_ty;gen=g;goal=b} as sg) pat t =
+    Options.incr_steps 1;
     !Options.thread_yield ();
     Debug.match_term sg t pat;
     let {T.f=f_pat;xs=pats;ty=ty_pat} = T.view pat in
