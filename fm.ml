@@ -523,6 +523,7 @@ module Make
 	       fm_equalities env eqs ineq
 		 
 	   | Trivial_ineq  c  ->
+               Options.incr_steps 1;
 	       let n, pp = 
 		 List.fold_left 
 		   (fun ((n, pp) as acc) (_, _, p, is_le) ->  
