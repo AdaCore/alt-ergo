@@ -30,7 +30,9 @@ module type S = sig
   val empty : unit -> t
   val assume : Literal.LT.t -> Explanation.t -> t -> t * Term.Set.t
   val query : Literal.LT.t -> t -> answer
+  val query_with_splits : Literal.LT.t -> t -> answer
   val class_of : t -> Term.t -> Term.t list
+  val class_of_with_splits : t -> Term.t -> Term.t list
   val print_model : Format.formatter -> t -> unit
   val cl_extract : t -> Term.Set.t list
   val term_repr : t -> Term.t -> Term.t
@@ -615,6 +617,8 @@ module Make (X : Sig.X) = struct
     t, T.Set.union choices_terms new_terms
 
   let class_of t term = Uf.class_of t.gamma.Env.uf term
+
+  let class_of_with_splits t term = Uf.class_of t.gamma_finite.Env.uf term
     
   let add_and_process a t =
     !Options.thread_yield ();
@@ -626,19 +630,22 @@ module Make (X : Sig.X) = struct
     let t, _ =  try_it (aux a Ex.empty) t in
     Use.print t.gamma.Env.use; t    
 
-  let query a t =
+  let query use_finite a t =
     !Options.thread_yield ();
     Print.query a;
     try
       match A.LT.view a with
 	| A.Eq (t1, t2)  ->
-	  let t = add_and_process a t in
-	  Uf.are_equal t.gamma.Env.uf t1 t2
+	  let na = A.LT.neg a in
+	  let t = add_and_process na t in
+	  let env = if use_finite then t.gamma_finite else t.gamma in
+	  Uf.are_equal env.Env.uf t1 t2
 
 	| A.Distinct (false, [t1; t2]) -> 
 	  let na = A.LT.neg a in
 	  let t = add_and_process na t in (* na ? *)
-	  Uf.are_distinct t.gamma.Env.uf t1 t2
+	  let env = if use_finite then t.gamma_finite else t.gamma in
+	  Uf.are_distinct env.Env.uf t1 t2
 
 	| A.Distinct _ -> 
 	  assert false (* devrait etre capture par une analyse statique *)
@@ -646,7 +653,7 @@ module Make (X : Sig.X) = struct
 	| _ -> 
 	  let na = A.LT.neg a in
 	  let t = add_and_process na t in
-	  let env = t.gamma in
+	  let env = if use_finite then t.gamma_finite else t.gamma in
 	  let are_eq = Uf.are_equal env.Env.uf in
 	  let are_neq = Uf.are_distinct env.Env.uf in
 	  let class_of = Uf.class_of env.Env.uf in
@@ -655,7 +662,10 @@ module Make (X : Sig.X) = struct
           Env.Rel.query env.Env.relation (rna, Some na, ex_rna)
 	    are_eq are_neq class_of classes
     with Exception.Inconsistent (d, classes) -> 
-      Yes (d, classes)
+      Yes (d, classes)  
+
+  let query_with_splits a t =
+    query true a t
 
   let empty () = 
     let env = Env.empty () in
@@ -709,13 +719,13 @@ module Make (X : Sig.X) = struct
     if !profiling then
       try 
 	!Options.timer_start Timers.TCC;
-	let res = query a t in
+	let res = query false a t in
 	!Options.timer_pause Timers.TCC;
 	res
       with e -> 
 	!Options.timer_pause Timers.TCC;
 	raise e
-    else query a t
+    else query false a t
 
 
   let class_of t term = 

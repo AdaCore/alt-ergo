@@ -52,8 +52,8 @@ type term_info = {
 module type X = sig
   type t
 
-  val class_of : t -> Term.t -> Term.t list
-  val query : Literal.LT.t -> t -> Sig.answer
+  val class_of_with_splits : t -> Term.t -> Term.t list
+  val query_with_splits : Literal.LT.t -> t -> Sig.answer
 
 end
 
@@ -268,7 +268,7 @@ module Make (X : X) = struct
   let add_msymb uf f t ({sbs=s_t; sty=s_ty} as sg)= 
     try 
       let a = Literal.LT.make (Literal.Eq (t, SubstT.find f s_t)) in
-      if X.query a uf = Sig.No then raise Echec;
+      if X.query_with_splits a uf = Sig.No then raise Echec;
       sg 
     with Not_found ->  {sg with sbs=SubstT.add f t s_t; sty=s_ty}
 
@@ -297,7 +297,7 @@ module Make (X : X) = struct
       | _ -> 
         try
           let s_ty = Ty.matching s_ty ty_pat (T.view t).T.ty in
-          let cl = X.class_of uf t in
+          let cl = X.class_of_with_splits uf t in
           Debug.match_class_of t cl;
           let cl =
 	    List.fold_left

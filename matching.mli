@@ -44,8 +44,8 @@ type term_info = {
 module type X = sig
   type t
 
-  val class_of : t -> Term.t -> Term.t list
-  val query : Literal.LT.t -> t -> Sig.answer
+  val class_of_with_splits : t -> Term.t -> Term.t list
+  val query_with_splits : Literal.LT.t -> t -> Sig.answer
 end
 
 module type S = sig

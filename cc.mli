@@ -30,7 +30,9 @@ module type S = sig
   val empty : unit -> t
   val assume : Literal.LT.t -> Explanation.t -> t -> t * Term.Set.t
   val query : Literal.LT.t -> t -> Sig.answer
+  val query_with_splits : Literal.LT.t -> t -> Sig.answer
   val class_of : t -> Term.t -> Term.t list
+  val class_of_with_splits : t -> Term.t -> Term.t list
   val print_model : Format.formatter -> t -> unit
   val cl_extract : t -> Term.Set.t list
   val term_repr : t -> Term.t -> Term.t
