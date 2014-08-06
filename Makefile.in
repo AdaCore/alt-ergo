@@ -74,7 +74,6 @@ GUINAME=altgr-ergo
 LIBNAME = altErgo
 BYTE=$(NAME).byte
 OPT=$(NAME).opt
-GNATPROVE_NAME=alt-ergo-gp
 
 ifeq ($(OCAMLBEST),opt)
 all: pack xpack opt gui META
@@ -247,7 +246,7 @@ install-man:
 
 install: install-indep
 	mkdir -p $(BINDIR)
-	cp -f $(NAME).$(OCAMLBEST) $(BINDIR)/$(GNATPROVE_NAME)$(EXE)
+	cp -f $(NAME).$(OCAMLBEST) $(BINDIR)/$(NAME)$(EXE)
 ifeq ($(ENABLEGUI),yes)
 	cp -f $(GUINAME).$(OCAMLBEST) $(BINDIR)/$(GUINAME)$(EXE)
 	mkdir -p $(DATADIR)/gtksourceview-2.0/language-specs
