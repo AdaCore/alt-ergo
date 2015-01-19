@@ -1,21 +1,18 @@
-##########################################################################
-#                                                                        #
-#     The Alt-Ergo theorem prover                                        #
-#     Copyright (C) 2006-2011                                            #
-#                                                                        #
-#     Sylvain Conchon                                                    #
-#     Evelyne Contejean                                                  #
-#                                                                        #
-#     Francois Bobot                                                     #
-#     Mohamed Iguernelala                                                #
-#     Stephane Lescuyer                                                  #
-#     Alain Mebsout                                                      #
-#                                                                        #
-#     CNRS - INRIA - Universite Paris Sud                                #
-#                                                                        #
-#   This file is distributed under the terms of the CeCILL-C licence     #
-#                                                                        #
-##########################################################################
+#****************************************************************************#
+#     The Alt-Ergo theorem prover                                            #
+#     Copyright (C) 2006-2013                                                #
+#     CNRS - INRIA - Universite Paris Sud                                    #
+#                                                                            #
+#     Sylvain Conchon                                                        #
+#     Evelyne Contejean                                                      #
+#                                                                            #
+#     Francois Bobot                                                         #
+#     Mohamed Iguernelala                                                    #
+#     Stephane Lescuyer                                                      #
+#     Alain Mebsout                                                          #
+#                                                                            #
+#   This file is distributed under the terms of the CeCILL-C licence         #
+#****************************************************************************#
 
 #
 # autoconf input for Objective Caml programs
@@ -51,7 +48,7 @@
 
 # check for one particular file of the sources 
 # ADAPT THE FOLLOWING LINE TO YOUR SOURCES!
-AC_INIT(cc.mli)
+AC_INIT(src/main/frontend.ml)
 
 # Check for Ocaml compilers
 
@@ -108,6 +105,30 @@ else
      fi
   else
      OCAMLGRAPHLIB="-I +ocamlgraph"
+  fi
+fi
+
+
+#looking for zarith library
+
+if test "$USEOCAMLFIND" = yes; then
+  ZARITHLIB=$(ocamlfind query -i-format zarith)
+fi
+
+if test -n "$ZARITHLIB";then
+  echo "ocamlfind found zarith in $ZARITHLIB"
+  ZARITH=yes
+else
+  AC_CHECK_FILE($OCAMLLIB/zarith/zarith.cma,ZARITH=yes,ZARITH=no)
+  if test "$ZARITH" = no ; then
+    AC_CHECK_FILE($OCAMLLIB/zarith.cma,ZARITH=yes,ZARITH=no)
+    if test "$ZARITH" = no ; then
+      AC_MSG_ERROR(Cannot find zarith library.)
+    else
+  	ZARITHLIB=""
+     fi
+  else
+     ZARITHLIB="-I +zarith"
   fi
 fi
 
@@ -194,7 +215,7 @@ if test "$USEOCAMLFIND" = yes; then
 fi
 
 if test -n "$LABLGTK2LIB";then
-  echo "ocamlfind found ocamlgraph in $LABLGTK2LIB"
+  echo "ocamlfind found lablgtk2.sourceview2 in $LABLGTK2LIB"
   LABLGTK2=yes
   ENABLEGUI="yes"
 else
@@ -225,9 +246,6 @@ else
     EXE=
 fi
 
-AC_CHECK_PROG(OCAMLWIZARD,ocamlwizard,ocamlwizard,true)
-
-
 # substitutions to perform
 AC_SUBST(OCAMLC)
 AC_SUBST(OCAMLOPT)
@@ -238,14 +256,14 @@ AC_SUBST(OCAMLBEST)
 AC_SUBST(OCAMLVERSION)
 AC_SUBST(OCAMLLIB)
 AC_SUBST(OCAMLGRAPHLIB)
+AC_SUBST(ZARITHLIB)
 AC_SUBST(OCAMLWEB)
 AC_SUBST(LABLGTK2LIB)
 AC_SUBST(ENABLEGUI)
 AC_SUBST(INCLUDEGTK2)
 AC_SUBST(OCAMLWIN32)
 AC_SUBST(EXE)
-AC_SUBST(OCAMLWIZARD)
 
-# Finally create the Makefile from Makefile.in
-AC_OUTPUT(Makefile)
-chmod a-w Makefile
+# Finally create the Makefile.configurable from Makefile.configurable.in
+AC_OUTPUT(Makefile.configurable)
+chmod a-w Makefile.configurable

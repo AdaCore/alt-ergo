@@ -581,7 +581,7 @@ PACKAGE_STRING=
 PACKAGE_BUGREPORT=
 PACKAGE_URL=
 
-ac_unique_file="cc.mli"
+ac_unique_file="src/main/frontend.ml"
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 EXE
@@ -589,11 +589,11 @@ OCAMLWIN32
 INCLUDEGTK2
 ENABLEGUI
 LABLGTK2LIB
+ZARITHLIB
 OCAMLGRAPHLIB
 OCAMLLIB
 OCAMLVERSION
 OCAMLBEST
-OCAMLWIZARD
 OCAMLWEB
 OCAMLYACC
 OCAMLLEXDOTOPT
@@ -1862,6 +1862,74 @@ fi
   fi
 fi
 
+
+#looking for zarith library
+
+if test "$USEOCAMLFIND" = yes; then
+  ZARITHLIB=$(ocamlfind query -i-format zarith)
+fi
+
+if test -n "$ZARITHLIB";then
+  echo "ocamlfind found zarith in $ZARITHLIB"
+  ZARITH=yes
+else
+  as_ac_File=`$as_echo "ac_cv_file_$OCAMLLIB/zarith/zarith.cma" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $OCAMLLIB/zarith/zarith.cma" >&5
+$as_echo_n "checking for $OCAMLLIB/zarith/zarith.cma... " >&6; }
+if eval \${$as_ac_File+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  test "$cross_compiling" = yes &&
+  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
+if test -r "$OCAMLLIB/zarith/zarith.cma"; then
+  eval "$as_ac_File=yes"
+else
+  eval "$as_ac_File=no"
+fi
+fi
+eval ac_res=\$$as_ac_File
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
+  ZARITH=yes
+else
+  ZARITH=no
+fi
+
+  if test "$ZARITH" = no ; then
+    as_ac_File=`$as_echo "ac_cv_file_$OCAMLLIB/zarith.cma" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $OCAMLLIB/zarith.cma" >&5
+$as_echo_n "checking for $OCAMLLIB/zarith.cma... " >&6; }
+if eval \${$as_ac_File+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  test "$cross_compiling" = yes &&
+  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
+if test -r "$OCAMLLIB/zarith.cma"; then
+  eval "$as_ac_File=yes"
+else
+  eval "$as_ac_File=no"
+fi
+fi
+eval ac_res=\$$as_ac_File
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
+  ZARITH=yes
+else
+  ZARITH=no
+fi
+
+    if test "$ZARITH" = no ; then
+      as_fn_error $? "Cannot find zarith library." "$LINENO" 5
+    else
+  	ZARITHLIB=""
+     fi
+  else
+     ZARITHLIB="-I +zarith"
+  fi
+fi
+
 # then we look for ocamlopt; if not present, we issue a warning
 # if the version is not the same, we also discard it
 # we set OCAMLBEST to "opt" or "byte", whether ocamlopt is available or not
@@ -2221,7 +2289,7 @@ if test "$USEOCAMLFIND" = yes; then
 fi
 
 if test -n "$LABLGTK2LIB";then
-  echo "ocamlfind found ocamlgraph in $LABLGTK2LIB"
+  echo "ocamlfind found lablgtk2.sourceview2 in $LABLGTK2LIB"
   LABLGTK2=yes
   ENABLEGUI="yes"
 else
@@ -2314,46 +2382,6 @@ else
     EXE=
 fi
 
-# Extract the first word of "ocamlwizard", so it can be a program name with args.
-set dummy ocamlwizard; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_prog_OCAMLWIZARD+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$OCAMLWIZARD"; then
-  ac_cv_prog_OCAMLWIZARD="$OCAMLWIZARD" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_prog_OCAMLWIZARD="ocamlwizard"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_prog_OCAMLWIZARD" && ac_cv_prog_OCAMLWIZARD="true"
-fi
-fi
-OCAMLWIZARD=$ac_cv_prog_OCAMLWIZARD
-if test -n "$OCAMLWIZARD"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $OCAMLWIZARD" >&5
-$as_echo "$OCAMLWIZARD" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-
-
 # substitutions to perform
 
 
@@ -2372,8 +2400,8 @@ fi
 
 
 
-# Finally create the Makefile from Makefile.in
-ac_config_files="$ac_config_files Makefile"
+# Finally create the Makefile.configurable from Makefile.configurable.in
+ac_config_files="$ac_config_files Makefile.configurable"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -3080,7 +3108,7 @@ cat >>$CONFIG_STATUS <<\_ACEOF || ac_write_fail=1
 for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
-    "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
+    "Makefile.configurable") CONFIG_FILES="$CONFIG_FILES Makefile.configurable" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
@@ -3530,4 +3558,4 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
-chmod a-w Makefile
+chmod a-w Makefile.configurable
