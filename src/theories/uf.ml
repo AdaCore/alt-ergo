@@ -70,7 +70,10 @@ module Make (X : Sig.X) : S with type r = X.r = struct
   module LX = Literal.Make(struct type t = X.r include X end)
   module MapL = LX.Map
 
-  module MapX = Map.Make(struct type t = X.r let compare = X.compare end)
+  module MapX = struct
+    include Map.Make(struct type t = X.r let compare = X.compare end)
+    let find m x = Steps.incr (Steps.Uf); find m x
+  end
   module SetX = Set.Make(struct type t = X.r let compare = X.compare end)
 
   module SetXX = Set.Make(struct 
@@ -487,6 +490,7 @@ module Make (X : Sig.X) : S with type r = X.r = struct
           SetRL.fold
 	    (fun ((g, d, dep_rl) as rul) env ->
 	      Options.exec_thread_yield ();
+	      Steps.incr Steps.Ac;
 	      let env = {env with ac_rs = RS.remove_rule rul env.ac_rs} in
 	      let gx = X.color g in
 	      let g2, ex_g2 = normal_form env (Ac.subst p v g) in
@@ -800,9 +804,7 @@ module Make (X : Sig.X) : S with type r = X.r = struct
       ac_rs = RS.empty
     }
     in
-    (*
-      let env, _ = add env Term.vrai in
-      let env, _ = add env Term.faux in
-    *)
+    let env, _ = add env Term.vrai in
+    let env, _ = add env Term.faux in
     distinct env [X.top (); X.bot ()] Ex.empty
 end

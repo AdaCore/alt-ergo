@@ -56,6 +56,7 @@ CMO = src/util/version.cmo \
       src/util/numbers.cmo \
       src/util/timers.cmo \
       src/util/options.cmo \
+      src/util/steps.cmo \
       src/util/loc.cmo \
       src/util/hashcons.cmo \
       src/util/hstring.cmo \

@@ -262,6 +262,7 @@ module EMatch (X : Theory.S) = struct
         in 
         [sb]
       | _ -> 
+	Steps.incr Steps.Matching;
         try
           let s_ty = Ty.matching s_ty ty_pat (T.view t).T.ty in
           let cl = if no_Ematching () then [t] else X.class_of tbox t in

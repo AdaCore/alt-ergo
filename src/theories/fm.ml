@@ -552,6 +552,7 @@ module Relation
 	      fm_equalities env eqs ineq
 		
 	    | Trivial_ineq  c  ->
+	      let _ =  Steps.incr Steps.Fourier in
 	      let n, pp = 
 		List.fold_left 
 		  (fun ((n, pp) as acc) (_, _, p, is_le) ->  
@@ -613,6 +614,7 @@ module Relation
           | [] -> acc
           | { Inequation.ple0 = p1; is_le = k1; dep = d1; expl = ex1 } :: l ->
 	    let n1 = Q.abs (P.find x p1) in
+	    let _ =  Steps.incr Steps.Fourier in
 	    (* let ty = P.type_info p1 in *)
 	    let acc = 
 	      List.fold_left 
@@ -865,6 +867,7 @@ module Relation
 	    try
               match a with
 	        | L.Builtin(_, n, [r1;r2]) when is_le n || is_lt n ->
+		  Steps.incr Steps.Builtin;
                   let root = match root with
 	            | Some a -> a | None -> assert false in
 		  let p1 = poly_of r1 in

@@ -406,6 +406,7 @@ module Shostak
       List.rev_append sbs sbs2
 
     and solve_int p = 
+      Steps.incr (Steps.Omega);
       if P.is_empty p then raise Not_found;
       let pgcd = P.pgcd_numerators p in
       let ppmc = P.ppmc_denominators p in
@@ -422,6 +423,7 @@ module Shostak
       try solve_int p with Not_found -> is_null p
 
     let solve_real p =
+      Steps.incr (Steps.Omega);
       try
         let a, x = P.choose p in
         let p = 

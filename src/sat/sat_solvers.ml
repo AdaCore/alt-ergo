@@ -65,9 +65,6 @@ module Dfs_sat : S = struct
   module SF = F.Set
   module MF = F.Map
   module Ex = Explanation
-
-  let steps = ref 0L
-
   module H = Hashtbl.Make(Formula)
 
   type t = { 
@@ -346,13 +343,6 @@ module Dfs_sat : S = struct
 	      in
 	      let tbox, new_terms, cpt = Th.assume a dep env.tbox in
 	      let inst = Inst.add_terms env.inst new_terms ff in
-	      steps := Int64.add (Int64.of_int cpt) !steps;
-	      if steps_bound () <> -1 
-	        && Int64.compare !steps (Int64.of_int (steps_bound ())) > 0 then 
-	        begin 
-		  printf "Steps limit reached: %Ld@." !steps;
-		  exit 1
-	        end;
 	      let env = { env with tbox = tbox; inst = inst } in
 	      env, true
 
@@ -541,8 +531,8 @@ module Dfs_sat : S = struct
   let empty_with_inst add_inst =
     { (empty ()) with add_inst = add_inst }
 
-  let start () = steps := 0L
-  let stop () = !steps
+  let start () = Steps.start ()
+  let stop () = Steps.stop ()
 
   let retrieve_used_context env dep = 
     Inst.retrieve_used_context env.inst dep
