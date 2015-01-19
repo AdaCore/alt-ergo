@@ -5,22 +5,22 @@ VERSION=0.99.1
 LOCAL_INC = -I src/util -I src/structures -I src/theories -I src/instances \
     -I src/sat -I src/preprocess -I src/parsing -I src/gui -I src/main
 
-INCLUDES = $(ZARITHLIB) $(OCAMLGRAPHLIB) $(LABLGTK2LIB) $(LOCAL_INC)
+INCLUDES = $(OCAMLGRAPHLIB) $(LABLGTK2LIB) $(LOCAL_INC)
 #for coverage # -I /usr/local/lib/ocaml/3.12.1/bisect -pp "camlp4o str.cma /usr/local/lib/ocaml/3.12.1/bisect/bisect_pp.cmo"
 
 BFLAGS = -annot -g $(INCLUDES)
 OFLAGS = -annot -inline 100 $(INCLUDES)
 # -for-pack AltErgo
 
-BIBBYTE = zarith.cma nums.cma graph.cma unix.cma dynlink.cma str.cma
+BIBBYTE = nums.cma graph.cma unix.cma dynlink.cma str.cma
 # for coverage bisect.cma 
 
 BIBOPT = $(BIBBYTE:.cma=.cmxa)
 
-BIBGUIBYTE = zarith.cma threads.cma lablgtk.cma lablgtksourceview2.cma \
+BIBGUIBYTE = threads.cma lablgtk.cma lablgtksourceview2.cma \
     gtkThread.cmo
 
-BIBGUIOPT = zarith.cmxa threads.cmxa lablgtk.cmxa lablgtksourceview2.cmxa \
+BIBGUIOPT = threads.cmxa lablgtk.cmxa lablgtksourceview2.cmxa \
     gtkThread.cmx
 
 # main target
@@ -170,7 +170,7 @@ META: config.status
 	@echo "version = \""$(VERSION)"\"" >> META
 #	@echo "archive(byte) = \"altErgo.cmo\"" >> META
 #	@echo "archive(native) = \"altErgo.cmx\"" >> META
-	@echo "requires = \"unix num ocamlgraph zarith\"" >> META
+	@echo "requires = \"unix num ocamlgraph\"" >> META
 
 
 

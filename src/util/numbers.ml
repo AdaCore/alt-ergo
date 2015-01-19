@@ -110,53 +110,6 @@ module Q1 = struct
 ********)
 end
 
-(******************************************************************************)
-
-module Z2 = struct
-
-  include Z
-
-  let my_gcd a b = 
-    if sign a = 0 then b
-    else if sign b = 0 then a
-    else gcd a b
-
-  let my_lcm a b = div (mul a b) (gcd a b)
-
-end
-
-module Q2 = struct
-
-  exception Not_a_float
-  include Q
-
-  let m_one = neg one
-  let minus = neg
-  let mult = mul
-  let numerator = num
-  let denominator = den
-
-  let of_z z = make z Z2.one
-  let z_of = num
-
-  let string_of = to_string
-
-  let is_integer t = Z2.equal Z2.one (den t)
-
-  let ceiling a = of_z (Z2.cdiv a.num a.den)
-
-  let floor a = of_z (Z2.fdiv a.num a.den)
-
-  let modulo t1 t2 = 
-    assert (is_integer t1 && is_integer t2);
-    {Q.num=Z2.rem t1.num t2.num; den = Z2.one}
-
-  let power t n = make (Z2.pow t.num n) (Z2.pow t.den n)
-
-  let float_of t = (Z2.to_float t.num) /. (Z2.to_float t.den)
-
-end
-
 (* XXX : 
    surprisingly, Z2 and Q2 (based on zarith) are not faster than 
    Z1 and Q1 (based on Nums)

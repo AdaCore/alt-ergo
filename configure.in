@@ -108,30 +108,6 @@ else
   fi
 fi
 
-
-#looking for zarith library
-
-if test "$USEOCAMLFIND" = yes; then
-  ZARITHLIB=$(ocamlfind query -i-format zarith)
-fi
-
-if test -n "$ZARITHLIB";then
-  echo "ocamlfind found zarith in $ZARITHLIB"
-  ZARITH=yes
-else
-  AC_CHECK_FILE($OCAMLLIB/zarith/zarith.cma,ZARITH=yes,ZARITH=no)
-  if test "$ZARITH" = no ; then
-    AC_CHECK_FILE($OCAMLLIB/zarith.cma,ZARITH=yes,ZARITH=no)
-    if test "$ZARITH" = no ; then
-      AC_MSG_ERROR(Cannot find zarith library.)
-    else
-  	ZARITHLIB=""
-     fi
-  else
-     ZARITHLIB="-I +zarith"
-  fi
-fi
-
 # then we look for ocamlopt; if not present, we issue a warning
 # if the version is not the same, we also discard it
 # we set OCAMLBEST to "opt" or "byte", whether ocamlopt is available or not
@@ -256,7 +232,6 @@ AC_SUBST(OCAMLBEST)
 AC_SUBST(OCAMLVERSION)
 AC_SUBST(OCAMLLIB)
 AC_SUBST(OCAMLGRAPHLIB)
-AC_SUBST(ZARITHLIB)
 AC_SUBST(OCAMLWEB)
 AC_SUBST(LABLGTK2LIB)
 AC_SUBST(ENABLEGUI)
