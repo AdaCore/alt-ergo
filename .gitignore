@@ -22,5 +22,6 @@ alt-ergo.opt
 .depend
 config.status
 Makefile
+Makefile.configurable
 autom4te.cache
 config.log
