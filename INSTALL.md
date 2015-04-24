@@ -1,6 +1,6 @@
 ## Build and Installation
 
-  You need OCaml >= 3.12.1 and ocamlgraph to compile the
+  You need OCaml >= 3.12.1, zarith and ocamlgraph to compile the
   sources. You need LablGtk2 and the widget GSourceView2 to compile
   the GUI. You may need superuser permissions to perform the
   installation.
