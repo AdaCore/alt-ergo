@@ -272,15 +272,15 @@ show-dest-dirs:
 # or configure.in is modified
 ######################################################################
 
-configure: configure.in
-	autoconf 
-	./configure
-
-Makefile.configurable: Makefile.configurable.in configure.in
-	./config.status
-
-config.status: configure
-	./config.status --recheck
+# configure: configure.in
+# 	autoconf
+# 	./configure
+#
+# Makefile.configurable: Makefile.configurable.in configure.in
+# 	./config.status
+#
+# config.status: configure
+# 	./config.status --recheck
 
 # stripped-arch-binary
 
