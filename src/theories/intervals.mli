@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -48,7 +48,7 @@ val power : int -> t -> t
 
 val sqrt : t -> t
 
-val root : int -> t -> t 
+val root : int -> t -> t
 
 val add : t -> t -> t
 
@@ -60,5 +60,7 @@ val print : Format.formatter -> t -> unit
 val finite_size : t -> Numbers.Q.t option
 
 val borne_inf : t -> Numbers.Q.t * Explanation.t
+
+val borne_sup : t -> Numbers.Q.t * Explanation.t
 
 val div : t -> t -> t

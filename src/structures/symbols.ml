@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -22,14 +22,14 @@
 
 open Hashcons
 
-type operator = 
-  | Plus | Minus | Mult | Div | Modulo | Concat | Extract 
+type operator =
+  | Plus | Minus | Mult | Div | Modulo | Concat | Extract
   | Get | Set | Access of Hstring.t | Record
 
 type name_kind = Ac | Constructor | Other
 
-type t = 
-  | True 
+type t =
+  | True
   | False
   | Void
   | Name of Hstring.t * name_kind
@@ -63,7 +63,7 @@ let compare_kind k1 k2 = match k1, k2 with
   | Constructor, Constructor -> 0
 
 let compare s1 s2 =  match s1, s2 with
-  | Name (n1,k1), Name (n2,k2) -> 
+  | Name (n1,k1), Name (n2,k2) ->
     let c = compare_kind k1 k2 in
     if c = 0 then Hstring.compare n1 n2 else c
   | Name _, _ ->  -1
@@ -78,7 +78,7 @@ let compare s1 s2 =  match s1, s2 with
   | Op(Access _), _ -> -1
   | _, Op(Access _) -> 1
   | _  -> Pervasives.compare s1 s2
-    
+
 let equal s1 s2 = compare s1 s2 = 0
 
 let hash = function
@@ -87,19 +87,19 @@ let hash = function
   | Var n (*| Int n*) -> Hstring.hash n * 19 + 1
   | Op (Access s) -> Hstring.hash s + 19
   | s -> Hashtbl.hash s
-    
+
 let to_string =  function
   | Name (n,_) -> Hstring.view n
-  | Var x -> (Hstring.view x)
+  | Var x -> Format.sprintf "'%s'" (Hstring.view x)
   | Int n -> Hstring.view n
   | Real n -> Hstring.view n
   | Bitv s -> "[|"^s^"|]"
-  | Op Plus -> "+" 
-  | Op Minus -> "-" 
+  | Op Plus -> "+"
+  | Op Minus -> "-"
   | Op Mult -> "*"
   | Op Div -> "/"
   | Op Modulo -> "%"
-  | Op (Access s) -> "@Access_"^(Hstring.view s) 
+  | Op (Access s) -> "@Access_"^(Hstring.view s)
   | Op Record -> "@Record"
   | Op Get -> "get"
   | Op Set -> "set"
@@ -119,7 +119,7 @@ let fresh =
     (* garder le suffixe "__" car cela influence l'ordre *)
     name (Format.sprintf "!?__%s%i" s (!cpt))
 
-let is_get f = equal f (Op Get) 
+let is_get f = equal f (Op Get)
 let is_set f = equal f (Op Set)
 
 let fake_eq  =  name "@eq"
@@ -130,7 +130,7 @@ let fake_le  =  name "@le"
 module Map =
   Map.Make(struct type t' = t type t=t' let compare=compare end)
 
-module Set = 
+module Set =
   Set.Make(struct type t' = t type t=t' let compare=compare end)
 
 
@@ -140,9 +140,9 @@ module Labels = Hashtbl.Make(struct
   let equal = equal
   let hash = hash
 end)
-  
+
 let labels = Labels.create 100007
-  
+
 let add_label lbl t = Labels.replace labels t lbl
-  
+
 let label t = try Labels.find labels t with Not_found -> Hstring.empty

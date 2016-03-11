@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -20,35 +20,25 @@
 (*   This file is distributed under the terms of the CeCILL-C licence         *)
 (******************************************************************************)
 
-open Why_ptree
-
-module Time : sig
-
-  val start : unit -> unit
-  val get : unit -> float
-
-  val set_timeout : unit -> unit
-  val unset_timeout : unit -> unit
-
-end
+open Typed
 
 module type S = sig
 
   type sat_env
 
-  type output = Unsat of Explanation.t | Inconsistent 
+  type output = Unsat of Explanation.t | Inconsistent
 	        | Sat of sat_env | Unknown of sat_env
 
   val process_decl:
-    (Why_ptree.sat_tdecl -> output -> int64 -> 'a) ->
-    sat_env * bool * Explanation.t -> sat_tdecl ->
+    (Commands.sat_tdecl -> output -> int64 -> 'a) ->
+    sat_env * bool * Explanation.t -> Commands.sat_tdecl ->
     sat_env * bool * Explanation.t
 
-  val open_file: 
+  val open_file:
     Lexing.lexbuf -> in_channel ->
-    ((int tdecl, int) annoted * Why_typing.env) list list * Smt_ast.status
+    ((int tdecl, int) annoted * Why_typing.env) list list
 
-  val print_status : sat_tdecl -> output -> int64 -> unit
+  val print_status : Commands.sat_tdecl -> output -> int64 -> unit
 end
 
 module Make (SAT: Sat_solvers.S) : S with type sat_env = SAT.t

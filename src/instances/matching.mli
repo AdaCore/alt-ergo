@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -43,8 +43,9 @@ module type S = sig
     (Formula.t -> Formula.t -> bool) ->
     instances * instances (* goal_directed, others *)
 
-  (* returns names of used axioms/predicates * unused axioms/predicates *)
-  val retrieve_used_context : t -> Explanation.t -> string list * string list
+  (* returns used axioms/predicates * unused axioms/predicates *)
+  val retrieve_used_context :
+    t -> Explanation.t -> Formula.t list * Formula.t list
 
 end
 

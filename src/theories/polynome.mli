@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -27,20 +27,17 @@ exception Not_a_num
 exception Maybe_zero
 
 module type S = sig
-  type r 
-  val compare : r -> r-> int
-  val term_embed : Term.t -> r
+  include Sig.X
   val mult : r -> r -> r
-  val print : Format.formatter -> r -> unit
-  val abstract_selectors : r -> (r * r) list -> r * (r * r) list
 end
 
 module type T = sig
 
-  type r 
+  type r
   type t
-    
+
   val compare : t -> t -> int
+  val equal : t -> t -> bool
   val hash : t -> int
 
   val create : (Numbers.Q.t * r) list -> Numbers.Q.t -> Ty.t-> t
@@ -58,7 +55,8 @@ module type T = sig
   val subst : r -> t -> t -> t
   val remove : r -> t -> t
   val to_list : t -> (Numbers.Q.t * r) list * Numbers.Q.t
-    
+  val leaves : t -> r list
+
   val print : Format.formatter -> t -> unit
   val type_info : t -> Ty.t
   val is_monomial : t -> (Numbers.Q.t * r * Numbers.Q.t) option
@@ -67,7 +65,7 @@ module type T = sig
   val ppmc_denominators : t -> Numbers.Q.t
   (* PGCD des numerateurs des coefficients excepte la constante *)
   val pgcd_numerators : t -> Numbers.Q.t
-  (* retourne un polynome sans constante et sa constante 
+  (* retourne un polynome sans constante et sa constante
      et la constante multiplicative:
      normal_form p = (p',c,d) <=> p = (p' + c) * d *)
   val normal_form : t -> t * Numbers.Q.t * Numbers.Q.t
@@ -75,7 +73,9 @@ module type T = sig
   val normal_form_pos : t -> t * Numbers.Q.t * Numbers.Q.t
 
   val abstract_selectors : t -> (r * r) list -> t * (r * r) list
+
+  val separate_constant : t -> t * Numbers.Q.t
 end
 
 module Make (X : S) : T with type r = X.r
-  
+

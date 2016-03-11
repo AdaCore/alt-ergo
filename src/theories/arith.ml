@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -30,7 +30,7 @@ module T = Term
 module Z = Numbers.Z
 module Q = Numbers.Q
 
-let ale = Hstring.make "<=" 
+let ale = Hstring.make "<="
 let alt = Hstring.make "<"
 let is_mult h = Sy.equal (Sy.Op Sy.Mult) h
 let mod_symb = Sy.name "@mod"
@@ -48,7 +48,7 @@ module Type (X:Sig.X) : Polynome.T with type r = X.r = struct
 	    l = let l2 = match X.ac_extract v1 with
 	      | Some {h=h; l=l} when Sy.equal h (Sy.Op Sy.Mult) -> l
 	      | _ -> [v1, 1]
-	        in Ac.add (Sy.Op Sy.Mult) (v2,1) l2 
+	        in Ac.add (Sy.Op Sy.Mult) (v2,1) l2
           }
     end)
 end
@@ -59,14 +59,14 @@ module type EXTENDED_Polynome = sig
   val embed : t -> r
 end
 
-module Shostak 
+module Shostak
   (X : Sig.X)
   (P : EXTENDED_Polynome with type r = X.r) = struct
 
     type t = P.t
 
     type r = P.r
-        
+
     module Ac = Ac.Make(X)
 
     let name = "arith"
@@ -75,17 +75,17 @@ module Shostak
     module Debug = struct
 
       let solve_aux r1 r2 =
-        if debug_arith () then 
+        if debug_arith () then
           fprintf fmt "[arith] we solve %a=%a@." X.print r1 X.print r2
 
-      let solve_one r1 r2 sbs = 
+      let solve_one r1 r2 sbs =
         if debug_arith () then
           begin
             fprintf fmt "[arith] solving %a = %a yields:@."
               X.print r1 X.print r2;
             let c = ref 0 in
-            List.iter 
-              (fun (p,v) -> 
+            List.iter
+              (fun (p,v) ->
                 incr c;
                 fprintf fmt " %d) %a |-> %a@." !c X.print p X.print v) sbs
           end
@@ -93,7 +93,7 @@ module Shostak
     (*BISECT-IGNORE-END*)
 
     let is_mine_symb = function
-      | Sy.Int _ | Sy.Real _ 
+      | Sy.Int _ | Sy.Real _
       | Sy.Op (Sy.Plus | Sy.Minus | Sy.Mult | Sy.Div | Sy.Modulo) -> true
       | _ -> false
 
@@ -102,50 +102,50 @@ module Shostak
     let is_mine p = match P.is_monomial p with
       | Some (a,x,b) when Q.equal a Q.one && Q.sign b = 0 -> x
       | _ -> P.embed p
-        
+
     let embed r = match P.extract r with
       | Some p -> p
-      | _ -> P.create [Q.one, r] Q.zero (X.type_info r)  
+      | _ -> P.create [Q.one, r] Q.zero (X.type_info r)
 
-    (* t1 % t2 = md  <-> 
+    (* t1 % t2 = md  <->
        c1. 0 <= md ;
        c2. md < t2 ;
        c3. exists k. t1 = t2 * k + t ;
        c4. t2 <> 0 (already checked) *)
-    let mk_modulo md t1 t2 p2 ctx = 
+    let mk_modulo md t1 t2 p2 ctx =
       let zero = T.int "0" in
       let c1 = A.LT.mk_builtin true ale [zero; md] in
       let c2 =
         match P.is_const p2 with
-	  | Some n2 -> 
+	  | Some n2 ->
 	    let an2 = Q.abs n2 in
-	    assert (Q.is_integer an2);
-	    let t2 = T.int (Q.string_of an2) in
+	    assert (Q.is_int an2);
+	    let t2 = T.int (Q.to_string an2) in
 	    A.LT.mk_builtin true alt [md; t2]
-	  | None -> 
+	  | None ->
 	    A.LT.mk_builtin true alt [md; t2]
       in
       let k  = T.fresh_name Ty.Tint in
       let t3 = T.make (Sy.Op Sy.Mult) [t2;k] Ty.Tint in
       let t3 = T.make (Sy.Op Sy.Plus) [t3;md] Ty.Tint in
       let c3 = A.LT.mk_eq t1 t3 in
-      c3 :: c2 :: c1 :: ctx    
+      c3 :: c2 :: c1 :: ctx
 
-    let mk_euc_division p p2 t1 t2 ctx = 
+    let mk_euc_division p p2 t1 t2 ctx =
       match P.to_list p2 with
         | [], coef_p2 ->
           let md = T.make (Sy.Op Sy.Modulo) [t1;t2] Ty.Tint in
           let r, ctx' = X.make md in
           let rp =
-            P.mult (P.create [] (Q.div Q.one coef_p2) Ty.Tint) (embed r) in 
+            P.mult (P.create [] (Q.div Q.one coef_p2) Ty.Tint) (embed r) in
           P.sub p rp, ctx' @ ctx
         | _ -> assert false
 
     let rec mke coef p t ctx =
       let {T.f = sb ; xs = xs; ty = ty} = T.view t in
       match sb, xs with
-        | (Sy.Int n | Sy.Real n) , _  -> 
-	  let c = Q.mult coef (Q.of_string (Hstring.view n)) in
+        | (Sy.Int n | Sy.Real n) , _  ->
+	  let c = Q.mult coef (Q.from_string (Hstring.view n)) in
 	  P.add (P.create [] c ty) p, ctx
 
         | Sy.Op Sy.Mult, [t1;t2] ->
@@ -153,43 +153,43 @@ module Shostak
 	  let p2, ctx = mke Q.one (empty_polynome ty) t2 ctx in
 	  P.add p (P.mult p1 p2), ctx
 
-        | Sy.Op Sy.Div, [t1;t2] -> 
+        | Sy.Op Sy.Div, [t1;t2] ->
 	  let p1, ctx = mke Q.one (empty_polynome ty) t1 ctx in
 	  let p2, ctx = mke Q.one (empty_polynome ty) t2 ctx in
-	  let p3, ctx = 
-	    try 
+	  let p3, ctx =
+	    try
               let p, approx = P.div p1 p2 in
               if approx then mk_euc_division p p2 t1 t2 ctx
               else p, ctx
-	    with Division_by_zero | Polynome.Maybe_zero -> 
+	    with Division_by_zero | Polynome.Maybe_zero ->
               P.create [Q.one, X.term_embed t] Q.zero ty, ctx
 	  in
 	  P.add p (P.mult (P.create [] coef ty) p3), ctx
-	    
-        | Sy.Op Sy.Plus , [t1;t2] -> 
+
+        | Sy.Op Sy.Plus , [t1;t2] ->
 	  let p2, ctx = mke coef p t2 ctx in
 	  mke coef p2 t1 ctx
 
-        | Sy.Op Sy.Minus , [t1;t2] -> 
+        | Sy.Op Sy.Minus , [t1;t2] ->
 	  let p2, ctx = mke (Q.minus coef) p t2 ctx in
 	  mke coef p2 t1 ctx
 
-        | Sy.Op Sy.Modulo , [t1;t2] -> 
+        | Sy.Op Sy.Modulo , [t1;t2] ->
 	  let p1, ctx = mke Q.one (empty_polynome ty) t1 ctx in
 	  let p2, ctx = mke Q.one (empty_polynome ty) t2 ctx in
-          let p3, ctx = 
+          let p3, ctx =
             try P.modulo p1 p2, ctx
             with e ->
-	      let t = T.make mod_symb [t1; t2] Ty.Tint in    
+	      let t = T.make mod_symb [t1; t2] Ty.Tint in
               let ctx = match e with
                 | Division_by_zero | Polynome.Maybe_zero -> ctx
                 | Polynome.Not_a_num -> mk_modulo t t1 t2 p2 ctx
-                | _ -> assert false 
-              in 
-              P.create [Q.one, X.term_embed t] Q.zero ty, ctx 
-	  in         
+                | _ -> assert false
+              in
+              P.create [Q.one, X.term_embed t] Q.zero ty, ctx
+	  in
 	  P.add p (P.mult (P.create [] coef ty) p3), ctx
-	    
+
         | _ ->
 	  let a, ctx' = X.make t in
 	  let ctx = ctx' @ ctx in
@@ -212,18 +212,18 @@ module Shostak
       List.fold_left P.mult (P.create [] Q.one ty) mlt
 
 
-    let rec number_of_vars l = 
-      List.fold_left (fun acc (r, n) -> acc + n * nb_vars_in_alien r) 0 l 
+    let rec number_of_vars l =
+      List.fold_left (fun acc (r, n) -> acc + n * nb_vars_in_alien r) 0 l
 
-    and nb_vars_in_alien r = 
+    and nb_vars_in_alien r =
       match P.extract r with
-        | Some p -> 
+        | Some p ->
 	  let l, _ = P.to_list p in
           List.fold_left (fun acc (a, x) -> max acc (nb_vars_in_alien x)) 0 l
-        | None -> 
+        | None ->
 	  begin
 	    match X.ac_extract r with
-	      | Some ac when is_mult ac.h -> 
+	      | Some ac when is_mult ac.h ->
 		number_of_vars ac.l
 	      | _ -> 1
 	  end
@@ -237,45 +237,36 @@ module Shostak
 
     let contains_a_fresh_alien xp =
       List.exists
-        (fun x -> 
+        (fun x ->
           match X.term_extract x with
-            | Some t, _ -> Term.is_fresh t 
+            | Some t, _ -> Term.is_fresh t
             | _ -> false
         ) (X.leaves xp)
 
-    let color ac = 
+    let color ac =
       match ac.l with
         | [(r, 1)] -> assert false
-        | _ -> 
-          let p = unsafe_ac_to_arith ac in 
+        | _ ->
+          let p = unsafe_ac_to_arith ac in
           let xp = is_mine p in
-          if contains_a_fresh_alien xp then 
+          if contains_a_fresh_alien xp then
 	    let l, _ = P.to_list p in
             let mx = max_list_ l in
-            if mx = 0 || mx = 1 || number_of_vars ac.l > mx then is_mine p 
+            if mx = 0 || mx = 1 || number_of_vars ac.l > mx then is_mine p
 	    else X.ac_embed ac
           else xp
 
     let type_info p = P.type_info p
 
-    module SX = Set.Make(struct type t = r let compare = X.compare end)
+    module SX = Set.Make(struct type t = r let compare = X.hash_cmp end)
 
-    let xs_of_list = 
-      List.fold_left (fun s x -> SX.add x s) SX.empty
-        
-    let rec leaves p = 
-      let s = 
-        List.fold_left
-	  (fun s (_, a) -> SX.union (xs_of_list (X.leaves a)) s)
-	  SX.empty (fst (P.to_list p))
-      in
-      SX.elements s
+    let leaves p = P.leaves p
 
-    let subst x t p = 
+    let subst x t p =
       let p = P.subst x (embed t) p in
       let ty = P.type_info p in
       let l, c = P.to_list p in
-      let p  = 
+      let p  =
         List.fold_left
           (fun p (ai, xi) ->
 	    let xi' = X.subst x t xi in
@@ -285,7 +276,7 @@ module Shostak
 	    in
 	    P.add p p')
           (P.create [] c ty) l
-      in 
+      in
       is_mine p
 
 
@@ -293,69 +284,71 @@ module Shostak
 
     let compare x y = P.compare (embed x) (embed y)
 
+    let equal p1 p2 = P.equal p1 p2
+
     let hash = P.hash
 
     (* symmetric modulo p 131 *)
-    let mod_sym a b = 
-      let m = Q.modulo a b in 
-      let m = 
+    let mod_sym a b =
+      let m = Q.modulo a b in
+      let m =
         if Q.sign m < 0 then
           if Q.compare m (Q.minus b) >= 0 then Q.add m b else assert false
-        else 
+        else
           if Q.compare m b <= 0 then m else assert false
-	    
+
       in
-      if Q.compare m (Q.div b (Q.of_int 2)) < 0 then m else Q.sub m b
+      if Q.compare m (Q.div b (Q.from_int 2)) < 0 then m else Q.sub m b
 
     let mult_const p c =
       P.mult p (P.create [] c (P.type_info p))
-        
+
     let map_monomes f l ax =
       List.fold_left
-        (fun acc (a,x) -> 
+        (fun acc (a,x) ->
           let a = f a in if Q.sign a = 0 then acc else (a, x) :: acc)
-        [ax] l 
+        [ax] l
 
-    let apply_subst sb v = 
+    let apply_subst sb v =
       is_mine (List.fold_left (fun v (x, p) -> embed (subst x p v)) v sb)
 
     (* substituer toutes variables plus grandes que x *)
-    let subst_bigger x l = 
-      List.fold_left 
+    let subst_bigger x l =
+      List.fold_left
         (fun (l, sb) (b, y) ->
-          if X.compare y x > 0 then
+          if X.str_cmp y x > 0 then
 	    let k = X.term_embed (T.fresh_name Ty.Tint) in
 	    (b, k) :: l, (y, embed k)::sb
 	  else (b, y) :: l, sb)
         ([], []) l
 
     let is_mine_p = List.map (fun (x,p) -> x, is_mine p)
-      
+
     let extract_min = function
       | [] -> assert false
       | [c] -> c, []
-      | (a, x) :: s -> 
-	List.fold_left 
+      | (a, x) :: s ->
+	List.fold_left
 	  (fun ((a, x), l) (b, y) ->
-	    if Q.compare (Q.abs a) (Q.abs b) <= 0 then 
-	      (a, x), ((b, y) :: l) 
+	    if Q.compare (Q.abs a) (Q.abs b) <= 0 then
+	      (a, x), ((b, y) :: l)
 	    else (b, y), ((a, x):: l)) ((a, x),[]) s
-          
+
 
     (* Decision Procedures. Page 131 *)
-    let rec omega l b = 
-      
-      (* 1. choix d'une variable donc le |coef| est minimal *)
-      let (a, x), l = extract_min l in 
+    let rec omega l b =
 
-      (* 2. substituer les aliens plus grand que x pour 
+      (* 1. choix d'une variable donc le |coef| est minimal *)
+      let (a, x), l = extract_min l in
+
+      (* 2. substituer les aliens plus grand que x pour
          assurer l'invariant sur l'ordre AC *)
       let l, sbs = subst_bigger x l in
       let p = P.create l b Ty.Tint in
       assert (Q.sign a <> 0);
-      if Q.equal a Q.one then 
+      if Q.equal a Q.one then
         (* 3.1. si a = 1 alors on a une substitution entiere pour x *)
-        let p = mult_const p Q.m_one in 
+        let p = mult_const p Q.m_one in
         (x, is_mine p) :: (is_mine_p sbs)
       else if Q.equal a Q.m_one then
         (* 3.2. si a = -1 alors on a une subst entiere pour x*)
@@ -363,38 +356,38 @@ module Shostak
       else
         (* 4. sinon, (|a| <> 1) et a <> 0 *)
         (* 4.1. on rend le coef a positif s'il ne l'est pas deja *)
-        let a, l, b = 
-          if Q.sign a < 0  then 
+        let a, l, b =
+          if Q.sign a < 0  then
 	    (Q.minus a,
 	     List.map (fun (a,x) -> Q.minus a,x) l, (Q.minus b))
           else (a, l, b)
         in
         (* 4.2. on reduit le systeme *)
         omega_sigma sbs a x l b
-          
+
     and omega_sigma sbs a x l b =
-      
+
       (* 1. on definie m qui vaut a + 1 *)
       let m = Q.add a Q.one in
 
       (* 2. on introduit une variable fraiche *)
       let sigma = X.term_embed (T.fresh_name Ty.Tint) in
-      
+
       (* 3. l'application de la formule (5.63) nous donne la valeur du pivot x*)
       let mm_sigma = (Q.minus m, sigma) in
       let l_mod = map_monomes (fun a -> mod_sym a m) l mm_sigma in
 
-      (* 3.1. Attention au signe de b : 
+      (* 3.1. Attention au signe de b :
          on le passe a droite avant de faire mod_sym, d'ou Q.minus *)
       let b_mod = Q.minus (mod_sym (Q.minus b) m) in
       let p = P.create l_mod b_mod Ty.Tint in
 
       let sbs = (x, p) :: sbs in
-      
-      (* 4. on substitue x par sa valeur dans l'equation de depart. 
+
+      (* 4. on substitue x par sa valeur dans l'equation de depart.
          Voir la formule (5.64) *)
       let p' = P.add (P.mult_const a p) (P.create l b Ty.Tint) in
-      
+
       (* 5. on resoud sur l'equation simplifiee *)
       let sbs2 = solve_int p' in
 
@@ -412,11 +405,12 @@ module Shostak
       let ppmc = P.ppmc_denominators p in
       let p = mult_const p (Q.div ppmc pgcd)  in
       let l, b = P.to_list p in
-      if not (Q.is_integer b) then raise Exception.Unsolvable;
+      if not (Q.is_int b) then raise Exception.Unsolvable;
       omega l b
 
-    let is_null p = 
-      if Q.sign (snd (P.to_list p)) <> 0 then raise Exception.Unsolvable; 
+    let is_null p =
+      if Q.sign (snd (P.separate_constant p)) <> 0 then
+        raise Exception.Unsolvable;
       []
 
     let solve_int p = 
@@ -469,18 +463,18 @@ module Shostak
     let solve_one r1 r2 =
       Options.tool_req 4 "TR-Arith-Solve";
       let sbs = solve_aux r1 r2 in
-      let sbs = List.fast_sort (fun (a,_) (x,y) -> X.compare x a)sbs in
+      let sbs = List.fast_sort (fun (a,_) (x,y) -> X.str_cmp x a)sbs in
       Debug.solve_one r1 r2 sbs;
       sbs
 
     let apply_subst r l =
       List.fold_left (fun r (p,v) -> X.subst p v r) r l
-        
-    let triangular_down sbs = 
+
+    let triangular_down sbs =
       List.fold_right
         (fun (p,v) nsbs -> (p, apply_subst v nsbs) :: nsbs) sbs []
 
-    let make_idemp a b sbs = 
+    let make_idemp a b sbs =
       let sbs = triangular_down sbs in
       let sbs = triangular_down (List.rev sbs) in (* triangular up *)
       let original = List.fold_right SX.add (X.leaves a) SX.empty in
@@ -490,51 +484,51 @@ module Shostak
                 X.equal (apply_subst a sbs) (apply_subst b sbs));
       sbs
 
-    let solve r1 r2 pb = 
+    let solve r1 r2 pb =
       let sbt = solve_one r1 r2 in
       {pb with sbt = List.rev_append (make_idemp r1 r2 sbt) pb.sbt}
 
     (*XXX*)
 
     let make t =
-      if profiling() then
-        try 
-	  Options.exec_timer_start Timers.TArith;
+      if Options.timers() then
+        try
+	  Options.exec_timer_start Timers.M_Arith Timers.F_make;
 	  let res = make t in
-	  Options.exec_timer_pause Timers.TArith;
+	  Options.exec_timer_pause Timers.M_Arith Timers.F_make;
 	  res
-        with e -> 
-	  Options.exec_timer_pause Timers.TArith;
+        with e ->
+	  Options.exec_timer_pause Timers.M_Arith Timers.F_make;
 	  raise e
       else make t
 
     let leaves p =
-      if profiling() then
-        try 
-	  Options.exec_timer_start Timers.TArith;
+      if Options.timers() then
+        try
+	  Options.exec_timer_start Timers.M_Arith Timers.F_leaves;
 	  let res = leaves p in
-	  Options.exec_timer_pause Timers.TArith;
+	  Options.exec_timer_pause Timers.M_Arith Timers.F_leaves;
 	  res
-        with e -> 
-	  Options.exec_timer_pause Timers.TArith;
+        with e ->
+	  Options.exec_timer_pause Timers.M_Arith Timers.F_leaves;
 	  raise e
       else leaves p
 
-    let solve r1 r2 pb = 
-      if profiling() then
-        try 
-	  Options.exec_timer_start Timers.TArith;
+    let solve r1 r2 pb =
+      if Options.timers() then
+        try
+	  Options.exec_timer_start Timers.M_Arith Timers.F_solve;
 	  let res = solve r1 r2 pb in
-	  Options.exec_timer_pause Timers.TArith;
+	  Options.exec_timer_pause Timers.M_Arith Timers.F_solve;
 	  res
-        with e -> 
-	  Options.exec_timer_pause Timers.TArith;
+        with e ->
+	  Options.exec_timer_pause Timers.M_Arith Timers.F_solve;
 	  raise e
       else solve r1 r2 pb
 
     let print = P.print
 
-    let fully_interpreted sb = 
+    let fully_interpreted sb =
       match sb with
         | Sy.Op (Sy.Plus | Sy.Minus) -> true
         | _ -> false
@@ -547,4 +541,4 @@ module Shostak
 
   end
 
-module Relation = Fm.Relation
+module Relation = IntervalCalculus.Make

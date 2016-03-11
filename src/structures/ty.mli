@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -20,7 +20,7 @@
 (*   This file is distributed under the terms of the CeCILL-C licence         *)
 (******************************************************************************)
 
-type t = 
+type t =
   | Tint
   | Treal
   | Tbool
@@ -34,14 +34,16 @@ type t =
   | Trecord of trecord
 
 and tvar = { v : int ; mutable value : t option }
-and trecord = { 
-  mutable args : t list; 
-  name : Hstring.t; 
+and trecord = {
+  mutable args : t list;
+  name : Hstring.t;
   mutable lbs :  (Hstring.t * t) list
 }
 
 
-type subst
+module M : Map.S with type key = int
+
+type subst = t M.t
 
 val esubst : subst
 
@@ -71,18 +73,19 @@ val matching : subst -> t -> t -> subst
 val apply_subst : subst -> t -> t
 val instantiate : t list -> t list -> t -> t
 
-(* Applique la seconde substitution sur la premiere 
+(* Applique la seconde substitution sur la premiere
    puis fais l'union des map avec prioritée à la première *)
 val union_subst : subst -> subst -> subst
 
 val compare_subst : subst -> subst -> int
+val equal_subst : subst -> subst -> bool
 
 val print : Format.formatter -> t -> unit
 val print_full : Format.formatter -> t -> unit
 (*val printl : Format.formatter -> t list -> unit*)
 
-module Svty : Set.S
-
+module Svty : Set.S with type elt = int
+module Set : Set.S with type elt = t
 val vty_of : t -> Svty.t
 
 val monomorphize: t -> t

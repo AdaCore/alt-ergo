@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -30,12 +30,8 @@ exception Not_a_num
 exception Maybe_zero
 
 module type S = sig
-  type r
-  val compare : r -> r -> int
-  val term_embed : Term.t -> r
+  include Sig.X
   val mult : r -> r -> r
-  val print : Format.formatter -> r -> unit
-  val abstract_selectors : r -> (r * r) list -> r * (r * r) list
 end
 
 module type T = sig
@@ -44,6 +40,7 @@ module type T = sig
   type t
 
   val compare : t -> t -> int
+  val equal : t -> t -> bool
   val hash : t -> int
   val create : (Q.t * r) list -> Q.t -> Ty.t-> t
   val add : t -> t -> t
@@ -60,7 +57,8 @@ module type T = sig
   val subst : r -> t -> t -> t
   val remove : r -> t -> t
   val to_list : t -> (Q.t * r) list * Q.t
-    
+  val leaves : t -> r list
+
   val print : Format.formatter -> t -> unit
   val type_info : t -> Ty.t
   val is_monomial : t -> (Q.t * r * Q.t) option
@@ -70,39 +68,41 @@ module type T = sig
   val normal_form : t -> t * Q.t * Q.t
   val normal_form_pos : t -> t * Q.t * Q.t
   val abstract_selectors : t -> (r * r) list -> t * (r * r) list
+
+  val separate_constant : t -> t * Numbers.Q.t
 end
 
 module Make (X : S) = struct
 
   type r = X.r
-      
-  module M : Map.S with type key = r = 
+
+  module M : Map.S with type key = r =
     Map.Make(
-      struct 
-        type t = r 
-            
+      struct
+        type t = r
+
         (*sorted in decreasing order to comply with AC(X) order requirements*)
-        let compare x y = X.compare y x
+        let compare x y = X.str_cmp y x
       end)
-      
+
   type t = { m : Q.t M.t; c : Q.t; ty : Ty.t }
 
   let map_to_list m = List.rev (M.fold (fun x a aliens -> (a, x)::aliens) m [])
 
   exception Out of int
 
-  let compare_maps l1 l2 = 
+  let compare_maps l1 l2 =
     try
       List.iter2
         (fun (a,x) (b,y) ->
-          let c = X.compare x y   in if c <> 0 then raise (Out c);
+          let c = X.str_cmp x y   in if c <> 0 then raise (Out c);
           let c = Q.compare a b in if c <> 0 then raise (Out c) )l1 l2;
       0
     with
-      | Out c -> c 
+      | Out c -> c
       | Invalid_argument("List.iter2") -> List.length l1 - List.length l2
-        
-  let compare p1 p2 = 
+
+  let compare p1 p2 =
     let c = Ty.compare p1.ty p2.ty in
     if c <> 0 then c
     else match M.is_empty p1.m, M.is_empty p2.m with
@@ -113,10 +113,18 @@ module Make (X : S) = struct
         let c =  compare_maps (map_to_list p1.m) (map_to_list p2.m) in
         if c = 0 then Q.compare p1.c p2.c else c
 
+  let equal {m=m1; c=c1} {m=m2; c=c2} =
+    Q.equal c1 c2 && M.equal Q.equal m1 m2
 
-  let hash p = 
-    abs (Hashtbl.hash p.m + 19*Hashtbl.hash p.c + 17 * Ty.hash p.ty)
-      
+  let hash p =
+    let h =
+      M.fold
+        (fun k v acc ->
+          23 * acc + (X.hash k) * Q.hash v
+        )p.m (19 * Q.hash p.c + 17 * Ty.hash p.ty)
+    in
+    abs h
+
   (*BISECT-IGNORE-BEGIN*)
   module Debug = struct
     let pprint fmt p =
@@ -127,25 +135,25 @@ module Make (X : S) = struct
             if Q.equal n Q.one then (if !zero then "" else "+"), "", ""
             else if Q.equal n Q.m_one then "-", "", ""
             else
-              if Q.sign n > 0 then 
-	        (if !zero then "" else "+"), Q.string_of n, "*" 
-              else "-", Q.string_of (Q.minus n), "*" 
+              if Q.sign n > 0 then
+	        (if !zero then "" else "+"), Q.to_string n, "*"
+              else "-", Q.to_string (Q.minus n), "*"
           in
 	  zero := false;
           fprintf fmt "%s%s%s%a" s n op X.print x
         ) p.m;
-      let s, n = 
-        if Q.sign p.c > 0 then (if !zero then "" else "+"), Q.string_of p.c 
-        else if Q.sign p.c < 0 then "-", Q.string_of (Q.minus p.c)
+      let s, n =
+        if Q.sign p.c > 0 then (if !zero then "" else "+"), Q.to_string p.c
+        else if Q.sign p.c < 0 then "-", Q.to_string (Q.minus p.c)
         else (if !zero then "","0" else "","") in
       fprintf fmt "%s%s" s n
 
     let print fmt p =
-      if Options.term_like_pp () then pprint fmt p 
+      if Options.term_like_pp () then pprint fmt p
       else begin
-        M.iter 
-          (fun t n -> fprintf fmt "%s*%a " (Q.string_of n) X.print t) p.m;
-        fprintf fmt "%s" (Q.string_of p.c);
+        M.iter
+          (fun t n -> fprintf fmt "%s*%a " (Q.to_string n) X.print t) p.m;
+        fprintf fmt "%s" (Q.to_string p.c);
         fprintf fmt " [%a]" Ty.print p.ty
       end
   end
@@ -157,39 +165,39 @@ module Make (X : S) = struct
 
   let find x m = try M.find x m with Not_found -> Q.zero
 
-  let create l c ty = 
-    let m = 
-      List.fold_left 
-	(fun m (n, x) -> 
+  let create l c ty =
+    let m =
+      List.fold_left
+	(fun m (n, x) ->
 	  let n' = Q.add n (find x m) in
 	  if Q.sign n' = 0 then M.remove x m else M.add x n' m) M.empty l
     in
     { m = m; c = c; ty = ty }
-      
-  let add p1 p2 = 
+
+  let add p1 p2 =
     Options.tool_req 4 "TR-Arith-Poly plus";
-    let m = 
-      M.fold 
-	(fun x a m -> 
+    let m =
+      M.fold
+	(fun x a m ->
 	  let a' = Q.add (find x m) a in
 	  if Q.sign a' = 0 then M.remove x m  else M.add x a' m)
 	p2.m p1.m
-    in 
+    in
     { m = m; c = Q.add p1.c p2.c; ty = p1.ty }
 
-  let mult_const n p = 
+  let mult_const n p =
     if Q.sign n = 0 then { m = M.empty; c = Q.zero; ty = p.ty }
     else { p with m = M.map (Q.mult n) p.m; c =  Q.mult n p.c }
 
-  let mult_monome a x p  = 
+  let mult_monome a x p  =
     let ax = { m = M.add x a M.empty; c = Q.zero; ty = p.ty} in
     let acx = mult_const p.c ax in
-    let m = 
+    let m =
       M.fold
-	(fun xi ai m -> M.add (X.mult x xi) (Q.mult a ai) m) p.m acx.m 
-    in 
+	(fun xi ai m -> M.add (X.mult x xi) (Q.mult a ai) m) p.m acx.m
+    in
     { acx with m = m}
-      
+
   let mult p1 p2 =
     Options.tool_req 4 "TR-Arith-Poly mult";
     let p = mult_const p1.c p2 in
@@ -199,7 +207,7 @@ module Make (X : S) = struct
     Options.tool_req 4 "TR-Arith-Poly moins";
     add p1 (mult (create [] Q.m_one p1.ty) p2)
 
-  let euc_mod_num c1 c2 = 
+  let euc_mod_num c1 c2 =
     let c = Q.modulo c1 c2 in
     if Q.sign c < 0 then Q.add c (Q.abs c2) else c
 
@@ -215,7 +223,7 @@ module Make (X : S) = struct
       | true, Ty.Tint  -> {p with c = euc_div_num p1.c p2.c}, false
       | false, Ty.Tint ->  p, true (* XXX *)
       | _ -> assert false
-        
+
   let modulo p1 p2 =
     Options.tool_req 4 "TR-Arith-Poly mod";
     if not (M.is_empty p2.m) then raise Maybe_zero;
@@ -232,7 +240,7 @@ module Make (X : S) = struct
     (*version I : prend le premier element de la table*)
     (try M.iter
            (fun x a -> tn := Some (a, x); raise Exit) p.m with Exit -> ());
-    (*version II : prend le dernier element de la table i.e. le plus grand 
+    (*version II : prend le dernier element de la table i.e. le plus grand
       M.iter (fun x a -> tn := Some (a, x)) p.m;*)
     match !tn with Some p -> p | _ -> raise Not_found
 
@@ -241,40 +249,50 @@ module Make (X : S) = struct
       let a = M.find x p2.m in
       add (mult_const a p1) { p2 with m = M.remove x p2.m}
     with Not_found -> p2
-      
+
   let remove x p = { p with m = M.remove x p.m }
-    
+
   let to_list p = map_to_list p.m , p.c
+
+  module SX = Set.Make(struct type t = r let compare = X.hash_cmp end)
+
+  let xs_of_list sx l = List.fold_left (fun s x -> SX.add x s) sx l
+
+  let leaves p =
+    let s =
+      M.fold (fun a _ s -> xs_of_list s (X.leaves a)) p.m SX.empty
+    in
+    SX.elements s
 
   let type_info p = p.ty
 
-  let is_monomial p  = 
-    try 
+  let is_monomial p  =
+    try
       M.fold
-	(fun x a r -> 
+	(fun x a r ->
 	  match r with
 	    | None -> Some (a, x, p.c)
 	    | _ -> raise Exit)
 	p.m None
     with Exit -> None
 
-  let ppmc_denominators {m=m} = 
-    let res =   
+  let ppmc_denominators {m=m} =
+    let res =
       M.fold
-        (fun k c acc -> Z.my_lcm (Q.denominator c) acc)
+        (fun k c acc -> Z.my_lcm (Q.den c) acc)
         m Z.one in
-    Q.abs (Q.of_z res)
+    Q.abs (Q.from_z res)
 
-  let pgcd_numerators {m=m} = 
-    let res =   
+  let pgcd_numerators {m=m} =
+    let res =
       M.fold
-        (fun k c acc -> Z.my_gcd (Q.numerator c) acc)
+        (fun k c acc -> Z.my_gcd (Q.num c) acc)
         m Z.zero
     in
-    Q.abs (Q.of_z res)
+    Q.abs (Q.from_z res)
 
   let normal_form ({ m = m; c = c } as p) =
-    if M.is_empty m then 
+    if M.is_empty m then
       { p with c = Q.zero }, p.c, Q.one
     else
       let ppcm = ppmc_denominators p in
@@ -291,20 +309,22 @@ module Make (X : S) = struct
     with Not_found -> p, c, d
 
   let abstract_selectors p acc =
-    let mp, acc = 
+    let mp, acc =
       M.fold
         (fun r i (mp, acc) ->
           let r, acc = X.abstract_selectors r acc in
           let mp =
-            try 
+            try
               let j = M.find r mp in
               let k = Q.add i j in
               if Q.sign k = 0 then M.remove r mp else M.add r k mp
             with Not_found -> M.add r i mp
-          in 
+          in
           mp, acc
         )p.m (M.empty, acc)
     in
     {p with m=mp}, acc
-      
+
+  let separate_constant t = { t with c = Q.zero}, t.c
+
 end

@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -51,7 +51,7 @@ let replay_addinstance id aname entries env =
     | AD (ad, _) ->
       begin
 	match ad.c with
-	  | AAxiom (_, aname, af) -> 
+	  | AAxiom (_, aname, af) ->
 	    add_instance ~register:false env id af aname entries
 	  | APredicate_def (_, aname,_ , af) ->
 	    add_instance ~register:false env id af aname entries
@@ -67,11 +67,11 @@ let replay env = function
   | IncorrectPrune id -> replay_incorrect_prune id env
   | Unprune id -> replay_unprune id env
   | AddInstance (id, aname, entries) -> replay_addinstance id aname entries env
-  | AddTrigger (id, inst_buf, str) -> 
+  | AddTrigger (id, inst_buf, str) ->
     readd_trigger ~register:false env id str inst_buf
   | LimitLemma (id, name, nb) -> replay_limitlemma id name nb env
   | UnlimitLemma (id, name) -> replay_limitlemma id name (-1) env
-    
+
 
 
 let replay_session env =
@@ -85,11 +85,11 @@ let undo_action env =
     | Unprune id -> replay env (Prune id)
     | ((AddInstance _ | AddTrigger _ ) as ac) ->
       replay env (Prune (Hashtbl.find resulting_ids ac))
-    | LimitLemma (id, name, _) | UnlimitLemma (id, name) -> 
-      try 
-	Stack.iter (function 
+    | LimitLemma (id, name, _) | UnlimitLemma (id, name) ->
+      try
+	Stack.iter (function
 	  | (LimitLemma (id', _, _) | UnlimitLemma (id', _) as ac)
-              when id = id' -> 
+              when id = id' ->
 	    replay env ac; raise Exit
 	  | _ -> ()) env.actions;
 	replay env (LimitLemma (id, name, -1))

@@ -1,15 +1,15 @@
 (*
  * The Why certification tool
  * Copyright (C) 2002 Jean-Christophe FILLIATRE
- * 
+ *
  * This software is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * See the GNU General Public License version 2 for more details
  * (enclosed in the file GPL).
  *)
@@ -23,8 +23,8 @@
   open Options
 
   let keywords = Hashtbl.create 97
-  let () = 
-    List.iter 
+  let () =
+    List.iter
       (fun (x,y) -> Hashtbl.add keywords x y)
       [ "ac", AC;
 	"and", AND;
@@ -41,7 +41,7 @@
 	"function", FUNCTION;
 	"goal", GOAL;
 	"if", IF;
-	"in", IN; 
+	"in", IN;
 	"int", INT;
 	"let", LET;
 	"logic", LOGIC;
@@ -58,10 +58,10 @@
 	"void", VOID;
 	"with", WITH;
       ]
-	       
+
   let newline lexbuf =
     let pos = lexbuf.lex_curr_p in
-    lexbuf.lex_curr_p <- 
+    lexbuf.lex_curr_p <-
       { pos with pos_lnum = pos.pos_lnum + 1; pos_bol = pos.pos_cnum }
 
   let string_buf = Buffer.create 1024
@@ -80,7 +80,7 @@
   let decnumber s =
     let r = ref num0 in
     for i=0 to String.length s - 1 do
-      r := Num.add_num (Num.mult_num num10 !r) 
+      r := Num.add_num (Num.mult_num num10 !r)
 	(Num.num_of_int (Char.code s.[i] - Char.code '0'))
     done;
     !r
@@ -89,7 +89,7 @@
     let r = ref num0 in
     for i=0 to String.length s - 1 do
       let c = s.[i] in
-      let v = 
+      let v =
 	match c with
 	  | '0'..'9' -> Char.code c - Char.code '0'
 	  | 'a'..'f' -> Char.code c - Char.code 'a' + 10
@@ -111,53 +111,53 @@ let hexdigit = ['0'-'9''a'-'f''A'-'F']
 let ident = (letter | '?') (letter | digit | '?' | '\'')*
 
 rule token = parse
-  | newline 
+  | newline
       { newline lexbuf; token lexbuf }
-  | space+  
+  | space+
       { token lexbuf }
-  | ident as id (* identifiers *)      
-      { try 
+  | ident as id (* identifiers *)
+      { try
 	  let k = Hashtbl.find keywords id in
 	  Options.tool_req 0 "TR-Lexical-keyword";
 	  k
-	with Not_found -> 
+	with Not_found ->
 	  Options.tool_req 0 "TR-Lexical-identifier";
 	  IDENT id }
   | digit+ as s (* integers *)
       { Options.tool_req 0 "TR-Lexical-integer";
 	INTEGER s }
   | (digit+ as i) ("" as f) ['e' 'E'] (['-' '+']? as sign (digit+ as exp))
-  | (digit+ as i) '.' (digit* as f) 
+  | (digit+ as i) '.' (digit* as f)
       (['e' 'E'] (['-' '+']? as sign (digit+ as exp)))?
-  | (digit* as i) '.' (digit+ as f) 
+  | (digit* as i) '.' (digit+ as f)
       (['e' 'E'] (['-' '+']? as sign (digit+ as exp)))?
       (* decimal real literals *)
       { (*
-          Format.eprintf "decimal real literal found: i=%s f=%s sign=%a exp=%a" 
+          Format.eprintf "decimal real literal found: i=%s f=%s sign=%a exp=%a"
           i f so sign so exp;
 	*)
 	Options.tool_req 0 "TR-Lexical-real";
         let v =
 	  match exp,sign with
 	    | Some exp,Some "-" ->
-		Num.div_num (decnumber (i^f)) 
+		Num.div_num (decnumber (i^f))
 		  (Num.power_num (Num.Int 10) (decnumber exp))
-	    | Some exp,_ -> 
-		Num.mult_num (decnumber (i^f)) 
+	    | Some exp,_ ->
+		Num.mult_num (decnumber (i^f))
 		  (Num.power_num (Num.Int 10) (decnumber exp))
-	    | None,_ -> decnumber (i^f) 
+	    | None,_ -> decnumber (i^f)
 	in
-	let v = 
-	  Num.div_num v 
-	    (Num.power_num (Num.Int 10) (Num.num_of_int (String.length f))) 
+	let v =
+	  Num.div_num v
+	    (Num.power_num (Num.Int 10) (Num.num_of_int (String.length f)))
 	in
 	(* Format.eprintf " -> value = %s@." (Num.string_of_num v); *)
 	NUM v
-      } 
+      }
 
       (* hexadecimal real literals a la C99 (0x..p..) *)
   | "0x" (hexdigit+ as e) ('.' (hexdigit* as f))?
-      ['p''P'] (['+''-']? as sign) (digit+ as exp) 
+      ['p''P'] (['+''-']? as sign) (digit+ as exp)
       { (* Format.eprintf "hex num found: %s" (lexeme lexbuf); *)
 	Options.tool_req 0 "TR-Lexical-hexponent";
 	Options.tool_req 0 "TR-Lexical-hexa";
@@ -165,19 +165,19 @@ rule token = parse
 	let v =
 	  match sign with
 	    | "-" ->
-		Num.div_num (hexnumber (e^f)) 
+		Num.div_num (hexnumber (e^f))
 		  (Num.power_num (Num.Int 2) (decnumber exp))
-	    | _ -> 
-		Num.mult_num (hexnumber (e^f)) 
+	    | _ ->
+		Num.mult_num (hexnumber (e^f))
 		  (Num.power_num (Num.Int 2) (decnumber exp))
 	in
-	let v = 
-	  Num.div_num v 
-	    (Num.power_num (Num.Int 16) (Num.num_of_int (String.length f))) 
+	let v =
+	  Num.div_num v
+	    (Num.power_num (Num.Int 16) (Num.num_of_int (String.length f)))
 	in
 	(* Format.eprintf " -> value = %s@." (Num.string_of_num v); *)
 	NUM v
-      } 
+      }
   | "(*"
       { comment lexbuf; token lexbuf }
   | "'"
@@ -253,21 +253,21 @@ rule token = parse
       { HAT }
   | "\""
       { Buffer.clear string_buf; string lexbuf }
-  | eof 
+  | eof
       { EOF }
   | _ as c
       { raise (Lexical_error ("illegal character: " ^ String.make 1 c)) }
 
 and comment = parse
-  | "*)" 
+  | "*)"
       { () }
-  | "(*" 
+  | "(*"
       { comment lexbuf; comment lexbuf }
-  | newline 
+  | newline
       { newline lexbuf; comment lexbuf }
   | eof
       { raise (Lexical_error "unterminated comment") }
-  | _ 
+  | _
       { comment lexbuf }
 
 and string = parse
@@ -276,7 +276,7 @@ and string = parse
 	STRING (Buffer.contents string_buf) }
   | "\\" (_ as c)
       { Buffer.add_char string_buf (char_for_backslash c); string lexbuf }
-  | newline 
+  | newline
       { newline lexbuf; Buffer.add_char string_buf '\n'; string lexbuf }
   | eof
       { raise (Lexical_error "unterminated string") }

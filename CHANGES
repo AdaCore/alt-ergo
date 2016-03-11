@@ -1,3 +1,190 @@
+public version 1.01, February 16, 2016
+======================================
+
+* This version is based on private version 1.00 (see its CHANGES
+  below). The main difference is the new option "-backward-compat"
+  that allows to output Alt-Ergo's answers in an older syntax (<=
+  0.99.1). It is intended to be used with tools that do not support
+  the new 'slightly different' output format (e.g. option
+  -wp-alt-ergo-opt="-backward-compat" should be used with current
+  Frama-C versions).
+
+
+private version 1.20, February 09, 2016
+======================================
+
+* default value of option -age-bound increased from 10 to 50
+
+* bugfix when using option --all-models
+
+* improvements in Matching: a set of instances may cause more than one
+  conflict. It's better to detect the more precise one
+
+* remove case-split limit for the theory of arrays
+
+* bugfix in the profiler plugin
+
+* improvements in the default SAT solver
+
+
+private version 1.10, October 19, 2015
+======================================
+
+* Improvements and bug fixes in the satML plugin
+
+* Improvement of the solver of linear arithmetic in presence of
+  non-linear arithmetic parts in the equations to be solved
+
+* Many improvements in case-split analysis. In particular, this is now
+  performed by explicit calls from the SAT solver. Its behavior can be
+  controlled with the new option "-case-split-policy". Possible values
+  for this option are: "after-theory-assume" (default),
+  "before-matching", and "after-matching".
+
+* Alt-Ergo can now be called on zipped files (eg. <file>.mlw.zip or
+  <file>.why.zip). Decompression is done on the fly with camlzip.
+
+* Soundness bug fixes in arithmetic, interval calculus, union-find,
+  ...
+
+* Code reviewing/refactoring/rewriting/optimization in many parts of
+  the solver
+
+
+private version 1.00, January 29, 2015
+======================================
+
+* General Improvements:
+
+   ** theories data structures: semantic values (internal theories
+      representation of terms) are now hash-consed. This enables the
+      use of hash-based comparison (instead of structural comparison)
+      when possible
+
+   ** theories combination: the dispatcher component, that sends
+      literals assumed by the SAT solver to different theories
+      depending on whether these literals are equalities,
+      disequalities or inequalities, has been re-implemented. The new
+      code is much simpler and enables new optimizations and
+      factorizations
+
+   ** case-split analysis: we made several improvements in the
+      heuristics of the case-split analysis mechanism over finite
+      domains
+
+   ** explanations propagation: we improved explanations propagation
+      in congruence closure and linear arithmetic algorithms. This
+      makes the proofs faster thanks to a better back-jumping in the
+      SAT solver part
+
+   ** linear integer arithmetic: we re-implemented several parts of
+      linear arithmetic and introduced important improvements in the
+      Fourier-Motzkin algorithm to make it run on smaller sub-problems
+      avoiding some redundant executions. These optimizations allowed
+      a significant speed up on our internal benchmarks
+
+   ** data structures: we optimized hash-consing and some functions in
+      the "formula" and "literal" modules
+
+   ** SAT solving: we made a lot of improvements to the default
+       SAT-solver and to the SatML plugin. In particular, the decision
+       procedure part now receives facts (literals) in bulk from the
+       solvers, rather than individually, trimming the costs of
+       intermediate calls to theories reasoners, such as
+       Fourier-Motzkin
+
+   ** Matching: we extended the E-matching algorithm to also perform
+      matching modulo the theory of records. In addition, we
+      simplified matching heuristics and optimized the E-matching
+      process to avoid computing the same instances several times
+
+   ** Memory management: thanks to the ocp-memprof tool
+      (http://memprof.typerex.org/), we identified some parts of
+      Alt-Ergo that needed some improvements in order to avoid useless
+      memory allocations, and thus unburden the OCaml garbage
+      collector
+
+   ** the function that retrieves the used axioms and predicates (when
+      option 'save-used-context' is set) has been improved
+
+
+* Bug Fixes:
+
+   ** 6 in the "inequalities" module of linear arithmetic
+
+   ** 4 in the "formula" module
+
+   ** 3 in the "ty" module used for types representation and
+      manipulation
+
+   ** 2 in the "theories front-end" module that interacts with the
+      SAT solvers
+
+   ** 1 in the "congruence closure" algorithm
+
+   ** 1 in "existential quantifiers elimination" module
+
+   ** 1 in the "type-checker"
+
+   ** 1 in the "AC theory" of associative and commutative function
+      symbols
+
+   ** 1 in the "union-find" module
+
+
+* New OCamlPro Plugins:
+
+  ** profiling plugin: when activated, this plugin records and prints
+    some information about the current execution of Alt-Ergo every 'n'
+    seconds: In particular, one can observe a module being activated,
+    a function being called, the amount of time spent in every
+    module/function, the current decision/instantiation level, the
+    number of decisions/instantiations that have been made so far, the
+    number of case-splits, of boolean/theory conflicts, of assumptions
+    in the decision procedure, of generated instances per axiom, ...
+
+  ** fm-simplex plugin: when activated, this plugin is used instead of
+    the Fourier-Motzkin method to infer bounds for linear integer
+    arithmetic affine forms (which are used in the case-split analysis
+    process). This module uses the Simplex algorithm to simulate
+    particular runs of Fourier-Motzkin. In practice, the new algorithm
+    scales better on linear integer arithmetic problems containing
+    lots of inequalities
+
+
+* New Options:
+
+  -version-info: prints some information about this version of
+   Alt-Ergo (release and compilation dates, release commit ID)
+
+  -no-theory: deactivate theory reasoning. In this case, only the
+   SAT-solver and the matching parts are used
+
+  -inequalities-plugin: specify a plugin to use, instead of the
+  "default" Fourier-Motzkin algorithm, to handle inequalities of
+  linear arithmetic
+
+  -tighten-vars: when this option is set, the Fm-Simplex plugin will
+   try to infer bounds for integer variables as well. Note that this
+   option may be very expensive
+
+  -profiling-plugin: specify a profiling plugin to use to monitor an
+   execution of Alt-Ergo
+
+  -profiling <delay>: makes the profiling module prints its information
+   every <delay> seconds
+
+  -no-tcp: deactivate constraints propagation modulo theories
+
+
+* Removed Capabilities:
+
+  ** the pruning module used in the frontend is not available anymore
+
+  ** the SMT and SMT2 front-ends have been removed. We plan to implement a
+     new front-end for SMT2 in upcoming releases
+
+
 version 0.99.1, December 30, 2014
 =================================
   o the "SAT solving" part can now be delegated to an external plugin;

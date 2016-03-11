@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -57,14 +57,14 @@ val compare : t -> t -> int
 val equal : t -> t -> bool
 val hash : t -> int
 
-val vars_of : t -> Symbols.Set.t
-val vars_of_as_term : t -> Set.t
+val vars_of : t -> Set.t Symbols.Map.t -> Set.t Symbols.Map.t
 val vty_of : t -> Ty.Svty.t
 
 val pred : t -> t
 
 val apply_subst : subst -> t -> t
 val compare_subst : subst -> subst -> int
+val equal_subst : subst -> subst -> bool
 val fold_subst_term : (Symbols.t -> t -> 'b -> 'b) -> subst -> 'b -> 'b
 
 val union_subst : subst -> subst -> subst
@@ -78,9 +78,10 @@ val print_list : Format.formatter -> t list -> unit
 val print_list_sep : string -> Format.formatter -> t list -> unit
 val print_tagged_classes : Format.formatter -> Set.t list -> unit
 
-val dummy : t 
+val dummy : t
 
 val subterms : Set.t -> t -> Set.t
 val type_info : t -> Ty.t
 val top : unit -> t
 val bot : unit -> t
+val is_ground : t -> bool

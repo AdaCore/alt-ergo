@@ -13,7 +13,6 @@ smtlib2_lex.ml
 smtlib2_parse.ml
 smtlib2_parse.mli
 smtlib2_parse.output
-version.ml
 why_lexer.ml
 why_parser.ml
 why_parser.mli

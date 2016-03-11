@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -20,6 +20,6 @@
 (*   This file is distributed under the terms of the CeCILL-C licence         *)
 (******************************************************************************)
 
-type loc = Lexing.position * Lexing.position
+type t = Lexing.position * Lexing.position
 
-val report : Format.formatter -> Lexing.position * Lexing.position -> unit
+val report : Format.formatter -> t -> unit

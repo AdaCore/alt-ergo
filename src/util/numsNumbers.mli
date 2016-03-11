@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -20,8 +20,8 @@
 (*   This file is distributed under the terms of the CeCILL-C licence         *)
 (******************************************************************************)
 
-open Why_ptree
+(** Integers implementation. Based on big_int **)
+module Z : NumbersInterface.ZSig with type t = Big_int.big_int
 
-val split_and_prune :
-  int -> (int tdecl, int) annoted list -> 
-  ((int tdecl,int) annoted * bool) list list
+(** Rationals implementation. Based on nums **)
+module Q : NumbersInterface.QSig with module Z = Z

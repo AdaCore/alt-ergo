@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -22,7 +22,7 @@
 
 type t
 
-type exp = 
+type exp =
   | Literal of Literal.LT.t
   | Fresh of int
   | Bj of Formula.t
@@ -58,8 +58,12 @@ val print_proof : Format.formatter -> t -> unit
 
 val formulas_of : t -> Formula.Set.t
 
+val bj_formulas_of : t -> Formula.Set.t
+
 module MI : Map.S with type key = int
 
 val literals_ids_of : t -> int MI.t
 
 val make_deps : Formula.Set.t -> t
+
+val has_no_bj : t -> bool

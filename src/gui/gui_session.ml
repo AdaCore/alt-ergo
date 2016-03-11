@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -31,7 +31,7 @@ type action =
 
 let resulting_ids = Hashtbl.create 17
 
-let save actions ac = 
+let save actions ac =
   (* (match ac with *)
   (*   | Prune id -> Format.eprintf "Prune %d@." id *)
   (*   | IncorrectPrune id -> Format.eprintf "Incorrectprune %d@." id *)
@@ -47,14 +47,14 @@ let save actions ac =
 
 let compute_ids_offsets old_res res =
   List.fold_left (fun acc (name1, id1) ->
-    try let id2 = List.assoc name1 res in 
+    try let id2 = List.assoc name1 res in
 	(* if id1 = id2 then acc else *) (id1, id2 - id1)::acc
     with Not_found -> acc) [] old_res
 
 let offset_id id offsets =
   let nid = ref id in
-  try 
-    List.iter 
+  try
+    List.iter
       (fun (i, off) ->
 	if id <= i then (nid := id + off; raise Exit))
       offsets;
@@ -83,9 +83,9 @@ let offset_stack st offsets =
   List.iter (fun ac -> Stack.push ac st) !l
 
 let read_actions res = function
-  | Some cin -> 
+  | Some cin ->
     begin
-      try 
+      try
 	let old_res = (input_value cin: (string * int) list) in
 	let st = (input_value cin: action Stack.t) in
 	let offsets = compute_ids_offsets old_res res in
@@ -102,7 +102,7 @@ let safe_session actions =
   let l = ref [] in
   Stack.iter (fun a -> l := a::!l) actions;
   let list_actions = !l in
-  let _, incorrect_prunes = 
+  let _, incorrect_prunes =
     List.fold_left (fun (prunes, incorrect_prunes) -> function
       | Prune id -> SI.add id prunes, incorrect_prunes
       | IncorrectPrune id -> prunes, SI.add id incorrect_prunes

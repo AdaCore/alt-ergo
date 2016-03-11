@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -20,6 +20,6 @@
 (*   This file is distributed under the terms of the CeCILL-C licence         *)
 (******************************************************************************)
 
-open Why_ptree
-
-val make : ((int tdecl, int) annoted * bool) list -> sat_tdecl Queue.t
+val make :
+  ((int Typed.tdecl, int) Typed.annoted * bool) list ->
+  Commands.sat_tdecl Queue.t

@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -21,15 +21,19 @@
 (******************************************************************************)
 
 type 'a view = private
-               | Eq of 'a * 'a 
+               | Eq of 'a * 'a
                | Distinct of bool * 'a list
                | Builtin of bool * Hstring.t * 'a list
                | Pred of 'a * bool
 
-type 'a atom_view = 
+type 'a atom_view
+(* We do not need to export internal representation
+   of literals !
+   =
   | EQ of 'a * 'a
   | BT of Hstring.t * 'a list
   | PR of 'a
+  | EQ_LIST of 'a list*)
 
 module type OrderedType = sig
   type t
@@ -86,8 +90,10 @@ module type S_Term = sig
 
   val apply_subst : Term.subst -> t -> t
 
-  val terms_of : t -> Term.Set.t
-  val vars_of : t -> Symbols.Set.t
+  val terms_nonrec : t -> Term.Set.t
+  val terms_rec : t -> Term.Set.t
+  val vars_of : t -> Term.Set.t Symbols.Map.t -> Term.Set.t Symbols.Map.t
+  val is_ground : t -> bool
   val is_in_model : t -> bool
 
 end

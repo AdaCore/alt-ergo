@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -44,14 +44,14 @@ let unprune ?(register=true) env r =
 
 let rec prune_dep env r =
   prune env r;
-  let deps = match find_tag_inversedeps env.dep r.tag  with 
+  let deps = match find_tag_inversedeps env.dep r.tag  with
     | None -> []
     | Some d -> d in
   List.iter (fun d -> prune_dep env d) deps
 
 let rec unprune_dep env r =
   unprune env r;
-  let deps = match find_tag_deps env.dep r.tag  with 
+  let deps = match find_tag_deps env.dep r.tag  with
     | None -> []
     | Some d -> d in
   List.iter (fun d -> unprune_dep env d) deps
@@ -78,10 +78,10 @@ let search_using t sbuf env =
 	  env.search_tags <- tags;
 	  List.iter (fun t -> t#set_property (`BACKGROUND "orange")) tags
 	| AF _ | QF _ -> ()
-          
+
 
 (* let hand_cursor () = Gdk.Cursor.create `TARGET *)
-          
+
 (* let arrow_cursor () = Gdk.Cursor.create `ARROW *)
 
 let set_select env sbuf = ()
@@ -99,15 +99,15 @@ let set_select env sbuf = ()
 (*   (\* 	  let _, ie = sbuf#selection_bounds in *\) *)
 (*   (\* 	  env.stop_select <- Some ie#offset; *\) *)
 (*   (\*       set_select env sbuf *\) *)
-  
+
 (*   | _ -> () *)
 
 let tag_callback t env sbuf ~origin:y z i =
   let ofs = (new GText.iter i)#offset in
   match GdkEvent.get_type z with
     | `MOTION_NOTIFY ->
-      if List.mem env.last_tag env.search_tags then 
-        env.last_tag#set_properties 
+      if List.mem env.last_tag env.search_tags then
+        env.last_tag#set_properties
 	  [`BACKGROUND "gold"; `UNDERLINE_SET false]
       (* else if List.mem env.last_tag env.proof_tags then  *)
       (*   env.last_tag#set_properties  *)
@@ -116,17 +116,17 @@ let tag_callback t env sbuf ~origin:y z i =
       (*   env.last_tag#set_properties  *)
       (*     [`BACKGROUND "pale green"; `UNDERLINE_SET false] *)
       else
-        env.last_tag#set_properties 
+        env.last_tag#set_properties
 	  [`BACKGROUND_SET false; `UNDERLINE_SET false];
       if env.ctrl then
 	begin
-	  t#set_properties 
+	  t#set_properties
 	    [`BACKGROUND "turquoise1"; `UNDERLINE `SINGLE]
 	end
       else
 	begin
 	  t#set_property (`BACKGROUND "light blue")
-	end;                         
+	end;
       env.last_tag <- t;
       env.stop_select <- Some ofs;
       set_select env sbuf;
@@ -137,8 +137,8 @@ let tag_callback t env sbuf ~origin:y z i =
 	  | None -> ()
 	  | Some an -> match an with
 	      | AD (r,_) ->
-		if env.ctrl then 
-		  if r.pruned then unprune_dep env r 
+		if env.ctrl then
+		  if r.pruned then unprune_dep env r
 		  else prune_dep env r
 		else toggle_prune env r
 	      | AF (r, Some parent) ->
@@ -155,7 +155,7 @@ let tag_callback t env sbuf ~origin:y z i =
       true
     | `BUTTON_PRESS ->
       let z = GdkEvent.Button.cast z in
-      let captured = 
+      let captured =
 	if GdkEvent.Button.button z = 1 then
 	  if env.ctrl then
 	    (search_using t sbuf env;
@@ -171,9 +171,9 @@ let tag_callback t env sbuf ~origin:y z i =
 	        | Some (AD ({c = AAxiom _}, _)) -> ": Axiom"
 	        | Some (AD ({c = AGoal _}, _)) -> ": Goal"
 	        | Some (AD ({c = ALogic _}, _)) -> ": Logic declaration"
-	        | Some (AD ({c = APredicate_def _}, _)) -> 
+	        | Some (AD ({c = APredicate_def _}, _)) ->
                   ": Predicate definition"
-	        | Some (AD ({c = AFunction_def _}, _)) -> 
+	        | Some (AD ({c = AFunction_def _}, _)) ->
                   ": Function definition"
 	        | Some (AD ({c = ATypeDecl _}, _)) -> ": Type declaration"
 	        | _ -> "" in
@@ -192,7 +192,7 @@ let tag_callback t env sbuf ~origin:y z i =
       env.stop_select <- None;
       set_select env sbuf;
       false
-	
+
     | _ -> false
 
 
@@ -215,7 +215,7 @@ let term_callback t env sbuf ~origin:y z i =
 	  end
 	else false
       | _ -> false
-	
+
 
 let rec list_uquant_vars_in_form = function
   | AFatom _ -> []
@@ -251,7 +251,7 @@ let rec is_quantified_term vars at =
   match at.at_desc with
     | ATconst _ -> false
     | ATvar s ->
-      List.fold_left 
+      List.fold_left
 	(fun b (s',_) -> b || (Symbols.equal s s')) false vars
     | ATapp (_, atl) ->
       List.fold_left
@@ -290,7 +290,7 @@ let unquantify_aatom (buffer:sbuffer) = function
   | AAlt aatl -> AAlt (List.map (unquantify_aaterm buffer) aatl)
   | AApred a -> AApred a
   | AAbuilt (h,aatl) -> AAbuilt (h, (List.map (unquantify_aaterm buffer) aatl))
-    
+
 
 let rec aterm_used_vars goal_vars at =
   match at.at_desc with
@@ -312,19 +312,19 @@ let rec aterm_used_vars goal_vars at =
       List.fold_left (fun l (_, at) -> aterm_used_vars goal_vars at @ l) [] r
 
 
-let rec unquantify_aform (buffer:sbuffer) tyenv vars_entries 
+let rec unquantify_aform (buffer:sbuffer) tyenv vars_entries
     used_vars goal_vars f pol =
   let ptag = (tag buffer) in
   let c, ve, goal_used = match f, pol with
 
-    | AFatom aa, _ -> 
+    | AFatom aa, _ ->
       AFatom (unquantify_aatom buffer aa), vars_entries, []
 
     | AFop (op, afl), _ ->
-      let nafl, ve, goal_used = 
+      let nafl, ve, goal_used =
 	List.fold_left (fun (nafl, ve, gu) af ->
-	  let res, ve, gu' = unquantify_aform buffer tyenv ve used_vars 
-	    goal_vars af.c af.polarity 
+	  let res, ve, gu' = unquantify_aform buffer tyenv ve used_vars
+	    goal_vars af.c af.polarity
 	  in
 	  (res::nafl, ve, gu'@gu))
 	  ([], vars_entries, []) afl in
@@ -338,13 +338,13 @@ let rec unquantify_aform (buffer:sbuffer) tyenv vars_entries
 	  let ((s, _) as v'), e = List.hd ve in
 	  let cdr_ve = List.tl ve in
 	  assert (v = v');
-	  if e = "" then 
+	  if e = "" then
 	    (v'::nbv, used, goal_used, cdr_ve, v'::uplet, lets)
 	  else
 	    let lb = Lexing.from_string e in
 	    let lexpr = Why_parser.lexpr Why_lexer.token lb in
 	    let at, gu =
-	      try 
+	      try
 		let tt = Why_typing.term tyenv uplet lexpr in
 		annot_of_tterm buffer tt, []
 	      with Errors.Error _ ->
@@ -356,7 +356,7 @@ let rec unquantify_aform (buffer:sbuffer) tyenv vars_entries
 		let at = annot_of_tterm buffer tt in
 		at, aterm_used_vars gv at.c
 	    in
-	    (nbv, v'::used, gu@goal_used, cdr_ve, 
+	    (nbv, v'::used, gu@goal_used, cdr_ve,
 	     v'::uplet, (uplet, s, at)::lets))
 	  ([], [], [], vars_entries, uv, []) bv in
       let aform, ve, gu =
@@ -365,13 +365,13 @@ let rec unquantify_aform (buffer:sbuffer) tyenv vars_entries
       let goal_used = gu@goal_used in
       let add_lets afc lets =
 	List.fold_left
-	  (fun af (u, s, at) -> 
+	  (fun af (u, s, at) ->
 	    new_annot buffer (AFlet (u, s, at.c, af))
 	      (Why_typing.new_id ()) (tag buffer))
 	  afc lets in
       if nbv = [] then (add_lets aform lets).c, ve, goal_used
-      else 
-	let aqf_triggers = 
+      else
+	let aqf_triggers =
 	  List.map (List.map (unquantify_aaterm buffer)) atll in
 	let aqf_triggers = List.filter
 	  (fun aatl ->
@@ -379,17 +379,17 @@ let rec unquantify_aform (buffer:sbuffer) tyenv vars_entries
 	    List.filter (fun aat -> is_quantified_term nbv aat.c) aatl <> []
 	  ) aqf_triggers in
 	if aqf_triggers = [] then (add_lets aform lets).c, ve, goal_used
-	else 
+	else
 	  let c =
 	    { aqf_bvars = nbv;
 	      aqf_upvars = List.filter (fun v -> not (List.mem v used_vars)) uv;
 	      aqf_triggers =  aqf_triggers;
 	      aqf_form =  add_lets aform lets} in
 	  (match f with
-	    | AFforall _ -> 
+	    | AFforall _ ->
 	      AFforall (new_annot buffer c (Why_typing.new_id ()) (tag buffer)),
 	      ve, goal_used
-	    | AFexists _ -> 
+	    | AFexists _ ->
 	      AFexists (new_annot buffer c (Why_typing.new_id ()) (tag buffer)),
 	      ve, goal_used
 	    | _ -> assert false)
@@ -400,16 +400,16 @@ let rec unquantify_aform (buffer:sbuffer) tyenv vars_entries
 	  aaqf.c.aqf_form.c aaqf.c.aqf_form.polarity in
       let c = { aaqf.c with aqf_form = naqf_form } in
       (match f with
-	| AFforall _ -> 
+	| AFforall _ ->
 	  AFforall (new_annot buffer c (Why_typing.new_id ()) (tag buffer)),
 	  ve, goal_used
-	| AFexists _ -> 
+	| AFexists _ ->
 	  AFexists (new_annot buffer c (Why_typing.new_id ()) (tag buffer)),
 	  ve, goal_used
 	| _ -> assert false)
 
     | AFlet (uv, s, at, aaf), _ ->
-      let naaf, ve, goal_used = 
+      let naaf, ve, goal_used =
 	unquantify_aform buffer tyenv vars_entries used_vars goal_vars
 	  aaf.c aaf.polarity
       in
@@ -419,7 +419,7 @@ let rec unquantify_aform (buffer:sbuffer) tyenv vars_entries
     | AFnamed (n, aaf), _ ->
       let naaf, ve, goal_used =
 	unquantify_aform buffer tyenv vars_entries used_vars goal_vars
-	  aaf.c aaf.polarity 
+	  aaf.c aaf.polarity
       in
       AFnamed (n, naaf), ve, goal_used
   in
@@ -431,12 +431,12 @@ let make_instance (buffer:sbuffer) vars entries afc goal_form tyenv =
   if debug () then List.iter (fun (v,e) ->
     eprintf "%a -> %s@." Symbols.print (fst v) e)
     (List.combine vars (List.rev entries));
-  let aform, _, goal_used = 
-    unquantify_aform buffer tyenv (List.combine vars (List.rev entries)) [] 
+  let aform, _, goal_used =
+    unquantify_aform buffer tyenv (List.combine vars (List.rev entries)) []
       goal_vars afc true
   in
   aform, goal_used
-    
+
 
 
 
@@ -471,7 +471,7 @@ let rec least_nested_form used_vars af =
       else least_nested_form not_covered aqf.c.aqf_form
     | _, AFlet (upvars, s, at, af) ->
       least_nested_form used_vars af
-    | _, AFnamed (_, af) -> 
+    | _, AFnamed (_, af) ->
       least_nested_form used_vars af
 
 let rec add_instance_aux ?(register=true) env id af aname vars entries =
@@ -491,31 +491,31 @@ let rec add_instance_aux ?(register=true) env id af aname vars entries =
   let ln_form = least_nested_form used_vars goal_form in
   env.inst_buffer#place_cursor  ~where:env.inst_buffer#end_iter;
   if ln_form = Exists goal_form then begin
-    let hy = 
+    let hy =
       AAxiom (loc, (sprintf "%s%s" "_instance_" aname), instance.c) in
     let ahy = new_annot env.inst_buffer hy instance.id ptag in
     let rev_ast = List.rev env.ast in
-    let rev_ast = match rev_ast with 
+    let rev_ast = match rev_ast with
       | (g,te)::l -> (g,te)::(ahy, te)::l
       | _ -> assert false
     in
     env.ast <- List.rev rev_ast;
     connect_tag env env.inst_buffer ahy.tag;
     connect_aaform env env.inst_buffer instance;
-    add_to_buffer env.errors env.inst_buffer [ahy, tyenv] 
+    add_to_buffer env.errors env.inst_buffer [ahy, tyenv]
   end
   else begin
     let instance = new_annot env.inst_buffer instance.c instance.id ptag in
-    begin match ln_form with 
+    begin match ln_form with
       | Exists lnf ->
-	lnf.c <- 
-	  AFop 
-	  (AOPand, 
+	lnf.c <-
+	  AFop
+	  (AOPand,
 	   [instance; {lnf with c = lnf.c}])
       | Forall lnf ->
-	lnf.c <- 
-	  AFop 
-	  (AOPimp, 
+	lnf.c <-
+	  AFop
+	  (AOPimp,
 	   [instance; {lnf with c = lnf.c}])
     end;
     env.inst_buffer#insert ~tags:[instance.tag] ("instance "^aname^": \n");
@@ -559,9 +559,9 @@ and popup_axiom t env offset () =
   ignore(GMisc.image ~stock:`CANCEL ~packing:phbox#add ());
   ignore(GMisc.label ~text:"Cancel" ~packing:phbox#add ());
 
-  let vars, entries, id, af, aname = 
+  let vars, entries, id, af, aname =
     match find t env.buffer env.ast with
-      | Some (AD (atd, tyenv)) -> 
+      | Some (AD (atd, tyenv)) ->
 	begin
 	  match atd.c with
 	    | AAxiom (_, aname, af) ->
@@ -580,7 +580,7 @@ and popup_axiom t env offset () =
 		~border_width:5 ~packing:pop_w#vbox#add () in
 	      let entries,_ = List.fold_left
 		(fun (entries,i) (s,ty) ->
-		  fprintf str_formatter "%a : %a = " 
+		  fprintf str_formatter "%a : %a = "
 		    Symbols.print s Ty.print ty;
 		  let text = flush_str_formatter () in
 		  ignore(
@@ -602,15 +602,15 @@ and popup_axiom t env offset () =
   let errors_l = GMisc.label ~text:"" ~packing:pop_w#vbox#pack () in
   errors_l#misc#modify_fg [`NORMAL, `NAME "red"];
   errors_l#misc#hide ();
-  
+
   ignore(button_ok#connect#clicked ~callback:
 	   (fun () ->
 	     try
 	       add_instance_entries env id af aname vars entries;
 	       pop_w#destroy ()
-		 
-	     with 
-	       | Why_lexer.Lexical_error s -> 
+
+	     with
+	       | Why_lexer.Lexical_error s ->
 		 errors_l#set_text ("Lexical error");
 		 errors_l#misc#show ()
 	       | Parsing.Parse_error ->
@@ -621,7 +621,7 @@ and popup_axiom t env offset () =
 		 errors_l#set_text (flush_str_formatter ());
 		 errors_l#misc#show ()
 	   ));
-  
+
   ignore(button_cancel#connect#clicked ~callback: pop_w#destroy);
   pop_w#show ()
 
@@ -656,7 +656,7 @@ and axiom_callback t env ~origin:y z i =
 
 and add_trigger ?(register=true) t qid env str offset (sbuf:sbuffer) =
   let iter = sbuf#get_iter (`OFFSET offset) in
-  match sbuf#forward_iter_to_source_mark 
+  match sbuf#forward_iter_to_source_mark
     ~category:(sprintf "trigger_%d" qid) iter with
       | true ->
 	begin
@@ -679,7 +679,7 @@ and add_trigger ?(register=true) t qid env str offset (sbuf:sbuffer) =
 		sbuf#insert ~iter ~tags " | ";
 	      add_aaterm_list_at sbuf tags iter "," atl;
 	      qf.c.aqf_triggers <- qf.c.aqf_triggers@[atl];
-	      if register then 
+	      if register then
 		save env.actions (AddTrigger (qf.id, sbuf=env.inst_buffer, str));
               commit_tags_buffer sbuf
 	    | _ -> assert false
@@ -690,7 +690,7 @@ and readd_trigger ?(register=true) env id str inst_buf =
   try
     match findbyid id env.ast with
       | QF qf ->
-	let sbuf = 
+	let sbuf =
 	  if inst_buf then env.inst_buffer else env.buffer in
 	add_trigger ~register qf.tag id env str 0 sbuf
       | _ -> assert false
@@ -701,14 +701,14 @@ and popup_trigger t qid env (sbuf:sbuffer) offset () =
   let pop_w = GWindow.dialog
     ~title:"Add new (multi) trigger"
     ~allow_grow:true
-    ~width:400 
+    ~width:400
     ~height:100 ()
   (* ~icon:(GdkPixbuf.from_xpm_data Logo.xpm_logo) ()  *)
   in
   let bbox = GPack.button_box `HORIZONTAL ~border_width:5 ~layout:`END
     ~child_height:20 ~child_width:85 ~spacing:10
     ~packing:pop_w#action_area#add () in
-  
+
   let button_ok = GButton.button ~packing:bbox#add () in
   let phbox = GPack.hbox ~packing:button_ok#add () in
   ignore(GMisc.image ~stock:`OK ~packing:phbox#add ());
@@ -721,32 +721,32 @@ and popup_trigger t qid env (sbuf:sbuffer) offset () =
 
   let lmanager = GSourceView2.source_language_manager ~default:true in
   let source_language = lmanager#language "alt-ergo" in
-  let buf1 = match source_language with 
+  let buf1 = match source_language with
     | Some language -> GSourceView2.source_buffer ~language
       ~highlight_syntax:true ~highlight_matching_brackets:true ()
     | None -> GSourceView2.source_buffer () in
   let sw1 = GBin.scrolled_window
-    ~vpolicy:`AUTOMATIC 
+    ~vpolicy:`AUTOMATIC
     ~hpolicy:`AUTOMATIC
     ~packing:pop_w#vbox#add () in
-  let tv1 = GSourceView2.source_view ~source_buffer:buf1 ~packing:(sw1#add) 
+  let tv1 = GSourceView2.source_view ~source_buffer:buf1 ~packing:(sw1#add)
     ~show_line_numbers:true ~wrap_mode:`CHAR() in
   let _ = tv1#misc#modify_font monospace_font in
   let _ = tv1#set_editable true in
-  
+
   let errors_l = GMisc.label ~text:"" ~packing:pop_w#vbox#pack () in
   errors_l#misc#modify_fg [`NORMAL, `NAME "red"];
   errors_l#misc#hide ();
-  
+
   ignore(button_ok#connect#clicked
-	   ~callback: 
+	   ~callback:
 	   (fun () ->
-	     try 
+	     try
 	       let str = buf1#get_text () in
 	       add_trigger t qid env str offset sbuf;
 	       pop_w#destroy ()
-	     with 
-	       | Why_lexer.Lexical_error s -> 
+	     with
+	       | Why_lexer.Lexical_error s ->
 		 errors_l#set_text ("Lexical error");
 		 errors_l#misc#show ()
 	       | Parsing.Parse_error ->
@@ -761,7 +761,7 @@ and popup_trigger t qid env (sbuf:sbuffer) offset () =
   pop_w#show ()
 
 and triggers_callback t qid env sbuf ~origin:y z i =
-  
+
   let ni = new GText.iter i in
   let offset = ni#offset in
   if tag_callback t env sbuf ~origin:y z i = true then true
@@ -790,7 +790,7 @@ and triggers_callback t qid env sbuf ~origin:y z i =
 (*   ignore (t#connect#event ~callback:(set_mark t buffer)); *)
 (*   (\* ignore (t#connect#event ~callback:(fetch_text t buffer)); *\) *)
 (*   t *)
-      
+
 
 and connect_tag env sbuf t =
   ignore (t#connect#event ~callback:(tag_callback t env sbuf))
@@ -804,7 +804,7 @@ and connect_trigger_tag env sbuf t qid =
 and connect_axiom_tag env t =
   ignore (t#connect#event ~callback:(axiom_callback t env))
 
-and connect_aterm env sbuf 
+and connect_aterm env sbuf
     { at_desc = at_desc } =
   connect_at_desc env sbuf at_desc
 
@@ -815,7 +815,7 @@ and connect_aaterm env sbuf connect_tag aat =
   connect_tag env sbuf aat.tag;
   connect_aterm env sbuf aat.c
 
-and connect_aaterm_list env sbuf 
+and connect_aaterm_list env sbuf
     connect_tag aatl =
   List.iter (connect_aaterm env sbuf connect_tag) aatl
 
@@ -832,10 +832,10 @@ and connect_at_desc env sbuf = function
     connect_aterm env sbuf t1;
     connect_aterm env sbuf t2;
     connect_aterm env sbuf t3
-  | ATrecord r -> 
+  | ATrecord r ->
     let atl = List.map snd r in
     connect_aterm_list env sbuf atl
-      
+
 and connect_aatom env sbuf aa =
   match aa with
     | AAtrue
@@ -857,16 +857,16 @@ and connect_quant_form env sbuf
 
 and connect_triggers env sbuf trs =
   List.iter (connect_aaterm_list env sbuf connect_tag) trs
-    
+
 and connect_aform env sbuf = function
   | AFatom a -> connect_aatom env sbuf a
   | AFop (op, afl) -> connect_aaform_list env sbuf afl
   | AFforall aqf
-  | AFexists aqf -> 
+  | AFexists aqf ->
     connect_trigger_tag env sbuf aqf.tag aqf.id;
     connect_quant_form env sbuf aqf.c
   | AFlet (vs, s, t, aaf) ->
-    connect_aterm env sbuf t;      
+    connect_aterm env sbuf t;
     connect_aform env sbuf aaf.c
   | AFnamed (_, aaf) ->
     connect_aform env sbuf aaf.c
@@ -892,11 +892,11 @@ let connect_atyped_decl env td =
       connect_aform env env.buffer aaf.c
     | AFunction_def (_, _, _, _, af) ->
       connect_tag env env.buffer td.tag;
-      connect_aform env env.buffer af	
+      connect_aform env env.buffer af
     | ALogic _
     | ATypeDecl _ ->
       connect_tag env env.buffer td.tag
-	
+
 let connect env =
   List.iter (fun (t, _) -> connect_atyped_decl env t) env.ast
 
@@ -905,7 +905,7 @@ let clear_used_lemmas_tags env =
   List.iter (fun t -> t#set_property (`BACKGROUND_SET false)) env.proof_toptags;
   env.proof_tags <- MTag.empty;
   env.proof_toptags <- []
-    
+
 let show_used_lemmas env expl =
   let colormap = Gdk.Color.get_system_colormap () in
   let atags,ftags = findtags_proof expl env.ast in
@@ -915,18 +915,18 @@ let show_used_lemmas env expl =
   List.iter (fun t -> t#set_property (`BACKGROUND_GDK green_0)) atags;
   MTag.iter (fun t m ->
     let perc = ((max_mul - m) * 65535) / max_mul in
-    let green_n = Gdk.Color.alloc colormap 
+    let green_n = Gdk.Color.alloc colormap
       (`RGB (perc*1/2, (perc + 2*65535) /3, perc*1/2)) in
     t#set_property (`BACKGROUND_GDK green_n)) ftags;
   env.proof_tags <- ftags;
   env.proof_toptags <- atags
-    
+
 
 (* More efficient but invariant broken when using user instanciated axioms
    let prune_unused env expl =
    let ids = match Explanation.ids_of expl with
    | None -> []
-   | Some ids -> List.sort Pervasives.compare ids 
+   | Some ids -> List.sort Pervasives.compare ids
    in
    let prune_top d = match d.c with
    | ATypeDecl _ | AGoal _ | ALogic _ -> ()
@@ -935,7 +935,7 @@ let show_used_lemmas env expl =
    let rec aux dont ast ids =
    match ast, ids with
    | [], _ | _, [] -> ()
-   
+
    | (d, _)::rast, id::rids ->
    if id = d.id then (* is d *)
    aux false rast rids
@@ -955,8 +955,8 @@ let prune_unused env =
     | ATypeDecl _ | AGoal _ | ALogic _ -> ()
     | _ -> prune env d
   in
-  List.iter (fun (d, _) -> 
-    if not (List.mem d.ptag env.proof_toptags) 
-      && not (MTag.mem d.ptag env.proof_tags) 
+  List.iter (fun (d, _) ->
+    if not (List.mem d.ptag env.proof_toptags)
+      && not (MTag.mem d.ptag env.proof_tags)
     then prune_top d
   ) env.ast

@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -33,8 +33,8 @@ module type S = sig
 
   val find_r : t -> r -> r * Explanation.t
 
-  val union : 
-    t -> r -> r -> Explanation.t -> 
+  val union :
+    t -> r -> r -> Explanation.t ->
     t * (r * (r * r * Explanation.t) list * r) list
 
   val distinct : t -> r list -> Explanation.t -> t
@@ -45,12 +45,15 @@ module type S = sig
 
   val class_of : t -> Term.t -> Term.t list
   val cl_extract : t -> Term.Set.t list
-  val model : t -> 
+  val model : t ->
     (r * Term.t list * (Term.t * r) list) list * (Term.t list) list
 
   val print : Format.formatter -> t -> unit
   val term_repr : t -> Term.t -> Term.t
 
+  val make : t -> Term.t -> r (* may raise Not_found *)
+
+  val is_normalized : t -> r -> bool
 end
 
 module Make (X : Sig.X) : S with type r = X.r

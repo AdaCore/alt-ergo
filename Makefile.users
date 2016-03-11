@@ -5,14 +5,14 @@ VERSION=0.99.1
 LOCAL_INC = -I src/util -I src/structures -I src/theories -I src/instances \
     -I src/sat -I src/preprocess -I src/parsing -I src/gui -I src/main
 
-INCLUDES = $(OCAMLGRAPHLIB) $(LABLGTK2LIB) $(LOCAL_INC)
+INCLUDES = $(ZARITHLIB) $(OCAMLGRAPHLIB) $(LABLGTK2LIB) $(LOCAL_INC)
 #for coverage # -I /usr/local/lib/ocaml/3.12.1/bisect -pp "camlp4o str.cma /usr/local/lib/ocaml/3.12.1/bisect/bisect_pp.cmo"
 
 BFLAGS = -annot -g $(INCLUDES)
 OFLAGS = -annot -inline 100 $(INCLUDES)
 # -for-pack AltErgo
 
-BIBBYTE = nums.cma graph.cma unix.cma dynlink.cma str.cma
+BIBBYTE = zarith.cma nums.cma unix.cma dynlink.cma str.cma
 # for coverage bisect.cma 
 
 BIBOPT = $(BIBBYTE:.cma=.cmxa)
@@ -38,21 +38,21 @@ else
 all: byte
 endif
 
-GENERATED = src/util/version.ml \
+GENERATED = src/util/config.ml \
             src/parsing/why_parser.ml \
             src/parsing/why_parser.mli \
-            src/parsing/why_lexer.ml \
-            src/parsing/smt_parser.ml \
-            src/parsing/smt_parser.mli \
-            src/parsing/smt_lex.ml \
-            src/parsing/smtlib2_parse.ml \
-            src/parsing/smtlib2_parse.mli \
-            src/parsing/smtlib2_lex.ml
+            src/parsing/why_lexer.ml
 
 # bytecode and native-code compilation
 ######################################
 
-CMO = src/util/version.cmo \
+CMO = src/util/config.cmo \
+      src/util/version.cmo \
+      src/util/myUnix.cmo \
+      src/util/util.cmo \
+      src/util/lists.cmo \
+      src/util/numsNumbers.cmo \
+      src/util/zarithNumbers.cmo \
       src/util/numbers.cmo \
       src/util/timers.cmo \
       src/util/options.cmo \
@@ -63,39 +63,36 @@ CMO = src/util/version.cmo \
       src/structures/exception.cmo \
       src/structures/symbols.cmo \
       src/structures/ty.cmo \
-      src/structures/why_ptree.cmo \
-      src/structures/smtlib2_ast.cmo \
+      src/structures/parsed.cmo \
+      src/structures/typed.cmo \
       src/structures/term.cmo \
       src/structures/literal.cmo \
       src/structures/formula.cmo \
       src/structures/explanation.cmo \
-      src/parsing/errors.cmo \
+      src/structures/errors.cmo \
+      src/util/profiling_default.cmo \
+      src/util/profiling.cmo \
       src/parsing/why_parser.cmo \
       src/parsing/why_lexer.cmo \
-      src/parsing/smt_parser.cmo \
-      src/parsing/smt_lex.cmo \
-      src/parsing/smtlib2_parse.cmo \
-      src/parsing/smtlib2_lex.cmo \
       src/preprocess/existantial.cmo \
-      src/preprocess/smt_to_why.cmo \
-      src/preprocess/smtlib2_to_why.cmo \
       src/preprocess/triggers.cmo \
       src/preprocess/why_typing.cmo \
       src/preprocess/cnf.cmo \
-      src/preprocess/pruning.cmo \
       src/instances/matching.cmo \
       src/theories/polynome.cmo \
       src/theories/ac.cmo \
       src/theories/uf.cmo \
       src/theories/use.cmo \
       src/theories/intervals.cmo \
-      src/theories/fm.cmo \
+      src/theories/inequalities.cmo \
+      src/theories/intervalCalculus.cmo \
       src/theories/arith.cmo \
       src/theories/records.cmo \
       src/theories/bitv.cmo \
       src/theories/arrays.cmo \
       src/theories/sum.cmo \
       src/theories/combine.cmo \
+      src/theories/ccx.cmo \
       src/theories/theory.cmo \
       src/sat/sat_solvers.cmo
 
@@ -156,21 +153,20 @@ endif
 
 .PHONY: gui
 
-src/util/version.ml: config.status
-	@echo "let version = \""$(VERSION)"\"" >> src/util/version.ml
-	@echo "let date = \""`LANG=en_US; date`"\"" >> src/util/version.ml
-	@echo "let bindir = \""$(BINDIR)"\"" >> src/util/version.ml
-	@echo "let libdir = \""$(LIBDIR)"\"" >> src/util/version.ml
-	@echo "let pluginsdir = \""$(PLUGINSDIR)"\"" >> src/util/version.ml
-	@echo "let datadir = \""$(DATADIR)"\"" >> src/util/version.ml
-	@echo "let mandir = \""$(MANDIR)"\"" >> src/util/version.ml
+src/util/config.ml: config.status
+	@echo "let date = \""`LANG=en_US; date`"\"" >> src/util/config.ml
+	@echo "let bindir = \""$(BINDIR)"\"" >> src/util/config.ml
+	@echo "let libdir = \""$(LIBDIR)"\"" >> src/util/config.ml
+	@echo "let pluginsdir = \""$(PLUGINSDIR)"\"" >> src/util/config.ml
+	@echo "let datadir = \""$(DATADIR)"\"" >> src/util/config.ml
+	@echo "let mandir = \""$(MANDIR)"\"" >> src/util/config.ml
 
 META: config.status
 	@echo "description = \"API of Alt-Ergo: An automatic theorem prover dedicated to program verification\"" > META
 	@echo "version = \""$(VERSION)"\"" >> META
 #	@echo "archive(byte) = \"altErgo.cmo\"" >> META
 #	@echo "archive(native) = \"altErgo.cmx\"" >> META
-	@echo "requires = \"unix num ocamlgraph\"" >> META
+	@echo "requires = \"unix num zarith\"" >> META
 
 
 
@@ -260,6 +256,57 @@ clean:
 	$(OCAMLDEP) -slash $(LOCAL_INC) src/util/*.ml* src/structures/*.ml* src/theories/*.ml* src/instances/*.ml* src/sat/*.ml* src/preprocess/*.ml* src/parsing/*.ml* src/gui/*.ml* src/main/*.ml* > .depend
 
 include .depend
+
+
+FM-SIMPLEX-CMO = non-free/plugins/common/vec.cmo \
+                 non-free/plugins/fm-simplex/simplex_cache.cmo \
+                 non-free/plugins/fm-simplex/simplex.cmo \
+                 non-free/plugins/fm-simplex/fmSimplexIneqs.cmo
+
+FM-SIMPLEX-CMX = $(FM-SIMPLEX-CMO:.cmo=.cmx)
+
+fm-simplex-plugin.cmxs: $(CMX) $(FM-SIMPLEX-CMX)
+	$(if $(QUIET),@echo 'Library $@' &&) $(OCAMLOPT) $(INCLUDES)  -shared -o $@ $(FM-SIMPLEX-CMX)
+
+fm-simplex-plugin.cma: $(CMO) $(FM-SIMPLEX-CMO)
+	$(if $(QUIET),@echo 'Library $@' &&) $(OCAMLC) $(INCLUDES)  -a        -o $@ $(FM-SIMPLEX-CMO)
+
+ifeq ($(OCAMLBEST),opt)
+fm-simplex: fm-simplex-plugin.cmxs
+else
+fm-simplex: fm-simplex-plugin.cma
+endif
+
+install-fm-simplex: fm-simplex
+ifeq ($(OCAMLBEST),opt)
+	mkdir -p $(PLUGINSDIR)
+	cp -f fm-simplex-plugin.cmxs $(PLUGINSDIR)
+else
+	mkdir -p $(PLUGINSDIR)
+	cp -f fm-simplex-plugin.cma $(PLUGINSDIR)
+endif
+
+
+profiler-plugin.cmxs: $(CMX) non-free/plugins/profiler/profiler.cmx
+	$(if $(QUIET),@echo 'Library $@' &&) $(OCAMLOPT) $(INCLUDES)  -shared -o $@ non-free/plugins/profiler/profiler.cmx
+
+profiler-plugin.cma: $(CMO) non-free/plugins/profiler/profiler.cmo
+	$(if $(QUIET),@echo 'Library $@' &&) $(OCAMLC) $(INCLUDES)  -a        -o $@ non-free/plugins/profiler/profiler.cmo
+
+ifeq ($(OCAMLBEST),opt)
+profiler: profiler-plugin.cmxs
+else
+profiler: profiler-plugin.cma
+endif
+
+install-profiler: profiler
+ifeq ($(OCAMLBEST),opt)
+	mkdir -p $(PLUGINSDIR)
+	cp -f profiler-plugin.cmxs $(PLUGINSDIR)
+else
+	mkdir -p $(PLUGINSDIR)
+	cp -f profiler-plugin.cma $(PLUGINSDIR)
+endif
 
 show-dest-dirs:
 	@echo BINDIR     = $(BINDIR)

@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -20,9 +20,9 @@
 (*   This file is distributed under the terms of the CeCILL-C licence         *)
 (******************************************************************************)
 
-open Why_ptree
+open Parsed
+open Typed
 open Gui_session
-open Loc
 
 type sbuffer = GSourceView2.source_buffer
 
@@ -81,7 +81,7 @@ type timers_model = {
 }
 
 type 'a annoted =
-    { mutable c : 'a; 
+    { mutable c : 'a;
       mutable pruned : bool;
       mutable polarity : bool;
       tag : GText.tag;
@@ -91,15 +91,15 @@ type 'a annoted =
       mutable line : int;
     }
 
-type aterm = 
+type aterm =
     { at_ty : Ty.t; at_desc : at_desc }
 
-and at_desc = 
+and at_desc =
   | ATconst of tconstant
   | ATvar of Symbols.t
   | ATapp of Symbols.t * aterm list
   | ATinfix of aterm * Symbols.t * aterm
-  | ATprefix of Symbols.t * aterm 
+  | ATprefix of Symbols.t * aterm
   | ATget of aterm * aterm
   | ATset of aterm * aterm * aterm
   | ATextract of aterm * aterm * aterm
@@ -108,9 +108,9 @@ and at_desc =
   | ATdot of aterm * Hstring.t
   | ATrecord of (Hstring.t * aterm) list
   | ATnamed of Hstring.t * aterm
-      
 
-type aatom = 
+
+type aatom =
   | AAtrue
   | AAfalse
   | AAeq of aterm annoted list
@@ -122,9 +122,9 @@ type aatom =
   | AAbuilt of Hstring.t * aterm annoted list
 
 type aoplogic =
-    AOPand |AOPor | AOPimp | AOPnot | AOPif of aterm | AOPiff 
+    AOPand |AOPor | AOPimp | AOPnot | AOPif of aterm | AOPiff
 
-type aquant_form = {       
+type aquant_form = {
   aqf_bvars : (Symbols.t * Ty.t) list ;
   aqf_upvars : (Symbols.t * Ty.t) list ;
   mutable aqf_triggers : aterm annoted list list ;
@@ -139,15 +139,15 @@ and aform =
   | AFlet of (Symbols.t * Ty.t) list * Symbols.t * aterm * aform annoted
   | AFnamed of Hstring.t * aform annoted
 
-type atyped_decl = 
-  | AAxiom of loc * string * aform
-  | ARewriting of loc * string * ((aterm rwt_rule) annoted) list
-  | AGoal of loc * goal_sort * string * aform annoted
-  | ALogic of loc * string list * plogic_type
-  | APredicate_def of loc * string * (string * ppure_type) list * aform
-  | AFunction_def 
-      of loc * string * (string * ppure_type) list * ppure_type * aform
-  | ATypeDecl of loc * string list * string * body_type_decl
+type atyped_decl =
+  | AAxiom of Loc.t * string * aform
+  | ARewriting of Loc.t * string * ((aterm rwt_rule) annoted) list
+  | AGoal of Loc.t * goal_sort * string * aform annoted
+  | ALogic of Loc.t * string list * plogic_type
+  | APredicate_def of Loc.t * string * (string * ppure_type) list * aform
+  | AFunction_def
+      of Loc.t * string * (string * ppure_type) list * ppure_type * aform
+  | ATypeDecl of Loc.t * string list * string * body_type_decl
 
 
 type annoted_node =
@@ -196,14 +196,14 @@ val create_env :
   error_model ->
   inst_model ->
   GMisc.statusbar_context ->
-  (atyped_decl annoted * Why_typing.env) list -> 
+  (atyped_decl annoted * Why_typing.env) list ->
   (atyped_decl annoted list * atyped_decl annoted list) MDep.t ->
   action Stack.t ->
   (string * int) list ->
   env
 
 val create_replay_env :
-  sbuffer -> 
+  sbuffer ->
   error_model ->
   inst_model ->
   (atyped_decl annoted * Why_typing.env) list ->
@@ -211,19 +211,19 @@ val create_replay_env :
   (string * int) list ->
   env
 
-val find : 
-  GText.tag -> sbuffer -> (atyped_decl annoted * Why_typing.env) list -> 
+val find :
+  GText.tag -> sbuffer -> (atyped_decl annoted * Why_typing.env) list ->
   annoted_node option
 
-val find_decl : 
-  GText.tag -> sbuffer -> (atyped_decl annoted * Why_typing.env) list -> 
+val find_decl :
+  GText.tag -> sbuffer -> (atyped_decl annoted * Why_typing.env) list ->
   annoted_node option
 
 val find_tag_inversedeps :
   (atyped_decl annoted list * atyped_decl annoted list) MDep.t ->
   GText.tag -> atyped_decl annoted list option
 
-val find_tag_deps : 
+val find_tag_deps :
   (atyped_decl annoted list * atyped_decl annoted list) MDep.t ->
   GText.tag -> atyped_decl annoted list option
 
@@ -231,16 +231,16 @@ val make_dep :
   (atyped_decl annoted  * Why_typing.env) list ->
   (atyped_decl annoted list * atyped_decl annoted list) MDep.t
 
-val tag : sbuffer -> GText.tag 
+val tag : sbuffer -> GText.tag
 
 val new_annot : sbuffer -> 'a -> int -> GText.tag -> 'a annoted
 
-val annot : 
-  sbuffer -> ((int tdecl, int) Why_ptree.annoted * Why_typing.env) list -> 
+val annot :
+  sbuffer -> ((int tdecl, int) Typed.annoted * Why_typing.env) list ->
   (atyped_decl annoted * Why_typing.env) list
 
-val annot_of_tterm : 
-  sbuffer -> (int tterm, int) Why_ptree.annoted -> aterm annoted
+val annot_of_tterm :
+  sbuffer -> (int tterm, int) Typed.annoted -> aterm annoted
 
 val add_aaterm_list_at : sbuffer ->
   GText.tag list -> GText.iter -> string -> aterm annoted list -> unit
@@ -248,36 +248,36 @@ val add_aaterm_list_at : sbuffer ->
 val add_aaform : error_model -> sbuffer -> int -> GText.tag list ->
   aform annoted -> unit
 
-val to_ast : 
-  (atyped_decl annoted * Why_typing.env) list -> 
-  (int tdecl, int) Why_ptree.annoted list
+val to_ast :
+  (atyped_decl annoted * Why_typing.env) list ->
+  (int tdecl, int) Typed.annoted list
 
-val add_to_buffer : 
+val add_to_buffer :
   error_model -> sbuffer -> (atyped_decl annoted * Why_typing.env) list -> unit
 
 val print_typed_decl_list  :
-  Format.formatter -> (int tdecl, int) Why_ptree.annoted list -> unit
+  Format.formatter -> (int tdecl, int) Typed.annoted list -> unit
 
-val findtags_using : 
-  atyped_decl -> (atyped_decl annoted * Why_typing.env) list -> GText.tag list 
+val findtags_using :
+  atyped_decl -> (atyped_decl annoted * Why_typing.env) list -> GText.tag list
 
-val findtags_dep : 
-  aterm -> (atyped_decl annoted * Why_typing.env) list -> GText.tag list 
+val findtags_dep :
+  aterm -> (atyped_decl annoted * Why_typing.env) list -> GText.tag list
 
-val findtags_proof : 
+val findtags_proof :
   Explanation.t -> (atyped_decl annoted * Why_typing.env) list ->
   GText.tag list * int MTag.t
 
-val find_line : 
+val find_line :
   int -> (atyped_decl annoted * 'a) list -> int * GText.tag
 
-val findbyid : 
+val findbyid :
   int -> (atyped_decl annoted * Why_typing.env) list -> annoted_node
 
-val findbyid_decl : 
+val findbyid_decl :
   int -> (atyped_decl annoted * Why_typing.env) list -> annoted_node
 
-val compute_resulting_ids : 
+val compute_resulting_ids :
   (atyped_decl annoted * Why_typing.env) list -> (string * int) list
 
 

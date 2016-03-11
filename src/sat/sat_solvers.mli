@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -30,13 +30,13 @@ module type S = sig
   (* the empty sat-solver context *)
   val empty : unit -> t
   val empty_with_inst : (Formula.t -> bool) -> t
-    
+
   (* [assume env f] assume a new formula [f] in [env]. Raises Unsat if
      [f] is unsatisfiable in [env] *)
   val assume : t -> Formula.gformula -> t
-    
+
   (* [pred_def env f] assume a new predicate definition [f] in [env]. *)
-  val pred_def : t -> Formula.t -> t
+  val pred_def : t -> Formula.t -> string -> Loc.t -> t
 
   (* [unsat env f size] checks the unsatisfiability of [f] in
      [env]. Raises I_dont_know when the proof tree's height reaches
@@ -45,19 +45,20 @@ module type S = sig
 
   val print_model : header:bool -> Format.formatter -> t -> unit
 
-  val start : unit -> unit
-  val stop : unit -> int64
+  val reset_steps : unit -> unit
+  val get_steps : unit -> int64
 
-  (* returns names of used axioms/predicates * unused axioms/predicates *)
-  val retrieve_used_context : t -> Explanation.t -> string list * string list
+  (* returns used axioms/predicates * unused axioms/predicates *)
+  val retrieve_used_context :
+    t -> Explanation.t -> Formula.t list * Formula.t list
 end
 
 (*** Dfs_sat ***)
-module Dfs_sat : S 
+module Dfs_sat : S
 
 val get_current : unit -> (module S)
 (** returns the current activated SAT-solver. The default value is Dfs_sat.
-    When the selected SAT-solver is an external plugin, the first call of this 
+    When the selected SAT-solver is an external plugin, the first call of this
     function will attemp to dynamically load it **)
 
 val set_current : (module S) -> unit

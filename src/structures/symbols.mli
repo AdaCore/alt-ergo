@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -20,14 +20,14 @@
 (*   This file is distributed under the terms of the CeCILL-C licence         *)
 (******************************************************************************)
 
-type operator = 
-  | Plus | Minus | Mult | Div | Modulo | Concat | Extract 
+type operator =
+  | Plus | Minus | Mult | Div | Modulo | Concat | Extract
   | Get | Set | Access of Hstring.t | Record
 
 type name_kind = Ac | Constructor | Other
 
-type t = 
-  | True 
+type t =
+  | True
   | False
   | Void
   | Name of Hstring.t * name_kind
@@ -55,9 +55,9 @@ val print : Format.formatter -> t -> unit
 val dummy : t
 
 val fresh : string -> t
-  
-val is_get : t -> bool 
-val is_set : t -> bool 
+
+val is_get : t -> bool
+val is_set : t -> bool
 
 val fake_eq  : t
 val fake_neq : t

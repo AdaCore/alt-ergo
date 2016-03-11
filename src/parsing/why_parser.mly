@@ -1,15 +1,15 @@
 /*
 * The Why certification tool
 * Copyright (C) 2002 Jean-Christophe FILLIATRE
-* 
+*
 * This software is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public
   * License version 2, as published by the Free Software Foundation.
-    * 
+    *
     * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * See the GNU General Public License version 2 for more details
  * (enclosed in the file GPL).
  */
@@ -18,7 +18,7 @@
 
 %{
 
-  open Why_ptree
+  open Parsed
   open Parsing
   open Format
   open Options
@@ -30,20 +30,20 @@
   let mk_ppl loc d = { pp_loc = loc; pp_desc = d }
   let mk_pp d = mk_ppl (loc ()) d
   let mk_pp_i i d = mk_ppl (loc_i i) d
-		    
+
   let infix_ppl loc a i b = mk_ppl loc (PPinfix (a, i, b))
   let infix_pp a i b = infix_ppl (loc ()) a i b
 
   let prefix_ppl loc p a = mk_ppl loc (PPprefix (p, a))
   let prefix_pp p a = prefix_ppl (loc ()) p a
 
-  let check_binary_mode s = 
+  let check_binary_mode s =
     String.iter (fun x-> if x<>'0' && x<>'1' then raise Parsing.Parse_error) s;
     s
 
 %}
 
-/* Tokens */ 
+/* Tokens */
 
 %token <string> IDENT
 %token <string> INTEGER
@@ -56,11 +56,11 @@
 %token BOOL COLON COMMA PV DISTINCT DOT ELSE EOF EQUAL
 %token EXISTS FALSE VOID FORALL FUNCTION GE GOAL GT CHECK CUT ADDTERM
 %token IF IN INT BITV
-%token LE LET LEFTPAR LEFTSQ LEFTBR LOGIC LRARROW LT MINUS 
-%token NOT NOTEQ OR PERCENT PLUS PREDICATE PROP 
+%token LE LET LEFTPAR LEFTSQ LEFTBR LOGIC LRARROW LT MINUS
+%token NOT NOTEQ OR PERCENT PLUS PREDICATE PROP
 %token QUOTE REAL UNIT
 %token RIGHTPAR RIGHTSQ RIGHTBR
-%token SLASH 
+%token SLASH
 %token THEN TIMES TRUE TYPE
 %token REACH
 
@@ -71,7 +71,7 @@
 %nonassoc prec_forall prec_exists
 %right ARROW LRARROW
 %right OR
-%right AND 
+%right AND
 %nonassoc prec_ite
 %left prec_relation EQUAL NOTEQ LT LE GT GE
 %left PLUS MINUS
@@ -86,25 +86,25 @@
 
 /* Entry points */
 
-%type <Why_ptree.lexpr list> trigger
+%type <Parsed.lexpr list> trigger
 %start trigger
-%type <Why_ptree.lexpr> lexpr
+%type <Parsed.lexpr> lexpr
 %start lexpr
-%type <Why_ptree.file> file
+%type <Parsed.file> file
 %start file
 %%
 
 file:
-| list1_decl EOF 
+| list1_decl EOF
    { Options.tool_req 0 "TR-Lexical-file"; $1 }
-| EOF 
+| EOF
    { Options.tool_req 0 "TR-Lexical-file"; [] }
 ;
 
 list1_decl:
-| decl 
+| decl
    { [$1] }
-| decl list1_decl 
+| decl list1_decl
    { $1 :: $2 }
 ;
 
@@ -121,7 +121,7 @@ decl:
 | LOGIC ac_modifier list1_named_ident_sep_comma COLON logic_type
    { Options.tool_req 0 "TR-Lexical-decl";
      Logic (loc (), $2, $3, $5) }
-| FUNCTION named_ident LEFTPAR list0_logic_binder_sep_comma RIGHTPAR COLON 
+| FUNCTION named_ident LEFTPAR list0_logic_binder_sep_comma RIGHTPAR COLON
   primitive_type EQUAL lexpr
    { Options.tool_req 0 "TR-Lexical-decl";
      Function_def (loc (), $2, $4, $7, $9) }
@@ -147,25 +147,25 @@ ac_modifier:
 | AC    { Symbols.Ac }
 
 primitive_type:
-| INT 
+| INT
    { Options.tool_req 0 "TR-Lexical-primitive-type";
      PPTint }
-| BOOL 
+| BOOL
    { Options.tool_req 0 "TR-Lexical-primitive-type";
      PPTbool }
-| REAL 
+| REAL
    { Options.tool_req 0 "TR-Lexical-primitive-type";
      PPTreal }
-| UNIT 
+| UNIT
    { Options.tool_req 0 "TR-Lexical-primitive-type";
      PPTunit }
 | BITV LEFTSQ INTEGER RIGHTSQ
    { Options.tool_req 0 "TR-Lexical-primitive-type";
      PPTbitv(int_of_string $3) }
-| ident 
+| ident
    { Options.tool_req 0 "TR-Lexical-primitive-type";
      PPTexternal ([], $1, loc ()) }
-| type_var 
+| type_var
    { Options.tool_req 0 "TR-Lexical-primitive-type";
      PPTvarid ($1, loc ()) }
 | primitive_type ident
@@ -212,7 +212,7 @@ list1_logic_binder_sep_comma:
 ;
 
 logic_binder:
-| ident COLON primitive_type       
+| ident COLON primitive_type
     { Options.tool_req 0 "TR-Lexical-logic-binder";
      (loc_i 1, $1, $3) }
 ;
@@ -224,7 +224,7 @@ list1_constructors_sep_bar:
 
 
 lexpr:
-    
+
 | simple_expr { $1 }
 
 /* binary operators */
@@ -244,16 +244,16 @@ lexpr:
 | lexpr PERCENT lexpr
    { Options.tool_req 0 "TR-Lexical-expr";
      infix_pp $1 PPmod $3 }
-| lexpr AND lexpr 
+| lexpr AND lexpr
    { Options.tool_req 0 "TR-Lexical-expr";
      infix_pp $1 PPand $3 }
-| lexpr OR lexpr 
+| lexpr OR lexpr
    { Options.tool_req 0 "TR-Lexical-expr";
      infix_pp $1 PPor $3 }
-| lexpr LRARROW lexpr 
+| lexpr LRARROW lexpr
    { Options.tool_req 0 "TR-Lexical-expr";
      infix_pp $1 PPiff $3 }
-| lexpr ARROW lexpr 
+| lexpr ARROW lexpr
    { Options.tool_req 0 "TR-Lexical-expr";
      infix_pp $1 PPimplies $3 }
 | lexpr relation lexpr %prec prec_relation
@@ -262,7 +262,7 @@ lexpr:
 
 /* unary operators */
 
-| NOT lexpr 
+| NOT lexpr
    { Options.tool_req 0 "TR-Lexical-expr";
      prefix_pp PPnot $2 }
 | MINUS lexpr %prec uminus
@@ -286,7 +286,7 @@ lexpr:
 
 /* predicate or function calls */
 
-| DISTINCT LEFTPAR list2_lexpr_sep_comma RIGHTPAR 
+| DISTINCT LEFTPAR list2_lexpr_sep_comma RIGHTPAR
    { Options.tool_req 0 "TR-Lexical-expr";
      mk_pp (PPdistinct $3) }
 
@@ -295,12 +295,12 @@ lexpr:
    { Options.tool_req 0 "TR-Lexical-expr";
      mk_pp (PPif ($2, $4, $6)) }
 
-| FORALL list1_named_ident_sep_comma COLON primitive_type triggers 
+| FORALL list1_named_ident_sep_comma COLON primitive_type triggers
   DOT lexpr %prec prec_forall
    { Options.tool_req 0 "TR-Lexical-expr";
      mk_pp (PPforall_named ($2, $4, $5, $7)) }
 
-| EXISTS list1_named_ident_sep_comma COLON primitive_type triggers 
+| EXISTS list1_named_ident_sep_comma COLON primitive_type triggers
   DOT lexpr %prec prec_exists
    { Options.tool_req 0 "TR-Lexical-expr";
      mk_pp (PPexists_named ($2, $4, $5, $7)) }
@@ -314,13 +314,13 @@ lexpr:
      mk_pp (PPlet ($2, $4, $6)) }
 
 | CHECK lexpr
-    { mk_pp (PPcheck $2) } 
+    { mk_pp (PPcheck $2) }
 
 | CUT lexpr
-    { mk_pp (PPcut $2) } 
+    { mk_pp (PPcut $2) }
 ;
 
-simple_expr : 
+simple_expr :
 
 /* constants */
 | INTEGER
@@ -334,10 +334,10 @@ simple_expr :
      mk_pp (PPconst ConstTrue) }
 | FALSE
    { Options.tool_req 0 "TR-Lexical-expr";
-     mk_pp (PPconst ConstFalse) }    
-| VOID 
+     mk_pp (PPconst ConstFalse) }
+| VOID
    { Options.tool_req 0 "TR-Lexical-expr";
-     mk_pp (PPconst ConstVoid) }    
+     mk_pp (PPconst ConstVoid) }
 | ident
    { Options.tool_req 0 "TR-Lexical-expr";
      mk_pp (PPvar $1) }
@@ -355,7 +355,7 @@ simple_expr :
 
 /* function or predicat calls */
 
-| ident LEFTPAR list0_lexpr_sep_comma RIGHTPAR 
+| ident LEFTPAR list0_lexpr_sep_comma RIGHTPAR
    { Options.tool_req 0 "TR-Lexical-expr";
      mk_pp (PPapp ($1, $3)) }
 
@@ -369,7 +369,7 @@ simple_expr :
     { Options.tool_req 0 "TR-Lexical-expr";
       let acc, l = match $3 with
 	| [] -> assert false
-	| (i, v)::l -> mk_pp (PPset($1, i, v)), l 
+	| (i, v)::l -> mk_pp (PPset($1, i, v)), l
       in
       List.fold_left (fun acc (i,v) -> mk_pp (PPset(acc, i, v))) acc l
     }
@@ -394,10 +394,10 @@ array_assignement:
 ;
 
 triggers:
-| /* epsilon */ 
+| /* epsilon */
     { Options.tool_req 0 "TR-Lexical-triggers";
       [] }
-| LEFTSQ list1_trigger_sep_bar RIGHTSQ 
+| LEFTSQ list1_trigger_sep_bar RIGHTSQ
     { Options.tool_req 0 "TR-Lexical-triggers";
       $2 }
 ;
@@ -408,7 +408,7 @@ list1_trigger_sep_bar:
 ;
 
 trigger:
-  list1_lexpr_sep_comma 
+  list1_lexpr_sep_comma
      { Options.tool_req 0 "TR-Lexical-trigger";
        $1 }
 ;
@@ -469,7 +469,7 @@ list1_label_expr_sep_PV:
 ;
 
 type_var:
-| QUOTE ident 
+| QUOTE ident
     { Options.tool_req 0 "TR-Lexical-car-type";
       $2 }
 ;
@@ -477,9 +477,9 @@ type_var:
 type_vars:
 | /* empty */
   { [] }
-| type_var 
+| type_var
    { [$1] }
-| LEFTPAR list1_type_var_sep_comma RIGHTPAR 
+| LEFTPAR list1_type_var_sep_comma RIGHTPAR
    { $2 }
 
 list1_type_var_sep_comma:

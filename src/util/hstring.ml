@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -22,9 +22,9 @@
 
 open Hashcons
 
-module S = 
-  Hashcons.Make_consed(struct include String 
-		              let hash = Hashtbl.hash 
+module S =
+  Hashcons.Make_consed(struct include String
+		              let hash = Hashtbl.hash
 		              let equal = (=)     end)
 
 type t = string Hashcons.hash_consed
@@ -45,12 +45,12 @@ let rec list_assoc x = function
   | [] -> raise Not_found
   | (y, v) :: l -> if equal x y then v else list_assoc x l
 
-let fresh_string = 
+let fresh_string =
   let cpt = ref 0 in
   fun () ->
     incr cpt;
     "!k" ^ (string_of_int !cpt)
 
-let is_fresh_string s = 
+let is_fresh_string s =
   try s.[0] = '!' && s.[1] = 'k'
   with Invalid_argument "index out of bounds" -> false

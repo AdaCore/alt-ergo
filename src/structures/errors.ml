@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -20,10 +20,9 @@
 (*   This file is distributed under the terms of the CeCILL-C licence         *)
 (******************************************************************************)
 
-open Loc
 open Format
 
-type error = 
+type error =
   | BitvExtract of int*int
   | BitvExtractRange of int*int
   | ClashType of string
@@ -33,7 +32,7 @@ type error =
   | UnboundedVar of string
   | UnknownType of string
   | WrongArity of string * int
-  | SymbAlreadyDefined of string 
+  | SymbAlreadyDefined of string
   | SymbUndefined of string
   | NotAPropVar of string
   | NotAPredicate of string
@@ -55,60 +54,60 @@ type error =
   | DuplicateLabel of Hstring.t
   | WrongLabel of Hstring.t * Ty.t
   | WrongNumberOfLabels
-  | Notrigger 
+  | Notrigger
   | CannotGeneralize
   | SyntaxError
 
-exception Error of error * loc
-exception Warning of error * loc
+exception Error of error * Loc.t
+exception Warning of error * Loc.t
 
 let report fmt = function
-  | BitvExtract(i,j) -> 
+  | BitvExtract(i,j) ->
     fprintf fmt "bitvector extraction malformed (%d>%d)" i j
-  | BitvExtractRange(n,j) -> 
+  | BitvExtractRange(n,j) ->
     fprintf fmt "extraction out of range (%d>%d)" j n
-  | ClashType s -> 
+  | ClashType s ->
     fprintf fmt "the type %s is already defined" s
-  | ClashParam s -> 
+  | ClashParam s ->
     fprintf fmt "parameter %s is bound twice" s
-  | ClashLabel (s,t) -> 
+  | ClashLabel (s,t) ->
     fprintf fmt "the label %s already appears in type %s" s t
-  | CannotGeneralize -> 
+  | CannotGeneralize ->
     fprintf fmt "cannot generalize the type of this expression"
   | TypeDuplicateVar s ->
     fprintf fmt "duplicate type variable %s" s
   | UnboundedVar s ->
     fprintf fmt "unbounded variable %s" s
-  | UnknownType s -> 
+  | UnknownType s ->
     fprintf fmt "unknown type %s" s
-  | WrongArity(s,n) -> 
+  | WrongArity(s,n) ->
     fprintf fmt "the type %s has %d arguments" s n
-  | SymbAlreadyDefined s -> 
+  | SymbAlreadyDefined s ->
     fprintf fmt "the symbol %s is already defined" s
-  | SymbUndefined s -> 
+  | SymbUndefined s ->
     fprintf fmt "undefined symbol %s" s
-  | NotAPropVar s -> 
+  | NotAPropVar s ->
     fprintf fmt "%s is not a propositional variable" s
-  | NotAPredicate s -> 
+  | NotAPredicate s ->
     fprintf fmt "%s is not a predicate" s
   | Unification(t1,t2) ->
     fprintf fmt "%a and %a cannot be unified" Ty.print t1 Ty.print t2
-  | ShouldBeApply s -> 
+  | ShouldBeApply s ->
     fprintf fmt "%s is a function symbol, it should be apply" s
   | WrongNumberofArgs s ->
     fprintf fmt "Wrong number of arguments when applying %s" s
   | ShouldHaveType(ty1,ty2) ->
     fprintf fmt "this expression has type %a but is here used with type %a"
       Ty.print ty1 Ty.print ty2
-  | ShouldHaveTypeBitv t -> 
+  | ShouldHaveTypeBitv t ->
     fprintf fmt "this expression has type %a but it should be a bitvector"
       Ty.print t
   | ShouldHaveTypeIntorReal t ->
-    fprintf fmt 
+    fprintf fmt
       "this expression has type %a but it should have type int or real"
       Ty.print t
   | ShouldHaveTypeInt t ->
-    fprintf fmt 
+    fprintf fmt
       "this expression has type %a but it should have type int"
       Ty.print t
   | ShouldHaveTypeArray ->
@@ -122,21 +121,21 @@ let report fmt = function
     fprintf fmt "this expression has type %s which has no label %s" s a
   | NoLabelInType (lb, ty) ->
     fprintf fmt "no label %s in type %a" (Hstring.view lb) Ty.print ty
-  | ShouldHaveTypeProp -> 
+  | ShouldHaveTypeProp ->
     fprintf fmt "this expression should have type prop"
   | NoRecordType s ->
     fprintf fmt "no record type has label %s" (Hstring.view s)
-  | DuplicateLabel s -> 
+  | DuplicateLabel s ->
     fprintf fmt "label %s is defined several times" (Hstring.view s)
-  | WrongLabel (s, ty) -> 
+  | WrongLabel (s, ty) ->
     fprintf fmt "wrong label %s in type %a" (Hstring.view s) Ty.print ty
-  | WrongNumberOfLabels -> 
+  | WrongNumberOfLabels ->
     fprintf fmt "wrong number of labels"
-  | ArrayIndexShouldHaveTypeInt -> 
+  | ArrayIndexShouldHaveTypeInt ->
     fprintf fmt "index of arrays should hava type int"
-  | Notrigger -> 
+  | Notrigger ->
     fprintf fmt "No trigger for this lemma"
-  | SyntaxError -> 
+  | SyntaxError ->
     fprintf fmt "syntax error"
 
 let error e l = raise (Error(e,l))

@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -20,7 +20,7 @@
 (*   This file is distributed under the terms of the CeCILL-C licence         *)
 (******************************************************************************)
 
-open Hashcons 
+open Hashcons
 
 type t = string hash_consed
 
@@ -34,7 +34,7 @@ val compare : t -> t -> int
 
 val hash : t -> int
 
-val empty : t 
+val empty : t
 
 val list_assoc : t -> (t * 'a) list -> 'a
 

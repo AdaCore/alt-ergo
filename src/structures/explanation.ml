@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -23,15 +23,15 @@
 open Format
 module F = Formula
 
-type exp = 
+type exp =
   | Literal of Literal.LT.t
   | Fresh of int
   | Bj of F.t
   | Dep of F.t
 
-module S = 
+module S =
   Set.Make
-    (struct 
+    (struct
       type t = exp
       let compare a b = match a,b with
 	| Fresh i1, Fresh i2 -> i1 - i2
@@ -56,7 +56,8 @@ type t = S.t
 
 let empty = S.empty
 
-let union s1 s2 = S.union s1 s2
+let union s1 s2 =
+  if s1 == s2 then s1 else S.union s1 s2
 
 let singleton e = S.singleton e
 
@@ -69,14 +70,14 @@ let remove e s =
 let iter_atoms f s = S.iter f s
 
 let fold_atoms f s acc = S.fold f s acc
-  
+
 (* TODO : XXX : We have to choose the smallest ??? *)
 let merge s1 s2 = s1
 
 let fresh_exp =
   let r = ref (-1) in
   fun () ->
-    incr r; 
+    incr r;
     Fresh !r
 
 let remove_fresh fe s =
@@ -85,21 +86,21 @@ let remove_fresh fe s =
 
 let add_fresh fe s = S.add fe s
 
-let print fmt ex = 
+let print fmt ex =
   if Options.verbose () then begin
     fprintf fmt "{";
-    S.iter (function 
+    S.iter (function
       | Literal a -> fprintf fmt "{Literal:%a}, " Literal.LT.print a
       | Fresh i -> Format.fprintf fmt "{Fresh:%i}" i;
       | Dep f -> Format.fprintf fmt "{Dep:%a}" Formula.print f
       | Bj f -> Format.fprintf fmt "{BJ:%a}" Formula.print f
-    ) ex; 
+    ) ex;
     fprintf fmt "}"
   end
 
 let print_proof fmt s =
-  S.iter 
-    (fun e -> match e with 
+  S.iter
+    (fun e -> match e with
       | Dep f -> Format.fprintf fmt "  %a@." F.print f
       | Bj f -> assert false (* XXX or same as Dep ? *)
       | Fresh i -> assert false
@@ -107,10 +108,18 @@ let print_proof fmt s =
     ) s
 
 let formulas_of s =
-  S.fold (fun e acc -> 
-    match e with 
+  S.fold (fun e acc ->
+    match e with
       | Dep f | Bj f -> F.Set.add f acc
       | Fresh _ -> acc
+      | Literal a -> assert false (*TODO*)
+  ) s F.Set.empty
+
+let bj_formulas_of s =
+  S.fold (fun e acc ->
+    match e with
+      | Bj f -> F.Set.add f acc
+      | Dep _ | Fresh _ -> acc
       | Literal a -> assert false (*TODO*)
   ) s F.Set.empty
 
@@ -120,16 +129,16 @@ let rec literals_of_acc lit fs f acc = match F.view f with
   | F.Unit (f1,f2) ->
     let acc = literals_of_acc false fs f1 acc in
     literals_of_acc false fs f2 acc
-  | F.Clause (f1, f2) -> 
+  | F.Clause (f1, f2) ->
     let acc = literals_of_acc true fs f1 acc in
     literals_of_acc true fs f2 acc
   | F.Lemma _ ->
     acc
-  | F.Skolem {F.sko_f = f1} | F.Let {F.let_f = f1} ->
+  | F.Skolem {F.main = f1} | F.Let {F.let_f = f1} ->
     literals_of_acc true fs f1 acc
 
 let literals_of ex =
-  let fs  = formulas_of ex in   
+  let fs  = formulas_of ex in
   F.Set.fold (literals_of_acc true fs) fs []
 
 module MI = Map.Make (struct type t = int let compare = compare end)
@@ -142,6 +151,9 @@ let literals_ids_of ex =
   ) MI.empty (literals_of ex)
 
 
-let make_deps sf = 
+let make_deps sf =
   Formula.Set.fold (fun l acc -> S.add (Bj l) acc) sf S.empty
 
+let has_no_bj s =
+  try S.iter (function Bj _ -> raise Exit | _ -> ())s; true
+  with Exit -> false

@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -23,11 +23,11 @@
 open Format
 open Lexing
 
-type loc = Lexing.position * Lexing.position
+type t = Lexing.position * Lexing.position
 
 let report fmt (b,e) =
   let l = b.pos_lnum in
   let fc = b.pos_cnum - b.pos_bol + 1 in
   let lc = e.pos_cnum - b.pos_bol + 1 in
-  fprintf fmt "File \"%s\", line %d, characters %d-%d:" 
+  fprintf fmt "File \"%s\", line %d, characters %d-%d:"
     (Options.get_file()) l fc lc

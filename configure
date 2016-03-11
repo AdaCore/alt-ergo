@@ -589,7 +589,7 @@ OCAMLWIN32
 INCLUDEGTK2
 ENABLEGUI
 LABLGTK2LIB
-OCAMLGRAPHLIB
+ZARITHLIB
 OCAMLLIB
 OCAMLVERSION
 OCAMLBEST
@@ -1786,33 +1786,57 @@ fi
 if test "$USEOCAMLFIND" = yes; then
    OCAMLFINDLIB=$(ocamlfind printconf stdlib)
    OCAMLFIND=$(which ocamlfind)
-   # if test "$OCAMLFINDLIB" != "$OCAMLLIB"; then
-   #  USEOCAMLFIND=no;
-   #  echo "but your ocamlfind is not compatible with your ocamlc:"
-   #  echo "ocamlfind : $OCAMLFINDLIB, ocamlc : $OCAMLLIB"
-   # fi
+#    if test "$OCAMLFINDLIB" != "$OCAMLLIB"; then
+#     USEOCAMLFIND=no;
+#     echo "but your ocamlfind is not compatible with your ocamlc:"
+#     echo "ocamlfind : $OCAMLFINDLIB, ocamlc : $OCAMLLIB"
+#    fi
 fi
 
 
 #looking for ocamlgraph library
+# not used anymore
+# if test "$USEOCAMLFIND" = yes; then
+#   OCAMLGRAPHLIB=$(ocamlfind query -i-format ocamlgraph)
+# fi
+
+# if test -n "$OCAMLGRAPHLIB";then
+#   echo "ocamlfind found ocamlgraph in $OCAMLGRAPHLIB"
+#   OCAMLGRAPH=yes
+# else
+#   AC_CHECK_FILE($OCAMLLIB/ocamlgraph/graph.cmi,OCAMLGRAPH=yes,OCAMLGRAPH=no)
+#   if test "$OCAMLGRAPH" = no ; then
+#     AC_CHECK_FILE($OCAMLLIB/graph.cmi,OCAMLGRAPH=yes,OCAMLGRAPH=no)
+#     if test "$OCAMLGRAPH" = no ; then
+#       AC_MSG_ERROR(Cannot find ocamlgraph library. Please install the *libocamlgraph-ocaml-dev* Debian package - or use the GODI caml package system *http://godi.ocaml-programming.de/* - or compile from sources *http://ocamlgraph.lri.fr/*)
+#     else
+#   	OCAMLGRAPHLIB=""
+#      fi
+#   else
+#      OCAMLGRAPHLIB="-I +ocamlgraph"
+#   fi
+# fi
+
+
+#looking for zarith library
 
 if test "$USEOCAMLFIND" = yes; then
-  OCAMLGRAPHLIB=$(ocamlfind query -i-format ocamlgraph)
+  ZARITHLIB=$(ocamlfind query -i-format zarith)
 fi
 
-if test -n "$OCAMLGRAPHLIB";then
-  echo "ocamlfind found ocamlgraph in $OCAMLGRAPHLIB"
-  OCAMLGRAPH=yes
+if test -n "$ZARITHLIB";then
+  echo "ocamlfind found zarith in $ZARITHLIB"
+  ZARITH=yes
 else
-  as_ac_File=`$as_echo "ac_cv_file_$OCAMLLIB/ocamlgraph/graph.cmi" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $OCAMLLIB/ocamlgraph/graph.cmi" >&5
-$as_echo_n "checking for $OCAMLLIB/ocamlgraph/graph.cmi... " >&6; }
+  as_ac_File=`$as_echo "ac_cv_file_$OCAMLLIB/zarith/zarith.cma" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $OCAMLLIB/zarith/zarith.cma" >&5
+$as_echo_n "checking for $OCAMLLIB/zarith/zarith.cma... " >&6; }
 if eval \${$as_ac_File+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   test "$cross_compiling" = yes &&
   as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$OCAMLLIB/ocamlgraph/graph.cmi"; then
+if test -r "$OCAMLLIB/zarith/zarith.cma"; then
   eval "$as_ac_File=yes"
 else
   eval "$as_ac_File=no"
@@ -1822,21 +1846,21 @@ eval ac_res=\$$as_ac_File
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
 $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  OCAMLGRAPH=yes
+  ZARITH=yes
 else
-  OCAMLGRAPH=no
+  ZARITH=no
 fi
 
-  if test "$OCAMLGRAPH" = no ; then
-    as_ac_File=`$as_echo "ac_cv_file_$OCAMLLIB/graph.cmi" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $OCAMLLIB/graph.cmi" >&5
-$as_echo_n "checking for $OCAMLLIB/graph.cmi... " >&6; }
+  if test "$ZARITH" = no ; then
+    as_ac_File=`$as_echo "ac_cv_file_$OCAMLLIB/zarith.cma" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $OCAMLLIB/zarith.cma" >&5
+$as_echo_n "checking for $OCAMLLIB/zarith.cma... " >&6; }
 if eval \${$as_ac_File+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   test "$cross_compiling" = yes &&
   as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$OCAMLLIB/graph.cmi"; then
+if test -r "$OCAMLLIB/zarith.cma"; then
   eval "$as_ac_File=yes"
 else
   eval "$as_ac_File=no"
@@ -1846,18 +1870,18 @@ eval ac_res=\$$as_ac_File
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
 $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  OCAMLGRAPH=yes
+  ZARITH=yes
 else
-  OCAMLGRAPH=no
+  ZARITH=no
 fi
 
-    if test "$OCAMLGRAPH" = no ; then
-      as_fn_error $? "Cannot find ocamlgraph library. Please install the *libocamlgraph-ocaml-dev* Debian package - or use the GODI caml package system *http://godi.ocaml-programming.de/* - or compile from sources *http://ocamlgraph.lri.fr/*" "$LINENO" 5
+    if test "$ZARITH" = no ; then
+      as_fn_error $? "Cannot find zarith library." "$LINENO" 5
     else
-  	OCAMLGRAPHLIB=""
+  	ZARITHLIB=""
      fi
   else
-     OCAMLGRAPHLIB="-I +ocamlgraph"
+     ZARITHLIB="-I +zarith"
   fi
 fi
 
@@ -2322,6 +2346,7 @@ fi
 
 
 
+#AC_SUBST(OCAMLGRAPHLIB)
 
 
 

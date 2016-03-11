@@ -1,6 +1,6 @@
 ## Build and Installation
 
-  You need OCaml >= 3.12.1, zarith and ocamlgraph to compile the
+  You need OCaml >= 3.12.1 and zarith to compile the
   sources. You need LablGtk2 and the widget GSourceView2 to compile
   the GUI. You may need superuser permissions to perform the
   installation.
@@ -32,9 +32,6 @@ depending on whether ocamlopt is installed or only ocamlc is detected.
   
   2. Install with "make install-gui"
  
-#### The Ctrl-Alt-Ergo wrapper
-   (not provided with this public release)
-
 The steps below will build and install OCamlPro plugins (extension
 .cmxs if ocamlopt is installed or .cma if only ocamlc is detected).
 
@@ -45,11 +42,16 @@ The steps below will build and install OCamlPro plugins (extension
   2. Install with "make install-satML"
 
 #### The Fm-Simplex Plugin
-   (not provided with this public release)
 
+  1. Compile with "make fm-simplex"
+
+  2. Install with "make install-fm-simplex"
 
 #### The Profiler Plugin
-   (not provided with this public release)
+
+  1. Compile with "make profiler"
+
+  2. Install with "make install-profiler"
 
 
 ## Usage
@@ -67,6 +69,32 @@ The steps below will build and install OCamlPro plugins (extension
 
    Alt-Ergo will try to load a local plugin called
    "satML-plugin.cmxs". If this fails, Alt-Ergo tries to load it from
+   the default plugins directory (execute "alt-ergo -where plugins" to
+   see its absolute path). You can also provide a relative or an
+   absolute path as shown by the second command above. Also, you
+   should replace ".cmxs" by ".cma" if you are working with bytcode
+   binaries.
+
+- The Fm-Simplex plugin can be used as follows: 
+
+        $ alt-ergo -inequalities-plugin fm-simplex-plugin.cmxs [other-options] file.why
+        $ alt-ergo -inequalities-plugin some-path/fm-simplex-plugin.cmxs [other-options] file.why
+
+   Alt-Ergo will try to load a local plugin called
+   "fm-simplex-plugin.cmxs". If this fails, Alt-Ergo tries to load it from
+   the default plugins directory (execute "alt-ergo -where plugins" to
+   see its absolute path). You can also provide a relative or an
+   absolute path as shown by the second command above. Also, you
+   should replace ".cmxs" by ".cma" if you are working with bytcode
+   binaries.
+
+- The profiler plugin can be used as follows:
+
+        $ alt-ergo -profiling 1. -profiling-plugin profiler-plugin.cmxs [other-options] file.why
+        $ alt-ergo -profiling 1. -profiling-plugin some-path/profiler-plugin.cmxs [other-options] file.why
+
+   Alt-Ergo will try to load a local plugin called
+   "profiler-plugin.cmxs". If this fails, Alt-Ergo tries to load it from
    the default plugins directory (execute "alt-ergo -where plugins" to
    see its absolute path). You can also provide a relative or an
    absolute path as shown by the second command above. Also, you

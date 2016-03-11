@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -24,12 +24,33 @@ type answer = Yes of Explanation.t * Term.Set.t list | No
 
 type 'a ac = {h: Symbols.t ; t: Ty.t ; l: ('a * int) list}
 
-type 'a literal = LTerm of Literal.LT.t | LSem of 'a Literal.view 
+type 'a literal = LTerm of Literal.LT.t | LSem of 'a Literal.view
 
-type 'a input =  'a Literal.view * Literal.LT.t option * Explanation.t
+type theory =
+| Th_arith
+| Th_sum
+| Th_arrays
 
-type 'a result = { 
-  assume : ('a literal * Explanation.t) list;  
+type lit_origin =
+| Subst
+| CS of theory * Numbers.Q.t
+| NCS of theory * Numbers.Q.t
+| Other
+
+type 'a input =
+  'a Literal.view * Literal.LT.t option * Explanation.t * lit_origin
+
+type 'a fact = 'a literal * Explanation.t * lit_origin
+
+type 'a facts = {
+  equas     : 'a fact Queue.t;
+  diseqs  : 'a fact Queue.t;
+  ineqs   : 'a fact Queue.t;
+  mutable touched : 'a Util.MI.t;
+}
+
+type 'a result = {
+  assume : 'a fact list;
   remove: ('a literal * Explanation.t) list;
 }
 
@@ -40,18 +61,18 @@ module type RELATION = sig
   type r
   type uf
   val empty : Term.Set.t list -> t
-    
+
   val assume : t -> uf -> (r input) list -> t * r result
   val query  : t -> uf -> r input -> answer
 
-  val case_split : t -> (r Literal.view * Explanation.t * Numbers.Q.t) list
+  val case_split : t -> uf -> (r Literal.view * Explanation.t * lit_origin) list
   (** case_split env returns a list of equalities *)
-    
+
   val add : t -> r -> t
   (** add a representant to take into account *)
 
   val print_model : Format.formatter -> t -> (Term.t * r) list -> unit
-    
+
   val new_terms : t -> Term.Set.t
 end
 
@@ -72,9 +93,9 @@ module type SHOSTAK = sig
   val term_extract : r -> Term.t option * bool (* original term ? *)
 
   val color : (r ac) -> r
-    
+
   val type_info : t -> Ty.t
-    
+
   val embed : r -> t
 
   (** Give the leaves of a term of the theory *)
@@ -82,6 +103,9 @@ module type SHOSTAK = sig
   val subst : r -> r -> t -> r
 
   val compare : r -> r -> int
+
+  (* tests if two values are equal (using tags) *)
+  val equal : t -> t -> bool
 
   val hash : t -> int
   (** solve r1 r2, solve the equality r1=r2 and return the substitution *)
@@ -100,37 +124,41 @@ module type X = sig
   type r
 
   val make : Term.t -> r * Literal.LT.t list
-    
+
   val type_info : r -> Ty.t
-    
-  val compare : r -> r -> int
-    
+
+  val str_cmp : r -> r -> int
+
+  val hash_cmp : r -> r -> int
+
   val equal : r -> r -> bool
 
   val hash : r -> int
-    
+
   val leaves : r -> r list
-    
+
   val subst : r -> r -> r -> r
-    
+
   val solve : r -> r ->  (r * r) list
-    
+
   val term_embed : Term.t -> r
 
   val term_extract : r -> Term.t option * bool (* original term ? *)
 
   val ac_embed : r ac -> r
-    
+
   val ac_extract : r -> (r ac) option
-    
+
   val color : (r ac) -> r
 
   val fully_interpreted : Symbols.t -> bool
-    
+
+  val is_a_leaf : r -> bool
+
   val print : Format.formatter -> r -> unit
-    
+
   val abstract_selectors : r -> (r * r) list -> r * (r * r) list
-    
+
   val top : unit -> r
   val bot : unit -> r
 end

@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -39,8 +39,8 @@ val show_used_lemmas : env -> Explanation.t -> unit
 
 val prune_unused : env -> unit
 
-val add_instance : 
-  ?register:bool -> env -> int -> aform -> string -> 
+val add_instance :
+  ?register:bool -> env -> int -> aform -> string ->
   string list -> unit
 
 val readd_trigger : ?register:bool -> env -> int -> string -> bool -> unit

@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2014 --- OCamlPro                                   *)
+(*     Copyright (C) 2013-2015 --- OCamlPro                                   *)
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
@@ -28,14 +28,14 @@ module type EXTENDED_Polynome = sig
   val embed : t -> r
 end
 
-module Shostak 
+module Shostak
   (X : Sig.X)
   (P : EXTENDED_Polynome with type r = X.r) : Sig.SHOSTAK
   with type r = X.r and type t = P.t
 
 module Relation
   (X : Sig.X)
-  (Uf : Uf.S)
-  (P : EXTENDED_Polynome with type r = X.r) 
-  : Sig.RELATION 
+  (Uf : Uf.S with type r = X.r)
+  (P : EXTENDED_Polynome with type r = X.r)
+  : Sig.RELATION
   with type r = X.r and type uf = Uf.t
