@@ -54,15 +54,6 @@ let () =
           )
       )[ Sys.sigterm (*-11*); Sys.sigquit (*-9*)]
 
-let () =
-    Sys.set_signal Sys.sigprof (*-21*)
-      (Sys.Signal_handle
-         (fun _ ->
-           if Options.profiling () then
-             Profiling.print false (SAT.get_steps ()) timers fmt;
-         )
-      )
-
 let processing report declss =
   SAT.reset_steps ();
   List.iter
