@@ -53,6 +53,10 @@ module Make(SAT : Sat_solvers.S) : S with type sat_env = SAT.t = struct
   type output = Unsat of Explanation.t | Inconsistent
 	        | Sat of sat_env | Unknown of sat_env
 
+  let get_steps () =
+    if Int64.compare (SAT.get_steps ()) (Steps.stop ()) > 0
+    then SAT.get_steps () else Steps.stop ()
+
   let check_produced_proof dep =
     if verbose () then
       fprintf fmt "checking the proof:\n-------------------\n%a@."
@@ -139,20 +143,20 @@ module Make(SAT : Sat_solvers.S) : S with type sat_env = SAT.t = struct
           in
           if debug_proof () then check_produced_proof dep;
           if save_used_context () then do_save_used_context env dep;
-	  print_status d (Unsat dep) (SAT.get_steps ());
+	  print_status d (Unsat dep) (get_steps ());
 	  env, consistent, dep
     with
       | SAT.Sat t ->
-        print_status d (Sat t) (SAT.get_steps ());
+        print_status d (Sat t) (get_steps ());
         if model () then SAT.print_model ~header:true std_formatter t;
         env , consistent, dep
       | SAT.Unsat dep' ->
         let dep = Explanation.union dep dep' in
         if debug_proof () then check_produced_proof dep;
-        print_status d Inconsistent (SAT.get_steps ());
+        print_status d Inconsistent (get_steps ());
         env , false, dep
       | SAT.I_dont_know t ->
-        print_status d (Unknown t) (SAT.get_steps ());
+        print_status d (Unknown t) (get_steps ());
         if model () then SAT.print_model ~header:true std_formatter t;
         env , consistent, dep
 
