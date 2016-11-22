@@ -49,6 +49,7 @@ module Shostak (X : ALIEN) = struct
   let color _        = assert false
   let print _ _      = assert false
   let embed _        = assert false
+  let is_mine _      = assert false
   let compare _ _    = assert false
   let equal _ _      = assert false
   let hash _         = assert false
@@ -58,6 +59,32 @@ module Shostak (X : ALIEN) = struct
   let term_extract _ = None, false
   let abstract_selectors p acc = assert false
   let solve r1 r2 = assert false
+  let assign_value r _ eq =
+    if List.exists (fun (t,_) -> (Term.view t).Term.depth = 1) eq then None
+    else
+      match X.term_extract r with
+      | Some t, true ->
+        Some (Term.fresh_name (X.type_info r), false)
+      | _ -> assert false
+
+  let choose_adequate_model t _ l =
+    let acc =
+      List.fold_left
+        (fun acc (s, r) ->
+          if (Term.view s).Term.depth <> 1 then acc
+          else
+            match acc with
+            | Some(s', r') when Term.compare s' s > 0 -> acc
+            | _ -> Some (s, r)
+        ) None l
+    in
+    match acc with
+    | Some (_, r) ->
+      ignore (flush_str_formatter ());
+      fprintf str_formatter "%a" X.print r; (* it's a EUF constant *)
+      r, flush_str_formatter ()
+
+    | _ -> assert false
 
 end
 
@@ -140,7 +167,7 @@ module Relation (X : ALIEN) (Uf : Uf.S) = struct
   module Debug = struct
 
     let assume fmt la =
-      if debug_arrays () && la <> [] then begin
+      if debug_arrays () && la != [] then begin
         fprintf fmt "[Arrays.Rel] We assume@.";
         L.iter (fun (a,_,_,_) -> fprintf fmt "  > %a@."
           LR.print (LR.make a)) la;
@@ -397,23 +424,20 @@ module Relation (X : ALIEN) (Uf : Uf.S) = struct
     let env, eqs = extensionality (env, eqs) la class_of in
     implied_consequences env eqs la
 
-  (* XXXXXX : TODO -> ajouter les explications dans les choix du
-     case split *)
   (* choisir une egalite sur laquelle on fait un case-split *)
   let two = Numbers.Q.from_int 2
 
-  let case_split env uf =
-    if Numbers.Q.compare
+  let case_split env uf ~for_model =
+    (*if Numbers.Q.compare
       (Numbers.Q.mult two env.size_splits) (max_split ()) <= 0  ||
-      Numbers.Q.sign  (max_split ()) < 0 then
-      try
-        let a = LR.neg (LRset.choose env.split) in
-        Debug.case_split a;
-        [LR.view a, Ex.empty, CS (Th_arrays, two)]
-      with Not_found ->
-        Debug.case_split_none ();
-        []
-    else []
+      Numbers.Q.sign  (max_split ()) < 0 then*)
+    try
+      let a = LR.neg (LRset.choose env.split) in
+      Debug.case_split a;
+      [LR.view a, true, CS (Th_arrays, two)]
+    with Not_found ->
+      Debug.case_split_none ();
+      []
 
   let count_splits env la =
     let nb =
@@ -427,7 +451,7 @@ module Relation (X : ALIEN) (Uf : Uf.S) = struct
     {env with size_splits = nb}
 
   let assume env uf la =
-    let are_eq = Uf.are_equal uf in
+    let are_eq = Uf.are_equal uf ~added_terms:true in
     let are_neq = Uf.are_distinct uf in
     let class_of = Uf.class_of uf in
     let env = count_splits env la in
@@ -457,7 +481,7 @@ module Relation (X : ALIEN) (Uf : Uf.S) = struct
     else assume env uf la
 
   let query _ _ _ = Sig.No
-  let add env r = env
+  let add env _ r _ = env
   let print_model _ _ _ = ()
 
   let new_terms env = env.new_terms

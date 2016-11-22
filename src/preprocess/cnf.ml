@@ -60,7 +60,7 @@ let rec make_term {c = { tt_ty = ty; tt_desc = tt }} =
     | TTinfix (t1, s, t2) ->
       T.make s [make_term t1;make_term t2] ty
     | TTprefix ((Sy.Op Sy.Minus) as s, n) ->
-      let t1 = if ty = Ty.Tint then T.int "0" else T.real "0"  in
+      let t1 = if ty == Ty.Tint then T.int "0" else T.real "0"  in
       T.make s [t1; make_term n] ty
     | TTprefix _ ->
       assert false
@@ -93,45 +93,49 @@ let rec make_term {c = { tt_ty = ty; tt_desc = tt }} =
       T.add_label lbl t;
       t
 
-let make_trigger = function
-  | [{c={ tt_desc = TTapp(s, t1::t2::l)}}]
-      when Sy.equal s Sy.fake_eq ->
-    let trs = List.filter (fun t -> not (List.mem t l)) [t1; t2] in
-    let trs = List.map make_term trs in
-    let lit = A.LT.mk_eq (make_term t1) (make_term t2) in
-    trs, Some lit
+let make_trigger (e, from_user) =
+  let content, guard = match e with
+    | [{c={ tt_desc = TTapp(s, t1::t2::l)}}]
+        when Sy.equal s Sy.fake_eq ->
+      let trs = List.filter (fun t -> not (List.mem t l)) [t1; t2] in
+      let trs = List.map make_term trs in
+      let lit = A.LT.mk_eq (make_term t1) (make_term t2) in
+      trs, Some lit
 
-  | [{c={ tt_desc = TTapp(s, t1::t2::l) } }]
-      when Sy.equal s Sy.fake_neq ->
-    let trs = List.filter (fun t -> not (List.mem t l)) [t1; t2] in
-    let trs = List.map make_term trs in
-    let lit = A.LT.mk_distinct false [make_term t1; make_term t2] in
-    trs, Some lit
+    | [{c={ tt_desc = TTapp(s, t1::t2::l) } }]
+        when Sy.equal s Sy.fake_neq ->
+      let trs = List.filter (fun t -> not (List.mem t l)) [t1; t2] in
+      let trs = List.map make_term trs in
+      let lit = A.LT.mk_distinct false [make_term t1; make_term t2] in
+      trs, Some lit
 
-  | [{c={ tt_desc = TTapp(s, t1::t2::l) } }]
-      when Sy.equal s Sy.fake_le ->
-    let trs = List.filter (fun t -> not (List.mem t l)) [t1; t2] in
-    let trs = List.map make_term trs in
-    let lit =
-      A.LT.mk_builtin true ale [make_term t1; make_term t2]
-    in
-    trs, Some lit
+    | [{c={ tt_desc = TTapp(s, t1::t2::l) } }]
+        when Sy.equal s Sy.fake_le ->
+      let trs = List.filter (fun t -> not (List.mem t l)) [t1; t2] in
+      let trs = List.map make_term trs in
+      let lit =
+        A.LT.mk_builtin true ale [make_term t1; make_term t2]
+      in
+      trs, Some lit
 
-  | [{c={ tt_desc = TTapp(s, t1::t2::l) } }]
-      when Sy.equal s Sy.fake_lt ->
-    let trs = List.filter (fun t -> not (List.mem t l)) [t1; t2] in
-    let trs = List.map make_term trs in
+    | [{c={ tt_desc = TTapp(s, t1::t2::l) } }]
+        when Sy.equal s Sy.fake_lt ->
+      let trs = List.filter (fun t -> not (List.mem t l)) [t1; t2] in
+      let trs = List.map make_term trs in
 
-    let lit =
-      A.LT.mk_builtin true alt [make_term t1; make_term t2]
-    in
-    trs, Some lit
+      let lit =
+        A.LT.mk_builtin true alt [make_term t1; make_term t2]
+      in
+      trs, Some lit
 
-  | lt -> List.map make_term lt, None
+    | lt -> List.map make_term lt, None
+  in
+  let depth = List.fold_left (fun z t -> max z (T.view t).T.depth) 0 content in
+  { F.content ; guard ; depth; from_user}
 
 let make_form name_base f loc =
   let name_tag = ref 0 in
-  let rec make_form acc c id =
+  let rec make_form toplevel acc c id =
     match c with
     | TFatom a ->
       let a , lit = match a.c with
@@ -177,27 +181,27 @@ let make_form name_base f loc =
       in F.mk_lit a id, lit
 
     | TFop(((OPand | OPor) as op),[f1;f2]) ->
-      let ff1 , lit1 = make_form acc f1.c f1.annot in
-      let ff2 , lit2 = make_form lit1 f2.c f2.annot in
+      let ff1 , lit1 = make_form false acc f1.c f1.annot in
+      let ff2 , lit2 = make_form false lit1 f2.c f2.annot in
       let mkop = match op with
-	| OPand -> F.mk_and ff1 ff2 id
-	| _ -> F.mk_or ff1 ff2 id in
+	| OPand -> F.mk_and ff1 ff2 false id
+	| _ -> F.mk_or ff1 ff2 false id in
       mkop , lit2
     | TFop(OPimp,[f1;f2]) ->
-      let ff1 , _ = make_form acc f1.c f1.annot in
-      let ff2 , lit = make_form acc f2.c f2.annot in
+      let ff1 , _ = make_form false acc f1.c f1.annot in
+      let ff2 , lit = make_form false acc f2.c f2.annot in
       F.mk_imp ff1 ff2 id, lit
     | TFop(OPnot,[f]) ->
-      let ff , lit = make_form acc f.c f.annot in
+      let ff , lit = make_form false acc f.c f.annot in
       F.mk_not ff , lit
     | TFop(OPif t,[f2;f3]) ->
       let tt = make_term t in
-      let ff2 , lit2 = make_form acc f2.c f2.annot in
-      let ff3 , lit3 = make_form lit2 f3.c f3.annot in
+      let ff2 , lit2 = make_form false acc f2.c f2.annot in
+      let ff3 , lit3 = make_form false lit2 f3.c f3.annot in
       F.mk_if tt ff2 ff3 id, lit3
     | TFop(OPiff,[f1;f2]) ->
-      let ff1 , lit1 = make_form acc f1.c f1.annot in
-      let ff2 , lit2 = make_form lit1 f2.c f2.annot in
+      let ff1 , lit1 = make_form false acc f1.c f1.annot in
+      let ff2 , lit2 = make_form false lit1 f2.c f2.annot in
       F.mk_iff ff1 ff2 id, lit2
     | (TFforall qf | TFexists qf) as f ->
       let name =
@@ -209,26 +213,38 @@ let make_form name_base f loc =
       let binders = F.mk_binders qvars in
       (*let upvars = varset_of_list qf.qf_upvars in*)
       let trs = List.map make_trigger qf.qf_triggers in
-      let ff , lit = make_form acc qf.qf_form.c qf.qf_form.annot in
-      let func = match f with
-	| TFforall _ -> F.mk_forall
-        | TFexists _ -> F.mk_exists
+      let ff , lit = make_form false acc qf.qf_form.c qf.qf_form.annot in
+      begin
+        match f with
+	| TFforall _ ->
+          F.mk_forall name loc binders trs ff id None, lit
+        | TFexists _ ->
+          if toplevel && not (Ty.Set.is_empty (F.type_variables ff)) then
+            (* If there is type variables in a toplevel exists:
+               1 - we add a forall quantification without term variables
+               (ie. only with type variables)
+               2 - we keep the triggers of 'exists' to try to instantiate
+               type variables with these triggers as guards
+            *)
+            let nm = sprintf "#%s#sub-%d" name_base 0 in
+            let gg = F.mk_exists nm loc binders trs ff id None in
+            F.mk_forall name loc Symbols.Map.empty trs gg id None, lit
+          else F.mk_exists name loc binders trs ff id None, lit
         | _ -> assert false
-      in
-      func name loc binders trs ff id None, lit
+      end
 
     | TFlet(up,lvar,lterm,lf) ->
-      let ff, lit = make_form acc lf.c lf.annot in
+      let ff, lit = make_form false acc lf.c lf.annot in
       F.mk_let (varset_of_list up) lvar (make_term lterm) ff id, lit
 
     | TFnamed(lbl, f) ->
-      let ff, lit = make_form acc f.c f.annot in
+      let ff, lit = make_form false acc f.c f.annot in
       F.add_label lbl ff;
       ff, lit
 
     | _ -> assert false
   in
-  make_form [] f.c f.annot
+  make_form true [] f.c f.annot
 
 let push_assume queue f name loc match_flag =
   let ff , _ = make_form name f loc in

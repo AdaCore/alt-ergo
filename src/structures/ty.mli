@@ -58,6 +58,8 @@ val trecord : t list -> string -> (string * t) list -> t
 val shorten : t -> t
 
 val fresh_var : unit -> tvar
+val fresh_tvar : unit -> t
+
 val fresh_empty_text : unit -> t
 
 val fresh : t -> subst -> t * subst
@@ -81,6 +83,7 @@ val compare_subst : subst -> subst -> int
 val equal_subst : subst -> subst -> bool
 
 val print : Format.formatter -> t -> unit
+val print_list : Format.formatter -> t list -> unit
 val print_full : Format.formatter -> t -> unit
 (*val printl : Format.formatter -> t list -> unit*)
 

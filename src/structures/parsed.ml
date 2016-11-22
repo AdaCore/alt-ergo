@@ -21,6 +21,7 @@
 (******************************************************************************)
 
 open Format
+open Options
 
 type constant =
   | ConstBitv of string
@@ -65,12 +66,12 @@ and pp_desc =
   | PPextract of lexpr * lexpr * lexpr
   | PPconcat of lexpr * lexpr
   | PPif of lexpr * lexpr * lexpr
-  | PPforall of string list * ppure_type * lexpr list list * lexpr
-  | PPexists of string list * ppure_type * lexpr list list * lexpr
+  | PPforall of string list * ppure_type * (lexpr list * bool) list * lexpr
+  | PPexists of string list * ppure_type * (lexpr list * bool) list * lexpr
   | PPforall_named of
-      (string * string) list * ppure_type * lexpr list list * lexpr
+      (string * string) list * ppure_type * (lexpr list * bool) list * lexpr
   | PPexists_named of
-      (string * string) list * ppure_type * lexpr list list * lexpr
+      (string * string) list * ppure_type * (lexpr list * bool) list * lexpr
   | PPnamed of string * lexpr
   | PPlet of string * lexpr * lexpr
   | PPcheck of lexpr

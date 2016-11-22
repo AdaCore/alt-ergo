@@ -20,6 +20,8 @@
 (*s Hash tables for hash-consing. (Some code is borrowed from the ocaml
   standard library, which is copyright 1996 INRIA.) *)
 
+open Options
+
 module type HashedType =
 sig
   type t

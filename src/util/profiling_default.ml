@@ -27,7 +27,7 @@ module type S = sig
   val reset_ilevel : int -> unit
 
   (* record the when axioms are instantiated. Bool tells whether the instance
-     is keeped or removed by the selector function *)
+     is kept or removed by the selector function *)
   val new_instance_of : string -> Loc.t -> bool -> unit
   val conflicting_instance : string -> Loc.t -> unit
   val register_produced_terms :
@@ -89,15 +89,15 @@ let load_current_module () =
     if Options.profiling() then
       Format.eprintf "[Dynlink] Loading the profiler in %s ...@." path;
     try
-      Dynlink.loadfile path;
+      MyDynlink.loadfile path;
       if Options.profiling() then Format.eprintf "Success !@.@."
     with
-    | Dynlink.Error m1 ->
+    | MyDynlink.Error m1 ->
       if Options.profiling() then begin
         Format.eprintf
           "[Dynlink] Loading the profiler in plugin \"%s\" failed!@."
           path;
-        Format.eprintf ">> Failure message: %s@.@." (Dynlink.error_message m1);
+        Format.eprintf ">> Failure message: %s@.@." (MyDynlink.error_message m1);
       end;
       let prefixed_path = Format.sprintf "%s/%s" Config.pluginsdir path in
       if Options.profiling() then
@@ -105,21 +105,21 @@ let load_current_module () =
           "[Dynlink] Loading the profiler in %s ... with prefix %s@."
           path Config.pluginsdir;
       try
-        Dynlink.loadfile prefixed_path;
+        MyDynlink.loadfile prefixed_path;
         if Options.profiling() then Format.eprintf "Success !@.@."
       with
-      | Dynlink.Error m2 ->
+      | MyDynlink.Error m2 ->
         if not (Options.profiling()) then begin
           Format.eprintf
             "[Dynlink] Loading the profiler in plugin \"%s\" failed!@."
             path;
           Format.eprintf ">> Failure message: %s@.@."
-            (Dynlink.error_message m1);
+            (MyDynlink.error_message m1);
         end;
         Format.eprintf
           "[Dynlink] Trying to load the plugin from \"%s\" failed too!@."
           prefixed_path;
-        Format.eprintf ">> Failure message: %s@.@." (Dynlink.error_message m2);
+        Format.eprintf ">> Failure message: %s@.@." (MyDynlink.error_message m2);
         exit 1
 
 let get_current () =

@@ -772,6 +772,12 @@ module Shostak(X : ALIEN) = struct
   let solve r1 r2 pb =
     {pb with sbt = List.rev_append (solve_bis r1 r2) pb.sbt}
 
+  let assign_value _ __ =
+    failwith "[Bitv.assign_value] not implemented for theory Bitv"
+
+  let choose_adequate_model t l =
+    assert false
+
 end
 
 module Relation (X : ALIEN) (Uf : Uf.S) = struct
@@ -783,8 +789,8 @@ module Relation (X : ALIEN) (Uf : Uf.S) = struct
   let assume _ _ _ =
     (), { assume = []; remove = []}
   let query _ _ _ = Sig.No
-  let case_split env _ = []
-  let add env _ = env
+  let case_split env _ ~for_model = []
+  let add env _ _ _ = env
   let print_model _ _ _ = ()
   let new_terms env = T.Set.empty
 end

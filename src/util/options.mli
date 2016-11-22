@@ -27,6 +27,7 @@ val fmt : Format.formatter
 (** setters for debug flags *)
 val set_debug : bool -> unit
 val set_debug_cc : bool -> unit
+val set_debug_gc : bool -> unit
 val set_debug_use : bool -> unit
 val set_debug_uf : bool -> unit
 val set_debug_fm : bool -> unit
@@ -43,7 +44,8 @@ val set_debug_types : bool -> unit
 val set_debug_combine : bool -> unit
 val set_debug_proof : bool -> unit
 val set_debug_split : bool -> unit
-val set_debug_matching : bool -> unit
+val set_debug_matching : int -> unit
+val set_debug_explanations : bool -> unit
 val set_timers : bool -> unit
 val set_profiling : float -> bool -> unit
 
@@ -58,7 +60,6 @@ val set_notriggers : bool -> unit
 val set_triggers_var : bool -> unit
 val set_nb_triggers : int -> unit
 val set_greedy : bool -> unit
-val set_select : int -> unit
 val set_rm_eq_existential : bool -> unit
 val set_no_Ematching : bool -> unit
 val set_nocontracongru : bool -> unit
@@ -66,7 +67,9 @@ val set_term_like_pp : bool -> unit
 val set_all_models : bool -> unit
 val set_model : bool -> unit
 val set_complete_model : bool -> unit
+val set_interpretation : int -> unit
 val set_max_split : Numbers.Q.t -> unit
+val set_fm_cross_limit : Numbers.Q.t -> unit
 val set_rewriting : bool -> unit
 val set_proof : bool -> unit
 val set_rules : int -> unit
@@ -95,6 +98,7 @@ val set_file_for_js : string -> unit
 val debug : unit -> bool
 val debug_warnings : unit -> bool
 val debug_cc : unit -> bool
+val debug_gc : unit -> bool
 val debug_use : unit -> bool
 val debug_uf : unit -> bool
 val debug_fm : unit -> bool
@@ -111,7 +115,8 @@ val debug_types : unit -> bool
 val debug_combine : unit -> bool
 val debug_proof : unit -> bool
 val debug_split : unit -> bool
-val debug_matching : unit -> bool
+val debug_matching : unit -> int
+val debug_explanations : unit -> bool
 
 (** additional getters *)
 val enable_assertions : unit -> bool
@@ -127,24 +132,33 @@ val triggers_var : unit -> bool
 val nb_triggers : unit -> int
 val verbose : unit -> bool
 val greedy : unit -> bool
-val select : unit -> int
 val rm_eq_existential : unit -> bool
 val no_Ematching : unit -> bool
+val no_backjumping : unit -> bool
+val no_NLA : unit -> bool
+val no_ac : unit -> bool
 val nocontracongru : unit -> bool
 val term_like_pp : unit -> bool
 val all_models : unit -> bool
 val model : unit -> bool
+val interpretation : unit -> int
+val debug_interpretation : unit -> bool
 val complete_model : unit -> bool
 val max_split : unit -> Numbers.Q.t
+val fm_cross_limit : unit -> Numbers.Q.t
 val rewriting : unit -> bool
 val proof : unit -> bool
 val rules : unit -> int
 val restricted : unit -> bool
 val bottom_classes : unit -> bool
 val timelimit : unit -> float
+val interpretation_timelimit : unit -> float
 val profiling : unit -> bool
+val cumulative_time_profiling : unit -> bool
 val profiling_period : unit -> float
 val js_mode : unit -> bool
+val case_split_policy : unit -> Util.case_split_policy
+val instantiate_after_backjump : unit -> bool
 
 (** this option also yields true if profiling is set to true **)
 val timers : unit -> bool
@@ -161,7 +175,6 @@ val inequalities_plugin : unit -> string
 val profiling_plugin : unit -> string
 val normalize_instances : unit -> bool
 val partial_bmodel : unit -> bool
-val backward_compat : unit -> bool
 
 (** particular getters : functions that are immediately executed **************)
 val exec_thread_yield : unit -> unit
@@ -177,7 +190,7 @@ module Time : sig
   val start : unit -> unit
   val value : unit -> float
 
-  val set_timeout : unit -> unit
+  val set_timeout : float -> unit
   val unset_timeout : unit -> unit
 
 end
@@ -186,3 +199,13 @@ end
 
 val cs_steps : unit -> int
 val incr_cs_steps : unit -> unit
+
+(** open Options in every module to hide polymorphic versions of Pervasives **)
+val (<>) : int -> int -> bool
+val (=) : int -> int -> bool
+val (<) : int -> int -> bool
+val (>) : int -> int -> bool
+val (<=) : int -> int -> bool
+val (>=) : int -> int -> bool
+
+val compare : int -> int -> int

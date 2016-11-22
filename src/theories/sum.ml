@@ -167,6 +167,29 @@ module Shostak (X : ALIEN) = struct
 	raise e
     else solve r1 r2 pb
 
+  let assign_value r _ _ =
+    (* values of theory sum should be assigned by case_split *)
+    None
+
+  let choose_adequate_model t r l =
+    let l =
+      List.filter
+        (fun (_, r) -> match embed r with Cons _ -> true | _ -> false) l
+    in
+    let r = match l with
+      | (_,r)::l ->
+        List.iter (fun (_,x) -> assert (X.equal x r)) l;
+        r
+
+      | [] ->
+        (* We do this, because terms of some semantic values created
+           by CS are not created and added to UF *)
+        match embed r with Cons _ -> r | _ -> assert false
+    in
+    ignore (flush_str_formatter ());
+    fprintf str_formatter "%a" print (embed r);
+    r, flush_str_formatter ()
+
 end
 
 module Relation (X : ALIEN) (Uf : Uf.S) = struct
@@ -308,11 +331,23 @@ module Relation (X : ALIEN) (Uf : Uf.S) = struct
       List.fold_left
         (fun nb (_,_,_,i) ->
           match i with
-          | CS (Th_arrays, n) -> Numbers.Q.mult nb n
+          | CS (Th_sum, n) -> Numbers.Q.mult nb n
           | _ -> nb
         )env.size_splits la
     in
     {env with size_splits = nb}
+
+  let add_aux env r =
+    Debug.add r;
+    match embed r, values_of r with
+      | Alien r, Some hss ->
+        if MX.mem r env.mx then env else
+          { env with mx = MX.add r (hss, Ex.empty) env.mx }
+      | _ -> env
+
+  (* needed for models generation because fresh terms are not
+     added with function add *)
+  let add_rec env r = List.fold_left add_aux env (X.leaves r)
 
   let assume env uf la =
     let env = count_splits env la in
@@ -332,9 +367,15 @@ module Relation (X : ALIEN) (Uf : Uf.S) = struct
       List.fold_left
         (fun (env,eqs) -> function
           | A.Eq(r1,r2), _, ex, _ ->
+            (* needed for models generation because fresh terms are not
+               added with function add *)
+            let env = add_rec (add_rec env r1) r2 in
 	    aux true  r1 r2 ex env eqs (values_of r1)
 
           | A.Distinct(false, [r1;r2]), _, ex, _ ->
+            (* needed for models generation because fresh terms are not
+               added with function add *)
+            let env = add_rec (add_rec env r1) r2 in
 	    aux false r1 r2 ex env eqs (values_of r1)
 
           | _ -> env, eqs
@@ -343,10 +384,9 @@ module Relation (X : ALIEN) (Uf : Uf.S) = struct
     in
     env, { assume = eqs; remove = [] }
 
-  (* XXXXXX : TODO -> ajouter les explications dans les choix du
-     case split *)
+  let add env _ r _ = add_aux env r
 
-  let case_split env uf =
+  let case_split env uf ~for_model =
     let acc = MX.fold
       (fun r (hss, ex) acc ->
         let sz = HSS.cardinal hss in
@@ -359,12 +399,13 @@ module Relation (X : ALIEN) (Uf : Uf.S) = struct
     match acc with
     | Some (n,r,hs) ->
       let n = Numbers.Q.from_int n in
-      if Numbers.Q.compare
+      if for_model ||
+        Numbers.Q.compare
         (Numbers.Q.mult n env.size_splits) (max_split ()) <= 0  ||
         Numbers.Q.sign  (max_split ()) < 0 then
         let r' = is_mine (Cons(hs,X.type_info r)) in
         Debug.case_split r r';
-        [LR.mkv_eq r r', Ex.empty, CS(Th_sum, n)]
+        [LR.mkv_eq r r', true, CS(Th_sum, n)]
       else []
     | None ->
       Debug.no_case_split ();
@@ -373,15 +414,6 @@ module Relation (X : ALIEN) (Uf : Uf.S) = struct
   let query env uf a_ex =
     try ignore(assume env uf [a_ex]); Sig.No
     with Inconsistent (expl, classes) -> Sig.Yes (expl, classes)
-
-  let add env r =
-    Debug.add r;
-    match embed r, values_of r with
-      | Alien r, Some hss ->
-        if MX.mem r env.mx then env else
-          { env with mx = MX.add r (hss, Ex.empty) env.mx }
-      | _ -> env
-
 
   let assume env uf la =
     if Options.timers() then

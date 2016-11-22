@@ -21,6 +21,8 @@
 (******************************************************************************)
 
 open Format
+open Options
+
 module F = Formula
 
 type exp =
@@ -87,7 +89,7 @@ let remove_fresh fe s =
 let add_fresh fe s = S.add fe s
 
 let print fmt ex =
-  if Options.verbose () then begin
+  if Options.debug_explanations () then begin
     fprintf fmt "{";
     S.iter (function
       | Literal a -> fprintf fmt "{Literal:%a}, " Literal.LT.print a
@@ -129,7 +131,7 @@ let rec literals_of_acc lit fs f acc = match F.view f with
   | F.Unit (f1,f2) ->
     let acc = literals_of_acc false fs f1 acc in
     literals_of_acc false fs f2 acc
-  | F.Clause (f1, f2) ->
+  | F.Clause (f1, f2, _) ->
     let acc = literals_of_acc true fs f1 acc in
     literals_of_acc true fs f2 acc
   | F.Lemma _ ->
@@ -157,3 +159,7 @@ let make_deps sf =
 let has_no_bj s =
   try S.iter (function Bj _ -> raise Exit | _ -> ())s; true
   with Exit -> false
+
+let compare = S.compare
+
+let subset = S.subset

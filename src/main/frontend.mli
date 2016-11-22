@@ -30,12 +30,12 @@ module type S = sig
 	        | Sat of sat_env | Unknown of sat_env
 
   val process_decl:
-    (Commands.sat_tdecl -> output -> int64 -> 'a) ->
+    (Commands.sat_tdecl -> output -> int64 -> unit) ->
     sat_env * bool * Explanation.t -> Commands.sat_tdecl ->
     sat_env * bool * Explanation.t
 
-  val open_file:
-    Lexing.lexbuf -> in_channel ->
+  val parse_and_typecheck:
+    string -> Lexing.lexbuf option ->
     ((int tdecl, int) annoted * Why_typing.env) list list
 
   val print_status : Commands.sat_tdecl -> output -> int64 -> unit

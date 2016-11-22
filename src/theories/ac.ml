@@ -83,15 +83,22 @@ module Make (X : Sig.X) = struct
   (*BISECT-IGNORE-BEGIN*)
   module Debug = struct
 
+
+    let print_x fmt v =
+      match X.leaves v with
+      | [w] when X.equal v w -> fprintf fmt "%a" X.print v
+      | _ -> fprintf fmt "(%a)" X.print v
+
+
     let rec pr_elt sep fmt (e,n) =
       assert (n >=0);
       if n = 0 then ()
-      else fprintf fmt "%s%a%a" sep X.print e (pr_elt sep) (e,n-1)
+      else fprintf fmt "%s%a%a" sep print_x e (pr_elt sep) (e,n-1)
 
     let pr_xs sep fmt = function
       | [] -> assert false
       | (p,n)::l  ->
-        fprintf fmt "%a" X.print p;
+        fprintf fmt "%a" print_x p;
         List.iter (fprintf fmt "%a" (pr_elt sep))((p,n-1)::l)
 
     let print fmt {h=h ; l=l} =
@@ -179,14 +186,15 @@ module Make (X : Sig.X) = struct
         let ra, ctx = abstract2 sy a ra (ctx1 @ ctx2) in
         let rb, ctx = abstract2 sy b rb ctx in
         let rxs = [ ra,1 ; rb,1 ] in
-	X.ac_embed {h=sy; l=compact (fold_flatten sy (fun x -> x) rxs); t=ty},
+	X.ac_embed {h=sy; l=compact (fold_flatten sy (fun x -> x) rxs); t=ty;
+                    distribute = true},
         ctx
       | _ -> assert false
     in
     Options.exec_timer_pause Timers.M_AC Timers.F_make;
     x
 
-  let is_mine_symb = Sy.is_ac
+  let is_mine_symb sy = Options.no_ac() == false && Sy.is_ac sy
 
   let type_info {t=ty} = ty
 

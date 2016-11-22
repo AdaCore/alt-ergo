@@ -50,7 +50,7 @@ module STRS = Set.Make(
 	[] , _ -> -1
       | _ , [] -> 1
       | x::l1 , y::l2 ->
-	let c = compare x y in if c=0 then compare_list l1 l2 else c
+	let c = Pervasives.compare x y in if c=0 then compare_list l1 l2 else c
 
     let compare (t1,_,_) (t2,_,_) = compare_term t1 t2
   end)
@@ -168,7 +168,7 @@ let rec compare_tterm t1 t2 =
     | TTconcat _, _ -> -1
     | _, TTconcat _ -> 1
     | TTdot(t1, a1), TTdot(t2,a2) ->
-      let c = compare a1 a2 in
+      let c = Pervasives.compare a1 a2 in
       if c<>0 then c else
 	compare_tterm t1 t2
     | TTdot _, _ -> -1
@@ -378,6 +378,10 @@ module SLLT =
     end)
 
 let parties bv vty l =
+  let l =
+    if triggers_var () then l
+    else List.filter (fun (t,_,_) -> not (is_var t)) l
+  in
   let rec parties_rec (llt, llt_ok)  l =
     match l with
       | [] -> llt_ok
@@ -428,8 +432,12 @@ let rec vars_of_term bv acc t = match t.c.tt_desc with
   | TTdot (t1, _) -> vars_of_term bv acc t1
   | TTrecord lbs ->
     List.fold_left (fun acc (_, t) -> vars_of_term bv acc t) acc lbs
-  (* XXX TTlet ? *)
-  | _ -> acc
+  | TTprefix (_, t) -> vars_of_term bv acc t
+  | TTnamed (_, t) -> vars_of_term bv acc t
+  | TTextract (t1, t2, t3) -> List.fold_left (vars_of_term bv) acc [t1;t2;t3]
+  | TTconcat (t1, t2) -> List.fold_left (vars_of_term bv) acc [t1;t2]
+  | TTconst _ -> acc
+
 
 let underscoring_term mvars underscores t =
   let rec under_rec t =
@@ -597,13 +605,13 @@ let potential_triggers =
 
 let filter_good_triggers (bv, vty) =
   List.filter
-    (fun l ->
+    (fun (l, _) ->
       let s1 = List.fold_left (vars_of_term bv) Vterm.empty l in
       let s2 = List.fold_left vty_term Vtype.empty l in
       Vterm.subset bv s1 && Vtype.subset vty s2 )
 
-let make_triggers all_triggers gopt vterm vtype trs =
-  match List.filter (filter_mono vterm vtype) trs with
+let make_triggers gopt vterm vtype trs =
+  let l = match List.filter (filter_mono vterm vtype) trs with
     | [] ->
       multi_triggers gopt vterm vtype trs
     | trs' ->
@@ -611,18 +619,20 @@ let make_triggers all_triggers gopt vterm vtype trs =
 	at_most all_triggers (nb_triggers ()) (List.map (fun (t, _, _) -> [t]) l) in
       let trs_v, trs_nv = List.partition (fun (t, _, _) -> is_var t) trs' in
       let ll =
-	if trs_nv = [] then
+	if trs_nv == [] then
 	  if triggers_var () || gopt then
 	    f trs_v
 	  else [] (*multi_triggers vars trs*)
 	else f trs_nv
       in
-      if greedy () then ll@(multi_triggers gopt vterm vtype trs) else ll
+      if greedy () || gopt then ll@(multi_triggers gopt vterm vtype trs) else ll
+  in
+  Lists.rrmap (fun e -> e, false) l
 
 let check_triggers trs (bv, vty) =
-  if trs = [] then
+  if trs == [] then
     failwith "There should be a trigger for every quantified formula in a theory.";
-  List.iter (fun l ->
+  List.iter (fun (l, _) ->
     let s1 = List.fold_left (vars_of_term bv) Vterm.empty l in
     let s2 = List.fold_left vty_term Vtype.empty l in
     if not (Vtype.subset vty s2) || not (Vterm.subset bv s1) then
@@ -639,22 +649,22 @@ let rec make_rec all_triggers keep_triggers pol gopt vterm vtype f =
       else
 	begin
 	  let l = match a.c with
-	    | TAeq l when pol = Neg ->
+	    | TAeq l when pol == Neg ->
 	      let v =
 		{tt_desc = TTapp(Sy.fake_eq, l); tt_ty = Ty.Tbool}
 	      in
 	      [ { c = v; annot = a.annot } ]
-	    | TAneq ([t1; t2] as l) when pol = Neg ->
+	    | TAneq ([t1; t2] as l) when pol == Neg ->
 	      let v =
 		{ tt_desc = TTapp(Sy.fake_neq, l); tt_ty = Ty.Tbool}
 	      in
 	      [ { c = v; annot = a.annot } ]
-	    | TAle l when pol = Neg ->
+	    | TAle l when pol == Neg ->
 	      let v =
 		{ tt_desc = TTapp(Sy.fake_le, l); tt_ty = Ty.Tbool}
 	      in
 	      [ { c = v; annot = a.annot } ]
-	    | TAlt l when pol = Neg ->
+	    | TAlt l when pol == Neg ->
 	      let v =
 		{ tt_desc = TTapp(Sy.fake_lt, l); tt_ty = Ty.Tbool}
 	      in
@@ -706,7 +716,7 @@ let rec make_rec all_triggers keep_triggers pol gopt vterm vtype f =
 	make_rec all_triggers keep_triggers pol gopt vterm'' vtype'' f2 in
       let trs12 =
 	if keep_triggers then check_triggers qf.qf_triggers (vterm', vtype')
-	else if Options.notriggers () || qf.qf_triggers = [] then
+	else if Options.notriggers () || qf.qf_triggers == [] then
 	  begin
 	    (make_triggers all_triggers false vterm' vtype'
 	       (STRS.elements trs1))@
@@ -716,7 +726,7 @@ let rec make_rec all_triggers keep_triggers pol gopt vterm vtype f =
 	else
 	  begin
 	    let lf = filter_good_triggers (vterm', vtype') qf.qf_triggers in
-	    if lf<>[] then lf
+	    if lf != [] then lf
 	    else
 	      (make_triggers all_triggers false vterm' vtype'
 		 (STRS.elements trs1))@
@@ -749,12 +759,12 @@ let rec make_rec all_triggers keep_triggers pol gopt vterm vtype f =
 	  (Vterm.union vterm vterm') (Vtype.union vtype vtype') qf.qf_form in
       let trs' =
 	if keep_triggers then check_triggers qf.qf_triggers (vterm', vtype')
-	else if Options.notriggers () || qf.qf_triggers=[] then
-	  make_triggers all_triggers gopt vterm' vtype' (STRS.elements trs)
+	else if Options.notriggers () || qf.qf_triggers == [] then
+	  make_triggers gopt vterm' vtype' (STRS.elements trs)
 	else
 	  let lf = filter_good_triggers (vterm',vtype') qf.qf_triggers in
-	  if lf <> [] then lf
-	  else make_triggers all_triggers gopt vterm' vtype' (STRS.elements trs)
+	  if lf != [] then lf
+	  else make_triggers gopt vterm' vtype' (STRS.elements trs)
       in
       let trs =
 	STRS.filter

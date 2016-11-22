@@ -378,18 +378,6 @@ module Shostak (X : ALIEN) = struct
       | Access _ , _ -> assert false
       | _ , Access _ -> assert false
 
-  let leaves t =
-    if Options.timers() then
-      try
-	Options.exec_timer_start Timers.M_Records Timers.F_leaves;
-	let res = leaves t in
-	Options.exec_timer_pause Timers.M_Records Timers.F_leaves;
-	res
-      with e ->
-	Options.exec_timer_pause Timers.M_Records Timers.F_leaves;
-	raise e
-    else leaves t
-
   let make t =
     if Options.timers() then
       try
@@ -414,6 +402,41 @@ module Shostak (X : ALIEN) = struct
 	raise e
     else solve r1 r2 pb
 
+  let assign_value t _ eq =
+    match embed t with
+    | Access _ -> None
+
+    | Record (_, ty) ->
+      if List.exists (fun (t,_) -> (Term.view t).Term.depth = 1) eq
+      then None
+      else Some (Term.fresh_name ty, false)
+
+    | Other (_,ty) ->
+      match ty with
+      | Ty.Trecord {Ty.args; name; lbs} ->
+        let rev_lbs = List.rev_map (fun (hs, ty) -> Term.fresh_name ty) lbs in
+        let s = Term.make (Symbols.Op Symbols.Record) (List.rev rev_lbs) ty in
+        Some (s, false) (* false <-> not a case-split *)
+      | _ -> assert false
+
+  let choose_adequate_model t _ l =
+    let acc =
+      List.fold_left
+        (fun acc (s, r) ->
+          if (Term.view s).Term.depth <> 1 then acc
+          else
+            match acc with
+            | Some(s', r') when Term.compare s' s > 0 -> acc
+            | _ -> Some (s, r)
+        ) None l
+    in
+    match acc with
+    | Some (_,r) ->
+      ignore (flush_str_formatter ());
+      fprintf str_formatter "%a" X.print r; (* it's a EUF constant *)
+      r, flush_str_formatter ()
+    | _ -> assert false
+
 end
 
 
@@ -426,8 +449,8 @@ module Relation (X : ALIEN) (Uf : Uf.S) = struct
   let assume _ _ _ =
     (), { assume = []; remove = []}
   let query _ _ _ = Sig.No
-  let case_split env _ = []
-  let add env _ = env
+  let case_split env _ ~for_model = []
+  let add env _ _ _ = env
   let print_model _ _ _ = ()
   let new_terms env = T.Set.empty
 end

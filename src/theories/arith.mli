@@ -22,20 +22,14 @@
 
 module Type (X : Sig.X ): Polynome.T with type r = X.r
 
-module type EXTENDED_Polynome = sig
-  include Polynome.T
-  val extract : r -> t option
-  val embed : t -> r
-end
-
 module Shostak
   (X : Sig.X)
-  (P : EXTENDED_Polynome with type r = X.r) : Sig.SHOSTAK
+  (P : Polynome.EXTENDED_Polynome with type r = X.r) : Sig.SHOSTAK
   with type r = X.r and type t = P.t
 
 module Relation
   (X : Sig.X)
   (Uf : Uf.S with type r = X.r)
-  (P : EXTENDED_Polynome with type r = X.r)
+  (P : Polynome.EXTENDED_Polynome with type r = X.r)
   : Sig.RELATION
   with type r = X.r and type uf = Uf.t

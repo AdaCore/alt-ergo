@@ -18,5 +18,5 @@ See enclosed INSTALL.md file
 
 ## Support
 
-See http://alt-ergo.ocamlpro.com or contact us at
+See http://alt-ergo.ocamlpro.com/support.php or contact us at
 contact@ocamlpro.com for more details

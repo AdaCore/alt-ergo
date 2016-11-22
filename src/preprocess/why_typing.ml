@@ -71,7 +71,10 @@ module Types = struct
     try
       List.for_all2
 	(fun pp x ->
-	  match pp with PPTvarid (y, _) -> x = y | _ -> false) lpp lvars
+	 match pp with
+         | PPTvarid (y, _) -> Pervasives.(=) x y
+         | _ -> false
+        ) lpp lvars
     with Invalid_argument _ -> false
 
   let rec ty_of_pp loc env rectype = function
@@ -88,7 +91,7 @@ module Types = struct
 	  to_tyvars := MString.add s nty !to_tyvars;
           nty
       end
-    | PPTexternal (l, s, loc) when s = "farray" ->
+    | PPTexternal (l, s, loc) when Pervasives.(=) s "farray" ->
       let t1,t2 = match l with
         | [t2] -> PPTint,t2
         | [t1;t2] -> t1,t2
@@ -99,7 +102,8 @@ module Types = struct
     | PPTexternal (l, s, loc) ->
       begin
 	match rectype with
-	  | Some (id, vars, ty) when s = id &&  equal_pp_vars l vars -> ty
+	| Some (id, vars, ty) when Pervasives.(=) s id &&
+                                     equal_pp_vars l vars -> ty
 	  | _ ->
 	    try
 	      let lty = List.map (ty_of_pp loc env rectype) l in
@@ -416,7 +420,7 @@ and type_term_desc env loc = function
   | PPprefix(PPneg, e) ->
     let te = type_term env e in
     let ty = Ty.shorten te.c.tt_ty in
-    if ty<>Ty.Tint && ty<>Ty.Treal then
+    if ty!=Ty.Tint && ty!=Ty.Treal then
       error (ShouldHaveTypeIntorReal ty) e.pp_loc;
     Options.tool_req 1 (append_type "TR-Typing-OpUnarith type" ty);
     TTprefix(Symbols.Op Symbols.Minus, te), ty
@@ -579,7 +583,7 @@ and type_term_desc env loc = function
   | PPlet(x, t1, t2) ->
     let te1 = type_term env t1 in
     let ty1 = Ty.shorten te1.c.tt_ty in
-    let env = Env.add env [x] Symbols.name ty1 in
+    let env = Env.add env [x] Symbols.var ty1 in
     let te2 = type_term env t2 in
     let ty2 = Ty.shorten te2.c.tt_ty in
     let s, _ = Env.find env x in
@@ -663,7 +667,7 @@ let rec type_form env f =
 	      begin
 		try
 		  List.iter2 Ty.unify lt lt_args;
-		  if p = "<=" || p = "<" then
+		  if Pervasives.(=) p "<=" || Pervasives.(=) p "<" then
 		    TFatom { c = TAbuilt(Hstring.make p,te_args);
 			     annot=new_id ()}
 		  else
@@ -790,7 +794,9 @@ let rec type_form env f =
 	  (fun env (lv, pp_ty) ->
 	    Env.add_var env lv pp_ty f.pp_loc) env ty_vars in
       let f', fv = type_form env' f' in
-      let ty_triggers = List.map (List.map (type_term env')) triggers in
+      let ty_triggers =
+        List.map (fun (tr, b) -> List.map (type_term env') tr, b) triggers
+      in
       let upbvars = Env.list_of env in
       let bvars =
 	List.fold_left
@@ -953,7 +959,7 @@ let rec no_alpha_renaming_b ((up, m) as s) f =
       let up = List.fold_left (fun up x -> S.add x up) up xs in
       let s = (up, m) in
       no_alpha_renaming_b s f1;
-      List.iter (List.iter (no_alpha_renaming_b s)) trs
+      List.iter (fun (l, _) -> List.iter (no_alpha_renaming_b s) l) trs
 
     | PPforall_named (xs, ty, trs, f1) ->
       let xs1, xs2 = List.partition (fun (x, _) -> S.mem x up) xs in
@@ -964,7 +970,7 @@ let rec no_alpha_renaming_b ((up, m) as s) f =
       let up = List.fold_left (fun up (x, _) -> S.add x up) up xs in
       let s = (up, m) in
       no_alpha_renaming_b s f1;
-      List.iter (List.iter (no_alpha_renaming_b s)) trs
+      List.iter (fun (l, _) -> List.iter (no_alpha_renaming_b s) l) trs
 
     | PPexists(lx, ty, trs, f1) ->
       let s, lx =
@@ -980,7 +986,7 @@ let rec no_alpha_renaming_b ((up, m) as s) f =
 	  (s, []) lx
       in
       no_alpha_renaming_b s f1;
-      List.iter (List.iter (no_alpha_renaming_b s)) trs
+      List.iter (fun (l, _) -> List.iter (no_alpha_renaming_b s) l) trs
 
     | PPexists_named (lx, ty, trs, f1) ->
       let s, lx =
@@ -996,7 +1002,7 @@ let rec no_alpha_renaming_b ((up, m) as s) f =
 	  (s, []) lx
       in
       no_alpha_renaming_b s f1;
-      List.iter (List.iter (no_alpha_renaming_b s)) trs
+      List.iter (fun (l, _) -> List.iter (no_alpha_renaming_b s) l) trs
 
 let rec alpha_renaming_b ((up, m) as s) f =
   match f.pp_desc with
@@ -1053,7 +1059,7 @@ let rec alpha_renaming_b ((up, m) as s) f =
     | PPconcat(f1, f2) ->
       let ff1 = alpha_renaming_b s f1 in
       let ff2 = alpha_renaming_b s f2 in
-      if ff1 == f1 && ff2 = f2 then f
+      if ff1 == f1 && ff2 == f2 then f
       else {f with pp_desc = PPconcat(ff1, ff2)}
 
     | PPif(f1, f2, f3) ->
@@ -1125,7 +1131,10 @@ let rec alpha_renaming_b ((up, m) as s) f =
       let up = List.fold_left (fun up x -> S.add x up) up xs in
       let s = (up, m) in
       let ff1 = alpha_renaming_b s f1 in
-      let trs2 = List.map (List.map (alpha_renaming_b s)) trs in
+      let trs2 =
+        List.map (fun (l, tuser) ->
+          List.map (alpha_renaming_b s) l, tuser) trs
+      in
       if f1==ff1 && List.for_all2 (fun a b -> a==b) trs trs2 then f
       else {f with pp_desc = PPforall(xs, ty, trs2, ff1)}
 
@@ -1138,7 +1147,10 @@ let rec alpha_renaming_b ((up, m) as s) f =
       let up = List.fold_left (fun up (x, _) -> S.add x up) up xs in
       let s = (up, m) in
       let ff1 = alpha_renaming_b s f1 in
-      let trs2 = List.map (List.map (alpha_renaming_b s)) trs in
+      let trs2 =
+        List.map (fun (l, tuser) ->
+          List.map (alpha_renaming_b s) l, tuser) trs
+      in
       if f1==ff1 && List.for_all2 (fun a b -> a==b) trs trs2 then f
       else {f with pp_desc = PPforall_named (xs, ty, trs2, ff1)}
 
@@ -1155,7 +1167,10 @@ let rec alpha_renaming_b ((up, m) as s) f =
 	      (S.add x up, m), x :: lx)
 	  (s, []) lx
       in
-      let trs2 = List.map (List.map (alpha_renaming_b s)) trs in
+      let trs2 =
+        List.map
+          (fun (l, tuser) -> List.map (alpha_renaming_b s) l, tuser) trs
+      in
       let ff1 = alpha_renaming_b s f1 in
       if f1==ff1 && List.for_all2 (fun a b -> a==b) trs trs2 then f
       else {f with pp_desc = PPexists(lx, ty, trs2, ff1)}
@@ -1174,7 +1189,10 @@ let rec alpha_renaming_b ((up, m) as s) f =
 	  (s, []) lx
       in
       let ff1 = alpha_renaming_b s f1 in
-      let trs2 = List.map (List.map (alpha_renaming_b s)) trs in
+      let trs2 =
+        List.map
+          (fun (l, tuser) -> List.map (alpha_renaming_b s) l, tuser) trs
+      in
       if f1==ff1 && List.for_all2 (fun a b -> a==b) trs trs2 then f
       else {f with pp_desc = PPexists_named (lx, ty, trs2, ff1)}
 
@@ -1372,13 +1390,15 @@ let rec monomorphize_form tf =
         {  qf_bvars = List.map monomorphize_var qf.qf_bvars;
            qf_upvars = List.map monomorphize_var qf.qf_upvars;
            qf_form = monomorphize_form qf.qf_form;
-           qf_triggers = List.map (List.map mono_term) qf.qf_triggers}
+           qf_triggers =
+            List.map (fun (l, b) -> List.map mono_term l, b) qf.qf_triggers}
     | TFexists qf ->
       TFexists
         {  qf_bvars = List.map monomorphize_var qf.qf_bvars;
            qf_upvars = List.map monomorphize_var qf.qf_upvars;
            qf_form = monomorphize_form qf.qf_form;
-           qf_triggers = List.map (List.map mono_term) qf.qf_triggers}
+           qf_triggers =
+            List.map (fun (l, b) -> List.map mono_term l, b) qf.qf_triggers}
     | TFlet (l, sy, tt, tf) ->
       let l = List.map monomorphize_var l in
       TFlet(l,sy, mono_term tt, monomorphize_form tf)
@@ -1423,6 +1443,7 @@ let rec type_and_intro_goal keep_triggers acc env loc sort n f =
   let b = (* smtfile() || smt2file() || satmode()*) false in
   let axioms, (goal, env_g) =
     intro_hypothesis env (not b) f in
+  let loc = f.pp_loc in
   let acc =
     List.fold_left
       (fun acc (f, env_f) -> match f.pp_desc with
@@ -1499,7 +1520,7 @@ let type_decl keep_triggers (acc, env) d =
 	   donc on calcule les termes maximaux de la definition pour
 	   laisser une possibilite de replier *)
 	let trs = max_terms e in
-	let f = make_pred loc ([p]::[trs]) f l in
+	let f = make_pred loc [[p], false ; trs, false] f l in
 	let f,_ = type_form env f in
 	let f = Triggers.make keep_triggers false f in
 	let td =
@@ -1543,10 +1564,10 @@ let file keep_triggers env ld =
   List.rev ltd, env
 
 let is_local_hyp s =
-  try String.sub s 0 2 = "@L" with Invalid_argument _ -> false
+  try Pervasives.(=) (String.sub s 0 2) "@L" with Invalid_argument _ -> false
 
 let is_global_hyp s =
-  try String.sub s 0 2 = "@H" with Invalid_argument _ -> false
+  try Pervasives.(=) (String.sub s 0 2) "@H" with Invalid_argument _ -> false
 
 let split_goals l =
   let _, _, _, ret =
@@ -1574,7 +1595,7 @@ let term env vars t =
   let vmap =
     List.fold_left
       (fun m (s,ty)->
-	let str = Symbols.to_string s in
+	let str = Symbols.to_string_clean s in
 	MString.add str (s,ty) m
       ) env.Env.var_map vars in
   let env = { env with Env.var_map = vmap } in

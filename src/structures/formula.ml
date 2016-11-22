@@ -29,10 +29,21 @@ module Sy = Symbols
 
 type binders = (Ty.t * int) Sy.Map.t (*int tag in globally unique *)
 
+type trigger = {
+  content : T.t list;
+  depth : int;
+  from_user : bool;
+  guard : Literal.LT.t option
+}
+
 type quantified = {
   name : string;
   main : t;
-  triggers : (T.t list * Literal.LT.t option) list;
+
+  (*simplified quantified formula, or immediate inst*)
+  simple_inst : (Term.t Symbols.Map.t * Ty.subst) option;
+
+  triggers : trigger list;
   binders : binders;
 
   (* These fields should be (ordered) lists ! important for skolemization *)
@@ -51,7 +62,7 @@ and llet = {
 
 and view =
     Unit of t*t
-  | Clause of t*t
+  | Clause of t*t*bool
   | Literal of Literal.LT.t
   | Lemma of quantified
   | Skolem of quantified
@@ -64,6 +75,8 @@ and t = iview * int
 
 type gformula = {
   f: t;
+  nb_reductions : int;
+  trigger_depth : int;
   age: int;
   lem: t option;
   from_terms : Term.t list;
@@ -78,7 +91,7 @@ let compare ((v1,_) as f1) ((v2,_) as f2) =
   if c=0 then Pervasives.compare v1.tag v2.tag else c
 
 let equal (f1,_) (f2,_) =
-  assert ((f1 == f2) = (f1.tag = f2.tag));
+  assert ((f1 == f2) == (f1.tag == f2.tag));
   f1 == f2
 
 let equal_binders b1 b2 = Sy.Map.equal (fun (_,i) (_,j) -> i = j) b1 b2
@@ -103,7 +116,7 @@ module MST = Map.Make(T.Set)
 let equal_triggers =
   let map_of l =
     List.fold_left
-      (fun mp (mtr, opt) ->
+      (fun mp {content=mtr; guard = opt} ->
         let st = List.fold_left (fun z t -> T.Set.add t z) T.Set.empty mtr in
         MST.add st opt mp
       )MST.empty l
@@ -163,7 +176,7 @@ module View = struct
 
   let eqc c1 c2 = match c1,c2 with
     | Literal x , Literal y -> Literal.LT.equal x y
-    | Unit(f1,f2), Unit(g1,g2) | Clause(f1,f2), Clause(g1,g2) ->
+    | Unit(f1,f2), Unit(g1,g2) | Clause(f1,f2,_), Clause(g1,g2,_) ->
       equal f1 g1 && equal f2 g2 || equal f1 g2 && equal f2 g1
 
     | Lemma q1, Lemma q2 | Skolem q1, Skolem q2  ->
@@ -188,7 +201,7 @@ module View = struct
       let max = max f1.tag f2.tag in
       (acc*19 + min)*19 + max
 
-    | Clause((f1,_),(f2,_)) ->
+    | Clause((f1,_),(f2,_),_) ->
       let min = min f1.tag f2.tag in
       let max = max f1.tag f2.tag in
       (acc*19 + min)*19 + max
@@ -221,17 +234,30 @@ let iview f = f
 
 let id (_,id) = id
 
+let print_binders =
+  let print_one fmt (sy, (ty, _)) =
+    fprintf fmt "%a:%a" Sy.print sy Ty.print ty
+  in fun fmt b ->
+    match Sy.Map.bindings b with
+    | [] ->
+      (* can happen when quantifying only on type variables *)
+      fprintf fmt "(no term variables)"
+    | e::l ->
+      print_one fmt e;
+      List.iter (fun e -> fprintf fmt ", %a" print_one e) l
+
 let rec print fmt f =
   match view f with
     | Literal a ->
       Literal.LT.print fmt a
-    | Lemma {triggers = trs; main = f; name = n} ->
+    | Lemma {triggers = trs; main = f; name = n; binders} ->
       if verbose () then
 	let first = ref true in
-	fprintf fmt "(lemma: %s)[%a]@  %a"
+	fprintf fmt "(lemma: %s forall %a.)[%a]@  %a"
 	  n
+          print_binders binders
 	  (fun fmt ->
-	    List.iter (fun (l, _) ->
+	    List.iter (fun {content=l} ->
 	      fprintf fmt "%s%a"
 		(if !first then "" else " | ") T.print_list l;
 	      first := false;
@@ -242,9 +268,10 @@ let rec print fmt f =
 
     | Unit(f1, f2) -> fprintf fmt "@[(%a /\\@ %a)@]" print f1 print f2
 
-    | Clause(f1, f2) -> fprintf fmt "@[(%a \\/@ %a)@]" print f1 print f2
+    | Clause(f1, f2,_) -> fprintf fmt "@[(%a \\/@ %a)@]" print f1 print f2
 
-    | Skolem{main=f} -> fprintf fmt "<sko> (%a)" print f
+    | Skolem{main=f; binders} ->
+      fprintf fmt "<sko exists %a.> (%a)" print_binders binders print f
 
     | Let l ->
       fprintf fmt
@@ -290,28 +317,26 @@ module F_Htbl =
     let equal = equal
   end)
 
-let merge_maps acc1 acc2 =
-  let acc1, acc2 =
-    if Sy.Map.cardinal acc1 <= Sy.Map.cardinal acc2 then acc1, acc2
-    else acc2, acc1
-  in
-  Sy.Map.fold
-    (fun sy st1 acc ->
-      try Sy.Map.add sy (T.Set.union st1 (Sy.Map.find sy acc)) acc
-      with Not_found -> Sy.Map.add sy st1 acc
-    )acc1 acc2
+let merge_maps acc b =
+  Sy.Map.merge
+    (fun sy a b ->
+      match a, b with
+      | None, None -> assert false
+      | Some _, None -> a
+      | _ -> b
+    ) acc b
 
 let free_vars =
   let rec free_rec acc f =
     match view f with
       | Literal a   -> Literal.LT.vars_of a acc
       | Unit(f1,f2) -> free_rec (free_rec acc f1) f2
-      | Clause(f1,f2) -> free_rec (free_rec acc f1) f2
+      | Clause(f1,f2,_) -> free_rec (free_rec acc f1) f2
       | Lemma {binders = binders; main = f}
       | Skolem {binders = binders; main = f} ->
 	let mp = free_rec Sy.Map.empty f in
         let mp = Sy.Map.filter (fun sy _ -> not (Sy.Map.mem sy binders)) mp in
-        merge_maps acc mp
+        merge_maps mp acc
 
       | Let {let_subst = (subst, _); let_term = t; let_f = lf} ->
         let mp = free_rec Sy.Map.empty lf in
@@ -326,14 +351,14 @@ let free_vars =
 	    else mp
 	  ) subst mp
         in
-        merge_maps acc mp
+        merge_maps mp acc
   in
   fun f -> free_rec Sy.Map.empty f
 
 let type_variables f =
   let rec aux acc f =
     match view f with
-      | Unit(f1,f2) | Clause(f1,f2) -> aux (aux acc f1) f2
+      | Unit(f1,f2) | Clause(f1,f2,_) -> aux (aux acc f1) f2
       | Lemma lem | Skolem lem -> aux acc lem.main
       | Let llet -> aux acc llet.let_f
       | Literal a ->
@@ -345,6 +370,44 @@ let type_variables f =
     (fun i z -> Ty.Set.add (Ty.Tvar {Ty.v=i; value = None}) z)
     (aux Ty.Svty.empty f) Ty.Set.empty
 
+
+exception Particuar_instance of Sy.t * Term.t
+
+let eventual_particular_inst =
+  let rec aux v tv f =
+    match view f with
+    | Unit _ | Lemma _ | Skolem _ | Let _ -> ()
+    | Clause(f1, f2,_) -> aux v tv f1; aux v tv f2
+    | Literal a ->
+      begin
+        match Literal.LT.view a with
+        | Literal.Distinct (false, [a;b]) when Term.equal tv a ->
+          if not (Sy.Map.mem v (T.vars_of b Sy.Map.empty)) then
+            raise (Particuar_instance (v, b))
+
+        | Literal.Distinct (false, [a;b]) when Term.equal tv b ->
+          if not (Sy.Map.mem v (T.vars_of a Sy.Map.empty)) then
+            raise (Particuar_instance (v, a))
+
+        | Literal.Pred (t, is_neg) when Term.equal tv t ->
+          raise (Particuar_instance (v, if is_neg then T.vrai else T.faux))
+
+        | _ -> ()
+      end
+  in
+  fun binders free_vty f ->
+    match free_vty with
+    | _::_ -> None
+    | [] ->
+      match Sy.Map.bindings binders with
+      | [] -> assert false
+      | _::_::_ -> None
+      | [v, (ty,_)] ->
+        try
+          aux v (Term.make v [] ty) f; None
+        with Particuar_instance (x, t) ->
+          Some (Sy.Map.singleton x t, Ty.esubst)
+
 let mk_forall =
   let env = F_Htbl.create 101 in
   (*fun up bv trs f name id ->*)
@@ -353,21 +416,27 @@ let mk_forall =
     let free_v_f = free_vars f in (* free variables of f *)
     let binders =  (* ignore binders that are not used in f *)
       Sy.Map.filter (fun sy _ -> Sy.Map.mem sy free_v_f) binders in
-    if Sy.Map.is_empty binders && Ty.Set.is_empty free_vty then f
+    if Sy.Map.is_empty binders && Ty.Set.is_empty free_vty then
+      (* not quantified ==> should fix save-used-context to be able to
+         save "non-quantified axioms", or use a cache to save the name
+         of axioms as labels, but they should be unique in this case *)
+      f
     else
       let free_v, free_vty = match ext_free with
         | Some (fv, fv_ty) -> fv, fv_ty
         | None ->
           let free_v = (* compute free vars (as terms) of f *)
             Sy.Map.fold
-              (fun sy st fv ->
+              (fun sy ty fv ->
                 if Sy.Map.mem sy binders then fv
-                else T.Set.fold (fun t fv -> t::fv) st fv) free_v_f []
+                else (Term.make sy [] ty) ::fv) free_v_f []
           in
           free_v, Ty.Set.elements free_vty
       in
+      let simple_inst = eventual_particular_inst binders free_vty f in
       let new_q = {
         name = name;
+        simple_inst = simple_inst;
         main = f;
         triggers = triggers;
         binders = binders;
@@ -389,6 +458,7 @@ let mk_forall =
         F_Htbl.add env f res;
         res
 
+
 let mk_exists name loc binders triggers f id ext_free =
   mk_not (mk_forall name loc binders triggers (mk_not f) id ext_free)
 
@@ -396,16 +466,14 @@ let mk_exists name loc binders triggers f id ext_free =
 let mk_let _up bv t f id =
   let {Term.ty=ty} = Term.view t in
   let up = Term.vars_of t Sy.Map.empty in
-  let up =
-    Sy.Map.fold
-      (fun _ st acc -> T.Set.fold (fun y acc -> y::acc) st acc) up [] in
+  let up = Sy.Map.fold (fun sy ty acc -> (Term.make sy [] ty)::acc) up [] in
   let subst = Sy.Map.add bv (T.make (Sy.fresh "_let") up ty) Sy.Map.empty in
   make
     (Let{let_var=bv; let_subst=(subst, Ty.esubst); let_term=t; let_f=f})
     (Let{let_var=bv; let_subst=(subst, Ty.esubst); let_term=t; let_f=mk_not f})
     (size f) id
 
-let mk_and f1 f2 id =
+let mk_and f1 f2 is_impl id =
   if equal f1 (mk_not f2) then faux
   else
     if equal f1 f2 then f1
@@ -413,11 +481,11 @@ let mk_and f1 f2 id =
     else if equal f2 vrai then f1
     else if (equal f1 faux) || (equal f2 faux) then faux
     else
-      let f1, f2 = if compare f1 f2 < 0 then f1, f2 else f2, f1 in
+      let f1, f2 = if is_impl || compare f1 f2 < 0 then f1, f2 else f2, f1 in
       let size = size f1 + size f2 in
-      make (Unit(f1,f2)) (Clause(mk_not f1,mk_not f2)) size id
+      make (Unit(f1,f2)) (Clause(mk_not f1,mk_not f2,is_impl)) size id
 
-let mk_or f1 f2 id =
+let mk_or f1 f2 is_impl id =
   if equal f1 (mk_not f2) then vrai
   else
     if equal f1 f2 then f1
@@ -425,25 +493,20 @@ let mk_or f1 f2 id =
     else if equal f2 faux then f1
     else if equal f1 vrai || equal f2 vrai then vrai
     else
-      let f1, f2 = if compare f1 f2 < 0 then f1, f2 else f2, f1 in
+      let f1, f2 = if is_impl || compare f1 f2 < 0 then f1, f2 else f2, f1 in
       let size = size f1 + size f2 in
-      make (Clause(f1,f2)) (Unit(mk_not f1,mk_not f2)) size id
+      make (Clause(f1,f2,is_impl)) (Unit(mk_not f1,mk_not f2)) size id
 
-(* using simplifications of mk_or is not always efficient !! *)
-let mk_imp f1 f2 id =
-  let size = size f1 + size f2 in
-  make (Clause(mk_not f1,f2)) (Unit(f1,mk_not f2)) size id
+let mk_imp f1 f2 id = mk_or (mk_not f1) f2 true id
 
 (* using simplifications of mk_or and mk_and is not always efficient !! *)
-let mk_iff f1 f2 id =
-  let a = mk_or (mk_not f1) f2 id in
-  let b = mk_or f1 (mk_not f2) id in
-  let na = mk_and f1 (mk_not f2) id in
-  let nb = mk_and (mk_not f1) f2 id in
-  make (Unit(a,b)) (Clause(na,nb)) (2*(size f1+size f2)) id
+let mk_iff f1 f2 id = (* try to interpret iff as a double implication *)
+  let a = mk_or (mk_not f1) f2 true id in
+  let b = mk_or f1 (mk_not f2) true id in
+  mk_and a b false id
 
 let translate_eq_to_iff s t =
-  (T.view s).T.ty = Ty.Tbool &&
+  (T.view s).T.ty == Ty.Tbool &&
   not
   (T.equal s T.vrai || T.equal s T.faux || T.equal t T.vrai ||T.equal t T.faux)
 
@@ -466,13 +529,22 @@ let mk_lit a id = match Literal.LT.view a with
 
 let mk_if t f2 f3 id =
   let lit = mk_lit (Literal.LT.mk_pred t false) id in
-  mk_or (mk_and lit f2 id) (mk_and (mk_not lit) f3 id) id
+  mk_or (mk_and lit f2 true id) (mk_and (mk_not lit) f3 true id) false id
 
 let no_capture_issue s_t binders =
   true (* TODO *)
 
 module Set = Set.Make(struct type t'=t type t=t' let compare=compare end)
 module Map = Map.Make(struct type t'=t type t=t' let compare=compare end)
+
+let apply_subst_trigger subst ({content; guard} as tr) =
+  {tr with
+    content = List.map (T.apply_subst subst) content;
+    guard =
+      match guard with
+      | None -> guard
+      | Some g -> Some (Literal.LT.apply_subst subst g)
+  }
 
 (* this function should only be applied with ground substitutions *)
 let rec apply_subst =
@@ -483,8 +555,12 @@ let rec apply_subst =
     else
       match sp with
       | Literal a      -> mk_lit a id     (* this may simplifies the res *)
-      | Unit (f1, f2)  -> mk_and f1 f2 id (* this may simplifies the res *)
-      | Clause (f1,f2) -> mk_or f1 f2 id  (* this may simplifies the res *)
+      | Unit (f1, f2)  ->
+        let is_impl = match sn with Clause(_,_,b) -> b | _ -> assert false in
+        mk_and f1 f2 is_impl id (* this may simplifies the res *)
+
+      | Clause (f1,f2,is_impl) -> mk_or f1 f2 is_impl id
+      (* this may simplifies the res *)
 
       | Lemma q  ->
         mk_forall
@@ -525,8 +601,7 @@ and iapply_subst ((s_t,s_ty) as subst) p n = match p, n with
     else
       let subst = s_t , s_ty in
       let f = apply_subst subst f in
-      let trs =
-        List.map (fun (l, r) -> List.map (T.apply_subst subst) l, r) trs in
+      let trs = List.map (apply_subst_trigger subst) trs in
       let binders =
         Sy.Map.fold
           (fun sy (ty,i) bders ->
@@ -547,17 +622,17 @@ and iapply_subst ((s_t,s_ty) as subst) p n = match p, n with
       | Skolem _, Lemma _ -> ssko, slem, false
       | _ -> assert false)
 
-  | Unit(f1, f2), _ ->
+  | Unit(f1, f2), Clause(_,_, is_impl) ->
     let sf1 = apply_subst subst f1 in
     let sf2 = apply_subst subst f2 in
     if sf1 == f1 && sf2 == f2 then p, n, true
-    else Unit(sf1, sf2), Clause(mk_not sf1, mk_not sf2), false
+    else Unit(sf1, sf2), Clause(mk_not sf1, mk_not sf2, is_impl), false
 
-  | Clause(f1, f2), _ ->
+  | Clause(f1, f2, is_impl), _ ->
     let sf1 = apply_subst subst f1 in
     let sf2 = apply_subst subst f2 in
     if sf1 == f1 && sf2 == f2 then p, n, true
-    else Clause(sf1, sf2), Unit(mk_not sf1, mk_not sf2), false
+    else Clause(sf1, sf2, is_impl), Unit(mk_not sf1, mk_not sf2), false
 
   | Let ({let_subst = s; let_term = lterm; let_f = lf} as e), Let _ ->
     let lterm = T.apply_subst subst lterm in
@@ -580,7 +655,7 @@ let label f =
     | _ -> Hstring.empty
 
 let label_model h =
-  try String.sub (Hstring.view h) 0 6 = "model:"
+  try Pervasives.(=) (String.sub (Hstring.view h) 0 6) "model:"
   with Invalid_argument _ -> false
 
 let is_in_model f =
@@ -602,7 +677,7 @@ let ground_terms_rec =
       T.Set.union s acc
     | Lemma {main = f} | Skolem {main = f} -> terms acc f
     | Unit(f1,f2) -> terms (terms acc f1) f2
-    | Clause(f1,f2) -> terms (terms acc f1) f2
+    | Clause(f1,f2,_) -> terms (terms acc f1) f2
     | Let {let_term=t; let_f=lf} ->
       let st =
 	T.Set.filter
@@ -646,3 +721,17 @@ let apply_subst s f =
       Options.exec_timer_pause Timers.M_Formula Timers.F_apply_subst;
       raise e
   else apply_subst s f
+
+let max_term_depth f =
+  let rec aux f mx =
+    match view f with
+    | Literal a ->
+        T.Set.fold
+          (fun t mx -> max mx (T.view t).T.depth)
+          (Literal.LT.terms_nonrec a) mx
+
+    | Clause(f1, f2,_) | Unit(f1, f2) -> aux f2 (aux f1 mx)
+    | Lemma q | Skolem q -> aux q.main mx
+    | Let q -> max (aux q.let_f mx) (T.view q.let_term).T.depth
+  in
+  aux f 0

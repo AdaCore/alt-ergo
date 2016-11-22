@@ -11,7 +11,7 @@ module Default_Unix = struct
   let cur_time () = (times()).tms_utime
 
   let set_timeout timelimit =
-    if timelimit <> 0. then
+    if Pervasives.(<>) timelimit 0. then
       ignore (Unix.setitimer Unix.ITIMER_REAL
 		{ Unix.it_value = timelimit; Unix.it_interval = 0. })
 
@@ -23,7 +23,7 @@ end
 
 include Default_Unix
 
-(*
+(* !! This commented code is used when compiling to javascript !!
 module JavaScript_Unix = struct
 
   let cur_time () =

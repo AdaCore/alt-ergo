@@ -21,6 +21,7 @@
 (******************************************************************************)
 
 open Typed
+open Options
 
 let eq_var x t =
   match t.c.tt_desc with
@@ -58,7 +59,7 @@ let find_equalities lv f =
   List.fold_left
     (fun eqs (x,_) ->
       let l = find_eq x [] f in
-      if l = [] then raise Not_found; l::eqs ) [] lv
+      if l == [] then raise Not_found; l::eqs ) [] lv
 
 let rec apply_subst_term env t =
   let tt = match t.c.tt_desc with

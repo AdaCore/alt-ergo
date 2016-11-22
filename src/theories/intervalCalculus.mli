@@ -20,15 +20,9 @@
 (*   This file is distributed under the terms of the CeCILL-C licence         *)
 (******************************************************************************)
 
-module type EXTENDED_Polynome = sig
-  include Polynome.T
-  val extract : r -> t option
-  val embed : t -> r
-end
-
 module Make
   (X : Sig.X)
   (Uf : Uf.S with type r = X.r)
-  (P : EXTENDED_Polynome with type r = X.r)
+  (P : Polynome.EXTENDED_Polynome with type r = X.r)
   : Sig.RELATION
   with type r = X.r and type uf = Uf.t

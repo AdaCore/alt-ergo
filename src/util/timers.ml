@@ -78,6 +78,7 @@ type ty_function =
   | F_none
   | F_new_facts
   | F_apply_subst
+  | F_instantiate
 
 let ftag f = match f with
   | F_add           -> 0
@@ -99,8 +100,48 @@ let ftag f = match f with
   | F_none          -> 16
   | F_new_facts     -> 17
   | F_apply_subst   -> 18
+  | F_instantiate   -> 19
 
-let nb_ftag = 19
+let nb_ftag = 20
+
+let string_of_ty_module k = match k with
+  | M_None   -> "None"
+  | M_Typing -> "Typing"
+  | M_Sat    -> "Sat"
+  | M_Match  -> "Match"
+  | M_CC     -> "CC"
+  | M_UF     -> "UF"
+  | M_Arith  -> "Arith"
+  | M_Arrays -> "Arrays"
+  | M_Sum    -> "Sum"
+  | M_Records-> "Records"
+  | M_AC     -> "AC"
+  | M_Formula-> "Formula"
+  | M_Literal-> "Literal"
+  | M_Term   -> "Term"
+  | M_Triggers->"Triggers"
+
+let string_of_ty_function f = match f with
+  | F_add           -> "add"
+  | F_add_lemma     -> "add_lemma"
+  | F_assume        -> "assume"
+  | F_class_of      -> "class_of"
+  | F_leaves        -> "leaves"
+  | F_make          -> "make"
+  | F_m_lemmas      -> "m_lemmas"
+  | F_m_predicates  -> "m_predicates"
+  | F_query         -> "query"
+  | F_solve         -> "solve"
+  | F_subst         -> "subst"
+  | F_union         -> "union"
+  | F_unsat         -> "unsat"
+  | F_add_predicate -> "add_predicate"
+  | F_add_terms     -> "add_terms"
+  | F_are_equal     -> "are_equal"
+  | F_none          -> "none"
+  | F_new_facts     -> "new_facts"
+  | F_apply_subst   -> "apply_subst"
+  | F_instantiate   -> "instantiate"
 
 type t = {
   (* current time *)
@@ -144,9 +185,28 @@ let accumulate env cur m f =
   let ft = ftag f in
   env.z.(mt).(ft) <- env.z.(mt).(ft) +. (cur -. env.cur_u)
 
+let accumulate_cumulative_mode name env m f cur =
+  (* currently disable because we have a circular
+     dependency between Options and Timers *)
+  ()
+  (*
+  if Options.cumulative_time_profiling() then
+    if Options.debug() then
+      eprintf "@.%s time of %s , %s@."
+              name (string_of_ty_module m) (string_of_ty_function f);
+      List.iter
+        (fun (m, f, id) ->
+         if Options.debug() then
+           eprintf "  also update time of %s , %s@."
+                   (string_of_ty_module m) (string_of_ty_function f);
+         accumulate env cur m f
+        )env.stack
+     *)
+
 (** save the current timer and start the timer m x f **)
 let start env m f =
   let cur = MyUnix.cur_time() in
+  accumulate_cumulative_mode "start" env m f cur;
   begin
     match env.cur_t with
     | (M_None, _, _) -> ()
@@ -160,6 +220,7 @@ let start env m f =
 (** pause the timer "m x f" and restore the former timer **)
 let pause env m f =
   let cur = MyUnix.cur_time() in
+  accumulate_cumulative_mode "pause" env m f cur;
   accumulate env cur m f;
   env.cur_u <- cur;
   match env.stack with
@@ -173,6 +234,7 @@ let pause env m f =
 let update env =
   let cur = MyUnix.cur_time() in
   let m, f, id = env.cur_t in
+  accumulate_cumulative_mode "update" env m f cur;
   accumulate env cur m f;
   env.cur_u <- cur
 
@@ -184,44 +246,6 @@ let get_sum env m =
   let cpt = ref 0. in
   Array.iter (fun v -> cpt := !cpt +. v) env.z.(mtag m);
   !cpt
-
-let string_of_ty_module k = match k with
-  | M_None   -> "None"
-  | M_Typing -> "Typing"
-  | M_Sat    -> "Sat"
-  | M_Match  -> "Match"
-  | M_CC     -> "CC"
-  | M_UF     -> "UF"
-  | M_Arith  -> "Arith"
-  | M_Arrays -> "Arrays"
-  | M_Sum    -> "Sum"
-  | M_Records-> "Records"
-  | M_AC     -> "AC"
-  | M_Formula-> "Formula"
-  | M_Literal-> "Literal"
-  | M_Term   -> "Term"
-  | M_Triggers->"Triggers"
-
-let string_of_ty_function f = match f with
-  | F_add           -> "add"
-  | F_add_lemma     -> "add_lemma"
-  | F_assume        -> "assume"
-  | F_class_of      -> "class_of"
-  | F_leaves        -> "leaves"
-  | F_make          -> "make"
-  | F_m_lemmas      -> "m_lemmas"
-  | F_m_predicates  -> "m_predicates"
-  | F_query         -> "query"
-  | F_solve         -> "solve"
-  | F_subst         -> "subst"
-  | F_union         -> "union"
-  | F_unsat         -> "unsat"
-  | F_add_predicate -> "add_predicate"
-  | F_add_terms     -> "add_terms"
-  | F_are_equal     -> "are_equal"
-  | F_none          -> "none"
-  | F_new_facts     -> "new_facts"
-  | F_apply_subst   -> "apply_subst"
 
 let current_timer env = env.cur_t
 
@@ -249,7 +273,8 @@ let all_functions =
         F_unsat;
         F_none;
         F_new_facts;
-        F_apply_subst
+        F_apply_subst;
+        F_instantiate;
       ]
     in
     assert (List.length l = nb_ftag);

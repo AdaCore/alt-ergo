@@ -22,10 +22,14 @@
 
 open Format
 open Hashcons
+open Options
 
 module Sy = Symbols
 
-type view = {f: Sy.t ; xs: t list; ty: Ty.t; depth: int; tag: int;}
+type view =
+  {f: Sy.t ; xs: t list; ty: Ty.t; depth: int; tag: int;
+   vars : Ty.t Sy.Map.t Lazy.t;
+   vty : Ty.Svty.t Lazy.t}
 
 and t = view
 
@@ -113,25 +117,57 @@ and print_list_sep sep fmt = function
 and print_list fmt = print_list_sep "," fmt
 
 
-(* fresh variables must be smaller than problem's variables.
-   thus, Instead of comparinf t1.tag with t2.tag,
-   we compare t2.tag and t1.tag
-   But we keep true and false as repr
+(*
+   * We keep true and false as repr
+   * ordering is influenced by depth
+   * otherwise, we compare tag2 - tag1 so that fresh vars will be smaller
 *)
 let compare t1 t2 =
-  let c = Pervasives.compare t2.tag t1.tag in
-  if c = 0 then c else
-    match (view t1).f, (view t2).f with
-      | (Sy.True | Sy.False ), (Sy.True | Sy.False) -> c
+  if t1 == t2 then 0
+  else
+    let c = t1.depth - t2.depth in
+    if c <> 0 then c
+    else
+      match (view t1).f, (view t2).f with
+      | (Sy.True | Sy.False ), (Sy.True | Sy.False) -> t2.tag - t1.tag
       | (Sy.True | Sy.False ), _ -> -1
       | _, (Sy.True | Sy.False ) -> 1
-      | _,_ -> c
+      | _ -> t2.tag - t1.tag
 
 let sort = List.sort compare
 
+let merge_maps acc b =
+  Sy.Map.merge (fun sy a b ->
+    match a, b with
+    | None, None -> assert false
+    | Some _, None -> a
+    | _ -> b
+  ) acc b
+
+let vars_of_make s l ty =
+  lazy (
+    match s, l with
+    | Sy.Var _, [] -> Sy.Map.singleton s ty
+    | Sy.Var _, _ -> assert false
+    | _, [] -> Sy.Map.empty
+    | _, e::r ->
+      List.fold_left
+        (fun s t -> merge_maps s (Lazy.force t.vars))
+        (Lazy.force e.vars) r
+  )
+
+let vty_of_make l ty =
+  lazy (
+    List.fold_left
+      (fun acc t -> Ty.Svty.union acc (Lazy.force t.vty))
+      (Ty.vty_of ty) l
+  )
+
 let make s l ty =
   let d = 1 + List.fold_left (fun z t -> max z t.depth) 0 l in
-  T.hashcons {f=s; xs=l; ty=ty; depth=d; tag=0 (* dumb_value *)}
+  let vars = vars_of_make s l ty in
+  let vty = vty_of_make l ty in
+  T.hashcons {f=s; xs=l; ty=ty; depth=d; tag= -42; vars; vty}
 
 let fresh_name ty = make (Sy.name (Hstring.fresh_string())) [] ty
 
@@ -139,6 +175,11 @@ let is_fresh t =
   match view t with
     | {f=Sy.Name(hs,_);xs=[]} -> Hstring.is_fresh_string (Hstring.view hs)
     | _ -> false
+
+let is_fresh_skolem t =
+  match view t with
+  | {f=Sy.Name(hs,_)} -> Hstring.is_fresh_skolem (Hstring.view hs)
+  | _ -> false
 
 let shorten t =
   let {f=f;xs=xs;ty=ty} = view t in
@@ -174,9 +215,9 @@ let real r =
 
 let bitv bt ty = make (Sy.Bitv bt) [] ty
 
-let is_int t = (view t).ty= Ty.Tint
+let is_int t = (view t).ty == Ty.Tint
 
-let is_real t = (view t).ty= Ty.Treal
+let is_real t = (view t).ty == Ty.Treal
 
 let equal t1 t2 =  t1 == t2
 
@@ -184,40 +225,22 @@ let hash t = t.tag
 
 let pred t = make (Sy.Op Sy.Minus) [t;int "1"] Ty.Tint
 
-let dummy = make Sy.dummy [] Ty.Tint
-(* verifier que ce type est correct et voir si on ne peut pas
-   supprimer ce dummy*)
-
 module Set =
   Set.Make(struct type t' = t type t=t' let compare=compare end)
 
 module Map =
   Map.Make(struct type t' = t type t=t' let compare=compare end)
 
-let vars_of =
-  let rec vars_of mp t =
-    match view t with
-      | { f = Sy.Var _ as v; xs=xs } ->
-        assert (xs=[]);
-        let st = try Sy.Map.find v mp with Not_found -> Set.empty in
-        Sy.Map.add v (Set.add t st) mp
-      | {xs=xs} -> List.fold_left vars_of mp xs
-  in
-  fun t acc -> vars_of acc t
+let vars_of t acc = merge_maps acc (Lazy.force t.vars)
 
-let vty_of t =
-  let rec vty_of s t =
-    let {xs = xs; ty = ty} = view t in
-    List.fold_left vty_of (Ty.Svty.union s (Ty.vty_of ty)) xs
-  in
-  vty_of Ty.Svty.empty t
+let vty_of t = Lazy.force t.vty
 
 module Hsko = Hashtbl.Make(H)
 let gen_sko ty = make (Sy.fresh "@sko") [] ty
 
 let is_skolem_cst v =
   try
-    String.sub (Sy.to_string v.f) 0 4 = "_sko"
+    Pervasives.(=) (String.sub (Sy.to_string v.f) 0 4) "_sko"
   with Invalid_argument _ -> false
 
 let find_skolem =
@@ -229,16 +252,28 @@ let find_skolem =
 	let c = gen_sko ty in Hsko.add hsko v c; c
     else v
 
-let rec apply_subst ((s_t,s_ty) as s) t =
-  let {f=f;xs=xs;ty=ty} = view t in
-  try
-    let v = Sy.Map.find f s_t in
-    find_skolem v ty
-  with Not_found ->
-    let xs', same = Lists.apply (apply_subst s) xs in
-    let ty' = Ty.apply_subst s_ty ty in
-    if same && ty == ty' then t
-    else make f xs' ty'
+let is_ground t =
+  Symbols.Map.is_empty (vars_of t Sy.Map.empty) && Ty.Svty.is_empty (vty_of t)
+
+let rec apply_subst (s_t,s_ty) t =
+  let {f=f;xs=xs;ty=ty; vars; vty} = view t in
+  if is_ground t then t
+  else
+    let vars = Lazy.force vars in
+    let vty = Lazy.force vty in
+    let s_t = Sy.Map.filter (fun sy _ -> Sy.Map.mem sy vars) s_t in
+    let s_ty = Ty.M.filter (fun id _ -> Ty.Svty.mem id vty) s_ty in
+    if s_t == Sy.Map.empty && s_ty == Ty.M.empty then t
+    else
+      try
+        let v = Sy.Map.find f s_t in
+        find_skolem v ty
+      with Not_found ->
+        let s = s_t, s_ty in
+        let xs', same = Lists.apply (apply_subst s) xs in
+        let ty' = Ty.apply_subst s_ty ty in
+        if same && ty == ty' then t
+        else make f xs' ty'
 
 let compare_subst (s_t1, s_ty1) (s_t2, s_ty2) =
   let c = Ty.compare_subst s_ty1 s_ty2 in
@@ -273,7 +308,7 @@ let label t = try Labels.find labels t with Not_found -> Hstring.empty
 
 
 let label_model h =
-  try String.sub (Hstring.view h) 0 6 = "model:"
+  try Pervasives.(=) (String.sub (Hstring.view h) 0 6) "model:"
   with Invalid_argument _ -> false
 
 let rec is_in_model_rec depth { f = f; xs = xs } =
@@ -296,15 +331,12 @@ let is_labeled t = not (Hstring.equal (label t) Hstring.empty)
 let print_tagged_classes fmt =
   List.iter (fun cl ->
     let cl = List.filter is_labeled (Set.elements cl) in
-    if cl <> [] then
+    if cl != [] then
       fprintf fmt "\n{ %a }" (print_list_sep " , ") cl)
 
 let type_info t = t.ty
 let top () = vrai
 let bot () = faux
-
-let is_ground t =
-  Symbols.Map.is_empty (vars_of t Sy.Map.empty) && Ty.Svty.is_empty (vty_of t)
 
 
 let apply_subst s t =

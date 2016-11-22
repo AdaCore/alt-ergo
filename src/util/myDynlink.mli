@@ -4,16 +4,13 @@
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
-(* WARNING: a "cut" is performed on the following file in the Makefile.
-   DO NOT CHANGE its format *)
+(** A wrapper of the Dynlink module: we use Dynlink except when we want to
+generate a static (native) binary **)
 
-let version="1.30"
+type error
 
-let release_commit = "(not released)"
+exception Error of error
 
-let release_date   = "(not released)"
+val error_message : error -> string
 
-
-let version="1.30"
-let release_commit = "0447785ef027702c0cd50a62b86fb28dd54acc08"
-let release_date = "Mon Nov 21 07:54:45 CET 2016"
+val loadfile : string -> unit

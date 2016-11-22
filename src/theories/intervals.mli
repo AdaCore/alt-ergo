@@ -23,12 +23,17 @@
 type t
 
 exception NotConsistent of Explanation.t
+exception No_finite_bound
 
 val undefined : Ty.t -> t
+
+val is_undefined : t -> bool
 
 val point : Numbers.Q.t -> Ty.t -> Explanation.t -> t
 
 val doesnt_contain_0 : t -> Sig.answer
+
+val is_positive : t -> Sig.answer
 
 val is_strict_smaller : t -> t -> bool
 
@@ -54,13 +59,52 @@ val add : t -> t -> t
 
 val scale : Numbers.Q.t -> t -> t
 
+val sub : t -> t -> t
+
+val merge : t -> t -> t
+
+val abs : t -> t
+
 val pretty_print : Format.formatter -> t -> unit
+
 val print : Format.formatter -> t -> unit
 
 val finite_size : t -> Numbers.Q.t option
 
-val borne_inf : t -> Numbers.Q.t * Explanation.t
+val borne_inf : t -> Numbers.Q.t * Explanation.t * bool
+(** bool is true when bound is large. Raise: No_finite_bound if no
+    finite lower bound *)
 
-val borne_sup : t -> Numbers.Q.t * Explanation.t
+val borne_sup : t -> Numbers.Q.t * Explanation.t * bool
+(** bool is true when bound is large. Raise: No_finite_bound if no
+    finite upper bound*)
 
 val div : t -> t -> t
+
+val mk_closed :
+  Numbers.Q.t -> Numbers.Q.t -> bool -> bool ->
+  Explanation.t -> Explanation.t -> Ty.t -> t
+(**
+   takes as argument in this order:
+   - a lower bound
+   - an upper bound
+   - a bool that says if the lower bound it is large (true) or strict
+   - a bool that says if the upper bound it is large (true) or strict
+   - an explanation of the lower bound
+   - an explanation of the upper bound
+   - a type Ty.t (Tint or Treal *)
+
+type bnd = (Numbers.Q.t * Numbers.Q.t) option * Explanation.t
+(* - None <-> Infinity
+   - the first number is the real bound
+   - the second number if +1 (resp. -1) for strict lower (resp. upper) bound,
+     and 0 for large bounds
+*)
+
+val  bounds_of : t -> (bnd * bnd) list
+
+val contains : t -> Numbers.Q.t -> bool
+
+val add_explanation : t -> Explanation.t -> t
+
+val equal : t -> t -> bool

@@ -43,7 +43,9 @@ module Type (X:Sig.X) : Polynome.T with type r = X.r = struct
       module Ac = Ac.Make(X)
       let mult v1 v2 =
         X.ac_embed
-          { h = Sy.Op Sy.Mult;
+          {
+            distribute = true;
+            h = Sy.Op Sy.Mult;
 	    t = X.type_info v1;
 	    l = let l2 = match X.ac_extract v1 with
 	      | Some {h=h; l=l} when Sy.equal h (Sy.Op Sy.Mult) -> l
@@ -53,15 +55,9 @@ module Type (X:Sig.X) : Polynome.T with type r = X.r = struct
     end)
 end
 
-module type EXTENDED_Polynome = sig
-  include Polynome.T
-  val extract : r -> t option
-  val embed : t -> r
-end
-
 module Shostak
   (X : Sig.X)
-  (P : EXTENDED_Polynome with type r = X.r) = struct
+  (P : Polynome.EXTENDED_Polynome with type r = X.r) = struct
 
     type t = P.t
 
@@ -76,12 +72,12 @@ module Shostak
 
       let solve_aux r1 r2 =
         if debug_arith () then
-          fprintf fmt "[arith] we solve %a=%a@." X.print r1 X.print r2
+          fprintf fmt "[arith:solve-aux] we solve %a=%a@." X.print r1 X.print r2
 
       let solve_one r1 r2 sbs =
         if debug_arith () then
           begin
-            fprintf fmt "[arith] solving %a = %a yields:@."
+            fprintf fmt "[arith:solve-one] solving %a = %a yields:@."
               X.print r1 X.print r2;
             let c = ref 0 in
             List.iter
@@ -137,34 +133,50 @@ module Shostak
           let md = T.make (Sy.Op Sy.Modulo) [t1;t2] Ty.Tint in
           let r, ctx' = X.make md in
           let rp =
-            P.mult (P.create [] (Q.div Q.one coef_p2) Ty.Tint) (embed r) in
+            P.mult_const (Q.div Q.one coef_p2) (embed r) in
           P.sub p rp, ctx' @ ctx
         | _ -> assert false
+
 
     let rec mke coef p t ctx =
       let {T.f = sb ; xs = xs; ty = ty} = T.view t in
       match sb, xs with
         | (Sy.Int n | Sy.Real n) , _  ->
 	  let c = Q.mult coef (Q.from_string (Hstring.view n)) in
-	  P.add (P.create [] c ty) p, ctx
+	  P.add_const c p, ctx
 
         | Sy.Op Sy.Mult, [t1;t2] ->
 	  let p1, ctx = mke coef (empty_polynome ty) t1 ctx in
 	  let p2, ctx = mke Q.one (empty_polynome ty) t2 ctx in
-	  P.add p (P.mult p1 p2), ctx
+          if Options.no_NLA() && P.is_const p1 == None && P.is_const p2 == None
+          then
+            (* becomes uninterpreted *)
+            let tau = Term.make (Sy.name ~kind:Sy.Ac "@*") [t1; t2] ty in
+            let xtau, ctx' = X.make tau in
+	    P.add p (P.create [coef, xtau] Q.zero ty), List.rev_append ctx' ctx
+          else
+	    P.add p (P.mult p1 p2), ctx
 
         | Sy.Op Sy.Div, [t1;t2] ->
 	  let p1, ctx = mke Q.one (empty_polynome ty) t1 ctx in
 	  let p2, ctx = mke Q.one (empty_polynome ty) t2 ctx in
-	  let p3, ctx =
-	    try
-              let p, approx = P.div p1 p2 in
-              if approx then mk_euc_division p p2 t1 t2 ctx
-              else p, ctx
-	    with Division_by_zero | Polynome.Maybe_zero ->
-              P.create [Q.one, X.term_embed t] Q.zero ty, ctx
-	  in
-	  P.add p (P.mult (P.create [] coef ty) p3), ctx
+          if Options.no_NLA() &&
+            (P.is_const p2 == None ||
+               (ty == Ty.Tint && P.is_const p1 == None)) then
+            (* becomes uninterpreted *)
+            let tau = Term.make (Sy.name "@/") [t1; t2] ty in
+            let xtau, ctx' = X.make tau in
+	    P.add p (P.create [coef, xtau] Q.zero ty), List.rev_append ctx' ctx
+          else
+	    let p3, ctx =
+	      try
+                let p, approx = P.div p1 p2 in
+                if approx then mk_euc_division p p2 t1 t2 ctx
+                else p, ctx
+	      with Division_by_zero | Polynome.Maybe_zero ->
+                P.create [Q.one, X.term_embed t] Q.zero ty, ctx
+	    in
+	    P.add p (P.mult_const coef p3), ctx
 
         | Sy.Op Sy.Plus , [t1;t2] ->
 	  let p2, ctx = mke coef p t2 ctx in
@@ -177,6 +189,14 @@ module Shostak
         | Sy.Op Sy.Modulo , [t1;t2] ->
 	  let p1, ctx = mke Q.one (empty_polynome ty) t1 ctx in
 	  let p2, ctx = mke Q.one (empty_polynome ty) t2 ctx in
+          if Options.no_NLA() &&
+            (P.is_const p1 == None || P.is_const p2 == None)
+          then
+            (* becomes uninterpreted *)
+            let tau = Term.make (Sy.name "@%") [t1; t2] ty in
+            let xtau, ctx' = X.make tau in
+	    P.add p (P.create [coef, xtau] Q.zero ty), List.rev_append ctx' ctx
+          else
           let p3, ctx =
             try P.modulo p1 p2, ctx
             with e ->
@@ -188,13 +208,13 @@ module Shostak
               in
               P.create [Q.one, X.term_embed t] Q.zero ty, ctx
 	  in
-	  P.add p (P.mult (P.create [] coef ty) p3), ctx
+	  P.add p (P.mult_const coef p3), ctx
 
         | _ ->
 	  let a, ctx' = X.make t in
 	  let ctx = ctx' @ ctx in
 	  match P.extract a with
-	    | Some p' -> P.add p (P.mult (P.create [] coef ty) p'), ctx
+	    | Some p' -> P.add p (P.mult_const coef p'), ctx
 	    | _ -> P.add p (P.create [coef, a] Q.zero ty), ctx
 
     let make t =
@@ -243,18 +263,28 @@ module Shostak
             | _ -> false
         ) (X.leaves xp)
 
+    let has_ac p kind =
+      List.exists
+        (fun (_, x) ->
+	 match X.ac_extract x with Some ac -> kind ac | _ -> false)
+        (fst (P.to_list p))
+
     let color ac =
-      match ac.l with
+        match ac.l with
         | [(r, 1)] -> assert false
         | _ ->
-          let p = unsafe_ac_to_arith ac in
-          let xp = is_mine p in
-          if contains_a_fresh_alien xp then
-	    let l, _ = P.to_list p in
-            let mx = max_list_ l in
-            if mx = 0 || mx = 1 || number_of_vars ac.l > mx then is_mine p
-	    else X.ac_embed ac
-          else xp
+           let p = unsafe_ac_to_arith ac in
+           if not ac.distribute then
+             if has_ac p (fun ac -> is_mult ac.h) then X.ac_embed ac
+             else is_mine p
+           else
+             let xp = is_mine p in
+             if contains_a_fresh_alien xp then
+	       let l, _ = P.to_list p in
+               let mx = max_list_ l in
+               if mx = 0 || mx = 1 || number_of_vars ac.l > mx then is_mine p
+	       else X.ac_embed ac
+             else xp
 
     let type_info p = P.type_info p
 
@@ -271,7 +301,7 @@ module Shostak
           (fun p (ai, xi) ->
 	    let xi' = X.subst x t xi in
 	    let p' = match P.extract xi' with
-	      | Some p' -> P.mult (P.create [] ai ty) p'
+	      | Some p' -> P.mult_const ai p'
 	      | _ -> P.create [ai, xi'] Q.zero ty
 	    in
 	    P.add p p')
@@ -300,9 +330,6 @@ module Shostak
       in
       if Q.compare m (Q.div b (Q.from_int 2)) < 0 then m else Q.sub m b
 
-    let mult_const p c =
-      P.mult p (P.create [] c (P.type_info p))
-
     let map_monomes f l ax =
       List.fold_left
         (fun acc (a,x) ->
@@ -316,7 +343,7 @@ module Shostak
     let subst_bigger x l =
       List.fold_left
         (fun (l, sb) (b, y) ->
-          if X.str_cmp y x > 0 then
+          if X.ac_extract y != None && X.str_cmp y x > 0 then
 	    let k = X.term_embed (T.fresh_name Ty.Tint) in
 	    (b, k) :: l, (y, embed k)::sb
 	  else (b, y) :: l, sb)
@@ -348,7 +375,7 @@ module Shostak
       assert (Q.sign a <> 0);
       if Q.equal a Q.one then
         (* 3.1. si a = 1 alors on a une substitution entiere pour x *)
-        let p = mult_const p Q.m_one in
+        let p = P.mult_const Q.m_one p in
         (x, is_mine p) :: (is_mine_p sbs)
       else if Q.equal a Q.m_one then
         (* 3.2. si a = -1 alors on a une subst entiere pour x*)
@@ -395,7 +422,7 @@ module Shostak
       let sbs =  List.map (fun (x, v) -> x, apply_subst sbs2 v) sbs in
 
       (* 7. on supprime les liaisons inutiles de sbs2 et on merge avec sbs *)
-      let sbs2 = List.filter (fun (y, _) -> y <> sigma) sbs2 in
+      let sbs2 = List.filter (fun (y, _) -> not (X.equal y sigma)) sbs2 in
       List.rev_append sbs sbs2
 
     and solve_int p = 
@@ -403,7 +430,7 @@ module Shostak
       if P.is_empty p then raise Not_found;
       let pgcd = P.pgcd_numerators p in
       let ppmc = P.ppmc_denominators p in
-      let p = mult_const p (Q.div ppmc pgcd)  in
+      let p = P.mult_const (Q.div ppmc pgcd) p in
       let l, b = P.to_list p in
       if not (Q.is_int b) then raise Exception.Unsolvable;
       omega l b
@@ -420,20 +447,15 @@ module Shostak
       Steps.incr (Steps.Omega);
       try
         let a, x = P.choose p in
-        let p = 
-	  P.mult 
-	    (P.create [] (Q.div Q.m_one a) (P.type_info p))
-	    (P.remove x p) 
-        in
+        let p = P.mult_const (Q.div Q.m_one a) (P.remove x p) in
         [x, is_mine p]
       with Not_found -> is_null p
-        
 
     let unsafe_ac_to_arith {h=sy; l=rl; t=ty} =
       let mlt = List.fold_left (fun l (r, n) -> expand (embed r) n l) [] rl in
       List.fold_left P.mult (P.create [] Q.one ty) mlt
 
-    let safe_distribution p = 
+    let polynome_distribution p unsafe_mode =
       let l, c = P.to_list p in
       let ty = P.type_info p in
       let pp = 
@@ -446,49 +468,74 @@ module Shostak
 		P.add p (P.create [coef,x] Q.zero ty)
 	  ) (P.create [] c ty) l
       in
-      if List.exists 
-        (fun (_, x)-> 
-	  match X.ac_extract x with | Some ac -> is_mult ac.h | _ -> false)
-        (fst (P.to_list pp)) then p else pp
+      if not unsafe_mode && has_ac pp (fun ac -> is_mult ac.h) then p
+      else pp
 
-    let solve_aux r1 r2 =
-      Debug.solve_aux r1 r2;
-      let p1 = embed r1 in
-      let p2 = embed r2 in
-      let ty = P.type_info p2 in
-      let p = P.add p1 (P.mult (P.create [] Q.m_one ty) p2) in
-      let pp = safe_distribution p in
-      if ty = Ty.Treal then solve_real pp else solve_int pp
-
-    let solve_one r1 r2 =
+    let solve_aux r1 r2 unsafe_mode =
       Options.tool_req 4 "TR-Arith-Solve";
-      let sbs = solve_aux r1 r2 in
+      Debug.solve_aux r1 r2;
+      let p = P.sub (embed r1) (embed r2) in
+      let pp = polynome_distribution p unsafe_mode in
+      let ty = P.type_info p in
+      let sbs = if ty == Ty.Treal then solve_real pp else solve_int pp in
       let sbs = List.fast_sort (fun (a,_) (x,y) -> X.str_cmp x a)sbs in
-      Debug.solve_one r1 r2 sbs;
       sbs
 
-    let apply_subst r l =
-      List.fold_left (fun r (p,v) -> X.subst p v r) r l
+    let apply_subst r l = List.fold_left (fun r (p,v) -> X.subst p v r) r l
 
-    let triangular_down sbs =
+    exception Unsafe
+
+    let check_pivot_safety p nsbs unsafe_mode =
+      let q = apply_subst p nsbs in
+      if X.equal p q then p
+      else
+        match X.ac_extract p with
+        | Some ac when unsafe_mode -> raise Unsafe
+        | Some ac -> X.ac_embed {ac with distribute = false}
+        | None -> assert false (* p is a leaf and not interpreted *)
+
+    let triangular_down sbs unsafe_mode =
       List.fold_right
-        (fun (p,v) nsbs -> (p, apply_subst v nsbs) :: nsbs) sbs []
+        (fun (p,v) nsbs ->
+         (check_pivot_safety p nsbs unsafe_mode, apply_subst v nsbs) :: nsbs)
+        sbs []
 
-    let make_idemp a b sbs =
-      let sbs = triangular_down sbs in
-      let sbs = triangular_down (List.rev sbs) in (* triangular up *)
-      let original = List.fold_right SX.add (X.leaves a) SX.empty in
-      let original = List.fold_right SX.add (X.leaves b) original in
-      let sbs = List.filter (fun (p,v) -> SX.mem p original) sbs in
+    let is_non_lin pv = match X.ac_extract pv with
+      | Some {Sig.h} -> is_mult h
+      | _ -> false
+
+    let make_idemp a b sbs lvs unsafe_mode =
+      let sbs = triangular_down sbs unsafe_mode in
+      let sbs = triangular_down (List.rev sbs) unsafe_mode in (*triangular up*)
+      let sbs = List.filter (fun (p,v) -> SX.mem p lvs || is_non_lin p) sbs in
       assert (not (Options.enable_assertions ()) ||
                 X.equal (apply_subst a sbs) (apply_subst b sbs));
+      List.iter
+        (fun (p, v) ->
+          if not (SX.mem p lvs) then (assert (is_non_lin p); raise Unsafe)
+        )sbs;
       sbs
 
-    let solve r1 r2 pb =
-      let sbt = solve_one r1 r2 in
-      {pb with sbt = List.rev_append (make_idemp r1 r2 sbt) pb.sbt}
+    let solve_one pb r1 r2 lvs unsafe_mode =
+      let sbt = solve_aux r1 r2 unsafe_mode in
+      let sbt = make_idemp r1 r2 sbt lvs unsafe_mode in (*may raise Unsafe*)
+      Debug.solve_one r1 r2 sbt;
+      {pb with sbt = List.rev_append sbt pb.sbt}
 
-    (*XXX*)
+    let solve r1 r2 pb =
+      let lvs = List.fold_right SX.add (X.leaves r1) SX.empty in
+      let lvs = List.fold_right SX.add (X.leaves r2) lvs in
+      try
+        if debug_arith () then
+          fprintf fmt "[arith] Try solving with unsafe mode.@.";
+        solve_one pb r1 r2 lvs true (* true == unsafe mode *)
+      with Unsafe ->
+        try
+          if debug_arith () then
+            fprintf fmt "[arith] Cancel unsafe solving mode. Try safe mode@.";
+          solve_one pb r1 r2 lvs false (* false == safe mode *)
+        with Unsafe ->
+          assert false
 
     let make t =
       if Options.timers() then
@@ -501,18 +548,6 @@ module Shostak
 	  Options.exec_timer_pause Timers.M_Arith Timers.F_make;
 	  raise e
       else make t
-
-    let leaves p =
-      if Options.timers() then
-        try
-	  Options.exec_timer_start Timers.M_Arith Timers.F_leaves;
-	  let res = leaves p in
-	  Options.exec_timer_pause Timers.M_Arith Timers.F_leaves;
-	  res
-        with e ->
-	  Options.exec_timer_pause Timers.M_Arith Timers.F_leaves;
-	  raise e
-      else leaves p
 
     let solve r1 r2 pb =
       if Options.timers() then
@@ -538,6 +573,72 @@ module Shostak
     let abstract_selectors p acc =
       let p, acc = P.abstract_selectors p acc in
       is_mine p, acc
+
+
+    (* this function is only called when some arithmetic values do not yet
+       appear in IntervalCalculus. Otherwise, the simplex with try to
+       assign a value
+    *)
+    let assign_value =
+      let cpt_int = ref Q.m_one in
+      let cpt_real = ref Q.m_one in
+      let max_constant distincts acc =
+        List.fold_left
+          (fun acc x ->
+            match P.is_const (embed x) with None -> acc | Some c -> Q.max c acc)
+          acc distincts
+      in
+      fun r distincts eq ->
+        if P.is_const (embed r) != None then None
+        else
+          if List.exists
+            (fun (t,x) ->is_mine_symb (Term.view t).Term.f &&
+              X.leaves x == []) eq
+          then None
+          else
+            let term_of_cst, cpt = match X.type_info r with
+              | Ty.Tint  -> Term.int, cpt_int
+              | Ty.Treal -> Term.real, cpt_real
+              | _ -> assert false
+            in
+            cpt := Q.add Q.one (max_constant distincts !cpt);
+            Some (term_of_cst (Q.to_string !cpt), true)
+
+
+
+    let pprint_const_for_model =
+      let pprint_positive_const c =
+        let num = Q.num c in
+        let den = Q.den c in
+        if Z.is_one den then Z.to_string num
+        else Format.sprintf "(/ %s %s)" (Z.to_string num) (Z.to_string den)
+      in
+      fun r ->
+        match P.is_const (embed r) with
+        | None -> assert false
+        | Some c ->
+          let sg = Q.sign c in
+          if sg = 0 then "0"
+          else if sg > 0 then pprint_positive_const c
+          else Format.sprintf "(- %s)" (pprint_positive_const (Q.abs c))
+
+    let choose_adequate_model t r l =
+      if debug_interpretation() then
+        fprintf fmt "[arith] choose_adequate_model for %a@." Term.print t;
+      let l = List.filter (fun (_, r) -> P.is_const (embed r) != None) l in
+      let r =
+        match l with
+        | [] ->
+          (* We do this, because terms of some semantic values created
+             by CS are not created and added to UF *)
+          assert (P.is_const (embed r) != None);
+          r
+
+        | (_,r)::l ->
+          List.iter (fun (_,x) -> assert (X.equal x r)) l;
+          r
+      in
+      r, pprint_const_for_model r
 
   end
 

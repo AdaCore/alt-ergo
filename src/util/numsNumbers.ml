@@ -47,14 +47,14 @@ module Z : NumbersInterface.ZSig with type t = Big_int.big_int = struct
   let abs t = abs_big_int t
   let sub a b = sub_big_int a b
   let minus t = minus_big_int t
-  let div a b = div_big_int a b
+  let div a b = assert (not (is_zero b)); div_big_int a b
   let max a b = max_big_int a b
 
   let to_string t = string_of_big_int t
   let from_string s = big_int_of_string s
   let from_int n = big_int_of_int n
-  let rem a b = mod_big_int a b
-  let div_rem a b = quomod_big_int a b
+  let rem a b = assert (not (is_zero b)); mod_big_int a b
+  let div_rem a b = assert (not (is_zero b)); quomod_big_int a b
   let print fmt t = Format.fprintf fmt "%s" (to_string t)
 
   let my_gcd a b =
@@ -71,7 +71,11 @@ module Z : NumbersInterface.ZSig with type t = Big_int.big_int = struct
 
   let to_float t = float_of_big_int t
 
+  let to_machine_int t =
+    try Some (Big_int.int_of_big_int t) with _ -> None
+
   let fdiv a b =
+    assert (not (is_zero b));
     let open Num in
     try
       let n1 = num_of_big_int a in
@@ -84,6 +88,7 @@ module Z : NumbersInterface.ZSig with type t = Big_int.big_int = struct
       assert false
 
   let cdiv a b =
+    assert (not (is_zero b));
     let open Num in
     try
       let n1 = num_of_big_int a in
@@ -98,6 +103,19 @@ module Z : NumbersInterface.ZSig with type t = Big_int.big_int = struct
   let power a n =
     assert (n>=0);
     power_big_int_positive_int a n
+
+  (* Shifts left by (n:int >= 0) bits. This is the same as t * pow(2,n) *)
+  let shift_left = shift_left_big_int
+
+  (* returns sqrt truncated with the remainder. It assumes that the argument
+     is positive, otherwise, [Invalid_argument] is raised. *)
+  let sqrt_rem t =
+    let sq = sqrt_big_int t in
+    sq, sub t (mult sq sq)
+
+  let testbit z n =
+    assert (n >= 0);
+    is_one (extract_big_int z n 1)
 
 end
 
@@ -136,7 +154,7 @@ module Q : NumbersInterface.QSig with module Z = Z = struct
       | _ -> power_num a (Int n)
 
   let modulo = mod_num
-  let div = div_num
+  let div a b = assert (not (is_zero b)); div_num a b
   let mult = mult_num
   let sub = sub_num
   let add = add_num
@@ -179,6 +197,7 @@ module Q : NumbersInterface.QSig with module Z = Z = struct
   let print fmt q = Format.fprintf fmt "%s" (to_string q)
 
   let min t1 t2  = min_num t1 t2
+  let max t1 t2  = max_num t1 t2
 
   let inv t =
     if Z.is_zero (num t) then raise Division_by_zero;
@@ -199,6 +218,18 @@ module Q : NumbersInterface.QSig with module Z = Z = struct
          assert (res =/ z);
          res
 ********)
+
+  let truncate t =
+    let res = integer_num t in
+    assert (compare (abs res) (abs t) <= 0);
+    match res with
+    | Int i -> Big_int.big_int_of_int i
+    | Big_int b -> b
+    | Ratio rat -> assert false
+
+  let mult_2exp t n = mult t (power (Int 2) n)
+
+  let div_2exp t n = div t (power (Int 2) n)
 
 end
 

@@ -43,9 +43,9 @@ module Z : NumbersInterface.ZSig with type t = Z.t = struct
   let add a b     = Z.add a b
   let sub a b     = Z.sub a b
   let mult a b    = Z.mul a b
-  let div a b     = Z.div a b
-  let rem a b     = Z.rem a b
-  let div_rem a b = Z.div_rem a b
+  let div a b     = assert (not (is_zero b)); Z.div a b
+  let rem a b     = assert (not (is_zero b)); Z.rem a b
+  let div_rem a b = assert (not (is_zero b)); Z.div_rem a b
   let minus t     = Z.neg t
   let abs t       = Z.abs t
   let max t1 t2   = Z.max t1 t2
@@ -66,11 +66,27 @@ module Z : NumbersInterface.ZSig with type t = Z.t = struct
       res1
     with Division_by_zero -> assert false
 
+  let to_machine_int t =
+    try Some (Z.to_int t) with Z.Overflow -> None
+
   (* These functuons are not exported, but they are used by module Q below *)
   let to_float z = Z.to_float z
-  let fdiv z1 z2 = Z.fdiv z1 z2
-  let cdiv z1 z2 = Z.cdiv z1 z2
-  let power z n  = Z.pow z n
+  let fdiv z1 z2 = assert (not (is_zero z2)); Z.fdiv z1 z2
+  let cdiv z1 z2 = assert (not (is_zero z2)); Z.cdiv z1 z2
+  let power z n  =
+    assert (n >= 0);
+    Z.pow z n
+
+  (* Shifts left by (n:int >= 0) bits. This is the same as t * pow(2,n) *)
+  let shift_left = Z.shift_left
+
+  (* returns sqrt truncated with the remainder. It assumes that the argument
+     is positive, otherwise, [Invalid_argument] is raised. *)
+  let sqrt_rem = Z.sqrt_rem
+
+  let testbit z n =
+    assert (n >= 0);
+    Z.testbit z n
 
 end
 
@@ -104,10 +120,11 @@ module Q : NumbersInterface.QSig with module Z = Z = struct
   let add t1 t2  = Q.add t1 t2
   let sub t1 t2  = Q.sub t1 t2
   let mult t1 t2 = Q.mul t1 t2
-  let div t1 t2  = Q.div t1 t2
+  let div t1 t2  = assert (not (is_zero t2)); Q.div t1 t2
   let minus t    = Q.neg t
   let abs t      = Q.abs t
   let min t1 t2  = Q.min t1 t2
+  let max t1 t2  = Q.max t1 t2
 
   let inv t      =
     if Z.is_zero (num t) then raise Division_by_zero;
@@ -128,9 +145,21 @@ module Q : NumbersInterface.QSig with module Z = Z = struct
 
   let floor t      = from_z (Z.fdiv (num t) (den t))
   let ceiling t    = from_z (Z.cdiv (num t) (den t))
-  let power t n    = from_zz (Z.power (num t) n) (Z.power (den t) n)
+  let power t n    =
+    let abs_n = Pervasives.abs n in
+    let num_pow = Z.power (num t) abs_n in
+    let den_pow = Z.power (den t) abs_n in
+    if n >= 0 then from_zz num_pow den_pow else from_zz den_pow num_pow
+
   let modulo t1 t2 =
     assert (is_int t1 && is_int t2);
     from_zz (Z.rem (num t1) (num t2)) Z.one
+
+  (* converts the argument to an integer by truncation. *)
+  let truncate = Q.to_bigint
+
+  let mult_2exp = Q.mul_2exp
+
+  let div_2exp = Q.div_2exp
 
 end

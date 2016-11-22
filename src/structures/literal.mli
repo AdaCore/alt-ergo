@@ -73,7 +73,7 @@ module type S = sig
   val compare : t -> t -> int
   val equal : t -> t -> bool
   val hash : t -> int
-
+  val uid : t -> int
   module Map : Map.S with type key = t
   module Set : Set.S with type elt = t
 
@@ -92,7 +92,7 @@ module type S_Term = sig
 
   val terms_nonrec : t -> Term.Set.t
   val terms_rec : t -> Term.Set.t
-  val vars_of : t -> Term.Set.t Symbols.Map.t -> Term.Set.t Symbols.Map.t
+  val vars_of : t -> Ty.t Symbols.Map.t -> Ty.t Symbols.Map.t
   val is_ground : t -> bool
   val is_in_model : t -> bool
 

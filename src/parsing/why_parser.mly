@@ -38,7 +38,10 @@
   let prefix_pp p a = prefix_ppl (loc ()) p a
 
   let check_binary_mode s =
-    String.iter (fun x-> if x<>'0' && x<>'1' then raise Parsing.Parse_error) s;
+    String.iter (fun x ->
+                 match x with
+                 | '0' | '1' -> ()
+                 | _ -> raise Parsing.Parse_error) s;
     s
 
 %}
@@ -62,7 +65,6 @@
 %token RIGHTPAR RIGHTSQ RIGHTBR
 %token SLASH
 %token THEN TIMES TRUE TYPE
-%token REACH
 
 /* Precedences */
 
@@ -86,7 +88,7 @@
 
 /* Entry points */
 
-%type <Parsed.lexpr list> trigger
+%type <Parsed.lexpr list * bool> trigger
 %start trigger
 %type <Parsed.lexpr> lexpr
 %start lexpr
@@ -410,7 +412,7 @@ list1_trigger_sep_bar:
 trigger:
   list1_lexpr_sep_comma
      { Options.tool_req 0 "TR-Lexical-trigger";
-       $1 }
+       ($1, true) }
 ;
 
 

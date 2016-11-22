@@ -55,16 +55,17 @@ module type S = sig
     r Sig.facts ->
     t * (r Sig.literal * Explanation.t * Sig.lit_origin) list
 
-  val case_split : t -> (r Literal.view * Explanation.t * Sig.lit_origin) list
+  val case_split :
+    t -> for_model:bool -> (r Literal.view * bool * Sig.lit_origin) list * t
   val query :  t -> Literal.LT.t -> Sig.answer
   val new_terms : t -> Term.Set.t
   val class_of : t -> Term.t -> Term.t list
-  val are_equal : t -> Term.t -> Term.t -> Sig.answer
+  val are_equal : t -> Term.t -> Term.t -> added_terms:bool -> Sig.answer
   val are_distinct : t -> Term.t -> Term.t -> Sig.answer
   val cl_extract : t -> Term.Set.t list
   val term_repr : t -> Term.t -> Term.t
   val print_model : Format.formatter -> t -> unit
-
+  val get_union_find : t -> Combine.Uf.t
 end
 
 module Main : S

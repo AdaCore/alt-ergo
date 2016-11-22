@@ -1,17 +1,51 @@
-public version 1.01, February 16, 2016
-======================================
+version 1.30, November 21, 2016
+==============================
 
-* This version is based on private version 1.00 (see its CHANGES
-  below). The main difference is the new option "-backward-compat"
-  that allows to output Alt-Ergo's answers in an older syntax (<=
-  0.99.1). It is intended to be used with tools that do not support
-  the new 'slightly different' output format (e.g. option
-  -wp-alt-ergo-opt="-backward-compat" should be used with current
-  Frama-C versions).
+* experimental support for models generation (for more details, see
+   http://www.ocamlpro.com/2016/11/21/release-of-alt-ergo-1-30-with-experimental-support-for-models-generation/).
+
+* simplify formulas of the form "forall x : t. x <> t or F" when t
+  does not contain x. The only relevant instance in this case is
+  "(x <> t or F) {x |-> t}". In a similar way, this allows to simplify
+  formulas of the form "exists x : t. x = t and F" to "F {x |-> t}".
+
+* integration of general simplex in IntervalCalculus based on
+  ocplib-simplex.
+
+* important parts of Intervals and IntervalCalculus have been
+  rewritten and improved.
+
+* improve tightening of intervals for non-linear variables, and of the
+  CP-like loop.
+
+* extend Fourier-Motzkin to deduce more bounds based on relational
+  dependencies of the form "c * x <= (Sum_i d_i * y_i) + e"
+
+* various improvements in the default SAT solver, Term, Formula,
+  IntervalCalculus, Matching, Numbers, case-split, ...
+
+* various (soundness and/or completeness) bug fixes in Uf, Intervals,
+  IntervalCalculus, Theory, Formula, type-checking, Triggers,
+  fm-simplex and satML, ...
+
+* new option "-inst-after-bj" that forces an instantiation round after
+  each backtracking/backjumping in the default SAT solver.
+
+* new option "-no-backjumping" that disables backjumping in the
+  default SAT solver (for debugging).
+
+* new option "-fm-cross-limit" that controls the number of
+  intermediate inequalities produces by Fourier-Motzking. Default
+  value is 10,000.
+
+* new option "-no-ac" to be able to deactivate the AC theory
+
+* new option "-no-NLA" that disables non-linear arithmetic reasoning
+   (*, /, %). Non-linear multiplication remains AC.
 
 
-private version 1.20, February 09, 2016
-======================================
+version 1.20, February 09, 2016
+==============================
 
 * default value of option -age-bound increased from 10 to 50
 
@@ -27,8 +61,8 @@ private version 1.20, February 09, 2016
 * improvements in the default SAT solver
 
 
-private version 1.10, October 19, 2015
-======================================
+version 1.10, October 19, 2015
+==============================
 
 * Improvements and bug fixes in the satML plugin
 
@@ -51,8 +85,8 @@ private version 1.10, October 19, 2015
   the solver
 
 
-private version 1.00, January 29, 2015
-======================================
+version 1.00, January 29, 2015
+==============================
 
 * General Improvements:
 

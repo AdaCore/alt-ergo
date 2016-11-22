@@ -24,10 +24,21 @@ type t
 
 type binders = (Ty.t * int) Symbols.Map.t (*int tag in globally unique *)
 
+type trigger = {
+  content : Term.t list;
+  depth : int;
+  from_user : bool;
+  guard : Literal.LT.t option
+}
+
 type quantified = {
   name : string;
   main : t;
-  triggers : (Term.t list * Literal.LT.t option) list;
+
+  (*simplified quantified formula, or immediate inst*)
+  simple_inst : (Term.t Symbols.Map.t * Ty.subst) option;
+
+  triggers : trigger list;
   binders : binders;   (* quantified variable *)
 
   (* These fields should be (ordered) lists ! important for skolemization *)
@@ -46,7 +57,7 @@ and llet = {
 
 and view =
     Unit of t*t  (* unit clauses *)
-  | Clause of t*t      (* a clause (t1 or t2) *)
+  | Clause of t*t*bool      (* a clause (t1 or t2) bool <-> is implication *)
   | Literal of Literal.LT.t   (* an atom *)
   | Lemma of quantified   (* a lemma *)
   | Skolem of quantified  (* lazy skolemization *)
@@ -55,6 +66,8 @@ and view =
 
 type gformula = {
   f: t;
+  nb_reductions : int;
+  trigger_depth : int;
   age: int;
   lem: t option;
   from_terms : Term.t list;
@@ -65,8 +78,8 @@ type gformula = {
 val mk_binders : Term.Set.t -> binders
 
 val mk_not : t -> t
-val mk_and : t -> t -> int -> t
-val mk_or : t -> t -> int -> t
+val mk_and : t -> t -> bool -> int -> t (* bool <-> is implication (neg) *)
+val mk_or : t -> t -> bool -> int -> t (* bool <-> is implication *)
 val mk_imp : t -> t -> int -> t
 val mk_if : Term.t -> t -> t -> int -> t
 val mk_iff : t -> t -> int -> t
@@ -75,7 +88,7 @@ val mk_forall :
   string -> (* name *)
   Loc.t -> (* location in the original file *)
   binders -> (* quantified variables *)
-  (Term.t list * Literal.LT.t option) list -> (* triggers *)
+  trigger list -> (* triggers *)
   t -> (* quantified formula *)
   int -> (* id, for the GUI *)
   (Term.t list * Ty.t list) option ->
@@ -86,7 +99,7 @@ val mk_exists :
   string -> (* name *)
   Loc.t -> (* location in the original file *)
   binders -> (* quantified variables *)
-  (Term.t list * Literal.LT.t option) list -> (* triggers *)
+  trigger list -> (* triggers *)
   t -> (* quantified formula *)
   int -> (* id, for the GUI *)
   (Term.t list * Ty.t list) option ->
@@ -106,7 +119,7 @@ val id : t -> int
 val print : Format.formatter -> t -> unit
 
 val ground_terms_rec : t -> Term.Set.t
-val free_vars : t -> Term.Set.t Symbols.Map.t
+val free_vars : t -> Ty.t Symbols.Map.t
 
 val apply_subst : Term.subst -> t -> t
 
@@ -117,6 +130,8 @@ val vrai : t
 val faux : t
 
 val skolemize : quantified -> t
+val type_variables: t -> Ty.Set.t
+val max_term_depth : t -> int
 
 module Set : Set.S with type elt = t
 module Map : Map.S with type key = t

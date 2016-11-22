@@ -16,7 +16,7 @@
 
 #
 # autoconf input for Objective Caml programs
-# Copyright (C) 2001 Jean-Christophe Filliâtre
+# Copyright (C) 2001 Jean-Christophe Filliï¿½tre
 #   from a first script by Georges Mariano 
 # 
 # This library is free software; you can redistribute it and/or
@@ -86,27 +86,27 @@ fi
 
 
 #looking for ocamlgraph library
-# not used anymore
-# if test "$USEOCAMLFIND" = yes; then
-#   OCAMLGRAPHLIB=$(ocamlfind query -i-format ocamlgraph)
-# fi
 
-# if test -n "$OCAMLGRAPHLIB";then
-#   echo "ocamlfind found ocamlgraph in $OCAMLGRAPHLIB"
-#   OCAMLGRAPH=yes
-# else
-#   AC_CHECK_FILE($OCAMLLIB/ocamlgraph/graph.cmi,OCAMLGRAPH=yes,OCAMLGRAPH=no)
-#   if test "$OCAMLGRAPH" = no ; then
-#     AC_CHECK_FILE($OCAMLLIB/graph.cmi,OCAMLGRAPH=yes,OCAMLGRAPH=no)
-#     if test "$OCAMLGRAPH" = no ; then
-#       AC_MSG_ERROR(Cannot find ocamlgraph library. Please install the *libocamlgraph-ocaml-dev* Debian package - or use the GODI caml package system *http://godi.ocaml-programming.de/* - or compile from sources *http://ocamlgraph.lri.fr/*)
-#     else
-#   	OCAMLGRAPHLIB=""
-#      fi
-#   else
-#      OCAMLGRAPHLIB="-I +ocamlgraph"
-#   fi
-# fi
+#if test "$USEOCAMLFIND" = yes; then
+#  OCAMLGRAPHLIB=$(ocamlfind query -i-format ocamlgraph)
+#fi
+#
+#if test -n "$OCAMLGRAPHLIB";then
+#  echo "ocamlfind found ocamlgraph in $OCAMLGRAPHLIB"
+#  OCAMLGRAPH=yes
+#else
+#  AC_CHECK_FILE($OCAMLLIB/ocamlgraph/graph.cmi,OCAMLGRAPH=yes,OCAMLGRAPH=no)
+#  if test "$OCAMLGRAPH" = no ; then
+#    AC_CHECK_FILE($OCAMLLIB/graph.cmi,OCAMLGRAPH=yes,OCAMLGRAPH=no)
+#    if test "$OCAMLGRAPH" = no ; then
+#      AC_MSG_ERROR(Cannot find ocamlgraph library. Please install the *libocamlgraph-ocaml-dev* Debian package - or use the GODI caml package system *http://godi.ocaml-programming.de/* - or compile from sources *http://ocamlgraph.lri.fr/*)
+#    else
+#  	OCAMLGRAPHLIB=""
+#     fi
+#  else
+#     OCAMLGRAPHLIB="-I +ocamlgraph"
+#  fi
+#fi
 
 
 #looking for zarith library
@@ -131,6 +131,42 @@ else
      ZARITHLIB="-I +zarith"
   fi
 fi
+
+#looking for camlzip library
+
+if test "$USEOCAMLFIND" = yes; then
+  CAMLZIPLIB=$(ocamlfind query -i-format camlzip)
+fi
+
+if test -n "$CAMLZIPLIB";then
+  echo "ocamlfind found camlzip in $CAMLZIPLIB"
+  CAMLZIP=yes
+else
+  AC_CHECK_FILE($OCAMLLIB/zip/zip.cma,CAMLZIP=yes,CAMLZIP=no)
+  if test "$CAMLZIP" = no ; then
+    AC_CHECK_FILE($OCAMLLIB/zip.cma,CAMLZIP=yes,CAMLZIP=no)
+    if test "$CAMLZIP" = no ; then
+      AC_MSG_ERROR(Cannot find camlzip library.)
+    else
+  	CAMLZIPLIB=""
+     fi
+  else
+     CAMLZIPLIB="-I +zip"
+  fi
+fi
+
+#looking for ocplib-simplex library
+
+if test "$USEOCAMLFIND" = yes; then
+  OCPLIBSIMPLEXLIB=$(ocamlfind query -i-format ocplib-simplex)
+fi
+
+if test -n "$OCPLIBSIMPLEXLIB";then
+  echo "ocamlfind found ocplib-simplex in $OCPLIBSIMPLEXLIB"
+else
+  AC_MSG_ERROR(Cannot find ocplib-simplex library.)
+fi
+
 
 # then we look for ocamlopt; if not present, we issue a warning
 # if the version is not the same, we also discard it
@@ -257,8 +293,10 @@ AC_SUBST(OCAMLVERSION)
 AC_SUBST(OCAMLLIB)
 #AC_SUBST(OCAMLGRAPHLIB)
 AC_SUBST(ZARITHLIB)
+AC_SUBST(CAMLZIPLIB)
 AC_SUBST(OCAMLWEB)
 AC_SUBST(LABLGTK2LIB)
+AC_SUBST(OCPLIBSIMPLEXLIB)
 AC_SUBST(ENABLEGUI)
 AC_SUBST(INCLUDEGTK2)
 AC_SUBST(OCAMLWIN32)

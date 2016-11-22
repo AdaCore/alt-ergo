@@ -127,7 +127,7 @@ type aoplogic =
 type aquant_form = {
   aqf_bvars : (Symbols.t * Ty.t) list ;
   aqf_upvars : (Symbols.t * Ty.t) list ;
-  mutable aqf_triggers : aterm annoted list list ;
+  mutable aqf_triggers : (aterm annoted list * bool) list ;
   aqf_form : aform annoted
 }
 
@@ -187,6 +187,13 @@ type env = {
 val indent_size : int
 val monospace_font : Pango.font_description
 val general_font : Pango.font_description
+
+
+val increase_size : env list -> unit
+val decrease_size : env list -> unit
+val reset_size : env list -> unit
+val set_font : env list -> string -> unit
+
 
 val create_env :
   sbuffer ->
@@ -263,6 +270,12 @@ val findtags_using :
 
 val findtags_dep :
   aterm -> (atyped_decl annoted * Why_typing.env) list -> GText.tag list
+
+val findtags_dep_aform :
+  aform -> (atyped_decl annoted * Why_typing.env) list -> GText.tag list
+
+val findtags_dep_adecl :
+  atyped_decl -> (atyped_decl annoted * Why_typing.env) list -> GText.tag list
 
 val findtags_proof :
   Explanation.t -> (atyped_decl annoted * Why_typing.env) list ->

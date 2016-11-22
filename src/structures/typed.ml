@@ -22,6 +22,7 @@
 
 open Format
 open Parsed
+open Options
 
 type ('a, 'b) annoted =
     { c : 'a;
@@ -73,7 +74,7 @@ type 'a quant_form = {
   (* quantified variables that appear in the formula *)
   qf_bvars : (Symbols.t * Ty.t) list ;
   qf_upvars : (Symbols.t * Ty.t) list ;
-  qf_triggers : ('a tterm, 'a) annoted list list ;
+  qf_triggers : (('a tterm, 'a) annoted list * bool) list ;
   qf_form : ('a tform, 'a) annoted
 }
 
@@ -185,7 +186,8 @@ let print_binder fmt (s, t) =
 let print_binders fmt l =
   List.iter (fun c -> fprintf fmt "%a, " print_binder c) l
 
-let print_triggers fmt = List.iter (fprintf fmt "%a | " print_term_list)
+let print_triggers fmt l =
+  List.iter (fun (tr, _) -> fprintf fmt "%a | " print_term_list tr) l
 
 let rec print_formula fmt f =
   match f.c with

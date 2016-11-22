@@ -45,6 +45,7 @@ module type T = sig
   val sub : t -> t -> t
   val mult : t -> t -> t
   val mult_const : Numbers.Q.t -> t -> t
+  val add_const : Numbers.Q.t -> t -> t
   val div : t -> t -> t * bool
   val modulo : t -> t -> t
 
@@ -75,6 +76,12 @@ module type T = sig
   val abstract_selectors : t -> (r * r) list -> t * (r * r) list
 
   val separate_constant : t -> t * Numbers.Q.t
+end
+
+module type EXTENDED_Polynome = sig
+  include T
+  val extract : r -> t option
+  val embed : t -> r
 end
 
 module Make (X : S) : T with type r = X.r

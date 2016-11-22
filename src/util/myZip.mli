@@ -4,16 +4,20 @@
 (*     This file is distributed under the terms of the CeCILL-C licence       *)
 (******************************************************************************)
 
-(* WARNING: a "cut" is performed on the following file in the Makefile.
-   DO NOT CHANGE its format *)
+(** A wrapper of the Zip module of CamlZip: we use Zip except when we want to
+generate the.js file for try-Alt-Ergo **)
 
-let version="1.30"
+type in_file
+type entry
 
-let release_commit = "(not released)"
+val open_in : string -> in_file
 
-let release_date   = "(not released)"
+val close_in : in_file -> unit
 
+val entries : in_file -> entry list
 
-let version="1.30"
-let release_commit = "0447785ef027702c0cd50a62b86fb28dd54acc08"
-let release_date = "Mon Nov 21 07:54:45 CET 2016"
+val read_entry : in_file -> entry -> string
+
+val filename : entry -> string
+
+val is_directory : entry -> bool

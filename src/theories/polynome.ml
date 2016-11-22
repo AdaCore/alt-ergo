@@ -47,6 +47,7 @@ module type T = sig
   val sub : t -> t -> t
   val mult : t -> t -> t
   val mult_const : Q.t -> t -> t
+  val add_const : Q.t -> t -> t
   val div : t -> t -> t * bool
   val modulo : t -> t -> t
 
@@ -70,6 +71,12 @@ module type T = sig
   val abstract_selectors : t -> (r * r) list -> t * (r * r) list
 
   val separate_constant : t -> t * Numbers.Q.t
+end
+
+module type EXTENDED_Polynome = sig
+  include T
+  val extract : r -> t option
+  val embed : t -> r
 end
 
 module Make (X : S) = struct
@@ -100,7 +107,9 @@ module Make (X : S) = struct
       0
     with
       | Out c -> c
-      | Invalid_argument("List.iter2") -> List.length l1 - List.length l2
+      | Invalid_argument s ->
+        assert (String.compare s "List.iter2" = 0);
+        List.length l1 - List.length l2
 
   let compare p1 p2 =
     let c = Ty.compare p1.ty p2.ty in
@@ -189,6 +198,8 @@ module Make (X : S) = struct
     if Q.sign n = 0 then { m = M.empty; c = Q.zero; ty = p.ty }
     else { p with m = M.map (Q.mult n) p.m; c =  Q.mult n p.c }
 
+  let add_const n p = {p with c = Q.add p.c n}
+
   let mult_monome a x p  =
     let ax = { m = M.add x a M.empty; c = Q.zero; ty = p.ty} in
     let acx = mult_const p.c ax in
@@ -205,7 +216,15 @@ module Make (X : S) = struct
 
   let sub p1 p2 =
     Options.tool_req 4 "TR-Arith-Poly moins";
-    add p1 (mult (create [] Q.m_one p1.ty) p2)
+    let m =
+      M.fold
+	(fun x a m ->
+	  let a' = Q.sub (find x m) a in
+	  if Q.sign a' = 0 then M.remove x m  else M.add x a' m)
+	p2.m p1.m
+    in
+    { m = m; c = Q.sub p1.c p2.c; ty = p1.ty }
+
 
   let euc_mod_num c1 c2 =
     let c = Q.modulo c1 c2 in

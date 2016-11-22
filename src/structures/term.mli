@@ -22,7 +22,10 @@
 
 type t
 
-type view = private {f: Symbols.t ; xs: t list; ty: Ty.t; depth: int; tag: int;}
+type view = private
+  {f: Symbols.t ; xs: t list; ty: Ty.t; depth: int; tag: int;
+   vars : Ty.t Symbols.Map.t Lazy.t;
+   vty : Ty.Svty.t Lazy.t}
 
 module Subst : sig
   include Map.S with type key = Symbols.t and type 'a t = 'a Symbols.Map.t
@@ -50,6 +53,7 @@ val bitv : string -> Ty.t -> t
 
 val fresh_name : Ty.t -> t
 val is_fresh : t -> bool
+val is_fresh_skolem : t -> bool
 val is_int : t -> bool
 val is_real : t -> bool
 
@@ -57,7 +61,7 @@ val compare : t -> t -> int
 val equal : t -> t -> bool
 val hash : t -> int
 
-val vars_of : t -> Set.t Symbols.Map.t -> Set.t Symbols.Map.t
+val vars_of : t -> Ty.t Symbols.Map.t -> Ty.t Symbols.Map.t
 val vty_of : t -> Ty.Svty.t
 
 val pred : t -> t
@@ -77,8 +81,6 @@ val print : Format.formatter -> t -> unit
 val print_list : Format.formatter -> t list -> unit
 val print_list_sep : string -> Format.formatter -> t list -> unit
 val print_tagged_classes : Format.formatter -> Set.t list -> unit
-
-val dummy : t
 
 val subterms : Set.t -> t -> Set.t
 val type_info : t -> Ty.t

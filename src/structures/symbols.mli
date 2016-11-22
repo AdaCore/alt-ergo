@@ -52,6 +52,9 @@ val hash : t -> int
 val to_string : t -> string
 val print : Format.formatter -> t -> unit
 
+val to_string_clean : t -> string
+val print_clean : Format.formatter -> t -> unit
+
 val dummy : t
 
 val fresh : string -> t

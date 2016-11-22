@@ -20,50 +20,36 @@
 (*   This file is distributed under the terms of the CeCILL-C licence         *)
 (******************************************************************************)
 
-open Hashcons
-open Options
+module type S = sig
+  type t
+  type tbox
+  type instances = (Formula.gformula * Explanation.t) list
 
-module S =
-  Hashcons.Make_consed(struct include String
-		              let hash = Hashtbl.hash
-		              let equal = Pervasives.(=)     end)
+  val empty : t
+  val add_terms : t -> Term.Set.t -> Formula.gformula -> t
+  val add_lemma : t -> Formula.gformula -> Explanation.t -> t * instances
+  val add_predicate : t -> Formula.gformula -> t
 
-type t = string Hashcons.hash_consed
+  val m_lemmas :
+    t ->
+    tbox ->
+    (Formula.t -> Formula.t -> bool) ->
+    int ->
+    instances * instances (* goal_directed, others *)
 
-let make s = S.hashcons s
+  val m_predicates :
+    t ->
+    tbox ->
+    (Formula.t -> Formula.t -> bool) ->
+    int ->
+    instances * instances (* goal_directed, others *)
 
-let view s = s.node
+  (* returns used axioms/predicates * unused axioms/predicates *)
+  val retrieve_used_context :
+    t -> Explanation.t -> Formula.t list * Formula.t list
 
-let equal s1 s2 = s1 == s2
+  val register_max_term_depth : t -> int -> t
 
-let compare s1 s2 = compare s1.tag s2.tag
+end
 
-let hash s = s.tag
-
-let empty = make ""
-
-let rec list_assoc x = function
-  | [] -> raise Not_found
-  | (y, v) :: l -> if equal x y then v else list_assoc x l
-
-let fresh_string =
-  let cpt = ref 0 in
-  fun () ->
-    incr cpt;
-    "!k" ^ (string_of_int !cpt)
-
-let is_fresh_string s =
-  try s.[0] == '!' && s.[1] == 'k'
-  with Invalid_argument s ->
-    assert (String.compare s "index out of bounds" = 0);
-    false
-
-let is_fresh_skolem s =
-  try s.[0] == '!' && s.[1] == '?'
-  with Invalid_argument s ->
-    assert (String.compare s "index out of bounds" = 0);
-    false
-
-module Arg = struct type t'= t type t = t' let compare = compare end
-module Set : Set.S with type elt = t = Set.Make(Arg)
-module Map : Map.S with type key = t = Map.Make(Arg)
+module Make (X : Theory.S) : S with type tbox = X.t

@@ -23,7 +23,7 @@
 open Gui_session
 open Why_annoted
 open Why_connected
-
+open Options
 
 let replay_prune id env =
   match findbyid id env.ast with

@@ -20,21 +20,15 @@
 (*   This file is distributed under the terms of the CeCILL-C licence         *)
 (******************************************************************************)
 
-module type EXTENDED_Polynome = sig
-  include Polynome.T
-  val extract : r -> t option
-  val embed : t -> r
-end
-
 module type S = sig
 
-  module P : EXTENDED_Polynome
+  module P : Polynome.EXTENDED_Polynome
   module MP : Map.S with type key = P.t
 
   type t = {
       ple0 : P.t;
       is_le : bool;
-      dep : (Numbers.Q.t * P.t * bool) Literal.LT.Map.t;
+      dep : (Numbers.Q.t * P.t * bool) Util.MI.t;
       expl : Explanation.t;
       age : Numbers.Z.t;
     }
@@ -55,20 +49,20 @@ module type S = sig
   val incr_age : unit -> unit
 
   val create_ineq :
-    P.t -> P.t -> bool -> Literal.LT.t -> Explanation.t -> t
+    P.t -> P.t -> bool -> Literal.LT.t option -> Explanation.t -> t
 
   val print_inequation : Format.formatter -> t -> unit
 
   val fourierMotzkin :
-    ('are_eq -> 'acc -> t list -> 'acc) -> 'are_eq -> 'acc ->
+    ('are_eq -> 'acc -> P.r option -> t list -> 'acc) -> 'are_eq -> 'acc ->
     MINEQS.mp -> 'acc
 
   val fmSimplex :
-    ('are_eq -> 'acc -> t list -> 'acc) -> 'are_eq -> 'acc ->
+    ('are_eq -> 'acc -> P.r option -> t list -> 'acc) -> 'are_eq -> 'acc ->
     MINEQS.mp -> 'acc
 
   val available :
-    ('are_eq -> 'acc -> t list -> 'acc) -> 'are_eq -> 'acc ->
+    ('are_eq -> 'acc -> P.r option -> t list -> 'acc) -> 'are_eq -> 'acc ->
     MINEQS.mp -> 'acc
 
 end
@@ -77,14 +71,14 @@ end
 module FM
   (X : Sig.X)
   (Uf : Uf.S with type r = X.r)
-  (P : EXTENDED_Polynome with type r = X.r)
+  (P : Polynome.EXTENDED_Polynome with type r = X.r)
   : S with module P = P
 
 module type Container_SIG = sig
   module Make
     (X : Sig.X)
     (Uf : Uf.S with type r = X.r)
-    (P : EXTENDED_Polynome with type r = X.r)
+    (P : Polynome.EXTENDED_Polynome with type r = X.r)
     : S with module P = P
 end
 

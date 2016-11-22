@@ -35,12 +35,12 @@ module type S = sig
 	        | Sat of sat_env | Unknown of sat_env
 
   val process_decl:
-    (Commands.sat_tdecl -> output -> int64 -> 'a) ->
+    (Commands.sat_tdecl -> output -> int64 -> unit) ->
     sat_env * bool * Explanation.t -> Commands.sat_tdecl ->
     sat_env * bool * Explanation.t
 
-  val open_file:
-    Lexing.lexbuf -> in_channel ->
+  val parse_and_typecheck:
+    string -> Lexing.lexbuf option ->
     ((int tdecl, int) annoted * Why_typing.env) list list
 
   val print_status : Commands.sat_tdecl -> output -> int64 -> unit
@@ -69,6 +69,8 @@ module Make(SAT : Sat_solvers.S) : S with type sat_env = SAT.t = struct
           (fun env f ->
             SAT.assume env
 	      {Formula.f=f;
+               trigger_depth = max_int;
+               nb_reductions = 0;
                age=0;
                lem=None;
                mf=false;
@@ -80,6 +82,8 @@ module Make(SAT : Sat_solvers.S) : S with type sat_env = SAT.t = struct
       ignore (SAT.unsat
                 env
     	        {Formula.f=Formula.vrai;
+                 trigger_depth = max_int;
+                 nb_reductions = 0;
                  age=0;
                  lem=None;
                  mf=false;
@@ -114,6 +118,8 @@ module Make(SAT : Sat_solvers.S) : S with type sat_env = SAT.t = struct
           if consistent then
 	    SAT.assume env
 	      {Formula.f=f;
+               trigger_depth = max_int;
+               nb_reductions = 0;
                age=0;
                lem=None;
 	       mf=mf;
@@ -132,9 +138,11 @@ module Make(SAT : Sat_solvers.S) : S with type sat_env = SAT.t = struct
 	    if consistent then
 	      let dep' = SAT.unsat env
 	        {Formula.f=f;
+                 trigger_depth = max_int;
+                 nb_reductions = 0;
                  age=0;
                  lem=None;
-	         mf=(sort <> Check);
+	         mf=(sort != Check);
                  gf=true;
                  from_terms = []
                 } in
@@ -162,16 +170,80 @@ module Make(SAT : Sat_solvers.S) : S with type sat_env = SAT.t = struct
 
   exception Parse_only
 
-  let open_file lb cin =
-    let file = Options.get_file() in
-    let a = Why_parser.file Why_lexer.token lb in
-    if parse_only () then exit 0;
-    Parsing.clear_parser ();
-    let ltd, typ_env = Why_typing.file false Why_typing.empty_env a in
-    let d = Why_typing.split_goals ltd in
-    if file <> " stdin" then close_in cin;
-    if type_only () then exit 0;
-    d
+  (* pre-condition: f is of the form f'.zip *)
+  let extract_zip_file f =
+    let cin = MyZip.open_in f in
+    try
+      match MyZip.entries cin with
+      | [e] when not (MyZip.is_directory e) ->
+         if verbose () then
+           eprintf
+             "I'll read the content of '%s' in the given zip@."
+             (MyZip.filename e);
+         let content = MyZip.read_entry cin e in
+         MyZip.close_in cin;
+         content
+      | _ ->
+         MyZip.close_in cin;
+         raise (Arg.Bad
+                  (sprintf "%s '%s' %s@?"
+                           "The zipped file" f
+                           "should contain exactly one file."))
+    with e ->
+      MyZip.close_in cin;
+      raise e
+
+  let close_and_exit opened_cin cin retcode =
+    if opened_cin then close_in cin;
+    exit retcode
+
+  (* lb_opt is set in to Some lb in JavaScript mode *)
+  let parse_and_typecheck file lb_opt =
+    let cin, lb, opened_cin =
+      match lb_opt, Filename.check_suffix file ".zip" with
+      | None, false ->
+         if Pervasives.(<>) file "" then
+           let cin = open_in file in
+           cin, from_channel cin, true
+         else stdin, from_channel stdin, false
+
+      | None, true ->
+         let file_content = extract_zip_file file in
+         stdin, from_string file_content, false
+
+      | Some lb, false ->
+         stdin, lb, false
+
+      | Some lb, true ->
+         eprintf "Error: Zip files are not supported in JS mode !@.";
+         exit 1
+    in
+    try
+      let a = Why_parser.file Why_lexer.token lb in
+      Parsing.clear_parser ();
+      if parse_only () then close_and_exit opened_cin cin 0;
+      let ltd, typ_env = Why_typing.file false Why_typing.empty_env a in
+      let d = Why_typing.split_goals ltd in
+      if type_only () then close_and_exit opened_cin cin 0;
+      if opened_cin then close_in cin;
+      d
+    with
+       | Why_lexer.Lexical_error s ->
+          Loc.report err_formatter (lexeme_start_p lb, lexeme_end_p lb);
+          eprintf "lexical error: %s\n@." s;
+          close_and_exit opened_cin cin 1
+
+       | Parsing.Parse_error ->
+          let  loc = (lexeme_start_p lb, lexeme_end_p lb) in
+          Loc.report err_formatter loc;
+          eprintf "syntax error\n@.";
+          close_and_exit opened_cin cin 1
+
+       | Errors.Error(e,l) ->
+          Loc.report err_formatter l;
+          eprintf "typing error: %a\n@." Errors.report e;
+          close_and_exit opened_cin cin 1
+
 
   let print_status d status steps =
     let time = Time.value() in
@@ -181,12 +253,7 @@ module Make(SAT : Sat_solvers.S) : S with type sat_env = SAT.t = struct
       if js_mode () then
         printf "# [answer] Valid (%2.4f seconds) (%Ld steps)@." time steps
       else begin
-        begin
-          if Options.backward_compat() then
-            printf "%aValid (%2.4f) (%Ld)@." Loc.report loc time steps
-          else
-            printf "%aValid (%2.4f) (%Ld steps)@." Loc.report loc time steps
-        end;
+        printf "%aValid (%2.4f) (%Ld steps)@." Loc.report loc time steps;
         if proof () && not (debug_proof ()) && not (save_used_context ()) then
           printf "Proof:\n%a@." Explanation.print_proof dep
       end
@@ -201,9 +268,6 @@ module Make(SAT : Sat_solvers.S) : S with type sat_env = SAT.t = struct
       if js_mode () then
         printf "# [answer] unknown (%2.4f seconds) (%Ld steps)@." time steps
       else
-        if Options.backward_compat() then
-          printf "%aI don't know.@." Loc.report loc
-        else
-          printf "%aI don't know (%2.4f) (%Ld steps)@." Loc.report loc time steps
+        printf "%aI don't know (%2.4f) (%Ld steps)@." Loc.report loc time steps
 
 end

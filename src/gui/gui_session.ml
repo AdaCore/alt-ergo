@@ -20,6 +20,8 @@
 (*   This file is distributed under the terms of the CeCILL-C licence         *)
 (******************************************************************************)
 
+open Options
+
 type action =
   | Prune of int
   | IncorrectPrune of int

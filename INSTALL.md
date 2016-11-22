@@ -1,9 +1,9 @@
 ## Build and Installation
 
-  You need OCaml >= 3.12.1 and zarith to compile the
-  sources. You need LablGtk2 and the widget GSourceView2 to compile
-  the GUI. You may need superuser permissions to perform the
-  installation.
+  You need OCaml >= 4.01.0, zarith, camlzip and ocplib-simplex >= 0.3
+  to compile the sources. You need LablGtk2 and the widget
+  GSourceView2 to compile the GUI. You may need superuser permissions
+  to perform the installation.
 
 #### Common Steps
 
@@ -32,6 +32,12 @@ depending on whether ocamlopt is installed or only ocamlc is detected.
   
   2. Install with "make install-gui"
  
+#### The Ctrl-Alt-Ergo wrapper
+   
+   - Compile with "make cae"
+
+   - Install with "make install-cae"
+
 The steps below will build and install OCamlPro plugins (extension
 .cmxs if ocamlopt is installed or .cma if only ocamlc is detected).
 
@@ -46,6 +52,7 @@ The steps below will build and install OCamlPro plugins (extension
   1. Compile with "make fm-simplex"
 
   2. Install with "make install-fm-simplex"
+
 
 #### The Profiler Plugin
 
@@ -100,3 +107,22 @@ The steps below will build and install OCamlPro plugins (extension
    absolute path as shown by the second command above. Also, you
    should replace ".cmxs" by ".cma" if you are working with bytcode
    binaries.
+
+- Ctrl-Alt-Ergo can be executed as shown below:
+
+        $ ctrl-alt-ergo "timeout" "sat-plugin" "alt-ergo" [options to alt-ergo]
+
+  1. "timeout" should be a positive integer. It will be divided by the
+  number of strategies that Alt-Ergo will try. 
+
+  2. "sat-plugin" should be substituted with the external SAT plugin
+  you would like to load (typically satML-plugin.cmxs), or you can
+  replace it with "" to deactivate strategies that use external SAT
+  solvers.
+
+  3. "alt-ergo" should be substituted with the binary you would like
+  to use for Alt-Ergo (typically alt-ergo, if you have already
+  installed it).
+
+  4. [options to alt-ergo] should contain the arguments that will be
+   passed to Alt-Ergo (input file, options, ...)

@@ -21,7 +21,7 @@
 (******************************************************************************)
 
 open Hashcons
-
+open Options
 type 'a view =
   | Eq of 'a * 'a
   | Distinct of bool * 'a list
@@ -72,6 +72,7 @@ module type S = sig
   val compare : t -> t -> int
   val equal : t -> t -> bool
   val hash : t -> int
+  val uid : t -> int
 
   module Map : Map.S with type key = t
   module Set : Set.S with type elt = t
@@ -89,6 +90,7 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
   let compare a1 a2 = Pervasives.compare a1.tpos a2.tpos
   let equal a1 a2 = a1.tpos = a2.tpos (* XXX == *)
   let hash a1 = a1.tpos
+  let uid a1 = a1.tpos
   let neg t = {t with neg = not t.neg; tpos = t.tneg; tneg = t.tpos}
 
   let atom_view t = t.at.node, t.neg
@@ -131,7 +133,7 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
 
   let print fmt a =
     let lbl = Hstring.view (label a) in
-    let lbl = if lbl = "" then lbl else lbl^":" in
+    let lbl = if String.length lbl = 0 then lbl else lbl^":" in
     match view a with
       | Eq (z1, z2) ->
 	Format.fprintf fmt "%s %a = %a" lbl X.print z1 X.print z2
@@ -158,8 +160,8 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
 	Format.fprintf fmt "%s %s %s(%a)" lbl b (Hstring.view n) print_list l
 
       | Pred (p,b) ->
-        let b = if b then "not" else "" in
-	Format.fprintf fmt "%s %s %a" lbl b X.print p
+        Format.fprintf fmt "%s %a = %s" lbl X.print p
+          (if b then "false" else "true")
 
       | Distinct (_, _) -> assert false
 
@@ -211,7 +213,7 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
     if c = 0 then Pred(X.top(), is_neg)
     else
       let t1, t2 = if c < 0 then t1, t2 else t2, t1 in
-      if X.type_info t1 = Ty.Tbool then normalize_eq_bool t1 t2 is_neg
+      if X.type_info t1 == Ty.Tbool then normalize_eq_bool t1 t2 is_neg
       else if is_neg then Distinct (false, [t1;t2]) (* XXX assert ? *)
       else Eq(t1,t2) (* should be translated into iff *)
 
@@ -297,7 +299,7 @@ module type S_Term = sig
   val terms_nonrec : t -> Term.Set.t
   val terms_rec : t -> Term.Set.t
 
-  val vars_of : t -> Term.Set.t Symbols.Map.t -> Term.Set.t Symbols.Map.t
+  val vars_of : t -> Ty.t Symbols.Map.t -> Ty.t Symbols.Map.t
   val is_ground : t -> bool
   val is_in_model : t -> bool
 

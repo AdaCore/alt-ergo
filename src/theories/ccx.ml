@@ -64,15 +64,17 @@ module type S = sig
     r Sig.facts ->
     t * (r Sig.literal * Explanation.t * Sig.lit_origin) list
 
-  val case_split : t -> (r Literal.view * Explanation.t * Sig.lit_origin) list
+  val case_split :
+    t -> for_model:bool -> (r Literal.view * bool * Sig.lit_origin) list * t
   val query :  t -> Literal.LT.t -> Sig.answer
   val new_terms : t -> Term.Set.t
   val class_of : t -> Term.t -> Term.t list
-  val are_equal : t -> Term.t -> Term.t -> Sig.answer
+  val are_equal : t -> Term.t -> Term.t -> added_terms:bool -> Sig.answer
   val are_distinct : t -> Term.t -> Term.t -> Sig.answer
   val cl_extract : t -> Term.Set.t list
   val term_repr : t -> Term.t -> Term.t
   val print_model : Format.formatter -> t -> unit
+  val get_union_find : t -> Combine.Uf.t
 
 end
 
@@ -149,15 +151,15 @@ module Main : S = struct
 
     let make_cst t ctx =
       if debug_cc () then
-	if ctx = [] then ()
-	else begin
-          fprintf fmt "[cc] constraints of make(%a)@." Term.print t;
-          let c = ref 0 in
-          List.iter
-            (fun a ->
-              incr c;
-              fprintf fmt " %d) %a@." !c A.LT.print a) ctx
-	end
+	if ctx != [] then
+          begin
+            fprintf fmt "[cc] constraints of make(%a)@." Term.print t;
+            let c = ref 0 in
+            List.iter
+              (fun a ->
+               incr c;
+               fprintf fmt " %d) %a@." !c A.LT.print a) ctx
+	  end
 
     let add_to_use t =
       if debug_cc () then
@@ -209,7 +211,7 @@ module Main : S = struct
 
   let are_equal env ex t1 t2 =
     if T.equal t1 t2 then ex
-    else match Uf.are_equal env.uf t1 t2 with
+    else match Uf.are_equal env.uf t1 t2 ~added_terms:true with
       | Yes (dep, _) -> Ex.union ex dep
       | No -> raise Exit
 
@@ -287,23 +289,20 @@ module Main : S = struct
 
   let clean_use =
     List.fold_left
-      (fun env (a, ex) ->
-	match a with
-	  | LSem _ -> assert false
-	  | LTerm t ->
-	    begin
-	      match A.LT.view t with
-		| A.Distinct (_, lt)
-		| A.Builtin (_, _, lt) ->
-		  let lvs = concat_leaves env.uf lt in
-		  List.fold_left
-		    (fun env rx ->
-		      let st, sa = Use.find rx env.use in
-		      let sa = SetA.remove (t, ex) sa in
-		      { env with use = Use.add rx (st,sa) env.use }
-		    ) env lvs
-		| _ -> assert false
-	    end)
+      (fun env a ->
+       match A.LT.view a with
+       | A.Distinct (_, lt)
+       | A.Builtin (_, _, lt) ->
+	  let lvs = concat_leaves env.uf lt in
+	  List.fold_left
+	    (fun env rx ->
+	     let st, sa = Use.find rx env.use in
+             (* SetA does not use ex, so Ex.empty is OK for removing *)
+	     let sa = SetA.remove (a, Ex.empty) sa in
+	     { env with use = Use.add rx (st,sa) env.use }
+	    ) env lvs
+       | _ -> assert false
+      )
 
   let contra_congruence env facts r =
     Options.exec_thread_yield ();
@@ -410,7 +409,7 @@ module Main : S = struct
       let nuse = Use.up_add env.use t rt lvs in
 
       (* If finitetest is used we add the term to the relation *)
-      let rel = Rel.add env.relation rt in
+      let rel = Rel.add env.relation nuf rt t in
       Use.print nuse;
 
       (* we compute terms to consider for congruence *)
@@ -467,7 +466,7 @@ module Main : S = struct
   let assume_eq env facts r1 r2 ex =
     Options.tool_req 3 "TR-CCX-Congruence";
     let env = congruence_closure env facts r1 r2 ex in
-    if Options.nocontracongru () || X.type_info r1 <> Ty.Tbool then env
+    if Options.nocontracongru () || X.type_info r1 != Ty.Tbool then env
     else begin
       contra_congruence env facts r1;
       contra_congruence env facts r2;
@@ -526,8 +525,17 @@ module Main : S = struct
     if Q.is_empty facts.ineqs then env, List.rev ineqs
     else
       let e = Q.pop facts.ineqs in
-      let env, e = semantic_view env e facts in
-      norm_queue env (e::ineqs) facts
+      let env, e' = semantic_view env e facts in
+      let ineqs = e'::ineqs in
+      let ineqs =
+        match e with
+        (* for case-split, to be sure that CS is given
+           back to relations *)
+        | LSem ra, ex, ((Sig.CS _ | Sig.NCS _) as orig) ->
+          (ra, None, ex, orig) :: ineqs
+        | _ -> ineqs
+      in
+      norm_queue env ineqs facts
 
   let add_touched uf acc (facts:r Sig.facts) =
     let acc =
@@ -579,7 +587,14 @@ module Main : S = struct
 
   (* End: new implementation of add, add_term, assume_literals and all that *)
 
-  let case_split env = Rel.case_split env.relation env.uf
+  let case_split env ~for_model =
+    match Rel.case_split env.relation env.uf for_model with
+    | [] when for_model ->
+      let l, uf = Uf.assign_next env.uf in
+      (* try to not to modify uf in the future. It's currently done only
+         to add fresh terms in UF to avoid loops *)
+      l, {env with uf}
+    | l -> l, env
 
   let query env a =
     let ra, ex_ra = term_canonical_view env a Ex.empty in
@@ -597,12 +612,14 @@ module Main : S = struct
 
   let term_repr env t = Uf.term_repr env.uf t
 
+  let get_union_find env = env.uf
+
   let print_model fmt env =
     let zero = ref true in
     let eqs, neqs = Uf.model env.uf in
     let rs =
       List.fold_left (fun acc (r, l, to_rel) ->
-	if l <> [] then begin
+	if l != [] then begin
 	  if !zero then begin
 	    fprintf fmt "Theory:";
 	    zero := false;

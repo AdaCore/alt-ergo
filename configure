@@ -588,7 +588,9 @@ EXE
 OCAMLWIN32
 INCLUDEGTK2
 ENABLEGUI
+OCPLIBSIMPLEXLIB
 LABLGTK2LIB
+CAMLZIPLIB
 ZARITHLIB
 OCAMLLIB
 OCAMLVERSION
@@ -622,6 +624,7 @@ infodir
 docdir
 oldincludedir
 includedir
+runstatedir
 localstatedir
 sharedstatedir
 sysconfdir
@@ -686,6 +689,7 @@ datadir='${datarootdir}'
 sysconfdir='${prefix}/etc'
 sharedstatedir='${prefix}/com'
 localstatedir='${prefix}/var'
+runstatedir='${localstatedir}/run'
 includedir='${prefix}/include'
 oldincludedir='/usr/include'
 docdir='${datarootdir}/doc/${PACKAGE}'
@@ -938,6 +942,15 @@ do
   | -silent | --silent | --silen | --sile | --sil)
     silent=yes ;;
 
+  -runstatedir | --runstatedir | --runstatedi | --runstated \
+  | --runstate | --runstat | --runsta | --runst | --runs \
+  | --run | --ru | --r)
+    ac_prev=runstatedir ;;
+  -runstatedir=* | --runstatedir=* | --runstatedi=* | --runstated=* \
+  | --runstate=* | --runstat=* | --runsta=* | --runst=* | --runs=* \
+  | --run=* | --ru=* | --r=*)
+    runstatedir=$ac_optarg ;;
+
   -sbindir | --sbindir | --sbindi | --sbind | --sbin | --sbi | --sb)
     ac_prev=sbindir ;;
   -sbindir=* | --sbindir=* | --sbindi=* | --sbind=* | --sbin=* \
@@ -1075,7 +1088,7 @@ fi
 for ac_var in	exec_prefix prefix bindir sbindir libexecdir datarootdir \
 		datadir sysconfdir sharedstatedir localstatedir includedir \
 		oldincludedir docdir infodir htmldir dvidir pdfdir psdir \
-		libdir localedir mandir
+		libdir localedir mandir runstatedir
 do
   eval ac_val=\$$ac_var
   # Remove trailing slashes.
@@ -1228,6 +1241,7 @@ Fine tuning of the installation directories:
   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
   --sharedstatedir=DIR    modifiable architecture-independent data [PREFIX/com]
   --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
+  --runstatedir=DIR       modifiable per-process data [LOCALSTATEDIR/run]
   --libdir=DIR            object code libraries [EPREFIX/lib]
   --includedir=DIR        C header files [PREFIX/include]
   --oldincludedir=DIR     C header files for non-gcc [/usr/include]
@@ -1786,36 +1800,36 @@ fi
 if test "$USEOCAMLFIND" = yes; then
    OCAMLFINDLIB=$(ocamlfind printconf stdlib)
    OCAMLFIND=$(which ocamlfind)
-#    if test "$OCAMLFINDLIB" != "$OCAMLLIB"; then
-#     USEOCAMLFIND=no;
-#     echo "but your ocamlfind is not compatible with your ocamlc:"
-#     echo "ocamlfind : $OCAMLFINDLIB, ocamlc : $OCAMLLIB"
-#    fi
+   if test "$OCAMLFINDLIB" != "$OCAMLLIB"; then
+    USEOCAMLFIND=no;
+    echo "but your ocamlfind is not compatible with your ocamlc:"
+    echo "ocamlfind : $OCAMLFINDLIB, ocamlc : $OCAMLLIB"
+   fi
 fi
 
 
 #looking for ocamlgraph library
-# not used anymore
-# if test "$USEOCAMLFIND" = yes; then
-#   OCAMLGRAPHLIB=$(ocamlfind query -i-format ocamlgraph)
-# fi
 
-# if test -n "$OCAMLGRAPHLIB";then
-#   echo "ocamlfind found ocamlgraph in $OCAMLGRAPHLIB"
-#   OCAMLGRAPH=yes
-# else
-#   AC_CHECK_FILE($OCAMLLIB/ocamlgraph/graph.cmi,OCAMLGRAPH=yes,OCAMLGRAPH=no)
-#   if test "$OCAMLGRAPH" = no ; then
-#     AC_CHECK_FILE($OCAMLLIB/graph.cmi,OCAMLGRAPH=yes,OCAMLGRAPH=no)
-#     if test "$OCAMLGRAPH" = no ; then
-#       AC_MSG_ERROR(Cannot find ocamlgraph library. Please install the *libocamlgraph-ocaml-dev* Debian package - or use the GODI caml package system *http://godi.ocaml-programming.de/* - or compile from sources *http://ocamlgraph.lri.fr/*)
-#     else
-#   	OCAMLGRAPHLIB=""
-#      fi
-#   else
-#      OCAMLGRAPHLIB="-I +ocamlgraph"
-#   fi
-# fi
+#if test "$USEOCAMLFIND" = yes; then
+#  OCAMLGRAPHLIB=$(ocamlfind query -i-format ocamlgraph)
+#fi
+#
+#if test -n "$OCAMLGRAPHLIB";then
+#  echo "ocamlfind found ocamlgraph in $OCAMLGRAPHLIB"
+#  OCAMLGRAPH=yes
+#else
+#  AC_CHECK_FILE($OCAMLLIB/ocamlgraph/graph.cmi,OCAMLGRAPH=yes,OCAMLGRAPH=no)
+#  if test "$OCAMLGRAPH" = no ; then
+#    AC_CHECK_FILE($OCAMLLIB/graph.cmi,OCAMLGRAPH=yes,OCAMLGRAPH=no)
+#    if test "$OCAMLGRAPH" = no ; then
+#      AC_MSG_ERROR(Cannot find ocamlgraph library. Please install the *libocamlgraph-ocaml-dev* Debian package - or use the GODI caml package system *http://godi.ocaml-programming.de/* - or compile from sources *http://ocamlgraph.lri.fr/*)
+#    else
+#  	OCAMLGRAPHLIB=""
+#     fi
+#  else
+#     OCAMLGRAPHLIB="-I +ocamlgraph"
+#  fi
+#fi
 
 
 #looking for zarith library
@@ -1884,6 +1898,86 @@ fi
      ZARITHLIB="-I +zarith"
   fi
 fi
+
+#looking for camlzip library
+
+if test "$USEOCAMLFIND" = yes; then
+  CAMLZIPLIB=$(ocamlfind query -i-format camlzip)
+fi
+
+if test -n "$CAMLZIPLIB";then
+  echo "ocamlfind found camlzip in $CAMLZIPLIB"
+  CAMLZIP=yes
+else
+  as_ac_File=`$as_echo "ac_cv_file_$OCAMLLIB/zip/zip.cma" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $OCAMLLIB/zip/zip.cma" >&5
+$as_echo_n "checking for $OCAMLLIB/zip/zip.cma... " >&6; }
+if eval \${$as_ac_File+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  test "$cross_compiling" = yes &&
+  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
+if test -r "$OCAMLLIB/zip/zip.cma"; then
+  eval "$as_ac_File=yes"
+else
+  eval "$as_ac_File=no"
+fi
+fi
+eval ac_res=\$$as_ac_File
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
+  CAMLZIP=yes
+else
+  CAMLZIP=no
+fi
+
+  if test "$CAMLZIP" = no ; then
+    as_ac_File=`$as_echo "ac_cv_file_$OCAMLLIB/zip.cma" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $OCAMLLIB/zip.cma" >&5
+$as_echo_n "checking for $OCAMLLIB/zip.cma... " >&6; }
+if eval \${$as_ac_File+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  test "$cross_compiling" = yes &&
+  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
+if test -r "$OCAMLLIB/zip.cma"; then
+  eval "$as_ac_File=yes"
+else
+  eval "$as_ac_File=no"
+fi
+fi
+eval ac_res=\$$as_ac_File
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
+  CAMLZIP=yes
+else
+  CAMLZIP=no
+fi
+
+    if test "$CAMLZIP" = no ; then
+      as_fn_error $? "Cannot find camlzip library." "$LINENO" 5
+    else
+  	CAMLZIPLIB=""
+     fi
+  else
+     CAMLZIPLIB="-I +zip"
+  fi
+fi
+
+#looking for ocplib-simplex library
+
+if test "$USEOCAMLFIND" = yes; then
+  OCPLIBSIMPLEXLIB=$(ocamlfind query -i-format ocplib-simplex)
+fi
+
+if test -n "$OCPLIBSIMPLEXLIB";then
+  echo "ocamlfind found ocplib-simplex in $OCPLIBSIMPLEXLIB"
+else
+  as_fn_error $? "Cannot find ocplib-simplex library." "$LINENO" 5
+fi
+
 
 # then we look for ocamlopt; if not present, we issue a warning
 # if the version is not the same, we also discard it
@@ -2347,6 +2441,8 @@ fi
 
 
 #AC_SUBST(OCAMLGRAPHLIB)
+
+
 
 
 

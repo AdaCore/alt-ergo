@@ -67,3 +67,7 @@ val literals_ids_of : t -> int MI.t
 val make_deps : Formula.Set.t -> t
 
 val has_no_bj : t -> bool
+
+val compare : t -> t -> int
+
+val subset : t -> t -> bool

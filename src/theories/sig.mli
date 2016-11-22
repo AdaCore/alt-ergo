@@ -22,7 +22,7 @@
 
 type answer = Yes of Explanation.t * Term.Set.t list | No
 
-type 'a ac = {h: Symbols.t ; t: Ty.t ; l: ('a * int) list}
+type 'a ac = {h: Symbols.t ; t: Ty.t ; l: ('a * int) list; distribute: bool}
 
 type 'a literal = LTerm of Literal.LT.t | LSem of 'a Literal.view
 
@@ -30,6 +30,7 @@ type theory =
 | Th_arith
 | Th_sum
 | Th_arrays
+| Th_UF
 
 type lit_origin =
 | Subst
@@ -51,7 +52,7 @@ type 'a facts = {
 
 type 'a result = {
   assume : 'a fact list;
-  remove: ('a literal * Explanation.t) list;
+  remove: Literal.LT.t list;
 }
 
 type 'a solve_pb = { sbt : ('a * 'a) list; eqs : ('a * 'a) list }
@@ -65,10 +66,11 @@ module type RELATION = sig
   val assume : t -> uf -> (r input) list -> t * r result
   val query  : t -> uf -> r input -> answer
 
-  val case_split : t -> uf -> (r Literal.view * Explanation.t * lit_origin) list
+  val case_split :
+    t -> uf -> for_model:bool -> (r Literal.view * bool * lit_origin) list
   (** case_split env returns a list of equalities *)
 
-  val add : t -> r -> t
+  val add : t -> uf -> r -> Term.t -> t
   (** add a representant to take into account *)
 
   val print_model : Format.formatter -> t -> (Term.t * r) list -> unit
@@ -97,6 +99,7 @@ module type SHOSTAK = sig
   val type_info : t -> Ty.t
 
   val embed : r -> t
+  val is_mine : t -> r
 
   (** Give the leaves of a term of the theory *)
   val leaves : t -> r list
@@ -117,6 +120,18 @@ module type SHOSTAK = sig
   val fully_interpreted : Symbols.t -> bool
 
   val abstract_selectors : t -> (r * r) list -> r * (r * r) list
+
+  (* the returned bool is true when the returned term in a constant of the
+     theory. Otherwise, the term contains aliens that should be assigned
+     (eg. records). In this case, it's a unit fact, not a decision
+  *)
+  val assign_value :
+    r -> r list -> (Term.t * r) list -> (Term.t * bool) option
+
+  (* choose the value to print and how to print it for the given term.
+     The second term is its representative. The list is its equivalence class
+  *)
+  val choose_adequate_model : Term.t -> r -> (Term.t * r) list -> r * string
 
 end
 
@@ -161,4 +176,18 @@ module type X = sig
 
   val top : unit -> r
   val bot : unit -> r
+
+  val is_solvable_theory_symbol : Symbols.t -> bool
+
+  (* the returned bool is true when the returned term in a constant of the
+     theory. Otherwise, the term contains aliens that should be assigned
+     (eg. records). In this case, it's a unit fact, not a decision
+  *)
+  val assign_value :
+    r -> r list -> (Term.t * r) list -> (Term.t * bool) option
+
+  (* choose the value to print and how to print it for the given term.
+     The second term is its representative. The list is its equivalence class
+  *)
+  val choose_adequate_model : Term.t -> r -> (Term.t * r) list -> r * string
 end

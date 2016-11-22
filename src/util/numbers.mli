@@ -24,4 +24,17 @@
 module Z : NumbersInterface.ZSig
 
 (** Rationals implementation. **)
-module Q : NumbersInterface.QSig with module Z = Z
+module Q : sig
+  include NumbersInterface.QSig with module Z = Z
+
+  (* computing root and sqrt by default and "by excess". The given
+     rational is supposed to be positive. The integer provided for
+     root_xxx is also supposed to be positive. Computations use
+     floats. None is returned in case of failure. sqrt_xxx versions
+     are more accurate and faster than their equivalent root_xxx when
+     the integer is 2*)
+  val root_default : t -> int -> t option
+  val root_excess  : t -> int -> t option
+  val sqrt_default : t -> t option
+  val sqrt_excess  : t -> t option
+end

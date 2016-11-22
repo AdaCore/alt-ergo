@@ -64,20 +64,29 @@ let toggle_prune env r =
   if r.pruned then unprune env r
   else prune env r
 
-let search_using t sbuf env =
+let reset_search_tags env =
   List.iter (fun t -> t#set_property (`BACKGROUND_SET false)) env.search_tags;
+  env.search_tags <- []
+
+let search_using t sbuf env =
   match find t sbuf env.ast with
     | None -> ()
     | Some an -> match an with
-	| AD (r,_) ->
-	  let tags = findtags_using r.c env.ast in
-	  env.search_tags <- tags;
-	  List.iter (fun t -> t#set_property (`BACKGROUND "gold")) tags
-	| AT {c = at} | AF ({c = AFatom (AApred at)}, _) ->
-	  let tags = findtags_dep at env.ast in
-	  env.search_tags <- tags;
-	  List.iter (fun t -> t#set_property (`BACKGROUND "orange")) tags
-	| AF _ | QF _ -> ()
+      | AD (r, _) ->
+	let tags1 = findtags_using r.c env.ast in
+	let tags2 = findtags_dep_adecl r.c env.ast in
+	List.iter (fun t -> t#set_property (`BACKGROUND "gold")) tags1;
+	List.iter (fun t -> t#set_property (`BACKGROUND "orange")) tags2;
+	env.search_tags <- List.rev_append tags1 tags2;
+      | AT {c = at} ->
+	let tags = findtags_dep at env.ast in
+	env.search_tags <- tags;
+	List.iter (fun t -> t#set_property (`BACKGROUND "orange")) tags
+      | AF (aaf, _) ->
+	let tags = findtags_dep_aform aaf.c env.ast in
+	env.search_tags <- tags;
+	List.iter (fun t -> t#set_property (`BACKGROUND "orange")) tags
+      | QF _ -> ()
 
 
 (* let hand_cursor () = Gdk.Cursor.create `TARGET *)
@@ -156,7 +165,8 @@ let tag_callback t env sbuf ~origin:y z i =
     | `BUTTON_PRESS ->
       let z = GdkEvent.Button.cast z in
       let captured =
-	if GdkEvent.Button.button z = 1 then
+	if GdkEvent.Button.button z = 1 then begin
+          reset_search_tags env;
 	  if env.ctrl then
 	    (search_using t sbuf env;
 	     true)
@@ -181,7 +191,8 @@ let tag_callback t env sbuf ~origin:y z i =
 	      ignore(env.st_ctx#push tyt);
 	      true
 	    end
-	else false
+        end
+        else false
       in
       env.start_select <- Some ofs;
       set_select env sbuf;
@@ -337,8 +348,8 @@ let rec unquantify_aform (buffer:sbuffer) tyenv vars_entries
 	List.fold_left (fun (nbv, used, goal_used, ve, uplet, lets) v ->
 	  let ((s, _) as v'), e = List.hd ve in
 	  let cdr_ve = List.tl ve in
-	  assert (v = v');
-	  if e = "" then
+	  assert (Pervasives.(=) v v');
+	  if String.length e == 0 then
 	    (v'::nbv, used, goal_used, cdr_ve, v'::uplet, lets)
 	  else
 	    let lb = Lexing.from_string e in
@@ -369,16 +380,16 @@ let rec unquantify_aform (buffer:sbuffer) tyenv vars_entries
 	    new_annot buffer (AFlet (u, s, at.c, af))
 	      (Why_typing.new_id ()) (tag buffer))
 	  afc lets in
-      if nbv = [] then (add_lets aform lets).c, ve, goal_used
+      if nbv == [] then (add_lets aform lets).c, ve, goal_used
       else
 	let aqf_triggers =
-	  List.map (List.map (unquantify_aaterm buffer)) atll in
+	  List.map (fun (l,b) -> List.map (unquantify_aaterm buffer)l, b) atll in
 	let aqf_triggers = List.filter
-	  (fun aatl ->
+	  (fun (aatl,_) ->
 	    (* TODO : change nbv with something else *)
-	    List.filter (fun aat -> is_quantified_term nbv aat.c) aatl <> []
+	    List.filter (fun aat -> is_quantified_term nbv aat.c) aatl != []
 	  ) aqf_triggers in
-	if aqf_triggers = [] then (add_lets aform lets).c, ve, goal_used
+	if aqf_triggers == [] then (add_lets aform lets).c, ve, goal_used
 	else
 	  let c =
 	    { aqf_bvars = nbv;
@@ -429,7 +440,7 @@ let rec unquantify_aform (buffer:sbuffer) tyenv vars_entries
 let make_instance (buffer:sbuffer) vars entries afc goal_form tyenv =
   let goal_vars = list_vars_in_form goal_form.c in
   if debug () then List.iter (fun (v,e) ->
-    eprintf "%a -> %s@." Symbols.print (fst v) e)
+    eprintf "%a -> %s@." Symbols.print_clean (fst v) e)
     (List.combine vars (List.rev entries));
   let aform, _, goal_used =
     unquantify_aform buffer tyenv (List.combine vars (List.rev entries)) []
@@ -460,14 +471,14 @@ let rec least_nested_form used_vars af =
 	(fun l v ->
 	  if List.mem v aqf.c.aqf_bvars then l else v::l (*XXX*)
 	) [] used_vars in
-      if not_covered = [] then Forall aqf.c.aqf_form
+      if not_covered == [] then Forall aqf.c.aqf_form
       else least_nested_form not_covered aqf.c.aqf_form
     | _, AFexists aqf ->
       let not_covered = List.fold_left
 	(fun l v ->
 	  if List.mem v aqf.c.aqf_bvars then l else v::l (*XXX*)
 	) [] used_vars in
-      if not_covered = [] then Exists aqf.c.aqf_form
+      if not_covered == [] then Exists aqf.c.aqf_form
       else least_nested_form not_covered aqf.c.aqf_form
     | _, AFlet (upvars, s, at, af) ->
       least_nested_form used_vars af
@@ -490,7 +501,7 @@ let rec add_instance_aux ?(register=true) env id af aname vars entries =
     make_instance env.inst_buffer vars entries af goal_form tyenv in
   let ln_form = least_nested_form used_vars goal_form in
   env.inst_buffer#place_cursor  ~where:env.inst_buffer#end_iter;
-  if ln_form = Exists goal_form then begin
+  if Pervasives.(=) ln_form (Exists goal_form) then begin
     let hy =
       AAxiom (loc, (sprintf "%s%s" "_instance_" aname), instance.c) in
     let ahy = new_annot env.inst_buffer hy instance.id ptag in
@@ -542,6 +553,7 @@ and popup_axiom t env offset () =
   let pop_w = GWindow.dialog
     ~title:"Instantiate axiom"
     ~allow_grow:true
+    ~position:`MOUSE
     ~width:400 ()
   (* ~icon:(GdkPixbuf.from_xpm_data Logo.xpm_logo) ()  *)
   in
@@ -581,7 +593,7 @@ and popup_axiom t env offset () =
 	      let entries,_ = List.fold_left
 		(fun (entries,i) (s,ty) ->
 		  fprintf str_formatter "%a : %a = "
-		    Symbols.print s Ty.print ty;
+		    Symbols.print_clean s Ty.print ty;
 		  let text = flush_str_formatter () in
 		  ignore(
 		    GMisc.label ~text ~xalign:1.0
@@ -665,7 +677,7 @@ and add_trigger ?(register=true) t qid env str offset (sbuf:sbuffer) =
 	      let tags = iter#tags in
 	      let iter = sbuf#get_iter (`OFFSET (iter#offset - 2)) in
 	      let lb = Lexing.from_string str in
-	      let lexprs = Why_parser.trigger Why_lexer.token lb in
+	      let lexprs, _ = Why_parser.trigger Why_lexer.token lb in
 	      let atl = List.fold_right
 		(fun lexpr l->
 		  let tt = Why_typing.term tyenv
@@ -675,12 +687,14 @@ and add_trigger ?(register=true) t qid env str offset (sbuf:sbuffer) =
 		  connect_aaterm env sbuf connect_tag at;
 		  at::l
 		) lexprs [] in
-	      if qf.c.aqf_triggers <> [] then
+	      if qf.c.aqf_triggers != [] then
 		sbuf#insert ~iter ~tags " | ";
 	      add_aaterm_list_at sbuf tags iter "," atl;
-	      qf.c.aqf_triggers <- qf.c.aqf_triggers@[atl];
+	      qf.c.aqf_triggers <- qf.c.aqf_triggers@[atl,true];
 	      if register then
-		save env.actions (AddTrigger (qf.id, sbuf=env.inst_buffer, str));
+		save env.actions
+                     (AddTrigger (qf.id,
+                                  Pervasives.(=) sbuf env.inst_buffer, str));
               commit_tags_buffer sbuf
 	    | _ -> assert false
 	end
@@ -764,7 +778,7 @@ and triggers_callback t qid env sbuf ~origin:y z i =
 
   let ni = new GText.iter i in
   let offset = ni#offset in
-  if tag_callback t env sbuf ~origin:y z i = true then true
+  if tag_callback t env sbuf ~origin:y z i == true then true
   else
     begin
       match GdkEvent.get_type z with
@@ -856,7 +870,7 @@ and connect_quant_form env sbuf
   connect_aaform env sbuf aaf
 
 and connect_triggers env sbuf trs =
-  List.iter (connect_aaterm_list env sbuf connect_tag) trs
+  List.iter (fun (l,_) -> connect_aaterm_list env sbuf connect_tag l) trs
 
 and connect_aform env sbuf = function
   | AFatom a -> connect_aatom env sbuf a

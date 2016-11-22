@@ -20,6 +20,8 @@
 (*   This file is distributed under the terms of the CeCILL-C licence         *)
 (******************************************************************************)
 
+open Options
+
 module type S = sig
   type t
 
@@ -45,7 +47,7 @@ module type S = sig
 
   val print_model : header:bool -> Format.formatter -> t -> unit
 
-  val reset_steps : unit -> unit
+  val reset_refs : unit -> unit
   val get_steps : unit -> int64
 
   (* returns used axioms/predicates * unused axioms/predicates *)

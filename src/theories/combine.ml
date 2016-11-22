@@ -149,7 +149,7 @@ struct
       | Term t -> (Term.view t).Term.ty
       | Ac x -> AC.type_info x
     in
-    ty = Ty.Tint
+    ty == Ty.Tint
 
   let type_info = function
     | {v=X1 t}   -> X1.type_info t
@@ -276,6 +276,16 @@ struct
     | false , false , false, false, false, true  -> AC.fully_interpreted sb
     | false , false , false, false, false, false -> false
     | _ -> assert false
+
+  let is_solvable_theory_symbol sb =
+    X1.is_mine_symb sb ||
+      not (restricted ()) &&
+      ((*X2.is_mine_symb sb || print records*)
+         X3.is_mine_symb sb ||
+         X4.is_mine_symb sb ||
+         X5.is_mine_symb sb)(* ||
+         AC.is_mine_symb sb*)
+
 
   let is_a_leaf r = match r.v with
     | Term _ | Ac _ -> true
@@ -463,12 +473,88 @@ struct
 
   let solve_abstracted oa ob a b sbt =
     Debug.debug_abstraction_result oa ob a b sbt;
-    let sbt = solve_list { sbt=sbt ; eqs=[a,b] } in
-    make_idemp oa ob sbt
+    let ra = apply_subst_right a sbt in
+    let rb = apply_subst_right b sbt in
+    let sbt' = solve_list { sbt=[] ; eqs=[ra,rb] } in
+    match sbt', sbt with
+    | [], _::_ -> [] (* the original equality was trivial *)
+    | _ -> make_idemp oa ob (List.rev_append sbt sbt')
 
   let solve  a b =
     let a', b', acc = abstract_equality a b in
     solve_abstracted a b a' b' acc
+
+  let assign_value r distincts eq =
+    let opt = match r.v, type_info r with
+      | _, Ty.Tint
+      | _, Ty.Treal     -> X1.assign_value r distincts eq
+      | _, Ty.Trecord _ -> X2.assign_value r distincts eq
+      | _, Ty.Tbitv _   -> X3.assign_value r distincts eq
+      | _, Ty.Tfarray _ -> X4.assign_value r distincts eq
+      | _, Ty.Tsum _    -> X5.assign_value r distincts eq
+      | Term t, ty      ->
+        if (Term.view t).Term.depth = 1 ||
+          List.exists (fun (t,_) -> (Term.view t).Term.depth = 1) eq then None
+        else Some (Term.fresh_name ty, false) (* false <-> not a case-split *)
+      | _               -> assert false
+    in
+    if debug_interpretation() then
+      begin
+        fprintf fmt "[combine] assign value to representative %a : " print r;
+        match opt with
+        | None -> fprintf fmt "None@."
+        | Some(res, is_cs) -> fprintf fmt " %a@." Term.print res
+      end;
+    opt
+
+  let choose_adequate_model t rep l =
+    let r, pprint =
+      match Term.type_info t with
+      | Ty.Tint
+      | Ty.Treal     -> X1.choose_adequate_model t rep l
+      | Ty.Tbitv _   -> X3.choose_adequate_model t rep l
+      | Ty.Tsum _    -> X5.choose_adequate_model t rep l
+      | Ty.Trecord _ -> X2.choose_adequate_model t rep l
+      | Ty.Tfarray _ -> X4.choose_adequate_model t rep l
+      | _            ->
+        let acc =
+          List.fold_left
+            (fun acc (s, r) ->
+              if (Term.view s).Term.depth <= 1 then
+                match acc with
+                | Some(s', r') when Term.compare s' s > 0 -> acc
+                | _ -> Some (s, r)
+              else
+                acc
+            ) None l
+        in
+        let r =
+          match acc with
+          | Some (_,r) -> r
+          | None ->
+            match term_extract rep with
+            | Some t, true when (Term.view t).Term.depth = 1 -> rep
+            | _ ->
+              if debug_interpretation() then begin
+                fprintf fmt "[Combine.choose_adequate_model] ";
+                fprintf fmt "What to choose for term %a with rep %a ??@."
+                  Term.print t print rep;
+                List.iter
+                  (fun (t, r) ->
+                    fprintf fmt "  > impossible case: %a -- %a@."
+                      Term.print t print r
+                  )l;
+              end;
+              assert false
+        in
+        ignore (flush_str_formatter ());
+        fprintf str_formatter "%a" print r; (* it's a EUF constant *)
+        r, flush_str_formatter ()
+    in
+    if debug_interpretation() then
+      fprintf fmt "[combine] %a selected as a model for %a@."
+        print r Term.print t;
+    r, pprint
 
 end
 
@@ -610,6 +696,11 @@ module Relation : Sig.RELATION with type r = CX.r and type uf = Uf.t = struct
     r5=Rel5.empty classes;
   }
 
+  let (|@|) l1 l2 =
+    if l1 == [] then l2
+    else if l2 == [] then l1
+    else List.rev_append l1 l2
+
   let assume env uf sa =
     Options.exec_thread_yield ();
     let env1, { assume = a1; remove = rm1} =
@@ -623,8 +714,8 @@ module Relation : Sig.RELATION with type r = CX.r and type uf = Uf.t = struct
     let env5, { assume = a5; remove = rm5} =
       Rel5.assume env.r5 uf sa in
     {r1=env1; r2=env2; r3=env3; r4=env4; r5=env5},
-    { assume = a1@a2@a3@a4@a5;
-      remove = rm1@rm2@rm3@rm4@rm5;}
+    { assume = a1 |@| a2 |@| a3 |@| a4 |@| a5;
+      remove = rm1 |@| rm2 |@| rm3 |@| rm4 |@| rm5;}
 
   let query env uf a =
     Options.exec_thread_yield ();
@@ -646,14 +737,14 @@ module Relation : Sig.RELATION with type r = CX.r and type uf = Uf.t = struct
                           Rel5.query
                             env.r5 uf a
 
-  let case_split env uf =
+  let case_split env uf ~for_model =
     Options.exec_thread_yield ();
-    let seq1 = Rel1.case_split env.r1 uf in
-    let seq2 = Rel2.case_split env.r2 uf in
-    let seq3 = Rel3.case_split env.r3 uf in
-    let seq4 = Rel4.case_split env.r4 uf in
-    let seq5 = Rel5.case_split env.r5 uf in
-    let l = seq1 @ seq2 @ seq3 @ seq4 @ seq5 in
+    let seq1 = Rel1.case_split env.r1 uf for_model in
+    let seq2 = Rel2.case_split env.r2 uf for_model in
+    let seq3 = Rel3.case_split env.r3 uf for_model in
+    let seq4 = Rel4.case_split env.r4 uf for_model in
+    let seq5 = Rel5.case_split env.r5 uf for_model in
+    let l = seq1 |@| seq2 |@| seq3 |@| seq4 |@| seq5 in
     List.sort
       (fun (_,_,sz1) (_,_,sz2) ->
         match sz1, sz2 with
@@ -662,13 +753,13 @@ module Relation : Sig.RELATION with type r = CX.r and type uf = Uf.t = struct
       )l
 
 
-  let add env r =
+  let add env uf r t =
     Options.exec_thread_yield ();
-    {r1=Rel1.add env.r1 r;
-     r2=Rel2.add env.r2 r;
-     r3=Rel3.add env.r3 r;
-     r4=Rel4.add env.r4 r;
-     r5=Rel5.add env.r5 r;
+    {r1=Rel1.add env.r1 uf r t;
+     r2=Rel2.add env.r2 uf r t;
+     r3=Rel3.add env.r3 uf r t;
+     r4=Rel4.add env.r4 uf r t;
+     r5=Rel5.add env.r5 uf r t;
     }
 
   let print_model fmt env rs =

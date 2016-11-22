@@ -22,6 +22,7 @@
 
 open Hashcons
 open Format
+open Options
 
 type t =
   | Tint
@@ -49,7 +50,7 @@ exception Shorten of t
 
 
 (*** pretty print ***)
-let print full fmt ty =
+let print full =
   let h = Hashtbl.create 17 in
   let rec print fmt = function
     | Tint -> fprintf fmt "int"
@@ -60,7 +61,7 @@ let print full fmt ty =
     | Tvar{v=v ; value = None} -> fprintf fmt "'a_%d" v
     | Tvar{v=v ; value = Some (Trecord {args=l; name=n} as t) } ->
       if Hashtbl.mem h v then
-	fprintf fmt "%a%s" printl l (Hstring.view n)
+	fprintf fmt "%a %s" print_list l (Hstring.view n)
       else
 	(Hashtbl.add h v ();
 	 (*fprintf fmt "('a_%d->%a)" v print t *)
@@ -68,12 +69,12 @@ let print full fmt ty =
     | Tvar{v=v ; value = Some t} ->
       (*fprintf fmt "('a_%d->%a)" v print t *)
       print fmt t
-    | Text(l, s) -> fprintf fmt "%a%s" printl l (Hstring.view s)
+    | Text(l, s) -> fprintf fmt "%a %s" print_list l (Hstring.view s)
     | Tfarray (t1, t2) -> fprintf fmt "(%a,%a) farray" print t1 print t2
     | Tnext t -> fprintf fmt "%a next" print t
     | Tsum(s, _) -> fprintf fmt "%s" (Hstring.view s)
     | Trecord {args=lv; name=n; lbs=lbls} ->
-      fprintf fmt "%a%s" printl lv (Hstring.view n);
+      fprintf fmt "%a %s" print_list lv (Hstring.view n);
       if full then begin
 	fprintf fmt " = {";
 	let first = ref true in
@@ -86,16 +87,19 @@ let print full fmt ty =
 	fprintf fmt "}"
       end
 
-  and printl fmt = function
-  [] -> ()
+  and print_list fmt = function
+    | [] -> ()
     | [t] -> fprintf fmt "%a " print t
-    | t::l -> fprintf fmt "%a,%a" print t printl l
+    | t::l ->
+      fprintf fmt "(%a" print t;
+      List.iter (fprintf fmt ", %a" print) l;
+      fprintf fmt ")"
   in
-  print fmt ty
+  print, print_list
 
-let print_full = print true
-let print = print false
-
+let print_list = snd (print false)
+let print_full = fst (print true)
+let print      = fst (print false)
 
 (* smart constructors *)
 
@@ -143,6 +147,8 @@ let fresh_var =
   let cpt = ref (-1) in
   fun () -> incr cpt; {v= !cpt ; value = None }
 
+let fresh_tvar () = Tvar (fresh_var ())
+
 let fresh_empty_text =
   let cpt = ref (-1) in
   fun () -> incr cpt; text [] ("'_c"^(string_of_int !cpt))
@@ -163,12 +169,7 @@ let rec hash t =
 	  (abs h) lbs
       in
       abs h
-    | Tsum (s, l) ->
-      let h =
-	List.fold_left
-	  (fun h x -> 13 * h + Hstring.hash x) (Hstring.hash s) l
-      in
-      abs h
+    | Tsum (s, l) -> abs (Hstring.hash s) (*we do not hash constructors*)
     | _ -> Hashtbl.hash t
 
 let rec equal t1 t2 =
@@ -333,7 +334,7 @@ let union_subst s1 s2 =
 
 let compare_subst = M.compare Pervasives.compare
 
-let equal_subst = M.equal (=)
+let equal_subst = M.equal Pervasives.(=)
 
 let rec fresh ty subst =
   match ty with

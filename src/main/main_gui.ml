@@ -132,7 +132,8 @@ let save_session envs =
   close_out session_cout
 
 let save_dialog cancel envs () =
-  if List.exists (fun env -> env.actions <> env.saved_actions) envs then
+  if List.exists
+       (fun env -> Pervasives.(<>) env.actions env.saved_actions) envs then
     if List.exists
       (fun env -> not (Gui_session.safe_session env.actions)) envs then
       GToolbox.message_box
@@ -155,6 +156,7 @@ let quit envs () =
 let show_about () =
   let v = "Alt-Ergo" in
   let aw = GWindow.about_dialog ~name:v
+    ~position:`CENTER
     ~authors:["Sylvain Conchon";
 	      "Évelyne Contejean";
 	      "Francois Bobot";
@@ -175,6 +177,7 @@ let pop_error ?(error=false) ~message () =
   let pop_w = GWindow.dialog
     ~title:(if error then "Error" else "Warning")
     ~allow_grow:true
+    ~position:`CENTER
     ~width:400 ()
   in
   let bbox = GPack.button_box `HORIZONTAL ~border_width:5 ~layout:`END
@@ -201,9 +204,11 @@ let pop_model sat_env () =
     ~title:"Model"
     ~allow_grow:true
     ~destroy_with_parent:true
+    ~position:`CENTER
     ~width:400
     ~height:300 ()
   in
+
   let sw1 = GBin.scrolled_window
     ~vpolicy:`AUTOMATIC
     ~hpolicy:`AUTOMATIC
@@ -223,7 +228,7 @@ let pop_model sat_env () =
 let compare_rows icol_number (model:#GTree.model) row1 row2 =
   let t1 = model#get ~row:row1 ~column:icol_number in
   let t2 = model#get ~row:row2 ~column:icol_number in
-  compare t1 t2
+  Pervasives.compare t1 t2
 
 
 let empty_inst_model () =
@@ -358,7 +363,7 @@ let refresh_timers t () =
   let total =
     tsat +. tmatch +. tcc +. tarith +. tarrays +. tsum +. trecords +. tac in
 
-  let total = if total = 0. then 1. else total in
+  let total = if Pervasives.(=) total 0. then 1. else total in
 
   t.tl_sat#set_text (sprintf "%3.2f s" tsat);
   t.tl_match#set_text (sprintf "%3.2f s" tmatch);
@@ -431,7 +436,7 @@ let add_inst ({h=h} as inst_model) orig =
   let id = Formula.id orig in
   let name =
     match Formula.view orig with
-      | Formula.Lemma {Formula.name=n} when n <> "" -> n
+      | Formula.Lemma {Formula.name=n} when Pervasives.(<>) n "" -> n
       | _ -> string_of_int id
   in
   let r, n, limit, to_add =
@@ -502,7 +507,7 @@ let update_status image label buttonclean env d s steps =
     | FE.Sat t ->
       if not satmode then Loc.report std_formatter d.st_loc;
       if satmode then printf "unknown (sat)@."
-      else printf "I don't know.@.";
+      else printf "I don't know@.";
       image#set_stock `NO;
       label#set_text
 	(sprintf "  I don't know (sat) (%2.2f s)" (Options.Time.value()));
@@ -575,7 +580,7 @@ let vt_signal =
 
 let force_interrupt old_action_ref n =
   (* This function is called just before the thread's timeslice ends *)
-  if Some(Thread.id(Thread.self())) = !interrupt then
+  if Pervasives.(=) (Some (Thread.id(Thread.self()))) !interrupt then
     raise Abort_thread;
   match !old_action_ref with
     | Sys.Signal_handle f -> f n
@@ -599,7 +604,7 @@ let run_replay env =
   let ast_pruned = [List.map (fun f -> f,true) ast] in
 
   Options.Time.start ();
-  Options.Time.set_timeout ();
+  Options.Time.set_timeout (Options.timelimit ());
   List.iter
     (fun dcl ->
       let cnf = Cnf.make dcl in
@@ -649,7 +654,7 @@ let run buttonrun buttonstop buttonclean inst_model timers_model
 	  (* Thread.yield (); *)
 	                 if debug () then fprintf fmt "Starting alt-ergo thread@.";
 	  Options.Time.start ();
-	  Options.Time.set_timeout ();
+          Options.Time.set_timeout (Options.timelimit ());
 	  Options.set_timer_start (Timers.start timers_model.timers);
 	  Options.set_timer_pause (Timers.pause timers_model.timers);
 
@@ -685,14 +690,18 @@ let remove_context env () =
 	| APredicate_def (_, _, _, _) ->
 	  toggle_prune env td
 	| AAxiom (_, s, _)
-	    when String.length s = 0 || (s.[0] <> '_'  && s.[0] <> '@') ->
+	     when String.length s = 0 ||
+                    (Pervasives.(<>) s.[0] '_'  &&
+                       Pervasives.(<>) s.[0] '@') ->
 	  toggle_prune env td
 	| _ -> ()
     ) env.ast
 
 
 let set_ctrl env b key =
-  if GdkEvent.Key.hardware_keycode key = 37 then
+  let open GdkKeysyms in
+  let k = GdkEvent.Key.keyval key in
+  if k == _Control_L || k == _Control_R then
     (env.ctrl <- b; true)
   else false
 
@@ -909,10 +918,10 @@ let search_all entry (sv:GSourceView2.source_view)
   buf#remove_tag found_all_tag ~start:buf#start_iter ~stop:buf#end_iter;
   let str = entry#text in
   let iter = ref buf#start_iter in
-  if str <> "" then
+  if Pervasives.(<>) str "" then
     let result = ref None in
     search_one buf str result iter found_all_tag;
-    while !result <> None do
+    while !result != None do
       search_one buf str result iter found_all_tag
     done
 
@@ -929,6 +938,7 @@ let start_gui () =
       ~title:"AltGr-Ergo"
       ~allow_grow:true
       ~allow_shrink:true
+      ~position:`CENTER
       ~width:window_width
       ~height:window_height ()
   in
@@ -939,25 +949,7 @@ let start_gui () =
   let smanager = GSourceView2.source_style_scheme_manager ~default:true in
   let scheme = smanager#style_scheme "tango" in
   let file = get_file () in
-  let cin = if file <> "" then open_in file else stdin in
-  let lb = from_channel cin in
-  let typed_ast =
-    try FE.open_file lb cin
-    with
-      | Why_lexer.Lexical_error s ->
-	Loc.report err_formatter (lexeme_start_p lb, lexeme_end_p lb);
-	printf "lexical error: %s\n@." s;
-	exit 1
-      | Parsing.Parse_error ->
-	let  loc = (lexeme_start_p lb, lexeme_end_p lb) in
-	Loc.report err_formatter loc;
-        printf "syntax error\n@.";
-	exit 1
-      | Errors.Error(e,l) ->
-	Loc.report err_formatter l;
-	printf "typing error: %a\n@." Errors.report e;
-	exit 1
-  in
+  let typed_ast = FE.parse_and_typecheck file None in
 
   let main_vbox = GPack.vbox
     ~homogeneous:false ~border_width:0 ~packing:w#add () in
@@ -1251,13 +1243,28 @@ let start_gui () =
 
   let set_wrap_lines _ =
     List.iter (fun env ->
-      if env.goal_view#wrap_mode = `NONE then (
+      if Pervasives.(=) env.goal_view#wrap_mode `NONE then (
         env.goal_view#set_wrap_mode `CHAR;
         env.inst_view#set_wrap_mode `CHAR
       ) else (
         env.goal_view#set_wrap_mode `NONE;
         env.inst_view#set_wrap_mode `NONE
       )) envs
+  in
+
+
+  let choose_font () =
+    let font_win = GWindow.font_selection_dialog
+        ~parent:w
+        ~destroy_with_parent:true
+        ~modal:true
+        ~position:`CENTER_ON_PARENT () in
+    ignore (
+      font_win#ok_button#connect#clicked (fun () ->
+        set_font envs font_win#selection#font_name)
+    );
+    ignore (font_win#run ());
+    ignore (font_win#misc#hide ())
   in
 
 
@@ -1297,6 +1304,11 @@ let start_gui () =
     `C ("Restricted", restricted (), set_restricted);
     `S;
     `C ("Wrap lines", false, set_wrap_lines);
+    `S;
+    `I ("Change font", choose_font);
+    `I ("Increase font size", fun () -> increase_size envs);
+    `I ("Decrease font size", fun () -> decrease_size envs);
+    `I ("Reset font size", fun () -> reset_size envs);
   ] in
 
   let help_entries = [
@@ -1345,16 +1357,22 @@ let start_gui () =
   let key_press ev =
     let key_ev = GdkEvent.Key.keyval ev in
     let mods_ev = List.filter
-      (fun m -> not (List.mem m mod_mask)) (GdkEvent.Key.state ev) in
+        (fun m -> not (List.mem m mod_mask)) (GdkEvent.Key.state ev) in
     match mods_ev with
-      |	[`CONTROL] ->
-	(match key_ev with
-	  | k when k = GdkKeysyms._q -> quit envs (); true
-	  | k when k = GdkKeysyms._s -> save_dialog "Cancel" envs (); true
-	  | k when k = GdkKeysyms._f -> focus_search (); true
-	  | k when k = GdkKeysyms._r -> launch_run (); true
-	  | _ -> false)
-      | _ -> false
+    | [`CONTROL] ->
+      (match key_ev with
+       | k when k = GdkKeysyms._q -> quit envs (); true
+       | k when k = GdkKeysyms._s -> save_dialog "Cancel" envs (); true
+       | k when k = GdkKeysyms._f -> focus_search (); true
+       | k when k = GdkKeysyms._r -> launch_run (); true
+       | k when k = GdkKeysyms._equal || k = GdkKeysyms._plus ->
+         increase_size envs; true
+       | k when k = GdkKeysyms._minus ->
+         decrease_size envs; true
+       | k when k = GdkKeysyms._0 || k = GdkKeysyms._KP_0 ->
+         reset_size envs; true
+       | _ -> false)
+    | _ -> false
   in
 
   ignore (w#event#connect#key_press ~callback:(key_press));
@@ -1368,25 +1386,7 @@ let start_gui () =
 
 let start_replay session_cin =
   let file = get_file () in
-  let cin = if file <> "" then open_in file else stdin in
-  let lb = from_channel cin in
-  let typed_ast =
-    try FE.open_file lb cin
-    with
-      | Why_lexer.Lexical_error s ->
-	Loc.report err_formatter (lexeme_start_p lb, lexeme_end_p lb);
-	printf "lexical error: %s\n@." s;
-	exit 1
-      | Parsing.Parse_error ->
-	let  loc = (lexeme_start_p lb, lexeme_end_p lb) in
-	Loc.report err_formatter loc;
-        printf "syntax error\n@.";
-	exit 1
-      | Errors.Error(e,l) ->
-	Loc.report err_formatter l;
-	printf "typing error: %a\n@." Errors.report e;
-	exit 1
-  in
+  let typed_ast = FE.parse_and_typecheck file None in
 
   List.iter
     (fun l ->
@@ -1426,4 +1426,8 @@ let _ =
   try
     if replay() then start_replay (Some (open_in_bin (get_session_file())))
     else start_gui ()
-  with Sys_error _ -> start_gui ()
+  with
+  | Sys_error _ -> start_gui ()
+  | Util.Timeout ->
+      Format.eprintf "Timeout@.";
+      exit 142

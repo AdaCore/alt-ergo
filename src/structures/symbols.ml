@@ -21,6 +21,7 @@
 (******************************************************************************)
 
 open Hashcons
+open Options
 
 type operator =
   | Plus | Minus | Mult | Div | Modulo | Concat | Extract
@@ -88,9 +89,10 @@ let hash = function
   | Op (Access s) -> Hstring.hash s + 19
   | s -> Hashtbl.hash s
 
-let to_string =  function
+let to_string ?(show_vars=true) =  function
   | Name (n,_) -> Hstring.view n
-  | Var x -> Format.sprintf "'%s'" (Hstring.view x)
+  | Var x when show_vars -> Format.sprintf "'%s'" (Hstring.view x)
+  | Var x -> Hstring.view x
   | Int n -> Hstring.view n
   | Real n -> Hstring.view n
   | Bitv s -> "[|"^s^"|]"
@@ -108,7 +110,13 @@ let to_string =  function
   | Void -> "void"
   | _ -> "" (*assert false*)
 
+let to_string_clean s = to_string ~show_vars:false s
+let to_string s = to_string ~show_vars:true s
+
+let print_clean fmt s = Format.fprintf fmt "%s" (to_string_clean s)
 let print fmt s = Format.fprintf fmt "%s" (to_string s)
+
+
 
 let dummy = Name (Hstring.make "_one", Other)
 

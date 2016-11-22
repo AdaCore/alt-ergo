@@ -57,6 +57,7 @@ type ty_function =
   | F_none
   | F_new_facts
   | F_apply_subst
+  | F_instantiate
 
 (** environment of internal timers **)
 type t

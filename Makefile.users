@@ -5,14 +5,14 @@ VERSION=0.99.1
 LOCAL_INC = -I src/util -I src/structures -I src/theories -I src/instances \
     -I src/sat -I src/preprocess -I src/parsing -I src/gui -I src/main
 
-INCLUDES = $(ZARITHLIB) $(OCAMLGRAPHLIB) $(LABLGTK2LIB) $(LOCAL_INC)
+INCLUDES = $(ZARITHLIB) $(LABLGTK2LIB)  $(CAMLZIPLIB) $(OCPLIBSIMPLEXLIB) $(LOCAL_INC)
 #for coverage # -I /usr/local/lib/ocaml/3.12.1/bisect -pp "camlp4o str.cma /usr/local/lib/ocaml/3.12.1/bisect/bisect_pp.cmo"
 
-BFLAGS = -annot -g $(INCLUDES)
-OFLAGS = -annot -inline 100 $(INCLUDES)
+BFLAGS = -annot -absname -bin-annot -short-paths -strict-sequence -g $(INCLUDES)
+OFLAGS = -annot -absname -bin-annot -short-paths -strict-sequence -g -inline 100 $(INCLUDES)
 # -for-pack AltErgo
 
-BIBBYTE = zarith.cma nums.cma unix.cma dynlink.cma str.cma
+BIBBYTE = zarith.cma nums.cma unix.cma dynlink.cma str.cma zip.cma ocplibSimplex.cma
 # for coverage bisect.cma 
 
 BIBOPT = $(BIBBYTE:.cma=.cmxa)
@@ -48,7 +48,10 @@ GENERATED = src/util/config.ml \
 
 CMO = src/util/config.cmo \
       src/util/version.cmo \
+      src/util/emap.cmo \
       src/util/myUnix.cmo \
+      src/util/myDynlink.cmo \
+      src/util/myZip.cmo \
       src/util/util.cmo \
       src/util/lists.cmo \
       src/util/numsNumbers.cmo \
@@ -57,6 +60,7 @@ CMO = src/util/config.cmo \
       src/util/timers.cmo \
       src/util/options.cmo \
       src/util/steps.cmo \
+      src/util/gc_debug.cmo \
       src/util/loc.cmo \
       src/util/hashcons.cmo \
       src/util/hstring.cmo \
@@ -79,6 +83,7 @@ CMO = src/util/config.cmo \
       src/preprocess/why_typing.cmo \
       src/preprocess/cnf.cmo \
       src/instances/matching.cmo \
+      src/instances/instances.cmo \
       src/theories/polynome.cmo \
       src/theories/ac.cmo \
       src/theories/uf.cmo \
@@ -334,3 +339,6 @@ show-dest-dirs:
 stripped-arch-binary: $(OPT)
 	cp $(OPT) alt-ergo-$(VERSION)-$(ARCH)
 	strip alt-ergo-$(VERSION)-$(ARCH)
+
+opam-deps:
+	opam install zarith camlzip conf-gtksourceview ocplib-simplex

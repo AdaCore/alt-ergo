@@ -39,7 +39,7 @@ module type S = sig
 
   val distinct : t -> r list -> Explanation.t -> t
 
-  val are_equal : t -> Term.t -> Term.t -> Sig.answer
+  val are_equal : t -> Term.t -> Term.t -> added_terms:bool -> Sig.answer
   val are_distinct : t -> Term.t -> Term.t -> Sig.answer
   val already_distinct : t -> r list -> bool
 
@@ -54,6 +54,9 @@ module type S = sig
   val make : t -> Term.t -> r (* may raise Not_found *)
 
   val is_normalized : t -> r -> bool
+
+  val assign_next : t -> (r Literal.view * bool * Sig.lit_origin) list * t
+  val output_concrete_model : t -> unit
 end
 
 module Make (X : Sig.X) : S with type r = X.r
