@@ -610,7 +610,7 @@ let filter_good_triggers (bv, vty) =
       let s2 = List.fold_left vty_term Vtype.empty l in
       Vterm.subset bv s1 && Vtype.subset vty s2 )
 
-let make_triggers gopt vterm vtype trs =
+let make_triggers all_triggers gopt vterm vtype trs =
   let l = match List.filter (filter_mono vterm vtype) trs with
     | [] ->
       multi_triggers gopt vterm vtype trs
@@ -760,11 +760,11 @@ let rec make_rec all_triggers keep_triggers pol gopt vterm vtype f =
       let trs' =
 	if keep_triggers then check_triggers qf.qf_triggers (vterm', vtype')
 	else if Options.notriggers () || qf.qf_triggers == [] then
-	  make_triggers gopt vterm' vtype' (STRS.elements trs)
+	  make_triggers all_triggers gopt vterm' vtype' (STRS.elements trs)
 	else
 	  let lf = filter_good_triggers (vterm',vtype') qf.qf_triggers in
 	  if lf != [] then lf
-	  else make_triggers gopt vterm' vtype' (STRS.elements trs)
+	  else make_triggers all_triggers gopt vterm' vtype' (STRS.elements trs)
       in
       let trs =
 	STRS.filter
