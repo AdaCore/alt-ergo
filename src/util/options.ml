@@ -108,7 +108,7 @@ module M = struct
       in
       Format.printf "%s@." path; exit 0
 
-  let show_version () = Format.printf "%s@." Version.version; exit 0
+  let show_version () = Format.printf "Alt-Ergo version %s@." Version.version; exit 0
 
   let show_version_info () =
     Format.printf "Version          = %s@." Version.version;
