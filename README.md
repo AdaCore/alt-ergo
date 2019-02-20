@@ -1,3 +1,12 @@
+Note
+====
+
+This repository is NOT the official Alt-Ergo repository. It is a clone of
+Alt-Ergo for its use in [SPARK](https://github.com/adacore/spark2014). Please
+report any issues or pull requests to the [original
+project](http://alt-ergo.ocamlpro.com/).
+
+
 # Alt-Ergo
 
 Alt-Ergo is an automatic theorem prover of mathematical formulas. It
