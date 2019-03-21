@@ -1,19 +1,32 @@
-*.cmo
-*.cmx
-*.annot
-*.o
-*.cmi
-*.cmt
-*.cmti
-src/util/config.ml
-src/parsing/why_parser.ml
-src/parsing/why_parser.mli
-src/parsing/why_parser.output
-src/parsing/why_lexer.ml
-alt-ergo.opt
-.depend
-config.status
-Makefile
-Makefile.configurable
-autom4te.cache
-config.log
+# Metadata files
+.gitignore
+META
+
+# Generated source files
+*.merlin
+sources/Makefile.config
+sources/lib/util/config.ml
+
+# Generated installation files
+sources/*.install
+
+# Generated build artifacts
+sources/_build
+sources/alt-ergo
+sources/altgr-ergo
+extra/ocamldot/_build
+
+# Generated documentation files
+extra/index.html
+
+# Generated release files
+public-release
+
+# Generated tmp files
+*.make.revision
+*~
+archi.*
+mlw
+tmp/
+*.tmp
+alt-ergo/tmp/
