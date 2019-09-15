@@ -94,6 +94,12 @@ let fresh_exp =
     incr r;
     Fresh !r
 
+let exists_fresh t =
+  S.exists (function
+      | Fresh _ -> true
+      | _ -> false
+    ) t
+
 let remove_fresh fe s =
   if S.mem fe s then Some (S.remove fe s)
   else None
