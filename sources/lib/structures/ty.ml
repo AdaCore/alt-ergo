@@ -201,7 +201,7 @@ and shorten_body _ _ =
 
 let rec compare t1 t2 =
   match shorten t1 , shorten t2 with
-  | Tvar{ v = v1; _ } , Tvar{ v = v2; _ } -> Stdlib.compare v1 v2
+  | Tvar{ v = v1; _ } , Tvar{ v = v2; _ } -> Pervasives.compare v1 v2
   | Tvar _, _ -> -1 | _ , Tvar _ -> 1
   | Text(l1, s1) , Text(l2, s2) ->
     let c = Hstring.compare s1 s2 in
@@ -234,7 +234,7 @@ let rec compare t1 t2 =
 
   | Tadt _, _ -> -1 | _ , Tadt _ -> 1
 
-  | t1 , t2 -> Stdlib.compare t1 t2
+  | t1 , t2 -> Pervasives.compare t1 t2
 
 
 and compare_list l1 l2 = match l1, l2 with
@@ -602,9 +602,9 @@ let instantiate lvar lty ty =
 let union_subst s1 s2 =
   M.fold (fun k x s2 -> M.add k x s2) (M.map (apply_subst s2)  s1) s2
 
-let compare_subst = M.compare Stdlib.compare
+let compare_subst = M.compare Pervasives.compare
 
-let equal_subst = M.equal Stdlib.(=)
+let equal_subst = M.equal Pervasives.(=)
 
 module Svty = Util.SI
 

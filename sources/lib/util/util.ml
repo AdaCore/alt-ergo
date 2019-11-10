@@ -15,10 +15,10 @@ exception Unsolvable
 exception Cmp of int
 
 module MI = Map.Make(struct type t = int
-    let compare (x: int) y = Stdlib.compare x y end)
+    let compare (x: int) y = Pervasives.compare x y end)
 
 module SI = Set.Make(struct type t = int
-    let compare (x: int) y = Stdlib.compare x y end)
+    let compare (x: int) y = Pervasives.compare x y end)
 
 module SS = Set.Make(String)
 
@@ -87,7 +87,7 @@ let [@inline always] compare_algebraic s1 s2 f_same_constrs_with_args =
   let r1 = Obj.repr s1 in
   let r2 = Obj.repr s2 in
   match Obj.is_int r1, Obj.is_int r2 with
-  | true, true -> Stdlib.compare s1 s2 (* both constructors without args *)
+  | true, true -> Pervasives.compare s1 s2 (* both constructors without args *)
   | true, false -> -1
   | false, true -> 1
   | false, false ->

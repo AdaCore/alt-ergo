@@ -353,7 +353,7 @@ module Make (Th : Theory.S) : SAT_ML with type th = Th.t = struct
 *)
 
   let f_weight env i j =
-    (Stdlib.compare
+    (Pervasives.compare
        (Vec.get env.vars j).weight (Vec.get env.vars i).weight) < 0
 
   (* unused -- let f_filter env i = (Vec.get env.vars i).level < 0 *)
@@ -368,7 +368,7 @@ module Make (Th : Theory.S) : SAT_ML with type th = Th.t = struct
 
   let var_bump_activity env v =
     v.weight <- v.weight +. env.var_inc;
-    if (Stdlib.compare v.weight 1e100) > 0 then begin
+    if (Pervasives.compare v.weight 1e100) > 0 then begin
       for i = 0 to env.vars.Vec.sz - 1 do
         (Vec.get env.vars i).weight <- (Vec.get env.vars i).weight *. 1e-100
       done;
@@ -380,7 +380,7 @@ module Make (Th : Theory.S) : SAT_ML with type th = Th.t = struct
 
   let clause_bump_activity env c =
     c.activity <- c.activity +. env.clause_inc;
-    if (Stdlib.compare c.activity 1e20) > 0 then begin
+    if (Pervasives.compare c.activity 1e20) > 0 then begin
       for i = 0 to env.learnts.Vec.sz - 1 do
         (Vec.get env.learnts i).activity <-
           (Vec.get env.learnts i).activity *. 1e-20;

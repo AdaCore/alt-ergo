@@ -85,7 +85,7 @@ let state =
 let set_sigprof () =
   let tm =
     let v = Options.profiling_period () in
-    if (Stdlib.compare v 0.) > 0 then v else -. v
+    if (Pervasives.compare v 0.) > 0 then v else -. v
   in
   ignore
     (Unix.setitimer Unix.ITIMER_PROF
@@ -629,9 +629,9 @@ let switch () =
 
 
 let float_print fmt v =
-  if Stdlib.(=) v 0. then fprintf fmt "--     "
-  else if (Stdlib.compare v 10.) < 0 then fprintf fmt "%0.5f" v
-  else if (Stdlib.compare v 100.) < 0 then fprintf fmt "%0.4f" v
+  if Pervasives.(=) v 0. then fprintf fmt "--     "
+  else if (Pervasives.compare v 10.) < 0 then fprintf fmt "%0.5f" v
+  else if (Pervasives.compare v 100.) < 0 then fprintf fmt "%0.4f" v
   else fprintf fmt "%0.3f" v
 
 let line_of_module arr f =
