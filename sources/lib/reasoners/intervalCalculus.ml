@@ -1494,6 +1494,7 @@ let assume ~query env uf la =
       (fun ((env, eqs, new_ineqs, rm) as acc) (a, root, expl, orig) ->
          let a = normal_form a in
          Debug.assume a expl;
+         Steps.incr (Interval_Calculus);
          try
            match a with
            | L.Builtin(_, ((L.LE | L.LT) as n), [r1;r2]) ->
@@ -1740,7 +1741,7 @@ let add_used_by t r env =
         {env with used_by = used_by_rb}, []
     end
   | _ -> env, []
-           [@ocaml.ppwarning "TODO: add other terms such as div!"]
+         [@ocaml.ppwarning "TODO: add other terms such as div!"]
 
 let add =
   let are_eq t1 t2 =
@@ -1985,7 +1986,7 @@ let best_interval_of optimized env p =
       with I.NotConsistent expl ->
         if true (*debug_fpa() >= 2*) then begin
           [@ocaml.ppwarning "TODO: find an example triggering this case!"]
-            fprintf fmt "TODO: should check that this is correct !!!!@."
+          fprintf fmt "TODO: should check that this is correct !!!!@."
         end;
         raise (Ex.Inconsistent (expl, env.classes))
 
