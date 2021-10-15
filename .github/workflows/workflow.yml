@@ -40,16 +40,25 @@ jobs:
       - run: opam install camlzip cmdliner dune dune-configurator menhir num ocamlgraph ocplib-simplex psmt2-frontend re seq yojson zarith
 
       - run: opam exec -- ocaml unix.cma configure.ml alt-ergo-lib
+        working-directory: sources
       - run: opam exec -- make alt-ergo-lib
+        working-directory: sources
       - run: opam exec -- make install-lib
+        working-directory: sources
 
       - run: opam exec -- ocaml unix.cma configure.ml alt-ergo-parsers
+        working-directory: sources
       - run: opam exec -- make alt-ergo-parsers
+        working-directory: sources
       - run: opam exec -- make install-parsers
+        working-directory: sources
 
       - run: opam exec -- ocaml unix.cma configure.ml alt-ergo --prefix=localinstall
+        working-directory: sources
       - run: opam exec -- make alt-ergo
+        working-directory: sources
       - run: opam exec -- make install-bin
+        working-directory: sources
 
       - name: Upload the build artifact
         uses: actions/upload-artifact@v2
