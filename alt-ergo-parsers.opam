@@ -14,13 +14,14 @@ homepage: "https://alt-ergo.ocamlpro.com/"
 doc: "https://ocamlpro.github.io/alt-ergo"
 bug-reports: "https://github.com/OCamlPro/alt-ergo/issues"
 depends: [
-  "ocaml" {>= "4.04.0"}
+  "ocaml" {>= "4.05.0"}
   "dune" {>= "2.0"}
   "alt-ergo-lib" {= version}
   "psmt2-frontend" {>= "0.3"}
   "camlzip" {>= "1.07"}
   "menhir"
   "stdlib-shims"
+  "odoc" {with-doc}
 ]
 dev-repo: "git+https://github.com/OCamlPro/alt-ergo.git"
 # This part comes from the template. Please edit alt-ergo.opam.template
@@ -31,7 +32,7 @@ license: [
 ]
 
 build: [
-  ["ocaml" "unix.cma" "configure.ml" name "--libdir" lib "--mandir" man]
+  ["ocaml" "unix.cma" "configure.ml" name "--prefix" prefix "--libdir" lib "--mandir" man]
   ["dune" "subst"] {pinned}
   ["dune" "build" "-p" name "-j" jobs]
 ]
