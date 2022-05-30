@@ -194,30 +194,4 @@ let () =
   let () = Format.printf "done.@." in
   ()
 
-(* check that dune is present *)
-let () =
-  let cmd = Format.asprintf "which dune" in
-  let ch = Unix.open_process_in cmd in
-  let _ = read_all ch in
-  let res = Unix.close_process_in ch in
-  match res with
-  | Unix.WEXITED 0 -> Format.printf "Found dune in path.@."
-  | _ -> Format.eprintf "ERROR: Couldn't find dune in env@.";
-    exit 1
-
-(* run dune to check that dependencies are installed *)
-let () =
-  let p_opt = match !pkg with "" -> "" | s -> Format.asprintf "-p %s" s in
-  let cmd =
-    Format.asprintf
-      "dune external-lib-deps --display=quiet --missing %s @install" p_opt
-  in
-  let ch = Unix.open_process_in cmd in
-  let _ = read_all ch in
-  let res = Unix.close_process_in ch in
-  match res with
-  | Unix.WEXITED 0 -> Format.printf "All deps are installed.@."
-  (* dune already prints the missing libs on stderr *)
-  | _ -> exit 2
-
 let () = Format.printf "Good to go!@."
