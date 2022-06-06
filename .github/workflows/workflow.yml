@@ -1,0 +1,58 @@
+name: Main workflow
+
+on:
+  - pull_request
+  - push
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - ubuntu-latest
+          - windows-latest
+        ocaml-version:
+          - 4.12.0
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Use Setup OCaml v2 ${{ matrix.ocaml-version }}
+        uses: avsm/setup-ocaml@v2
+        if: runner.os != 'Windows'
+        with:
+          ocaml-version: ${{ matrix.ocaml-version }}
+
+      - name: Use Setup OCaml v1 ${{ matrix.ocaml-version }}
+        uses: avsm/setup-ocaml@v1
+        if: runner.os == 'Windows'
+        with:
+          ocaml-version: ${{ matrix.ocaml-version }}
+
+      - name: opam install depext
+        run: opam depext alt-ergo-lib alt-ergo-parsers alt-ergo
+
+      - run: opam install camlzip cmdliner dune dune-configurator menhir num ocamlgraph ocplib-simplex psmt2-frontend re seq yojson zarith
+
+      - run: opam exec -- ocaml unix.cma configure.ml alt-ergo-lib
+      - run: opam exec -- make alt-ergo-lib
+      - run: opam exec -- make install-lib
+
+      - run: opam exec -- ocaml unix.cma configure.ml alt-ergo-parsers
+      - run: opam exec -- make alt-ergo-parsers
+      - run: opam exec -- make install-parsers
+
+      - run: opam exec -- ocaml unix.cma configure.ml alt-ergo --prefix=localinstall
+      - run: opam exec -- make alt-ergo
+      - run: opam exec -- make install-bin
+
+      - name: Upload the build artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: alt-ergo_${{matrix.os}}
+          path: localinstall
