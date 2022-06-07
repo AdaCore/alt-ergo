@@ -234,8 +234,6 @@ uninstall-parsers:
 install-bin:
 	$(DUNE) install $(DUNE_FLAGS)		\
 		--prefix $(prefix)						\
-		--libdir $(libdir)						\
-		--mandir $(mandir)						\
 		-p alt-ergo alt-ergo
 
 # Uninstall the binary
