@@ -80,7 +80,6 @@ See more details on http://alt-ergo.ocamlpro.com/"
   (dune (and (>= 2.0) (< 3.0)))
   (alt-ergo-lib (= :version))
   (psmt2-frontend (>= 0.3))
-  (camlzip (>= 1.07))
   menhir
   stdlib-shims
   (odoc :with-doc)
