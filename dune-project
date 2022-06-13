@@ -87,7 +87,6 @@ See more details on http://alt-ergo.ocamlpro.com/"
   stdlib-shims
   (ppx_blob (>= 0.7.2))
   ppx_deriving
-  (camlzip (>= 1.07))
   (odoc :with-doc)
   ppx_deriving
   (qcheck (and :with-test (= 0.22)))
