@@ -5,7 +5,7 @@
 (generate_opam_files true)
 
 (name alt-ergo)
-(version 2.4.0)
+(version 2.4.2)
 (authors "Alt-Ergo developers")
 (maintainers "Alt-Ergo developers")
 (source (github OCamlPro/alt-ergo))
@@ -26,11 +26,11 @@ Alt-Ergo is an automatic theorem prover of mathematical formulas. It was develop
 See more details on https://alt-ergo.ocamlpro.com/")
  (depends
   (ocaml (>= 4.05.0))
-  (dune (>= 2.0))
+  (dune (and (>= 2.0)))
   (alt-ergo-lib (= :version))
   (alt-ergo-parsers (= :version))
    menhir
-   cmdliner
+  (cmdliner (>= 1.1.0))
   (odoc :with-doc)
   )
 )
@@ -51,12 +51,13 @@ See more details on https://alt-ergo.ocamlpro.com/"
 
  (depends
   (ocaml (>= 4.05.0))
-  (dune (>= 2.0))
+  (dune (and (>= 2.0)))
   (alt-ergo-lib (= :version))
   (alt-ergo-parsers (= :version))
-  lablgtk
-  conf-gtksourceview
-  cmdliner
+  lablgtk3
+  conf-gtksourceview3
+  lablgtk3-sourceview3
+  (cmdliner (>= 1.1.0))
   (odoc :with-doc)
 )
 )
@@ -77,7 +78,7 @@ See more details on http://alt-ergo.ocamlpro.com/"
 
  (depends
   (ocaml (>= 4.05.0))
-  (dune (>= 2.0))
+  (dune (and (>= 2.0)))
   (alt-ergo-lib (= :version))
   (psmt2-frontend (>= 0.3))
   (camlzip (>= 1.07))
@@ -103,7 +104,7 @@ See more details on http://alt-ergo.ocamlpro.com/"
 
  (depends
   (ocaml (>= 4.05.0))
-  (dune (>= 2.0))
+  (dune (and (>= 2.0)))
   dune-configurator
   num
   (ocplib-simplex (>= 0.4))
