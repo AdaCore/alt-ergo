@@ -3,13 +3,34 @@
   (mld_files :standard)
 )
 
-(documentation
-  (package altgr-ergo)
-  (mld_files :standard)
+(library
+ (package alt-ergo)
+ (name alt_ergo_common)
+ (libraries
+   alt-ergo-lib
+   alt-ergo-parsers
+   stdlib-shims
+   cmdliner
+   dune-site
+   dune-site.plugins
+ )
+ (modules
+   Config
+   MyDynlink
+   AltErgoSites
+   Parse_command
+   Input_frontend
+   Signals_profiling
+   Solving_loop)
+  (preprocess
+    (pps
+      ppx_deriving.eq
+    )
+  )
 )
 
-(library
- (name        alt_ergo_common)
- (libraries   alt-ergo-lib alt-ergo-parsers stdlib-shims cmdliner)
- (modules     Parse_command Input_frontend Signals_profiling Solving_loop)
-)
+(generate_sites_module
+ (module AltErgoSites)
+ (sites alt-ergo)
+ (plugins
+  (alt-ergo plugins)))

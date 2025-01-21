@@ -1,41 +1,39 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
-
-open Options
-open Format
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 module E = Expr
 module SE = E.Set
 module ME = E.Map
 module Ex = Explanation
 
+let src = Logs.Src.create ~doc:"Sat" __MODULE__
+module Log = (val Logs.src_log src : Logs.LOG)
 
-module Make (Th : Theory.S) : Sat_solver_sig.S = struct
+module Make (Th : Theory.S) = struct
   module Inst = Instances.Make(Th)
   module CDCL = Satml_frontend_hybrid.Make(Th)
 
@@ -75,7 +73,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
         SE.fold
           (fun f mp ->
              let w = var_inc +. try ME.find f mp with Not_found -> 0. in
-             stable := !stable && (Stdlib.compare w 1e100) <= 0;
+             stable := !stable && (Float.compare w 1e100) <= 0;
              ME.add f w mp
           )(Ex.bj_formulas_of expl) mp
       in
@@ -118,9 +116,9 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       let dec =
         List.fast_sort
           (fun (_, x1, b1) (_, x2, b2) ->
-             let c = Stdlib.compare b2 b1 in
+             let c = Bool.compare b2 b1 in
              if c <> 0 then c
-             else Stdlib.compare x2 x1
+             else Float.compare x2 x1
           )dec
       in
       (*
@@ -173,20 +171,21 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
     unit_tbox : Th.t; (* theory env of facts at level 0 *)
     inst : Inst.t;
     heuristics : Heuristics.t ref;
-    model_gen_mode : bool ref;
+    model_gen_phase : bool ref;
     guards : guards;
     add_inst: E.t -> bool;
     unit_facts_cache : (E.gformula * Ex.t) ME.t ref;
+    last_saved_model : Models.t Lazy.t option ref;
+    unknown_reason : Sat_solver_sig.unknown_reason option;
+
+    declare_top : Id.typed list ref;
+    declare_tail : Id.typed list Stack.t;
+    (** Stack of the declared symbols by the user. The field [declare_top]
+        is the top of the stack and [declare_tail] is tail. In particular, this
+        stack is never empty. *)
   }
 
-  let all_models_sat_env = ref None
-  let latest_saved_env = ref None
-  let terminated_normally = ref false
-
   let reset_refs () =
-    all_models_sat_env := None;
-    latest_saved_env := None;
-    terminated_normally := false;
     Steps.reset_steps ()
 
   let save_guard_and_refs env new_guard =
@@ -201,17 +200,19 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       unit_facts_cache = ref refs.unit_facts}, guard
 
   exception Sat of t
-  exception Unsat of Ex.t
+  exception Unsat of Explanation.t
   exception I_dont_know of t
   exception IUnsat of Ex.t * SE.t list
 
+  let i_dont_know env ur =
+    raise (I_dont_know {env with unknown_reason = Some ur})
 
   (*BISECT-IGNORE-BEGIN*)
   module Debug = struct
     open Printer
 
     let print_nb_related env =
-      if get_verbose () then
+      if Options.get_verbose () then
         print_dbg ~module_name:"Fun_sat" ~function_name:"print_nb_related"
           "@[<v 0>----------------------------------------------------@ \
            nb_related_to_both = %d@ \
@@ -225,7 +226,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
           env.nb_unrelated
 
     let propagations (env, bcp, tcp, ap_delta, lits) =
-      if get_debug_sat () then
+      if Options.get_debug_sat () then
         print_dbg ~module_name:"Fun_sat" ~function_name:"propagations"
           "|lits| = %d, B = %b, T = %b, \
            |Delta| = %d, |ap_Delta| = %d"
@@ -236,7 +237,6 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
     let is_it_unsat gf =
       let s =
         match E.form_view gf.E.ff with
-        | E.Not_a_form -> assert false
         | E.Lemma _   -> "lemma"
         | E.Clause _  -> "clause"
         | E.Unit _    -> "conjunction"
@@ -246,41 +246,40 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
         | E.Xor _ -> "xor"
         | E.Let _ -> "let"
       in
-      if get_verbose () && get_debug_sat () then
+      if Options.get_verbose () && Options.get_debug_sat () then
         print_dbg
           ~module_name:"Fun_sat" ~function_name:"is_it_unsat"
           "the following %s is unsat ? :@ %a"
           s E.print gf.E.ff
 
     let pred_def f =
-      if get_debug_sat () then
+      if Options.get_debug_sat () then
         print_dbg
           ~module_name:"Fun_sat" ~function_name:"pred_def"
           "I assume a predicate: %a" E.print f
 
     let unsat_rec dep =
-      if get_debug_sat () then
+      if Options.get_debug_sat () then
         print_dbg
           ~module_name:"Fun_sat" ~function_name:"unsat_rec"
           "unsat_rec : %a" Ex.print dep
 
     let assume gf dep env =
-      if get_debug_sat () then
+      if Options.get_debug_sat () then
         let { E.ff = f; lem; from_terms = terms; _ } = gf in
         print_dbg ~flushed:false
           ~module_name:"Fun_sat" ~function_name:"assume"
           "at level (%d, %d) I assume a @ " env.dlevel env.plevel;
         begin match E.form_view f with
-          | E.Not_a_form -> assert false
           | E.Literal a ->
             let n = match lem with
               | None -> ""
-              | Some ff ->
-                (match E.form_view ff with
-                 | E.Lemma xx -> xx.E.name
-                 | E.Unit _ | E.Clause _ | E.Literal _ | E.Skolem _
-                 | E.Let _ | E.Iff _ | E.Xor _ -> ""
-                 | E.Not_a_form -> assert false)
+              | Some ff -> begin
+                  match E.form_view ff with
+                  | E.Lemma xx -> xx.E.name
+                  | E.Unit _ | E.Clause _ | E.Literal _ | E.Skolem _
+                  | E.Let _ | E.Iff _ | E.Xor _ -> ""
+                end
             in
             print_dbg ~header:false
               "LITERAL (%s : %a) %a@ "
@@ -300,52 +299,52 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
           | E.Xor _ ->
             print_dbg ~header:false "neg-equivalence/xor %a" E.print f
         end;
-        if get_verbose () then
+        if Options.get_verbose () then
           print_dbg ~header:false
             "with explanations : %a" Explanation.print dep
 
     let unsat () =
-      if get_debug_sat () then
+      if Options.get_debug_sat () then
         print_dbg
           ~module_name:"Fun_sat" ~function_name:"unsat"
           "unsat"
 
     let decide f env =
-      if get_debug_sat () then
+      if Options.get_debug_sat () then
         print_dbg
           ~module_name:"Fun_sat" ~function_name:"decide"
           "I decide: at level (%d, %d), on %a"
           env.dlevel env.plevel E.print f
 
     let instantiate env =
-      if get_debug_sat () then
+      if Options.get_debug_sat () then
         print_dbg
           ~module_name:"Fun_sat" ~function_name:"instanciate"
           "I instantiate at level (%d, %d). Inst level = %d"
           env.dlevel env.plevel env.ilevel
 
     let backtracking f env =
-      if get_debug_sat () then
+      if Options.get_debug_sat () then
         print_dbg
           ~module_name:"Fun_sat" ~function_name:"backtracking"
           "backtrack: at level (%d, %d), and assume not %a"
           env.dlevel env.plevel E.print f
 
     let backjumping f env =
-      if get_debug_sat () then
+      if Options.get_debug_sat () then
         print_dbg
           ~module_name:"Fun_sat" ~function_name:"backjumping"
           "backjump: at level (%d, %d), I ignore the case %a"
           env.dlevel env.plevel E.print f
 
     let elim _ _ =
-      if get_debug_sat () && get_verbose () then
+      if Options.(get_debug_sat () && get_verbose ()) then
         print_dbg
           ~module_name:"Fun_sat" ~function_name:"elim"
           "elim"
 
     let red _ _ =
-      if get_debug_sat () && get_verbose () then
+      if Options.(get_debug_sat () && get_verbose ()) then
         print_dbg
           ~module_name:"Fun_sat" ~function_name:"red"
           "red"
@@ -361,7 +360,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
            "[sat] --------------------- Delta -" *)
 
     let gamma g =
-      if get_debug_sat () && get_verbose () then begin
+      if Options.(get_debug_sat () && get_verbose ()) then begin
         print_dbg ~module_name:"Fun_sat" ~function_name:"gamma"
           "@[<v 0>--- GAMMA ---------------------@ ";
         ME.iter (fun f (_, ex, dlvl, plvl) ->
@@ -373,24 +372,24 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       end
 
     let bottom classes =
-      if get_bottom_classes () then
+      if Options.get_bottom_classes () then
         print_dbg "bottom:%a@?" E.print_tagged_classes classes
 
     let inconsistent expl env =
-      if get_debug_sat () then
+      if Options.get_debug_sat () then
         print_dbg
           ~module_name:"Fun_sat" ~function_name:"inconsistent"
           "inconsistent at level (%d, %d), reason : %a"
           env.dlevel env.plevel Ex.print expl
 
     let in_mk_theories_instances () =
-      if Options.get_debug_fpa() > 0 || get_debug_sat () then
+      if Options.(get_debug_fpa() > 0 || get_debug_sat ()) then
         print_dbg
           ~module_name:"Fun_sat" ~function_name:"in_mk_theories_instances"
           "entering mk_theories_instances:"
 
     let out_mk_theories_instances normal_exit =
-      if Options.get_debug_fpa() > 0 || get_debug_sat() then
+      if Options.(get_debug_fpa () > 0 || get_debug_sat ()) then
         print_dbg
           ~module_name:"Fun_sat" ~function_name:"out_mk_theories_instances"
           (if normal_exit then
@@ -400,10 +399,10 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
 
     let print_f_conj fmt hyp =
       match hyp with
-      | [] -> fprintf fmt "True";
+      | [] -> Format.fprintf fmt "True";
       | e::l ->
-        fprintf fmt "%a" E.print e;
-        List.iter (fun f -> fprintf fmt " /\\  %a" E.print f) l
+        Format.fprintf fmt "%a" E.print e;
+        List.iter (fun f -> Format.fprintf fmt " /\\  %a" E.print f) l
 
     let print_theory_instance hyp gf =
       if Options.get_debug_fpa() > 1 || Options.get_debug_sat() then
@@ -425,7 +424,6 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       | E.Lemma _ -> env.add_inst orig
       | E.Unit _ | E.Clause _ | E.Literal _ | E.Skolem _
       | E.Let _ | E.Iff _ | E.Xor _ -> true
-      | E.Not_a_form -> assert false
     end
 
   let inst_predicates mconf env inst tbox selector ilvl =
@@ -443,56 +441,6 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       Options.tool_req 2 "TR-Sat-Conflict-2";
       env.heuristics := Heuristics.bump_activity !(env.heuristics) expl;
       raise (IUnsat (expl, classes))
-
-  let is_literal f =
-    match E.form_view f with
-    | E.Literal _ -> true
-    | E.Unit _ | E.Clause _ | E.Lemma _ | E.Skolem _
-    | E.Let _ | E.Iff _ | E.Xor _ -> false
-    | E.Not_a_form -> assert false
-
-  let extract_prop_model t =
-    let s = ref SE.empty in
-    ME.iter
-      (fun f _ ->
-         if (get_complete_model () && is_literal f) || E.is_in_model f then
-           s := SE.add f !s
-      )
-      t.gamma;
-    !s
-
-  let print_prop_model fmt s =
-    SE.iter (fprintf fmt "\n %a" E.print) s
-
-  let print_model ~header fmt t =
-    Format.print_flush ();
-    if header then fprintf fmt "\nModel\n";
-    let pm = extract_prop_model t in
-    if not (SE.is_empty pm) then begin
-      fprintf fmt "Propositional:";
-      print_prop_model fmt pm;
-      fprintf fmt "\n";
-    end;
-    Th.print_model fmt t.tbox
-
-
-  let refresh_model_handler =
-    if get_model () then
-      fun t ->
-        try
-          let alrm =
-            if Options.get_is_gui() then
-              Sys.sigalrm (* troubles with GUI+VTARLM *)
-            else
-              Sys.sigvtalrm
-          in
-          Sys.set_signal alrm
-            (Sys.Signal_handle (fun _ ->
-                 Printer.print_fmt (Options.get_fmt_mdl ())
-                   "%a" (print_model ~header:true) t;
-                 Options.exec_timeout ()))
-        with Invalid_argument _ -> ()
-    else fun _ -> ()
 
   (* sat-solver *)
 
@@ -513,7 +461,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
 
   (* hybrid functions*)
   let print_decisions_in_the_sats msg env =
-    if Options.get_tableaux_cdcl () && get_verbose() then begin
+    if Options.(get_tableaux_cdcl () && get_verbose ()) then begin
       Printer.print_dbg ~flushed:false ~module_name:"Fun_sat"
         ~function_name:"print_decisions_in_the_sats"
         "@[<v 0>-----------------------------------------------------@ \
@@ -539,7 +487,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
     end
 
   let cdcl_same_decisions env =
-    if Options.get_tableaux_cdcl () && get_enable_assertions () then begin
+    if Options.get_tableaux_cdcl () then begin
       let cdcl_decs = CDCL.get_decisions !(env.cdcl) in
       let ok = ref true in
       let decs =
@@ -594,11 +542,11 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
     in
     (* try to keep the decision ordering *)
     let l = List.fast_sort (fun (_,i) (_,j) -> j - i) l in
-    List.fold_left (fun acc (f, _) -> E.mk_imp f acc (E.id f)) acc0 l
+    List.fold_left (fun acc (f, _) -> E.mk_imp f acc) acc0 l
 
 
   let cdcl_assume delay env l =
-    if get_debug_sat() && get_verbose() then
+    if Options.(get_debug_sat () && get_verbose ()) then
       Printer.print_dbg
         ~module_name:"Fun_sat" ~function_name:"cdcl_assume" "";
     let gamma = env.gamma in
@@ -613,7 +561,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       env.cdcl := CDCL.assume delay !(env.cdcl) l
     with
     | CDCL.Bottom (ex, l, cdcl) ->
-      if get_debug_sat() && get_verbose() then
+      if Options.(get_debug_sat () && get_verbose ()) then
         Printer.print_dbg
           ~module_name:"Fun_sat" ~function_name:"cdcl_assume"
           "conflict";
@@ -622,14 +570,14 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       raise (IUnsat(ex, l))
 
   let cdcl_decide env f dlvl =
-    if get_debug_sat() && get_verbose() then
+    if Options.(get_debug_sat () && get_verbose ()) then
       Printer.print_dbg
         ~module_name:"Fun_sat" ~function_name:"cdcl_decide" "";
     try
       env.cdcl := CDCL.decide !(env.cdcl) f dlvl
     with
     | CDCL.Bottom (ex, l, _cdcl) ->
-      if get_debug_sat() && get_verbose() then
+      if Options.(get_debug_sat () && get_verbose ()) then
         Printer.print_dbg
           ~module_name:"Fun_sat" ~function_name:"cdcl_decide"
           "conflict";
@@ -656,7 +604,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
     cdcl_assume delay env [ff, Ex.empty]
 
   let profile_conflicting_instances exp =
-    if Options.get_profiling() then
+    if Options.get_profiling () then
       SE.iter
         (fun f ->
            match E.form_view f with
@@ -664,26 +612,23 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
              Profiling.conflicting_instance name loc
            | E.Unit _ | E.Clause _ | E.Literal _ | E.Skolem _
            | E.Let _ | E.Iff _ | E.Xor _ -> ()
-           | E.Not_a_form -> assert false
         )(Ex.formulas_of exp)
 
   let do_case_split env origin =
-    if Options.get_case_split_policy () == origin then
-      try
-        if get_debug_sat () then
-          Printer.print_dbg
-            ~module_name:"Fun_sat" ~function_name:"do_case_split"
-            "performing case-split";
-        let tbox, new_terms = Th.do_case_split env.tbox in
-        let inst =
-          Inst.add_terms env.inst new_terms (mk_gf E.vrai "" false false) in
-        {env with tbox = tbox; inst = inst}
-      with Ex.Inconsistent (expl, classes) ->
-        Debug.inconsistent expl env;
-        Options.tool_req 2 "TR-Sat-Conflict-2";
-        env.heuristics := Heuristics.bump_activity !(env.heuristics) expl;
-        raise (IUnsat (expl, classes))
-    else env
+    try
+      if Options.get_debug_sat () then
+        Printer.print_dbg
+          ~module_name:"Fun_sat" ~function_name:"do_case_split"
+          "performing case-split";
+      let tbox, new_terms = Th.do_case_split env.tbox origin in
+      let inst =
+        Inst.add_terms env.inst new_terms (mk_gf E.vrai "" false false) in
+      {env with tbox = tbox; inst = inst}
+    with Ex.Inconsistent (expl, classes) ->
+      Debug.inconsistent expl env;
+      Options.tool_req 2 "TR-Sat-Conflict-2";
+      env.heuristics := Heuristics.bump_activity !(env.heuristics) expl;
+      raise (IUnsat (expl, classes))
 
   let b_elim f env =
     try
@@ -695,14 +640,15 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
 
   let update_unit_facts env ff dep =
     let f = ff.E.ff in
-    if get_sat_learning () && not (ME.mem f !(env.unit_facts_cache)) then
+    if Options.get_sat_learning ()
+    && not (ME.mem f !(env.unit_facts_cache)) then
       begin
         assert (Ex.has_no_bj dep);
         env.unit_facts_cache := ME.add f (ff, dep) !(env.unit_facts_cache)
       end
 
   let learn_clause ({ gamma; _ } as env) ff0 dep =
-    if get_sat_learning () then
+    if Options.get_sat_learning () then
       let fl, dep =
         Ex.fold_atoms
           (fun e (l, ex) ->
@@ -719,7 +665,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       let fl = List.fast_sort (fun (_, d1) (_,d2) -> d1 - d2) fl in
       let f =
         List.fold_left
-          (fun acc (f, _) -> E.mk_or f acc false (E.id f))
+          (fun acc (f, _) -> E.mk_or f acc false)
           ff0.E.ff fl
       in
       update_unit_facts env {ff0 with E.ff=f} dep
@@ -751,7 +697,6 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       ans
     | E.Unit _ | E.Clause _ | E.Lemma _ | E.Skolem _
     | E.Let _ | E.Iff _ | E.Xor _ -> None
-    | E.Not_a_form -> assert false
 
   let red tcp_cache tmp_cache ff env tcp =
     let nf = E.neg ff.E.ff in
@@ -774,7 +719,6 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
           ans, false
         | E.Unit _ | E.Clause _ | E.Lemma _ | E.Skolem _
         | E.Let _ | E.Iff _ | E.Xor _ -> None, false
-        | E.Not_a_form -> assert false
 
   let red tcp_cache tmp_cache ff env tcp =
     match red tcp_cache tmp_cache ff env tcp with
@@ -786,7 +730,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
         match CDCL.is_true !(env.cdcl) (E.neg ff.E.ff) with
         | Some (ex, _lvl) ->
           let ex = Lazy.force ex in
-          if get_debug_sat() && get_verbose() then
+          if Options.(get_debug_sat () && get_verbose ()) then
             Printer.print_dbg "red thanks to satML";
           assert (cdcl_known_decisions ex env);
           Some(ex, []), true
@@ -796,23 +740,21 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
   let add_dep f dep =
     match E.form_view f with
     | E.Literal _ ->
-      if not (get_unsat_core ()) || Ex.mem (Ex.Bj f) dep then dep
+      if not (Options.get_unsat_core ()) || Ex.mem (Ex.Bj f) dep then dep
       else Ex.union (Ex.singleton (Ex.Dep f)) dep
     | E.Clause _ ->
-      if get_unsat_core () then Ex.union (Ex.singleton (Ex.Dep f)) dep
+      if Options.get_unsat_core () then Ex.union (Ex.singleton (Ex.Dep f)) dep
       else dep
     | E.Unit _ | E.Lemma _ | E.Skolem _ | E.Let _ | E.Iff _ | E.Xor _ -> dep
-    | E.Not_a_form -> assert false
 
   let rec add_dep_of_formula f dep =
     let dep = add_dep f dep in
     match E.form_view f with
     | E.Unit (f1, f2) ->
-      if not (get_unsat_core ()) then dep
+      if not (Options.get_unsat_core ()) then dep
       else add_dep_of_formula f2 (add_dep_of_formula f1 dep)
     | E.Lemma _ | E.Clause _ | E.Literal _ | E.Skolem _
     | E.Let _ | E.Iff _ | E.Xor _ -> dep
-    | E.Not_a_form -> assert false
 
   (* currently:
      => this is not done modulo theories
@@ -904,9 +846,11 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
                  "%a is not ground" E.print a;
                assert false
              end;
-             let facts = (a, ex, dlvl, plvl) :: facts in
+             let alit = Shostak.Literal.make (LTerm a) in
+             let facts = (alit, Th_util.Other, ex, dlvl, plvl) :: facts in
              let ufacts =
-               if Ex.has_no_bj ex then (a, ex, dlvl, plvl) :: ufacts
+               if Ex.has_no_bj ex then
+                 (alit, Th_util.Other, ex, dlvl, plvl) :: ufacts
                else ufacts
              in
              if not ff.E.mf then begin
@@ -927,7 +871,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
           with Ex.Inconsistent (reason, _) as e ->
             assert (Ex.has_no_bj reason);
             if Options.get_profiling() then Profiling.theory_conflict();
-            if get_debug_sat () then
+            if Options.get_debug_sat () then
               Printer.print_dbg
                 ~module_name:"Fun_sat" ~function_name:"theory_assume"
                 "solved by unit_tbox";
@@ -980,12 +924,11 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       (fun
         ((env, _bcp, tcp, ap_delta, lits) as acc)
         ({ E.ff = f; _ } as ff, dep) ->
-        refresh_model_handler env;
         Options.exec_thread_yield ();
         let dep = add_dep f dep in
         let dep_gamma = add_dep_of_formula f dep in
         (* propagate all unit facts to cache *)
-        if get_sat_learning () && Ex.has_no_bj dep_gamma then
+        if Options.get_sat_learning () && Ex.has_no_bj dep_gamma then
           update_unit_facts env ff dep_gamma;
         Debug.gamma env.gamma;
         (try
@@ -1004,7 +947,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
         end
         else
           let env =
-            if ff.E.mf && get_greedy () then
+            if ff.E.mf && Options.get_greedy () then
               { env with inst=
                            Inst.add_terms
                              env.inst (E.max_ground_terms_rec_of_form f) ff }
@@ -1019,22 +962,19 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
           in
           let env = update_nb_related env ff in
           match E.form_view f with
-          | E.Not_a_form -> assert false
           | E.Iff (f1, f2) ->
-            let id = E.id f in
-            let g = E.elim_iff f1 f2 id ~with_conj:true in
+            let g = E.elim_iff f1 f2 ~with_conj:true in
             if Options.get_tableaux_cdcl () then begin
-              let f_imp_g = E.mk_imp f g id in
+              let f_imp_g = E.mk_imp f g in
               (* correct to put <-> ?*)
               cdcl_assume false env [{ff with E.ff=f_imp_g}, Ex.empty]
             end;
             asm_aux (env, true, tcp, ap_delta, lits) [{ff with E.ff = g}, dep]
 
           | E.Xor (f1, f2) ->
-            let id = E.id f in
-            let g = E.elim_iff f1 f2 id ~with_conj:false |> E.neg in
+            let g = E.elim_iff f1 f2 ~with_conj:false |> E.neg in
             if Options.get_tableaux_cdcl () then begin
-              let f_imp_g = E.mk_imp f g id in
+              let f_imp_g = E.mk_imp f g in
               (* should do something similar for Let ? *)
               cdcl_assume false env [{ff with E.ff=f_imp_g}, Ex.empty]
             end;
@@ -1074,7 +1014,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
                 assert (ME.mem guard env.gamma);
                 if Options.get_tableaux_cdcl () then
                   cdcl_assume false env
-                    [{ff with E.ff = E.mk_imp f af (E.id f)}, adep];
+                    [{ff with E.ff = E.mk_imp f af}, adep];
                 asm_aux acc [{ff with E.ff = af}, Ex.union dep adep]
               | None -> acc
             end
@@ -1083,7 +1023,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
             Options.tool_req 2 "TR-Sat-Assume-Sko";
             let f' = E.skolemize quantif  in
             if Options.get_tableaux_cdcl () then begin
-              let f_imp_f' = E.mk_imp f f' (E.id f) in
+              let f_imp_f' = E.mk_imp f f' in
               (* correct to put <-> ?*)
               (* should do something similar for Let ? *)
               cdcl_assume false env [{ff with E.ff=f_imp_f'}, Ex.empty]
@@ -1095,7 +1035,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
             let elim_let = E.elim_let ~recursive:true letin in
             let ff = {ff with E.ff = elim_let} in
             if Options.get_tableaux_cdcl () then begin
-              let f_imp_f' = E.mk_imp f elim_let (E.id f) in
+              let f_imp_f' = E.mk_imp f elim_let in
               (* correct to put <-> ?*)
               (* should do something similar for Let ? *)
               cdcl_assume false env [{ff with E.ff=f_imp_f'}, Ex.empty]
@@ -1108,7 +1048,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
     if list == [] then
       begin
         print_decisions_in_the_sats "exit assume rec" env;
-        assert (cdcl_same_decisions env);
+        Options.heavy_assert (fun () -> cdcl_same_decisions env);
         env
       end
     else
@@ -1137,14 +1077,19 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
      The reason for this modification is that a set of instances may
      cause several conflict, and we don't always detect the one which
      makes us backjump better. *)
-  let update_instances_cache =
+  let update_instances_cache, clear_instances_cache =
     let last_cache = ref [] in
-    fun l_opt ->
+    let update_instances_cache l_opt =
       match l_opt with
       | None   -> Some !last_cache (* Get *)
       | Some l -> (* Set or reset if l = [] *)
         last_cache := List.filter (fun (_,e) -> Ex.has_no_bj e) l;
         None
+    in
+    let clear_instances_cache () =
+      last_cache := []
+    in
+    update_instances_cache, clear_instances_cache
 
   (* returns the (new) env and true if some new instances are made *)
   let inst_and_assume mconf env inst_function inst_env =
@@ -1156,7 +1101,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
     (* do this to avoid loosing instances when a conflict is detected
        directly with some of these instances only, ie before assumign
        the others *)
-    if get_sat_learning () then
+    if Options.get_sat_learning () then
       List.iter
         (fun (gf, dep) ->
            if Ex.has_no_bj dep then update_unit_facts env gf dep;
@@ -1177,112 +1122,54 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       ignore (update_instances_cache (Some []));
       env, true
 
-  let update_all_models_option env =
-    if get_all_models () then
-      begin
-        (* should be used when all_models () is activated only *)
-        if !all_models_sat_env == None then all_models_sat_env := Some env;
-        let m =
-          ME.fold
-            (fun f _ s -> if is_literal f then SE.add f s else s)
-            env.gamma SE.empty
-        in
-        Printer.print_fmt (Options.get_fmt_mdl ())
-          "@[<v 0>--- SAT model found ---@ \
-           %a@ \
-           --- / SAT model  ---@]"
-          print_prop_model m;
-        raise (IUnsat (Ex.make_deps m, []))
-      end
-
-  let get_all_models_answer () =
-    if get_all_models () then
-      match !all_models_sat_env with
-      | Some env -> raise (I_dont_know env)
-      | None ->
-        Printer.print_fmt (Options.get_fmt_mdl ())
-          "[all-models] No SAT models found"
-
-
-  let compute_concrete_model env origin =
-    if abs (get_interpretation ()) <> origin then env
-    else
+  let may_update_last_saved_model env compute =
+    let compute =
+      if not (Options.get_first_interpretation ()) then compute
+      else !(env.last_saved_model) == None
+    in
+    if not compute then env
+    else begin
       try
-        (* to push pending stuff *)
-        let env = do_case_split env (Options.get_case_split_policy ()) in
-        let env = {env with tbox = Th.compute_concrete_model env.tbox} in
-        latest_saved_env := Some env;
+        (* also performs case-split and pushes pending atoms to CS *)
+        let declared_ids = !(env.declare_top) in
+        let model, _ = Th.extract_concrete_model ~declared_ids env.tbox in
+        env.last_saved_model := Some model;
         env
       with Ex.Inconsistent (expl, classes) ->
         Debug.inconsistent expl env;
         Options.tool_req 2 "TR-Sat-Conflict-2";
         env.heuristics := Heuristics.bump_activity !(env.heuristics) expl;
         raise (IUnsat (expl, classes))
+    end
 
+  let update_model_and_return_unknown env compute_model ~unknown_reason =
+    try
+      let env = may_update_last_saved_model env compute_model in
+      Options.Time.unset_timeout ();
+      i_dont_know env unknown_reason
+    with Util.Timeout when !(env.model_gen_phase) ->
+      (* In this case, timeout reason becomes 'ModelGen' *)
+      i_dont_know env (Timeout ModelGen)
 
-  let return_cached_model return_function =
-    let i = abs(get_interpretation ()) in
-    assert (i = 1 || i = 2 || i = 3);
-    assert (not !terminated_normally);
-    terminated_normally := true; (* to avoid loops *)
-    begin
-      match !latest_saved_env with
-      | None ->
-        Printer.print_fmt (Options.get_fmt_mdl ())
-          "@[<v 0>[FunSat]@, \
-           It seems that no model has been computed so far.@,\
-           You may need to change your model generation strategy@,\
-           or to increase your timeout.@]"
-      | Some env ->
-        let cs_tbox = Th.get_case_split_env env.tbox in
-        let uf = Ccx.Main.get_union_find cs_tbox in
-        Uf.output_concrete_model uf
-    end;
-    return_function ()
-
-
-  let () =
-    at_exit
-      (fun () ->
-         let i = abs(get_interpretation ()) in
-         if not !terminated_normally && (i = 1 || i = 2 || i = 3) then
-           return_cached_model (fun () -> ())
-      )
-
-
-  let return_answer env orig return_function =
-    update_all_models_option env;
-    let env = compute_concrete_model env orig in
-    let uf = Ccx.Main.get_union_find (Th.get_case_split_env env.tbox) in
-    Options.Time.unset_timeout ~is_gui:(Options.get_is_gui());
-    Uf.output_concrete_model uf;
-    terminated_normally := true;
-    return_function env
-
-
-  let switch_to_model_gen env =
-    not !terminated_normally &&
-    not !(env.model_gen_mode) &&
-    let i = abs (get_interpretation ()) in
-    (i = 1 || i = 2 || i = 3)
-
-
-  let do_switch_to_model_gen env =
-    let i = abs (get_interpretation ()) in
-    assert (i = 1 || i = 2 || i = 3);
-    if not !(env.model_gen_mode) &&
-       Stdlib.(<>) (Options.get_timelimit_interpretation ()) 0. then
-      begin
-        Options.Time.unset_timeout ~is_gui:(Options.get_is_gui());
-        Options.Time.set_timeout
-          ~is_gui:(Options.get_is_gui())
-          (Options.get_timelimit_interpretation ());
-        env.model_gen_mode := true;
-        return_answer env i (fun _ -> raise Util.Timeout)
-      end
+  let model_gen_on_timeout env =
+    let i = Options.get_interpretation () in
+    let ti = Options.get_timelimit_interpretation () in
+    if not i || (* not asked to gen a model *)
+       !(env.model_gen_phase) ||  (* we timeouted in model-gen-phase *)
+       Float.equal ti 0. (* no time allocated for extra model search *)
+    then
+      i_dont_know env (Timeout ProofSearch)
     else
-      return_cached_model (fun () -> raise Util.Timeout)
-
+      begin
+        (* Beware: models generated on timeout of ProofSearch phase may
+           be incohrent wrt. the ground part of the pb (ie. if delta
+           is not empty ? *)
+        env.model_gen_phase := true;
+        Options.Time.unset_timeout ();
+        Options.Time.set_timeout ti;
+        update_model_and_return_unknown
+          env i ~unknown_reason:(Timeout ProofSearch) (* may becomes ModelGen *)
+      end
 
   let reduce_hypotheses tcp_cache tmp_cache env acc (hyp, gf, dep) =
     Debug.print_theory_instance hyp gf;
@@ -1311,11 +1198,8 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
              end
            | E.Unit _ | E.Clause _ | E.Lemma _ | E.Skolem _
            | E.Let _ | E.Iff _ | E.Xor _ ->
-             Printer.print_err
-               "Currently, arbitrary formulas in Hyps
-                are not Th-reduced";
-             assert false
-           | E.Not_a_form ->
+             Printer.print_err "Currently, arbitrary formulas in Hyps \
+                                are not Th-reduced";
              assert false
         )(dep, acc) hyp
     in
@@ -1324,7 +1208,6 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
   let does_not_contain_a_disjunction =
     let rec aux f =
       match E.form_view f with
-      | E.Not_a_form -> assert false
       | E.Literal _ -> true
       | E.Unit(f1, f2) -> aux f1 && aux f2
       | E.Clause _ | E.Iff _ | E.Xor _ -> false
@@ -1392,10 +1275,12 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       aux_rec ~rm_clauses env inst loop nb_ok, !nb_ok > 0
 
   let greedy_instantiation env =
-    match get_instantiation_heuristic () with
+    match Options.get_instantiation_heuristic () with
     | INormal ->
-      return_answer env 1
-        (fun e -> raise (I_dont_know e))
+      (* TODO: check if this test still produces a wrong model. *)
+      update_model_and_return_unknown
+        env (Options.get_last_interpretation ())
+        ~unknown_reason:Incomplete (* may becomes ModelGen *)
     | IAuto | IGreedy ->
       let gre_inst =
         ME.fold
@@ -1405,7 +1290,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       in
       let env = new_inst_level env in
       let mconf =
-        {Util.nb_triggers = max 10 (get_nb_triggers () * 10);
+        {Util.nb_triggers = max 10 (Options.get_nb_triggers () * 10);
          no_ematching = false;
          triggers_var = true;
          use_cs = true;
@@ -1421,21 +1306,24 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       let env = do_case_split env Util.AfterMatching in
       if ok1 || ok2 || ok3 || ok4 then env
       else
-        return_answer env 1
-          (fun e -> raise (I_dont_know e))
+        update_model_and_return_unknown
+          env (Options.get_last_interpretation ())
+          ~unknown_reason:Incomplete (* may becomes ModelGen *)
 
   let normal_instantiation env try_greedy =
     Debug.print_nb_related env;
     let env = do_case_split env Util.BeforeMatching in
-    let env = compute_concrete_model env 2 in
+    let env =
+      may_update_last_saved_model env (Options.get_every_interpretation ())
+    in
     let env = new_inst_level env in
     let mconf =
-      {Util.nb_triggers = get_nb_triggers ();
-       no_ematching = get_no_ematching();
-       triggers_var = get_triggers_var ();
+      {Util.nb_triggers = Options.get_nb_triggers ();
+       no_ematching = Options.get_no_ematching();
+       triggers_var = Options.get_triggers_var ();
        use_cs = false;
        backward = Util.Normal;
-       greedy = get_greedy ();
+       greedy = Options.get_greedy ();
       }
     in
     let env, ok1 = inst_and_assume mconf env inst_predicates env.inst in
@@ -1446,11 +1334,10 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
     if ok1 || ok2 || ok3 || ok4 then env
     else if try_greedy then greedy_instantiation env else env
 
-
   (* should be merged with do_bcp/red/elim ?
      calls to debug hooks are missing *)
   let propagate_unit_facts_in_cache env =
-    if get_no_sat_learning() then None
+    if Options.get_no_sat_learning() then None
     else
       let cache = !(env.unit_facts_cache) in
       let in_cache f =
@@ -1521,7 +1408,6 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
 
   and back_tracking env =
     try
-      let env = compute_concrete_model env 3 in
       if env.delta == [] || Options.get_no_decisions() then
         back_tracking (normal_instantiation env true)
       else
@@ -1534,7 +1420,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
           with No_suitable_decision ->
             back_tracking (normal_instantiation env true)
     with
-    | Util.Timeout when switch_to_model_gen env -> do_switch_to_model_gen env
+    | Util.Timeout -> model_gen_on_timeout env
 
   and make_one_decision env =
     try
@@ -1545,7 +1431,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       if Options.get_profiling() then
         Profiling.decision new_level a.E.origin_name;
       (*fprintf fmt "@.BEFORE DECIDING %a@." E.print f;*)
-      assert (cdcl_same_decisions env);
+      Options.heavy_assert (fun () -> cdcl_same_decisions env);
       let env_a =
         {env with
          delta=l;
@@ -1574,7 +1460,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
           Profiling.reset_ilevel env.ilevel;
         end;
         let not_a = {a with E.ff = E.neg f} in
-        if get_sat_learning () then learn_clause env not_a dep';
+        if Options.get_sat_learning () then learn_clause env not_a dep';
         let env = {env with delta=l} in
         (* in the section below, we try to backjump further with latest
            generated instances if any *)
@@ -1588,17 +1474,17 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
             (*No backtrack, reset cache*)
             ignore (update_instances_cache (Some []));
         end;
-        assert (cdcl_same_decisions env);
+        Options.heavy_assert (fun () -> cdcl_same_decisions env);
         if Options.get_tableaux_cdcl () then
           cdcl_learn_clause false env dep' (E.neg f);
         print_decisions_in_the_sats "make_one_decision:backtrack" env;
-        assert (cdcl_same_decisions env);
+        Options.heavy_assert (fun () -> cdcl_same_decisions env);
         if not (Options.get_tableaux_cdcl ()) then
           unsat_rec (assume env [b, Ex.union d dep']) (not_a,dep') false
         else
           match CDCL.is_true !(env.cdcl) a.E.ff with
           | Some (ex, _lvl) -> (* it is a propagation in satML *)
-            if get_verbose () then
+            if Options.get_verbose () then
               Printer.print_dbg
                 "Better backjump thanks to satML";
             let ex = Lazy.force ex in
@@ -1611,7 +1497,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
         Options.tool_req 2 "TR-Sat-Backjumping";
         dep
     with Propagate (ff, ex) ->
-      assert (cdcl_same_decisions env);
+      Options.heavy_assert (fun () -> cdcl_same_decisions env);
       back_tracking (assume env [ff, ex])
 
   let max_term_depth_in_sat env =
@@ -1625,13 +1511,14 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
     else
       let nb1 = env.nb_related_to_goal in
       let nc1 = env.nb_related_to_hypo in
-      if get_verbose () || get_debug_sat () then
+      if Options.(get_verbose () || get_debug_sat ()) then
         Printer.print_dbg
           ~flushed:false
           ~module_name:"Fun_sat"
           ~function_name:"backward_instantiation_rec"
           "round %d / %d@ " rnd max_rnd;
       let mconf =
+        let open Options in
         {Util.nb_triggers = get_nb_triggers ();
          no_ematching = get_no_ematching();
          triggers_var = get_triggers_var ();
@@ -1644,7 +1531,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       let env, new_i2 = inst_and_assume mconf env inst_lemmas env.inst in
       let nb2 = env.nb_related_to_goal in
       let nc2 = env.nb_related_to_hypo in
-      if get_verbose () || get_debug_sat () then
+      if Options.(get_verbose () || get_debug_sat ()) then
         Printer.print_dbg
           ~header:false
           ~module_name:"Fun_sat"
@@ -1662,21 +1549,21 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
 
 
   let backward_instantiation env deepest_term =
+    let no_ematching = Options.get_no_ematching () in
+    let no_nla = Options.get_no_nla () in
+    let no_ac = Options.get_no_ac () in
+    let instantiation_heuristic = Options.get_instantiation_heuristic () in
+    (*let normalize_instances = Options.normalize_instances () in*)
+    let max_split = Options.get_max_split () in
+
+    Options.set_no_ematching true;
+    Options.set_no_nla true;
+    Options.set_no_ac  true;
+    Options.set_instantiation_heuristic IGreedy;
+    (*Options.set_normalize_instances true;*)
+    Options.set_max_split Numbers.Q.zero;
+
     try
-      let no_ematching = Options.get_no_ematching () in
-      let no_nla = Options.get_no_nla () in
-      let no_ac = Options.get_no_ac () in
-      let instantiation_heuristic = Options.get_instantiation_heuristic () in
-      (*let normalize_instances = Options.normalize_instances () in*)
-      let max_split = Options.get_max_split () in
-
-      Options.set_no_ematching true;
-      Options.set_no_nla true;
-      Options.set_no_ac  true;
-      Options.set_instantiation_heuristic IGreedy;
-      (*Options.set_normalize_instances true;*)
-      Options.set_max_split Numbers.Q.zero;
-
       let max_rnd = 3 * deepest_term in
       let modified_env = backward_instantiation_rec env 1 max_rnd in
 
@@ -1701,27 +1588,37 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       in
       let l = List.rev_map (fun (ff, ex, _) -> ff, ex) l in
       let print fmt (ff, _ex) =
-        fprintf fmt "%2d : %a@," ff.E.gdist E.print ff.E.ff
+        Format.fprintf fmt "%2d : %a@," ff.E.gdist E.print ff.E.ff
       in
-      if get_verbose () || get_debug_sat () then
+      if Options.(get_verbose () || get_debug_sat ()) then
         Printer.print_dbg
           ~module_name:"Fun_sat" ~function_name:"backward_instantiation"
           "@[<v 0>%a@]"
           (Printer.pp_list_no_space print) l;
       let env = assume env l in
       Debug.print_nb_related env;
-      if get_verbose () || get_debug_sat () then
+      if Options.(get_verbose () || get_debug_sat ()) then
         Printer.print_dbg
           ~module_name:"Fun_sat" ~function_name:"backward_instantiation"
           "done (after %2.4f seconds)"
           (Options.Time.value ());
       env
     with IUnsat _ as e ->
-      if get_verbose () || get_debug_sat () then
+      Options.set_no_ematching no_ematching;
+      Options.set_no_nla no_nla;
+      Options.set_no_ac  no_ac;
+      Options.set_instantiation_heuristic instantiation_heuristic;
+      Options.set_max_split max_split;
+
+      if Options.(get_verbose () || get_debug_sat ()) then
         Printer.print_dbg
           ~module_name:"Fun_sat" ~function_name:"backward_instantiation"
           "solved with backward!";
       raise e
+
+  let declare env id =
+    env.declare_top := id :: !(env.declare_top);
+    env
 
   let push env to_push =
     if Options.get_tableaux_cdcl () then
@@ -1738,11 +1635,13 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
           let guards = ME.add new_guard
               (mk_gf new_guard "" true true,Ex.empty)
               acc.guards.guards in
+          Stack.push !(env.declare_top) env.declare_tail;
           {acc with guards =
                       { acc.guards with
                         current_guard = new_guard;
                         guards = guards;
-                      }})
+                      }}
+        )
       ~max:to_push
       ~elt:()
       ~init:env
@@ -1765,10 +1664,13 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
               (mk_gf (E.neg guard_to_neg) "" true true,Ex.empty)
               acc.guards.guards
           in
-          acc.model_gen_mode := false;
-          all_models_sat_env := None;
-          latest_saved_env := None;
-          terminated_normally := false;
+          acc.model_gen_phase := false;
+          env.last_saved_model := None;
+          let () =
+            try env.declare_top := Stack.pop env.declare_tail
+            with Stack.Empty ->
+              Errors.error (Run_error Stack_underflow)
+          in
           {acc with inst;
                     guards =
                       { acc.guards with
@@ -1813,6 +1715,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       let env, _ = semantic_th_inst  env env.inst ~rm_clauses:true ~loop:4 in
 
       let mconf =
+        let open Options in
         {Util.nb_triggers = get_nb_triggers ();
          no_ematching = get_no_ematching();
          triggers_var = get_triggers_var ();
@@ -1840,22 +1743,19 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
 
       let d = back_tracking env in
       assert (Ex.has_no_bj d);
-      get_all_models_answer ();
-      terminated_normally := true;
       d
     with
     | IUnsat (dep, classes) ->
       Debug.bottom classes;
       Debug.unsat ();
-      get_all_models_answer ();
-      terminated_normally := true;
       assert (Ex.has_no_bj dep);
       dep
-    | Util.Timeout when switch_to_model_gen env -> do_switch_to_model_gen env
+    | Util.Timeout -> model_gen_on_timeout env
+    | Util.Step_limit_reached n -> i_dont_know env (Step_limit n)
 
   let add_guard env gf =
     let current_guard = env.guards.current_guard in
-    {gf with E.ff = E.mk_imp current_guard gf.E.ff 1}
+    {gf with E.ff = E.mk_imp current_guard gf.E.ff}
 
   let assume env fg dep =
     try
@@ -1864,11 +1764,16 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       assume env [add_guard env fg,dep]
     with
     | IUnsat (d, classes) ->
-      terminated_normally := true;
       Debug.bottom classes;
       raise (Unsat d)
-    | Util.Timeout when switch_to_model_gen env -> do_switch_to_model_gen env
-
+    | Util.Timeout ->
+      (* don't attempt to compute a model if timeout before
+         calling unsat function *)
+      i_dont_know env (Timeout Assume)
+    | Util.Step_limit_reached n ->
+      (* When reaching the step limit on an assume, we do not want to answer
+         'unknown' right away. *)
+      {env with unknown_reason = Some (Step_limit n)}
 
   let pred_def env f name dep _loc =
     Debug.pred_def f;
@@ -1879,28 +1784,12 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
         Inst.add_predicate env.inst ~guard ~name gf dep }
 
   let unsat env fg =
-    if Options.get_timers() then
-      try
-        Timers.exec_timer_start Timers.M_Sat Timers.F_unsat;
-        let env = unsat env fg in
-        Timers.exec_timer_pause Timers.M_Sat Timers.F_unsat;
-        env
-      with e ->
-        Timers.exec_timer_pause Timers.M_Sat Timers.F_unsat;
-        raise e
-    else unsat env fg
+    Timers.with_timer Timers.M_Sat Timers.F_unsat @@ fun () ->
+    unsat env fg
 
   let assume env fg =
-    if Options.get_timers() then
-      try
-        Timers.exec_timer_start Timers.M_Sat Timers.F_assume;
-        let env = assume env fg in
-        Timers.exec_timer_pause Timers.M_Sat Timers.F_assume;
-        env
-      with e ->
-        Timers.exec_timer_pause Timers.M_Sat Timers.F_assume;
-        raise e
-    else assume env fg
+    Timers.with_timer Timers.M_Sat Timers.F_assume @@ fun () ->
+    assume env fg
 
   let empty_guards () = {
     current_guard = Expr.vrai;
@@ -1913,7 +1802,7 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
     Stack.push (Expr.vrai,{unit_facts = ME.empty}) guards.stack_elt;
     guards
 
-  let empty () =
+  let empty ?(selector=fun _ -> true) () =
     (* initialize some structures in SAT.empty. Otherwise, E.faux is never
        added as it is replaced with (not E.vrai) *)
     reset_refs ();
@@ -1941,18 +1830,68 @@ module Make (Th : Theory.S) : Sat_solver_sig.S = struct
       unit_tbox = tbox;
       inst = inst;
       heuristics = ref (Heuristics.empty ());
-      model_gen_mode = ref false;
+      model_gen_phase = ref false;
       unit_facts_cache = ref ME.empty;
       guards = init_guards ();
-      add_inst = fun _ -> true;
+      add_inst = selector;
+      last_saved_model = ref None;
+      unknown_reason = None;
+      declare_top = ref [];
+      declare_tail = Stack.create ();
     }
     in
     assume env gf_true Ex.empty
   (*maybe usefull when -no-theory is on*)
 
-  let empty_with_inst add_inst =
-    { (empty ()) with add_inst = add_inst }
-
   let assume_th_elt env th_elt dep =
     {env with tbox = Th.assume_th_elt env.tbox th_elt dep}
+
+  (** returns the latest model stored in the env if any *)
+  let get_model env =
+    Option.map Lazy.force !(env.last_saved_model)
+
+  let get_unknown_reason env = env.unknown_reason
+
+  let get_value env t =
+    match E.type_info t with
+    | Ty.Tbool ->
+      begin
+        match ME.find_opt t env.gamma with
+        | None ->
+          begin
+            match ME.find_opt (E.neg t) env.gamma with
+            | None -> None
+            | Some _ -> Some E.faux
+          end
+        | Some _ -> Some E.vrai
+      end
+    | _ -> None
+
+  let reinit_ctx () =
+    (* all_models_sat_env := None; *)
+    (* latest_saved_env := None;
+       terminated_normally := false; *)
+    Steps.reinit_steps ();
+    clear_instances_cache ();
+    Th.reinit_cpt ();
+    Symbols.clear_labels ();
+    Id.Namespace.reinit ();
+    Var.reinit_cnt ();
+    Satml_types.Flat_Formula.reinit_cpt ();
+    Ty.reinit_decls ();
+    IntervalCalculus.reinit_cache ();
+    Inst.reinit_em_cache ();
+    Expr.reinit_cache ();
+    Hstring.reinit_cache ();
+    Shostak.Combine.reinit_cache ();
+    Uf.reinit_cache ()
+
+  let () =
+    Steps.save_steps ();
+    Var.save_cnt ();
+    Expr.save_cache ();
+    Hstring.save_cache ();
+    Shostak.Combine.save_cache ();
+    Uf.save_cache ()
+
 end

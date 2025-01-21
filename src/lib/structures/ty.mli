@@ -1,30 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 (** Types
 
@@ -39,26 +38,27 @@ type t =
   (** Real numbers *)
   | Tbool
   (** Booleans *)
-  | Tunit
-  (** The unit type *)
   | Tvar of tvar
   (** Type variables *)
   | Tbitv of int
   (** Bitvectors of a given length *)
-  | Text of t list * Hstring.t
+  | Text of t list * Uid.ty_cst
   (** Abstract types applied to arguments. [Text (args, s)] is
       the application of the abstract type constructor [s] to
       arguments [args]. *)
+
   | Tfarray of t * t
   (** Functional arrays. [TFarray (src,dst)] maps values of type [src]
       to values of type [dst]. *)
-  | Tsum of Hstring.t * Hstring.t list
-  (** Enumeration, with its name, and the list of its constructors. *)
 
-  | Tadt of Hstring.t * t list
-  (** Algebraic types applied to arguments. [Tadt (s, args)] is
-      the application of the datatype constructor [s] to
-      arguments [args]. *)
+  | Tadt of Uid.ty_cst * t list
+  (** Application of algebraic data types. [Tadt (a, params)] denotes
+      the application of the polymorphic datatype [a] to the types parameters
+      [params].
+
+      For instance the type of integer lists can be represented by the
+      value [Tadt (Hstring.make "list", [Tint]] where the identifier
+      {e list} denotes a polymorphic ADT defined by the user with [t_adt]. *)
 
   | Trecord of trecord
   (** Record type. *)
@@ -77,32 +77,30 @@ and tvar = {
 and trecord = {
   mutable args : t list;
   (** Arguments passed to the record constructor *)
-  name : Hstring.t;
+  name : Uid.ty_cst;
   (** Name of the record type *)
-  mutable lbs :  (Hstring.t * t) list;
+  mutable lbs :  (Uid.term_cst * t) list;
   (** List of fields of the record. Each field has a name,
       and an associated type. *)
-  record_constr : Hstring.t;
+  record_constr : Uid.term_cst;
   (** record constructor. Useful is case it's a specialization of an
       algeberaic datatype. Default value is "\{__[name]" *)
 }
 (** Record types. *)
 
 type adt_constr =
-  { constr : Hstring.t ;
+  { constr : Uid.term_cst ;
     (** constructor of an ADT type *)
 
-    destrs : (Hstring.t * t) list
+    destrs : (Uid.term_cst * t) list
     (** the list of destructors associated with the constructor and
         their respective types *)
   }
 
-(** bodies of types definitions. Currently, bodies are inlined in the
+(** Bodies of types definitions. Currently, bodies are inlined in the
     type [t] for records and enumerations. But, this is not possible
     for recursive ADTs *)
-type type_body =
-  | Adt of adt_constr list
-  (** body of an algebraic datatype *)
+type type_body = adt_constr list
 
 module Svty : Set.S with type elt = int
 (** Sets of type variables, indexed by their identifier. *)
@@ -111,11 +109,12 @@ module Set : Set.S with type elt = t
 (** Sets of types *)
 
 
-val assoc_destrs : Hstring.t -> adt_constr list -> (Hstring.t * t) list
-(** returns the list of destructors associated with the given consturctor.
-    raises Not_found if the constructor is not in the given list *)
+val assoc_destrs : Uid.term_cst -> adt_constr list -> (Uid.term_cst * t) list
+(** [assoc_destrs cons cases] returns the list of destructors associated with
+    the constructor [cons] in the ADT defined by [cases].
+    @raises Not_found if the constructor is not in the given list. *)
 
-val type_body : Hstring.t -> t list -> type_body
+val type_body : Uid.ty_cst -> t list -> type_body
 
 (** {2 Type inspection} *)
 
@@ -127,6 +126,9 @@ val equal : t -> t -> bool
 
 val compare : t -> t -> int
 (** Comparison function *)
+
+val pp_smtlib : Format.formatter -> t -> unit
+(** Printing function for types in smtlib2 format. *)
 
 val print : Format.formatter -> t -> unit
 (** Printing function for types (does not print
@@ -158,19 +160,14 @@ val fresh_tvar : unit -> t
 val fresh_empty_text : unit -> t
 (** Return a fesh abstract type. *)
 
-val text : t list -> string -> t
+val text : t list -> Uid.ty_cst -> t
 (** Apply the abstract type constructor to the list of type arguments
     given. *)
 
-val tsum : string -> string list -> t
-(** Create an enumeration type. [tsum name enums] creates an enumeration
-    named [name], with constructors [enums]. *)
-
 val t_adt :
-  ?body: ((string * (string * t) list) list) option ->
-  string -> t list ->
-  t
-(** Crearte and algebraic datatype. The body is a list of
+  ?body:((Uid.term_cst * (Uid.term_cst * t) list) list) option ->
+  Uid.ty_cst -> t list -> t
+(** Create an algebraic datatype. The body is a list of
     constructors, where each constructor is associated with the list of
     its destructors with their respective types. If [body] is none,
     then no definition will be registered for this type. The second
@@ -178,9 +175,15 @@ val t_adt :
     of arguments. *)
 
 val trecord :
-  ?record_constr:string -> t list -> string -> (string * t) list -> t
+  ?sort_fields:bool ->
+  record_constr:Uid.term_cst ->
+  t list -> Uid.ty_cst -> (Uid.term_cst * t) list -> t
 (** Create a record type. [trecord args name lbs] creates a record
-    type with name [name], arguments [args] and fields [lbs]. *)
+    type with name [name], arguments [args] and fields [lbs].
+
+    If [sort_fields] is true, the record fields are sorted according to
+    [Hstring.compare]. This is to preserve compatibility with the old
+    typechecker behavior and should not be used in new code. *)
 
 
 (** {2 Substitutions} *)
@@ -266,3 +269,31 @@ val monomorphize: t -> t
 (** Return a monomorphized variant of the given type, where
     type variable without values have been replaced by abstract types. *)
 
+type goal_sort =
+  | Cut
+  (** Introduce a cut in a goal. Once the cut proved,
+      it's added as a hypothesis. *)
+  | Check
+  (** Check if some intermediate assertion is prouvable *)
+  | Thm
+  (** The goal to be proved valid *)
+  | Sat
+  (** The goal to be proved satisfiable *)
+(** Goal sort. Used in typed declarations. *)
+
+val fresh_hypothesis_name : goal_sort -> string
+(** create a fresh hypothesis name given a goal sort. *)
+
+val is_local_hyp : string -> bool
+(** Assuming a name generated by {!fresh_hypothesis_name},
+    answers whether the name design a local hypothesis ? *)
+
+val is_global_hyp : string -> bool
+(** Assuming a name generated by {!fresh_hypothesis_name},
+    does the name design a global hypothesis ? *)
+
+val print_goal_sort : Format.formatter -> goal_sort -> unit
+(** Print a goal sort *)
+
+val reinit_decls : unit -> unit
+(** Empties the decls cache *)

@@ -1,42 +1,38 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
-[@@@ocaml.warning "-33"]
-open Options
-
-open Sig
+val src : Logs.src
 
 module type S = sig
 
   type t
   type r = Shostak.Combine.r
 
-  val empty : unit -> t
+  val empty : t
 
   val empty_facts : unit -> r Sig_rel.facts
 
@@ -61,17 +57,17 @@ module type S = sig
     r Sig_rel.facts ->
     t * (r Sig_rel.literal * Explanation.t * Th_util.lit_origin) list
 
-  val case_split :
-    t -> for_model:bool ->
-    (r Xliteral.view * bool * Th_util.lit_origin) list * t
+  val case_split : t -> for_model:bool -> Th_util.case_split list * t
+  val optimizing_objective :
+    t -> Objective.Function.t -> Th_util.optimized_split option
+
   val query :  t -> Expr.t -> Th_util.answer
   val new_terms : t -> Expr.Set.t
-  val class_of : t -> Expr.t -> Expr.t list
+  val class_of : t -> Expr.t -> Expr.Set.t
   val are_equal : t -> Expr.t -> Expr.t -> init_terms:bool -> Th_util.answer
   val are_distinct : t -> Expr.t -> Expr.t -> Th_util.answer
   val cl_extract : t -> Expr.Set.t list
   val term_repr : t -> Expr.t -> init_term:bool -> Expr.t
-  val print_model : Format.formatter -> t -> unit
   val get_union_find : t -> Uf.t
 
   val assume_th_elt : t -> Expr.th_elt -> Explanation.t -> t
@@ -79,6 +75,12 @@ module type S = sig
     do_syntactic_matching:bool ->
     Matching_types.info Expr.Map.t * Expr.t list Expr.Map.t Symbols.Map.t ->
     t -> (Expr.t -> Expr.t -> bool) -> t * Sig_rel.instances
+
+  val extract_concrete_model :
+    prop_model:Expr.Set.t ->
+    declared_ids:Id.typed list ->
+    t -> Models.t
+
 end
 
 module Main : S

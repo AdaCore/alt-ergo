@@ -6,19 +6,36 @@ description: """
 Alt-Ergo is an automatic theorem prover of mathematical formulas. It was developed at LRI, and is now maintained at OCamlPro.
 
 See more details on https://alt-ergo.ocamlpro.com/"""
-maintainer: ["Alt-Ergo developers"]
-authors: ["Alt-Ergo developers"]
+maintainer: ["Alt-Ergo developers <alt-ergo@ocamlpro.com>"]
+authors: ["Alt-Ergo developers <alt-ergo@ocamlpro.com>"]
 homepage: "https://alt-ergo.ocamlpro.com/"
 doc: "https://ocamlpro.github.io/alt-ergo"
 bug-reports: "https://github.com/OCamlPro/alt-ergo/issues"
 depends: [
-  "ocaml" {>= "4.05.0"}
-  "dune" {>= "2.0"}
+  "ocaml" {>= "4.08.1"}
+  "dune" {>= "3.14"}
   "alt-ergo-lib" {= version}
   "alt-ergo-parsers" {= version}
   "menhir"
+  "dune-site"
   "cmdliner" {>= "1.1.0"}
   "odoc" {with-doc}
+]
+build: [
+  ["dune" "subst"] {dev}
+  [
+    "dune"
+    "build"
+    "-p"
+    name
+    "-j"
+    jobs
+    "--promote-install-files=false"
+    "@install"
+    "@runtest" {with-test}
+    "@doc" {with-doc}
+  ]
+  ["dune" "install" "-p" name "--create-install-files" name]
 ]
 dev-repo: "git+https://github.com/OCamlPro/alt-ergo.git"
 # This part comes from the template. Please edit alt-ergo.opam.template
@@ -26,12 +43,6 @@ dev-repo: "git+https://github.com/OCamlPro/alt-ergo.git"
 tags: "org:OCamlPro"
 
 license: [
-  "OCamlPro Non-Commercial Purpose License, version 1"
-  "LGPL-2.1-only"
-]
-
-build: [
-  ["ocaml" "unix.cma" "configure.ml" name "--prefix" prefix "--libdir" lib "--mandir" man]
-  ["dune" "subst"] {pinned}
-  ["dune" "build" "-p" name "-j" jobs]
+  "LicenseRef-OCamlpro-Non-Commercial"
+  "Apache-2.0"
 ]

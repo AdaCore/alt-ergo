@@ -30,10 +30,8 @@
    DO NOT CHANGE its format *)
 
 
-let _version="Alt-Ergo version 2.4.0"
+let _version="Alt-Ergo version 2.g.0"
 
 let _release_commit = "(not released)"
 
 let _release_date   = "(not released)"
-
-

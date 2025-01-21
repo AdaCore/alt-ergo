@@ -1,49 +1,62 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
-
-open Format
-open Options
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 type builtin =
     LE | LT (* arithmetic *)
-  | IsConstr of Hstring.t (* ADT tester *)
+  | IsConstr of Uid.term_cst (* ADT tester *)
+  | BVULE (* unsigned bit-vector arithmetic *)
 
 type operator =
-    Plus | Minus | Mult | Div | Modulo
-  | Concat | Extract | Get | Set | Fixed | Float
-  | Reach | Access of Hstring.t | Record
-  | Sqrt_real | Abs_int | Abs_real | Real_of_int | Int_floor | Int_ceil
-  | Sqrt_real_default | Sqrt_real_excess
-  | Min_real | Min_int | Max_real | Max_int | Integer_log2
-  | Pow | Integer_round
-  | Constr of Hstring.t (* enums, adts *)
-  | Destruct of Hstring.t * bool
   | Tite
+  (* Arithmetic *)
+  | Plus | Minus | Mult | Div | Modulo | Pow
+  (* ADTs *)
+  | Access of Uid.term_cst | Record
+  | Constr of Uid.term_cst (* enums, adts *)
+  | Destruct of Uid.term_cst
+  (* Arrays *)
+  | Get | Set
+  (* BV *)
+  | Concat
+  | Extract of int * int (* lower bound * upper bound *)
+  | Sign_extend of int
+  | Repeat of int
+  | BVnot | BVand | BVor | BVxor
+  | BVadd | BVsub | BVmul | BVudiv | BVurem
+  | BVshl | BVlshr
+  | Int2BV of int | BV2Nat
+  (* FP *)
+  | Float
+  | Integer_round
+  | Sqrt_real | Sqrt_real_default | Sqrt_real_excess
+  | Abs_int | Abs_real | Real_of_int | Real_is_int
+  | Int_floor | Int_ceil | Integer_log2
+  | Max_real | Max_int | Min_real | Min_int
+  | Not_theory_constant | Is_theory_constant | Linear_dependency
 
 type lit =
   (* literals *)
@@ -64,20 +77,48 @@ type form =
 
 type name_kind = Ac | Other
 
-type bound_kind = VarBnd of Var.t | ValBnd of Numbers.Q.t
+type name_space = User | Internal | Fresh | Fresh_ac | Skolem | Abstract
+
+let compare_name_space ns1 ns2 =
+  match ns1, ns2 with
+  | User, User -> 0
+  | User, _ -> -1
+  | _, User -> 1
+
+  | Internal, Internal -> 0
+  | Internal, _ -> -1
+  | _, Internal -> 1
+
+  | Fresh, Fresh -> 0
+  | Fresh, _ -> -1
+  | _, Fresh -> 1
+
+  | Fresh_ac, Fresh_ac -> 0
+  | Fresh_ac, _ -> -1
+  | _, Fresh_ac -> 1
+
+  | Skolem, Skolem -> 0
+  | Skolem, _ -> -1
+  | _, Skolem -> 1
+
+  | Abstract, Abstract -> 0
+
+type bound_kind = Unbounded | VarBnd of Var.t | ValBnd of Numbers.Q.t
 
 type bound = (* private *)
   { kind : bound_kind; sort : Ty.t; is_open : bool; is_lower : bool }
 
-
 type t =
   | True
   | False
-  | Void
-  | Name of Hstring.t * name_kind
-  | Int of Hstring.t
-  | Real of Hstring.t
-  | Bitv of string
+  | Name of
+      { hs : Id.t
+      ; kind : name_kind
+      ; defined : bool
+      ; ns : name_space }
+  | Int of Z.t
+  | Real of Q.t
+  | Bitv of int * Z.t
   | Op of operator
   | Lit of lit
   | Form of form
@@ -86,14 +127,35 @@ type t =
   | MapsTo of Var.t
   | Let
 
-type s = t
+let mangle ns s =
+  match ns with
+  | User when String.length s > 0 && Char.equal '.' s.[0] -> ".." ^ s
+  | User when String.length s > 0 && Char.equal '@' s.[0] -> ".@" ^ s
+  | User -> s
+  | Internal -> ".!" ^ s
+  | Fresh -> ".k" ^ s
+  | Fresh_ac -> ".K" ^ s
+  | Skolem -> ".?__" ^ s
+  | Abstract -> "@a" ^ s
 
-let name ?(kind=Other) s = Name (Hstring.make s, kind)
+(* NB: names are pre-mangled, which means that we don't need to take the
+   namespace into consideration when hashing or comparing. *)
+let name ?(kind=Other) ?(defined=false) ?(ns = User) s =
+  Name { hs = Hstring.make (mangle ns s) ; kind ; defined ; ns }
+
 let var s = Var s
-let int i = Int (Hstring.make i)
-let real r = Real (Hstring.make r)
-let constr s = Op (Constr (Hstring.make s))
-let destruct ~guarded s = Op (Destruct (Hstring.make s, guarded))
+let int i = Int (Z.of_string i)
+let bitv s =
+  let biv =
+    Compat.String.fold_left (fun n c ->
+        match c with
+        | '0' -> Z.(n lsl 1)
+        | '1' -> Z.((n lsl 1) lor ~$1)
+        | _ -> assert false) Z.zero s
+  in Bitv (String.length s, biv)
+let real r = Real (Q.of_string r)
+let constr c = Op (Constr c)
+let destruct s = Op (Destruct s)
 
 let mk_bound kind sort ~is_open ~is_lower =
   {kind; sort; is_open; is_lower}
@@ -106,12 +168,14 @@ let mk_in b1 b2 =
 let mk_maps_to x = MapsTo x
 
 let is_ac x = match x with
-  | Name(_, Ac) -> true
+  | Name { kind = Ac; _ } -> true
   | _           -> false
 
-let underscore =
-  Random.self_init ();
-  var @@ Var.of_string @@ sprintf "_%d" (Random.int 1_000_000)
+let is_internal sy =
+  match sy with
+  | Name { ns = User; _ } -> false
+  | Name _ -> true
+  | _ -> false
 
 let compare_kinds k1 k2 =
   Util.compare_algebraic k1 k2
@@ -122,24 +186,35 @@ let compare_kinds k1 k2 =
 let compare_operators op1 op2 =
   Util.compare_algebraic op1 op2
     (function
-      | Access h1, Access h2 | Constr h1, Constr h2 -> Hstring.compare h1 h2
-      | Destruct (h1, b1), Destruct(h2, b2) ->
-        let c = Stdlib.compare b1 b2 in
-        if c <> 0 then c else Hstring.compare h1 h2
-      | _ , (Plus | Minus | Mult | Div | Modulo
-            | Concat | Extract | Get | Set | Fixed | Float | Reach
+      | Access h1, Access h2 | Constr h1, Constr h2
+      | Destruct h1, Destruct h2 ->
+        Uid.compare h1 h2
+      | Extract (i1, j1), Extract (i2, j2) ->
+        let r = Int.compare i1 i2 in
+        if r = 0 then Int.compare j1 j2 else r
+      | Sign_extend n1, Sign_extend n2
+      | Repeat n1, Repeat n2 ->
+        Int.compare n1 n2
+      | Int2BV n1, Int2BV n2 -> Int.compare n1 n2
+      | _ , (Plus | Minus | Mult | Div | Modulo | Real_is_int
+            | Concat | Extract _ | Sign_extend _ | Repeat _ | Get | Set | Float
             | Access _ | Record | Sqrt_real | Abs_int | Abs_real
             | Real_of_int | Int_floor | Int_ceil | Sqrt_real_default
             | Sqrt_real_excess | Min_real | Min_int | Max_real | Max_int
             | Integer_log2 | Pow | Integer_round
+            | BVnot | BVand | BVor | BVxor
+            | BVadd | BVsub | BVmul | BVudiv | BVurem
+            | BVshl | BVlshr
+            | Int2BV _ | BV2Nat
+            | Not_theory_constant | Is_theory_constant | Linear_dependency
             | Constr _ | Destruct _ | Tite) -> assert false
     )
 
 let compare_builtin b1 b2 =
   Util.compare_algebraic b1 b2
     (function
-      | IsConstr h1, IsConstr h2 -> Hstring.compare h1 h2
-      | _, (LT | LE | IsConstr _) -> assert false
+      | IsConstr h1, IsConstr h2 -> Uid.compare h1 h2
+      | _, (LT | LE | BVULE | IsConstr _) -> assert false
     )
 
 let compare_lits lit1 lit2 =
@@ -155,7 +230,7 @@ let compare_forms f1 f2 =
   Util.compare_algebraic f1 f2
     (function
       | F_Unit b1, F_Unit b2
-      | F_Clause b1, F_Clause b2 -> Stdlib.compare b1 b2
+      | F_Clause b1, F_Clause b2 -> Bool.compare b1 b2
       | _, (F_Unit _ | F_Clause _ | F_Lemma | F_Skolem
            | F_Iff | F_Xor) ->
         assert false
@@ -166,30 +241,35 @@ let compare_bounds_kind a b =
     (function
       | VarBnd h1, VarBnd h2 -> Var.compare h1 h2
       | ValBnd q1, ValBnd q2 -> Numbers.Q.compare q1 q2
-      | _, (VarBnd _ | ValBnd _) -> assert false
+      | _, (VarBnd _ | ValBnd _ | Unbounded) -> assert false
     )
 
 let compare_bounds a b =
   let c = Ty.compare a.sort b.sort in
   if c <> 0 then c
   else
-    let c = Stdlib.compare a.is_open b.is_open in
+    let c = Bool.compare a.is_open b.is_open in
     if c <> 0 then c
     else
-      let c = Stdlib.compare a.is_lower b.is_lower in
+      let c = Bool.compare a.is_lower b.is_lower in
       if c <> 0 then c
       else compare_bounds_kind a.kind b.kind
 
 let compare s1 s2 =
   Util.compare_algebraic s1 s2
     (function
-      | Int h1, Int h2
-      | Real h1, Real h2 -> Hstring.compare h1 h2
+      | Int z1, Int z2 -> Z.compare z1 z2
+      | Real h1, Real h2 -> Q.compare h1 h2
       | Var v1, Var v2 | MapsTo v1, MapsTo v2 -> Var.compare v1 v2
-      | Name (h1, k1), Name (h2, k2) ->
+      | Name { ns = ns1; hs = h1; kind = k1; _ },
+        Name { ns = ns2; hs = h2; kind = k2; _ } ->
         let c = Hstring.compare h1 h2 in
-        if c <> 0 then c else compare_kinds k1 k2
-      | Bitv s1, Bitv s2 -> String.compare s1 s2
+        if c <> 0 then c else
+          let c = compare_kinds k1 k2 in
+          if c <> 0 then c else compare_name_space ns1 ns2
+      | Bitv (n1, s1), Bitv (n2, s2) ->
+        let c = Int.compare n1 n2 in
+        if c <> 0 then c else Z.compare s1 s2
       | Op op1, Op op2 -> compare_operators op1 op2
       | Lit lit1, Lit lit2 -> compare_lits lit1 lit2
       | Form f1, Form f2 -> compare_forms f1 f2
@@ -197,7 +277,7 @@ let compare s1 s2 =
         let c = compare_bounds b1 b1' in
         if c <> 0 then c else compare_bounds b2 b2'
       | _ ,
-        (True | False | Void | Name _ | Int _ | Real _ | Bitv _
+        (True | False | Name _ | Int _ | Real _ | Bitv _
         | Op _ | Lit _ | Form _ | Var _ | In _ | MapsTo _ | Let) ->
         assert false
     )
@@ -207,15 +287,16 @@ let equal s1 s2 = compare s1 s2 = 0
 let hash x =
   abs @@
   match x with
-  | Void -> 0
   | True -> 1
   | False -> 2
   | Let -> 3
-  | Bitv s -> 19 * Hashtbl.hash s + 3
+  | Bitv (n, s) -> 19 * (Hashtbl.hash n + Hashtbl.hash s) + 3
   | In (b1, b2) -> 19 * (Hashtbl.hash b1 + Hashtbl.hash b2) + 4
-  | Name (n,Ac) -> 19 * Hstring.hash n + 5
-  | Name (n,Other) -> 19 * Hstring.hash n + 6
-  | Int n | Real n -> 19 * Hstring.hash n + 7
+  (* NB: No need to hash the namespace because names are pre-mangled *)
+  | Name { hs = n; kind = Ac; _ } -> 19 * Hstring.hash n + 5
+  | Name { hs = n; kind = Other; _ } -> 19 * Hstring.hash n + 6
+  | Int z -> 19 * Z.hash z + 7
+  | Real n -> 19 * Hashtbl.hash n + 7
   | Var v -> 19 * Var.hash v + 8
   | MapsTo v -> 19 * Var.hash v + 9
   | Op op -> 19 * Hashtbl.hash op + 10
@@ -223,6 +304,7 @@ let hash x =
   | Form x -> 19 * Hashtbl.hash x + 12
 
 let string_of_bound_kind x = match x with
+  | Unbounded -> "?"
   | VarBnd v -> Var.to_string v
   | ValBnd v -> Numbers.Q.to_string v
 
@@ -235,108 +317,222 @@ let string_of_bound b =
 
 let print_bound fmt b = Format.fprintf fmt "%s" (string_of_bound b)
 
-let string_of_lit lit = match lit with
-  | L_eq -> "="
-  | L_neg_eq -> "<>"
-  | L_neg_pred -> "not "
-  | L_built LE -> "<="
-  | L_built LT -> "<"
-  | L_neg_built LE -> ">"
-  | L_neg_built LT -> ">="
-  | L_built (IsConstr h) ->
-    sprintf "? %s" (Hstring.view h)
-  | L_neg_built (IsConstr h) ->
-    sprintf "?not? %s" (Hstring.view h)
+let pp_name ppf (_ns, s) =
+  (* Names are pre-mangled *)
+  Dolmen.Smtlib2.Script.Poly.Print.id ppf (Dolmen.Std.Name.simple s)
 
-let string_of_form f = match f with
-  | F_Unit _ -> "/\\"
-  | F_Clause _ -> "\\/"
-  | F_Lemma -> "Lemma"
-  | F_Skolem -> "Skolem"
-  | F_Iff -> "<->"
-  | F_Xor -> "xor"
+module AEPrinter = struct
+  let pp_operator ppf op =
+    match op with
+    (* Core theory *)
+    | Tite -> Fmt.pf ppf "ite"
 
-let to_string ?(show_vars=true) x = match x with
-  | Name (n,_) -> Hstring.view n
-  | Var v when show_vars -> Format.sprintf "'%s'" (Var.to_string v)
-  | Var v -> Var.to_string v
-  | Int n -> Hstring.view n
-  | Real n -> Hstring.view n
-  | Bitv s -> "[|"^s^"|]"
-  | Op Plus -> "+"
-  | Op Minus -> "-"
-  | Op Mult -> "*"
-  | Op Div -> "/"
-  | Op Modulo -> "%"
-  | Op (Access s) -> "@Access_"^(Hstring.view s)
-  | Op (Constr s) -> (Hstring.view s)
-  | Op (Destruct (s,g)) ->
-    Format.sprintf "%s%s" (if g then "" else "!") (Hstring.view s)
+    (* Reals and Ints theories *)
+    | Plus -> Fmt.pf ppf "+"
+    | Minus -> Fmt.pf ppf "-"
+    | Mult -> Fmt.pf ppf "*"
+    | Div -> Fmt.pf ppf "/"
+    | Modulo -> Fmt.pf ppf "%%"
+    | Pow -> Fmt.pf ppf "**"
+    | Sqrt_real -> Fmt.pf ppf "sqrt_real"
+    | Sqrt_real_default -> Fmt.pf ppf "sqrt_real_default"
+    | Sqrt_real_excess -> Fmt.pf ppf "sqrt_real_excess"
+    | Int_floor -> Fmt.pf ppf "int_floor"
+    | Int_ceil -> Fmt.pf ppf "int_ceil"
+    | Max_real -> Fmt.pf ppf "max_real"
+    | Max_int -> Fmt.pf ppf "max_int"
+    | Min_real -> Fmt.pf ppf "min_real"
+    | Min_int -> Fmt.pf ppf "min_int"
+    | Integer_log2 -> Fmt.pf ppf "integer_log2"
+    | Integer_round -> Fmt.pf ppf "integer_round"
 
-  | Op Record -> "@Record"
-  | Op Get -> "get"
-  | Op Set -> "set"
-  | Op Float -> "float"
-  | Op Fixed -> "fixed"
-  | Op Abs_int -> "abs_int"
-  | Op Abs_real -> "abs_real"
-  | Op Sqrt_real -> "sqrt_real"
-  | Op Sqrt_real_default -> "sqrt_real_default"
-  | Op Sqrt_real_excess -> "sqrt_real_excess"
-  | Op Real_of_int -> "real_of_int"
-  | Op Int_floor -> "int_floor"
-  | Op Int_ceil -> "int_ceil"
-  | Op Max_real -> "max_real"
-  | Op Max_int -> "max_int"
-  | Op Min_real -> "min_real"
-  | Op Min_int -> "min_int"
-  | Op Integer_log2 -> "integer_log2"
-  | Op Pow -> "**"
-  | Op Integer_round -> "integer_round"
-  | Op Concat -> "@"
-  | Op Extract -> "^"
-  | Op Tite -> "ite"
-  | Op Reach -> assert false
-  | True -> "true"
-  | False -> "false"
-  | Void -> "void"
-  | In (lb, rb) ->
-    Format.sprintf "%s , %s" (string_of_bound lb) (string_of_bound rb)
+    (* Reals_Ints theory *)
+    | Abs_int -> Fmt.pf ppf "abs_int"
+    | Abs_real -> Fmt.pf ppf "abs_real"
+    | Real_of_int -> Fmt.pf ppf "real_of_int"
+    | Real_is_int -> Fmt.pf ppf "real_is_int"
 
-  | MapsTo x ->  Format.sprintf "%s |->" (Var.to_string x)
+    (* FixedSizedBitVectors theory *)
+    | Extract (i, j) -> Fmt.pf ppf "^{%d; %d}" i j
+    | Concat -> Fmt.pf ppf "@"
+    | Sign_extend i -> Fmt.pf ppf  "sign_extend[%d]" i
+    | Repeat i -> Fmt.pf ppf "repeat[%d]" i
+    | BV2Nat -> Fmt.pf ppf "bv2nat"
+    | Int2BV n -> Fmt.pf ppf "int2bv[%d]" n
+    | BVnot -> Fmt.pf ppf "bvnot"
+    | BVand -> Fmt.pf ppf "bvand"
+    | BVor -> Fmt.pf ppf "bvor"
+    | BVxor -> Fmt.pf ppf "bvxor"
 
-  | Lit lit -> string_of_lit lit
-  | Form form -> string_of_form form
-  | Let -> "let"
+    (* BV logic *)
+    | BVadd -> Fmt.pf ppf "bvadd"
+    | BVsub -> Fmt.pf ppf "bvsub"
+    | BVmul -> Fmt.pf ppf "bvmul"
+    | BVudiv -> Fmt.pf ppf "bvudiv"
+    | BVurem -> Fmt.pf ppf "bvurem"
+    | BVshl -> Fmt.pf ppf "bvshl"
+    | BVlshr -> Fmt.pf ppf "bvlshr"
 
-let to_string_clean s = to_string ~show_vars:false s
-let to_string s = to_string ~show_vars:true s
+    (* ArraysEx theory *)
+    | Get -> Fmt.pf ppf "get"
+    | Set -> Fmt.pf ppf "set"
 
-let print_clean fmt s = Format.fprintf fmt "%s" (to_string_clean s)
-let print fmt s = Format.fprintf fmt "%s" (to_string s)
+    (* DT theory *)
+    | Record -> Fmt.pf ppf "@Record"
+    | Access s -> Fmt.pf ppf "@Access_%a" Uid.pp s
+    | Constr s
+    | Destruct s -> Uid.pp ppf s
 
+    (* Float theory *)
+    | Float -> Fmt.pf ppf "float"
 
-let fresh =
-  let cpt = ref 0 in
-  fun ?(is_var=false) s ->
-    incr cpt;
-    (* garder le suffixe "__" car cela influence l'ordre *)
-    let s = (Format.sprintf "!?__%s%i" s (!cpt)) in
-    if is_var then var @@ Var.of_string s else name s
+    | Not_theory_constant -> Fmt.pf ppf "not_theory_constant"
+    | Is_theory_constant -> Fmt.pf ppf "is_theory_constant"
+    | Linear_dependency -> Fmt.pf ppf "linear_dependency"
+
+  let pp_lit ppf lit =
+    match lit with
+    | L_eq -> Fmt.pf ppf "="
+    | L_neg_eq -> Fmt.pf ppf "distinct"
+    | L_built LE -> Fmt.pf ppf "<="
+    | L_built LT -> Fmt.pf ppf "<"
+    | L_neg_built LE -> Fmt.pf ppf ">"
+    | L_neg_built LT -> Fmt.pf ppf ">="
+    | L_neg_pred -> Fmt.pf ppf "not "
+    | L_built BVULE -> Fmt.pf ppf "<="
+    | L_neg_built BVULE -> Fmt.pf ppf ">"
+    | L_built (IsConstr h) ->
+      Fmt.pf ppf "? %a" Uid.pp h
+    | L_neg_built (IsConstr h) ->
+      Fmt.pf ppf "?not? %a" Uid.pp h
+
+  let pp_form ppf f =
+    match f with
+    | F_Unit _ -> Fmt.pf ppf "/\\"
+    | F_Clause _ -> Fmt.pf ppf "\\/"
+    | F_Lemma -> Fmt.pf ppf "Lemma"
+    | F_Skolem -> Fmt.pf ppf "Skolem"
+    | F_Iff -> Fmt.pf ppf "<->"
+    | F_Xor -> Fmt.pf ppf "xor"
+
+  let pp ?(show_vars = true) ppf sy =
+    match sy with
+    | Lit lit -> pp_lit ppf lit
+    | Form form -> pp_form ppf form
+    | Let -> Fmt.pf ppf "let"
+    | Op op -> pp_operator ppf op
+
+    (* Core theory *)
+    | True -> Fmt.pf ppf "true"
+    | False -> Fmt.pf ppf "false"
+    | Name { ns; hs; _ } -> pp_name ppf (ns, Hstring.view hs)
+    | Var v when show_vars -> Fmt.pf ppf "'%s'" (Var.to_string v)
+    | Var v -> Fmt.string ppf (Var.to_string v)
+
+    (* Reals and Ints theories *)
+    | Int i -> Z.pp_print ppf i
+    | Real q -> Q.pp_print ppf q
+
+    (* FixedSizedBitVectors theory *)
+    | Bitv (n, s) ->
+      Fmt.pf ppf "[|%s|]" (Z.format (Fmt.str "%%0%db" n) s)
+
+    (* Symbols used in semantic triggers *)
+    | In (lb, rb) ->
+      Fmt.pf ppf "%s, %s" (string_of_bound lb) (string_of_bound rb)
+    | MapsTo v -> Fmt.pf ppf "%a |->" Var.print v
+end
+
+module SmtPrinter = struct
+  let pp_operator ppf op =
+    match op with
+    (* Core theory *)
+    |Tite -> Fmt.pf ppf "ite"
+
+    (* Reals and Ints theories *)
+    | Plus -> Fmt.pf ppf "+"
+    | Minus -> Fmt.pf ppf "-"
+    | Mult -> Fmt.pf ppf "*"
+    | Div -> Fmt.pf ppf "/"
+    | Modulo -> Fmt.pf ppf "%%"
+
+    (* Reals_Ints theory *)
+    | Abs_int | Abs_real -> Fmt.pf ppf "abs"
+    | Real_of_int -> Fmt.pf ppf "to_real"
+    | Real_is_int -> Fmt.pf ppf "is_int"
+    | Int_floor -> Fmt.pf ppf "to_int"
+
+    (* FixedSizedBitVectors theory *)
+    | Extract (i, j) -> Fmt.pf ppf "(_ extract %d %d)" j i
+    | Concat -> Fmt.pf ppf "concat"
+    | Sign_extend i -> Fmt.pf ppf "(_ sign_extend %d)" i
+    | Repeat i -> Fmt.pf ppf "(_ repeat %d)" i
+    | BV2Nat -> Fmt.pf ppf "bv2nat"
+    | BVnot -> Fmt.pf ppf "bvnot"
+    | BVand -> Fmt.pf ppf "bvand"
+    | BVor -> Fmt.pf ppf "bvor"
+    | BVxor -> Fmt.pf ppf "bvxor"
+
+    (* BV logic *)
+    | BVadd -> Fmt.pf ppf "bvadd"
+    | BVsub -> Fmt.pf ppf "bvsub"
+    | BVmul -> Fmt.pf ppf "bvmul"
+    | BVudiv -> Fmt.pf ppf "bvudiv"
+    | BVurem -> Fmt.pf ppf "bvurem"
+    | BVshl -> Fmt.pf ppf "bvshl"
+    | BVlshr -> Fmt.pf ppf "bvlshr"
+
+    (* ArraysEx theory *)
+    | Get -> Fmt.pf ppf "select"
+    | Set -> Fmt.pf ppf "store"
+
+    (* DT theory *)
+    | Record -> ()
+    | Access s | Constr s | Destruct s -> Uid.pp ppf s
+
+    (* Float theory *)
+    | Float -> Fmt.pf ppf "ae.round"
+
+    (* Not in the SMT-LIB standard *)
+    | Int2BV n -> Fmt.pf ppf "(_ int2bv %d)" n
+    | Not_theory_constant -> Fmt.pf ppf "ae.not_theory_constant"
+    | Is_theory_constant -> Fmt.pf ppf "ae.is_theory_constant"
+    | Linear_dependency -> Fmt.pf ppf "ae.linear_dependency"
+    | Sqrt_real -> Fmt.pf ppf "ae.sqrt_real"
+    | Sqrt_real_default -> Fmt.pf ppf "ae.sqrt_real_default"
+    | Sqrt_real_excess -> Fmt.pf ppf "ae.sqrt_real_excess"
+    | Int_ceil -> Fmt.pf ppf "ae.int_ceil"
+    | Max_real -> Fmt.pf ppf "ae.max_real"
+    | Max_int -> Fmt.pf ppf "ae.max_int"
+    | Min_real -> Fmt.pf ppf "ae.min_real"
+    | Min_int -> Fmt.pf ppf "ae.min_int"
+    | Integer_log2 -> Fmt.pf ppf "ae.integer_log2"
+    | Integer_round -> Fmt.pf ppf "ae.integer_round"
+    | Pow -> Fmt.pf ppf "ae.pow"
+
+end
+
+let pp_ae_operator = AEPrinter.pp_operator
+let pp_smtlib_operator = SmtPrinter.pp_operator
+
+let print_clean = AEPrinter.pp ~show_vars:false
+let print = AEPrinter.pp ~show_vars:true
+
+let to_string_clean sy =
+  Fmt.str "%a" (AEPrinter.pp ~show_vars:false) sy
+
+let to_string sy =
+  Fmt.str "%a" (AEPrinter.pp ~show_vars:true) sy
+
+let fresh_skolem_string base = Id.Namespace.Skolem.fresh ~base ()
+let fresh_skolem_name base = name ~ns:Skolem (fresh_skolem_string base)
+let fresh_skolem_var base = Var.of_string (fresh_skolem_string base)
 
 let is_get f = equal f (Op Get)
 let is_set f = equal f (Op Set)
 
-
-let fake_eq  =  name "@eq"
-let fake_neq =  name "@neq"
-let fake_lt  =  name "@lt"
-let fake_le  =  name "@le"
-
-
-
 module Labels = Hashtbl.Make(struct
-    type t = s
+    type nonrec t = t
     let equal = equal
     let hash = hash
   end)
@@ -347,16 +543,10 @@ let add_label lbl t = Labels.replace labels t lbl
 
 let label t = try Labels.find labels t with Not_found -> Hstring.empty
 
+let clear_labels () = Labels.clear labels
+
 module Set : Set.S with type elt = t =
-  Set.Make (struct type t=s let compare=compare end)
+  Set.Make (struct type nonrec t = t let compare=compare end)
 
-module Map : sig
-  include Map.S with type key = t
-  val print :
-    (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
-end = struct
-  include Map.Make (struct type t = s let compare = compare end)
-  let print pr_elt fmt sbt =
-    iter (fun k v -> fprintf fmt "%a -> %a  " print k pr_elt v) sbt
-end
-
+module Map : Map.S with type key = t =
+  Map.Make (struct type nonrec t = t let compare = compare end)

@@ -1,25 +1,53 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the license indicated      *)
-(*     in the file 'License.OCamlPro'. If 'License.OCamlPro' is not           *)
-(*     present, please contact us to clarify licensing.                       *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 exception Timeout
+exception Step_limit_reached of int
 exception Unsolvable
 
 exception Cmp of int
 
-module MI = Map.Make(struct type t = int
-    let compare (x: int) y = Stdlib.compare x y end)
+exception Not_implemented of string
+exception Internal_error of string
 
-module SI = Set.Make(struct type t = int
-    let compare (x: int) y = Stdlib.compare x y end)
+let () =
+  Printexc.register_printer
+    (function
+      | Not_implemented s ->
+        Some (Format.sprintf "Feature not implemented (%s)" s)
+      | Internal_error s ->
+        Some (Format.sprintf "Internal error: %s" s)
+      | _ -> None
+    )
 
+module MI = Map.Make (Int)
+module SI = Set.Make (Int)
+
+module MS = Map.Make(String)
 module SS = Set.Make(String)
 
 
@@ -42,6 +70,12 @@ type sat_solver =
   | CDCL
   | CDCL_Tableaux
 
+let pp_sat_solver ppf = function
+  | Tableaux -> Format.fprintf ppf "Tableaux"
+  | Tableaux_CDCL -> Format.fprintf ppf "Tableaux-CDCL"
+  | CDCL -> Format.fprintf ppf "CDCL"
+  | CDCL_Tableaux -> Format.fprintf ppf "CDCL-Tableaux"
+
 type theories_extensions =
   | Sum
   | Adt
@@ -53,8 +87,32 @@ type theories_extensions =
   | NRA
   | NIA
   | FPA
+  | RIA
 
 type axiom_kind = Default | Propagator
+
+type mode =
+  | Start
+  | Assert
+  | Sat
+  | Unsat
+
+let pp_mode fmt m =
+  Format.pp_print_string fmt begin
+    match m with
+    | Start -> "Start"
+    | Assert -> "Assert"
+    | Sat -> "Sat"
+    | Unsat -> "Unsat"
+  end
+
+let equal_mode x y = match x, y with
+  | Start, Start
+  | Assert, Assert
+  | Sat, Sat
+  | Unsat, Unsat -> true
+  | (Start | Assert | Sat | Unsat), (Start | Assert | Sat | Unsat) ->
+    false
 
 let th_ext_of_string ext =
   match ext with
@@ -68,6 +126,7 @@ let th_ext_of_string ext =
   | "NRA" -> Some NRA
   | "NIA" -> Some NIA
   | "FPA" -> Some FPA
+  | "RIA" -> Some RIA
   |  _ -> None
 
 let string_of_th_ext ext =
@@ -82,6 +141,7 @@ let string_of_th_ext ext =
   | NRA -> "NRA"
   | NIA -> "NIA"
   | FPA -> "FPA"
+  | RIA -> "RIA"
 
 let [@inline always] compare_algebraic s1 s2 f_same_constrs_with_args =
   let r1 = Obj.repr s1 in
@@ -136,7 +196,6 @@ let print_list ~sep ~pp fmt l =
     Format.fprintf fmt "%a" pp e;
     List.iter (fun e -> Format.fprintf fmt "%s %a" sep pp e) l
 
-
 let rec print_list_pp ~sep ~pp fmt = function
   | [] -> ()
   | [x] -> pp fmt x
@@ -144,3 +203,5 @@ let rec print_list_pp ~sep ~pp fmt = function
     Format.fprintf fmt "%a %a" pp x sep ();
     print_list_pp ~sep ~pp fmt l
 
+let internal_error msg =
+  Format.kasprintf (fun s -> raise (Internal_error s)) msg

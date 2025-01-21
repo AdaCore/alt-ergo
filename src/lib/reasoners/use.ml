@@ -1,33 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
-
-open Options
-open Format
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 module E = Expr
 module SE = E.Set
@@ -43,6 +39,9 @@ module X = Shostak.Combine
 
 module MX = Shostak.MXH
 
+let src = Logs.Src.create ~doc:"Use" __MODULE__
+module Log = (val Logs.src_log src : Logs.LOG)
+
 type t = (SE.t * SA.t) MX.t
 type r = X.r
 
@@ -54,7 +53,7 @@ let union_tpl (x1,y1) (x2,y2) =
   Options.exec_thread_yield ();
   SE.union x1 x2, SA.union y1 y2
 
-let one, _ = X.make (E.mk_term (Symbols.name "@bottom") [] Ty.Tint)
+let one, _ = X.make (E.mk_term (Symbols.name ~ns:Internal "@bottom") [] Ty.Tint)
 let leaves r =
   match X.leaves r with [] -> [one] | l -> l
 
@@ -66,9 +65,8 @@ let add_term k t mp =
 let up_add g t rt lvs =
   let g = if MX.mem rt g then g else MX.add rt (SE.empty, SA.empty) g in
   match E.term_view t with
-  | E.Term { E.xs = []; _ } -> g
-  | E.Term _ -> List.fold_left (fun g x -> add_term x t g) g lvs
-  | _ -> assert false
+  | { E.xs = []; _ } -> g
+  | _ -> List.fold_left (fun g x -> add_term x t g) g lvs
 
 let congr_add g lvs =
   match lvs with
@@ -94,21 +92,21 @@ let congr_close_up g p touched =
     (find p g) touched
 
 let print g =
-  if get_debug_use () then
+  if Options.get_debug_use () then
     begin
-      let sterms fmt = SE.iter (fprintf fmt "%a " E.print) in
+      let sterms fmt = SE.iter (Format.fprintf fmt "%a " E.print) in
       let satoms fmt =
         SA.iter
           (fun (a,e) ->
-             fprintf fmt "%a %a" E.print a Explanation.print e)
+             Format.fprintf fmt "%a %a" E.print a Explanation.print e)
       in
       let print_sterms_and_atoms fmt (st,sa) =
         match SE.is_empty st,SA.is_empty sa with
-        | true, true -> fprintf fmt ""
-        | false, true -> fprintf fmt " is used by {%a}" sterms st
-        | true,false -> fprintf fmt " is used by {%a}" satoms sa
+        | true, true -> Format.fprintf fmt ""
+        | false, true -> Format.fprintf fmt " is used by {%a}" sterms st
+        | true,false -> Format.fprintf fmt " is used by {%a}" satoms sa
         | false, false ->
-          fprintf fmt " is used by {%a} and {%a}" sterms st satoms sa
+          Format.fprintf fmt " is used by {%a} and {%a}" sterms st satoms sa
       in
       Printer.print_dbg
         ~module_name:"Use" ~function_name:"print"

@@ -1,12 +1,10 @@
 # Metadata files
 .gitignore
+*.orig
 META
 
 # Generated source files
 *.merlin
-Makefile.config
-src/lib/util/config.ml
-src/bin/text/flags.dune
 
 # Generated installation files
 *.install
@@ -20,6 +18,7 @@ AB-Why3-plugin.cmxs
 fm-simplex-plugin.cma
 fm-simplex-plugin.cmxs
 rsc/extra/ocpchecker/ocp-checker
+*.exe
 
 # Generated documentation files
 rsc/extra/index.html
@@ -41,3 +40,9 @@ _opam
 alt-ergo.js
 alt-ergo-worker.js
 www/
+
+# Generated python files
+__pycache__
+
+# Generated nix files
+/result*

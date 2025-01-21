@@ -1,33 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
-
-[@@@ocaml.warning "-33"]
-open Options
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 module type HASHED =
 sig
@@ -42,6 +38,8 @@ end
 module type S =
 sig
   type t
+  val save_cache: unit -> unit
+  val reinit_cache: unit -> unit
   val make : t -> t
   val elements : unit -> t list
 end
@@ -61,6 +59,29 @@ struct
   let retain_list = ref []
 
   let next_id = ref 0
+
+  let save_cache, reinit_cache =
+    let saved_nid = ref 0 in
+    let saved_retain_list = ref [] in
+    let saved_storage = ref None in
+    let save_cache () =
+      saved_retain_list := !retain_list;
+      saved_nid := !next_id;
+      saved_storage := (
+        let hw = HWeak.create Hashed.initial_size in
+        HWeak.iter (HWeak.add hw) storage;
+        Some hw
+      )
+    in
+    let reinit_cache () =
+      next_id := !saved_nid;
+      retain_list := !saved_retain_list;
+      HWeak.clear storage;
+      match !saved_storage with
+      | Some st -> HWeak.iter (HWeak.add storage) st
+      | None -> ()
+    in
+    save_cache, reinit_cache
 
   let make d =
     let d = Hashed.set_id !next_id d in

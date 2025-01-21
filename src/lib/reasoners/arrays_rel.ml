@@ -1,33 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
-
-open Options
-open Format
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 module Sy = Symbols
 module E  = Expr
@@ -38,6 +34,9 @@ module X = Shostak.Combine
 module Ex = Explanation
 
 module LR = Uf.LX
+
+let src = Logs.Src.create ~doc:"Arrays_rel" __MODULE__
+module Log = (val Logs.src_log src : Logs.LOG)
 
 (* map get |-> { set } des associations (get,set) deja splites *)
 module Tmap = struct
@@ -68,7 +67,7 @@ module G :Set.S with type elt = gtype = Set.Make
     (struct type t = gtype let compare t1 t2 = E.compare t1.g t2.g end)
 
 (* ensemble de termes "set" avec leurs arguments et leurs types *)
-type stype = {s:E.t; st:E.t; si:E.t; sv:E.t; sty:Ty.t}
+type stype = {s:E.t; st:E.t; si:E.t; sv:E.t}
 module S :Set.S with type elt = stype = Set.Make
     (struct type t = stype let compare t1 t2 = E.compare t1.s t2.s end)
 
@@ -82,6 +81,10 @@ module TBS = struct
   let add k v mp = add k (S.add v (find k mp)) mp
 end
 
+let timer = Timers.M_Arrays
+
+module H = Ephemeron.K1.Make (Expr)
+
 type t =
   {gets  : G.t;               (* l'ensemble des "get" croises*)
    tbset : S.t TBS.t ;        (* map t |-> set(t,-,-) *)
@@ -90,10 +93,11 @@ type t =
    seen  : E.Set.t Tmap.t;    (* combinaisons (get,set) deja splitees *)
    new_terms : E.Set.t;
    size_splits : Numbers.Q.t;
+   cached_relevant_terms : (G.t * S.t TBS.t) H.t;
   }
 
 
-let empty _ =
+let empty uf =
   {gets  = G.empty;
    tbset = TBS.empty;
    split = LRset.empty;
@@ -101,7 +105,8 @@ let empty _ =
    seen  = Tmap.empty;
    new_terms = E.Set.empty;
    size_splits = Numbers.Q.one;
-  }
+   cached_relevant_terms = H.create 1024;
+  }, Uf.domains uf
 
 (*BISECT-IGNORE-BEGIN*)
 module Debug = struct
@@ -109,10 +114,10 @@ module Debug = struct
 
   let assume la =
     let print fmt (a,_,_,_) =
-      fprintf fmt "> %a@,"
+      Format.fprintf fmt "> %a@,"
         LR.print (LR.make a)
     in
-    if get_debug_arrays () && la != [] then
+    if Options.get_debug_arrays () && la != [] then
       Printer.print_dbg
         ~module_name:"Arrays_rel"
         ~function_name:"assume"
@@ -139,7 +144,7 @@ module Debug = struct
   *)
 
   let new_equalities st =
-    if get_debug_arrays () then begin
+    if Options.get_debug_arrays () then begin
       Printer.print_dbg
         ~module_name:"Arrays_rel"
         ~function_name:"new_equalities"
@@ -152,14 +157,14 @@ module Debug = struct
     end
 
   let case_split a =
-    if get_debug_arrays () then
+    if Options.get_debug_arrays () then
       print_dbg
         ~module_name:"Arrays_rel"
         ~function_name:"case_split"
         "%a" LR.print a
 
   let case_split_none () =
-    if get_debug_arrays () then
+    if Options.get_debug_arrays () then
       print_dbg
         ~module_name:"Arrays_rel"
         ~function_name:"case_split_none"
@@ -168,20 +173,46 @@ module Debug = struct
 end
 (*BISECT-IGNORE-END*)
 
-(* met a jour gets et tbset en utilisant l'ensemble des termes donne*)
-let rec update_gets_sets acc t =
-  let { E.f; xs; ty; _ } =
-    match E.term_view t with
-    | E.Not_a_term _ -> assert false
-    | E.Term tt -> tt
+let merge_revelant_terms (gets, tbset) (g, t) =
+  let gets = G.union gets g in
+  let tbset =
+    TBS.merge
+      (fun _ s1 s2 ->
+         match s1, s2 with
+         | Some s1, Some s2 -> Some (S.union s1 s2)
+         | Some s, None | None, Some s -> Some s
+         | None, None -> None
+      ) tbset t
   in
-  let gets, tbset = List.fold_left update_gets_sets acc xs in
+  gets, tbset
+
+(* Collects all the select or store subterms of the term [t]
+   for the instantiation engine. Use a weak cache to avoid a bottleneck in
+   presence of very large terms in the problem.
+
+   See issue https://github.com/OCamlPro/alt-ergo/issues/1123 *)
+let rec relevant_terms env t =
+  let { E.f; xs; ty; _ } = E.term_view t in
+  let gets, tbset =
+    List.fold_left
+      (fun acc x ->
+         merge_revelant_terms acc (cached_relevant_terms env x)
+      ) (G.empty, TBS.empty) xs
+  in
   match Sy.is_get f, Sy.is_set f, xs with
   | true , false, [a;i]   -> G.add {g=t; gt=a; gi=i; gty=ty} gets, tbset
   | false, true , [a;i;v] ->
-    gets, TBS.add a {s=t; st=a; si=i; sv=v; sty=ty} tbset
+    gets, TBS.add a {s=t; st=a; si=i; sv=v} tbset
   | false, false, _ -> (gets,tbset)
   | _  -> assert false
+
+and cached_relevant_terms env t =
+  match H.find env.cached_relevant_terms t with
+  | r -> r
+  | exception Not_found ->
+    let r = relevant_terms env t in
+    H.add env.cached_relevant_terms t r;
+    r
 
 (* met a jour les composantes gets et tbset de env avec les termes
    contenus dans les atomes de la *)
@@ -190,7 +221,8 @@ let new_terms env la =
     List.fold_left
       (fun acc x ->
          match X.term_extract x with
-         | Some t, _ -> update_gets_sets acc t
+         | Some t, _ ->
+           merge_revelant_terms acc @@ cached_relevant_terms env t
          | None, _   -> acc
       )acc (X.leaves r)
   in
@@ -204,7 +236,6 @@ let new_terms env la =
       ) (env.gets,env.tbset) la
   in
   {env with gets=gets; tbset=tbset}
-
 
 (* mise a jour de env avec les instances
    1) p   => p_ded
@@ -234,16 +265,12 @@ let update_env are_eq are_dist dep env acc gi si p p_ded n n_ded =
   ---------------------------------------------------------------------*)
 let get_of_set are_eq are_dist gtype (env,acc) class_of =
   let {g=get; gt=gtab; gi=gi; gty=gty} = gtype in
-  L.fold_left
-    (fun (env,acc) set ->
+  E.Set.fold
+    (fun set (env,acc) ->
        if Tmap.splited get set env.seen then (env,acc)
        else
          let env = {env with seen = Tmap.update get set env.seen} in
-         let { E.f; xs; _ } =
-           match E.term_view set with
-           | E.Not_a_term _ -> assert false
-           | E.Term tt -> tt
-         in
+         let { E.f; xs; _ } = E.term_view set in
          match Sy.is_set f, xs with
          | true , [stab;si;sv] ->
            let xi, _ = X.make gi in
@@ -262,16 +289,16 @@ let get_of_set are_eq are_dist gtype (env,acc) class_of =
            update_env
              are_eq are_dist dep env acc gi si p p_ded n n_ded
          | _ -> (env,acc)
-    ) (env,acc) (class_of gtab)
+    ) (class_of gtab) (env,acc)
 
 (*----------------------------------------------------------------------
   set(-,-,-) modulo egalite
   ---------------------------------------------------------------------*)
 let get_from_set _are_eq _are_dist stype (env,acc) class_of =
   let sets =
-    L.fold_left
-      (fun acc t -> S.union acc (TBS.find t env.tbset))
-      (S.singleton stype) (class_of stype.st)
+    E.Set.fold
+      (fun t acc -> S.union acc (TBS.find t env.tbset))
+      (class_of stype.st) (S.singleton stype)
   in
 
   S.fold (fun { s = set; si = si; sv = sv; _ } (env,acc) ->
@@ -294,9 +321,9 @@ let get_and_set are_eq are_dist gtype (env,acc) class_of =
   let {g=get; gt=gtab; gi=gi; gty=gty} = gtype in
 
   let suff_sets =
-    L.fold_left
-      (fun acc t -> S.union acc (TBS.find t env.tbset))
-      S.empty (class_of gtab)
+    E.Set.fold
+      (fun t acc -> S.union acc (TBS.find t env.tbset))
+      (class_of gtab) S.empty
   in
   S.fold
     (fun  {s=set; st=stab; si=si; sv=sv; _ } (env,acc) ->
@@ -393,7 +420,7 @@ let new_equalities env eqs la class_of =
 (* choisir une egalite sur laquelle on fait un case-split *)
 let two = Numbers.Q.from_int 2
 
-let case_split env _ ~for_model:_ =
+let case_split env _uf ~for_model:_ =
   (*if Numbers.Q.compare
     (Numbers.Q.mult two env.size_splits) (max_split ()) <= 0  ||
     Numbers.Q.sign  (max_split ()) < 0 then*)
@@ -404,6 +431,8 @@ let case_split env _ ~for_model:_ =
   with Not_found ->
     Debug.case_split_none ();
     []
+
+let optimizing_objective _env _uf _o = None
 
 let count_splits env la =
   let nb =
@@ -431,26 +460,12 @@ let assume env uf la =
   Debug.new_equalities atoms;
   let l =
     Conseq.fold (fun (a,ex) l ->
-        ((Sig_rel.LTerm a, ex, Th_util.Other)::l)) atoms []
+        ((Literal.LTerm a, ex, Th_util.Other)::l)) atoms []
   in
-  env, { Sig_rel.assume = l; remove = [] }
-
-
-let assume env uf la =
-  if get_timers() then
-    try
-      Timers.exec_timer_start Timers.M_Arrays Timers.F_assume;
-      let res =assume env uf la in
-      Timers.exec_timer_pause Timers.M_Arrays Timers.F_assume;
-      res
-    with e ->
-      Timers.exec_timer_pause Timers.M_Arrays Timers.F_assume;
-      raise e
-  else assume env uf la
+  env, Uf.domains uf, { Sig_rel.assume = l; remove = [] }
 
 let query _ _ _ = None
-let add env _ _ _ = env, []
-let print_model _ _ _ = ()
+let add env uf _ _ = env, Uf.domains uf, []
 
 let new_terms env = env.new_terms
 let instantiate ~do_syntactic_matching:_ _ env _ _ = env, []

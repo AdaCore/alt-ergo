@@ -1,76 +1,134 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
-(* Formatter declarations, getters and setters *)
-let fmt_std = ref Format.std_formatter
-let fmt_err = ref Format.err_formatter
-let fmt_wrn = ref Format.err_formatter
-let fmt_dbg = ref Format.err_formatter
-let fmt_mdl = ref Format.std_formatter
-let fmt_usc = ref Format.std_formatter
+module Output = struct
+  type t =
+    | Stdout
+    | Stderr
+    | Channel of string * out_channel * Format.formatter
+    | Fmt of Format.formatter
+    | Invalid
 
-let set_std_fmt f =
-  fmt_std := f;
-  fmt_mdl := f;
-  fmt_usc := f
+  let to_string = function
+    | Stdout -> "stdout"
+    | Stderr -> "stderr"
+    | Channel (fname, _, _) -> fname
+    | Fmt _ -> "custom formatter"
+    | Invalid -> "invalid"
 
-let set_err_fmt f =
-  fmt_err := f;
-  fmt_wrn := f;
-  fmt_dbg := f
+  let of_formatter fmt = Fmt fmt
 
-let get_fmt_std () = !fmt_std
-let get_fmt_err () = !fmt_err
-let get_fmt_wrn () = !fmt_wrn
-let get_fmt_dbg () = !fmt_dbg
-let get_fmt_mdl () = !fmt_mdl
-let get_fmt_usc () = !fmt_usc
+  let to_formatter = function
+    | Stdout -> Format.std_formatter
+    | Stderr -> Format.err_formatter
+    | Channel (_, _, fmt) -> fmt
+    | Fmt fmt -> fmt
+    | Invalid -> assert false
 
-let set_fmt_std f = fmt_std := f
-let set_fmt_err f = fmt_err := f
-let set_fmt_wrn f = fmt_wrn := f
-let set_fmt_dbg f = fmt_dbg := f
-let set_fmt_mdl f = fmt_mdl := f
-let set_fmt_usc f = fmt_usc := f
+  let create_channel = function
+    | "stdout" -> Stdout
+    | "stderr" -> Stderr
+    | str ->
+      let cout = open_out str in
+      let fmt = Format.formatter_of_out_channel cout in
+      Channel (str, cout, fmt)
 
+  let regular_output = ref Stdout
+  let diagnostic_output = ref Stderr
+  let dump_models_output = ref Stderr
+
+  let all_channels = [
+    regular_output;
+    diagnostic_output;
+    dump_models_output;
+  ]
+
+  let close o =
+    match o with
+    | Stdout | Stderr | Fmt _ ->
+      Format.pp_print_flush (to_formatter o) ();
+    | Channel (_, cout, _) ->
+      Format.pp_print_flush (to_formatter o) ();
+      close_out cout
+    | Invalid -> ()
+
+  let set_output output o =
+    close !output;
+    output := o
+
+  let close_all () = List.iter (fun o -> set_output o Invalid) all_channels
+
+  let set_regular o = set_output regular_output o
+  let set_diagnostic o = set_output diagnostic_output o
+  let set_dump_models o = set_output dump_models_output o
+
+  let get_fmt_regular () = to_formatter !regular_output
+  let get_fmt_diagnostic () = to_formatter !diagnostic_output
+  let get_fmt_models () = to_formatter !dump_models_output
+end
+
+module Sources = struct
+  let constr = Logs.Src.create ~doc:"Constr" "AltErgoLib.constr"
+  let fm = Logs.Src.create ~doc:"fm" "AltErgoLib.fm"
+  let fpa = Logs.Src.create ~doc:"fpa" "AltErgoLib.fpa"
+  let interpretation =
+    Logs.Src.create ~doc:"Interpretation" "AltErgoLib.Interpretation"
+  let model = Logs.Src.create ~doc:"Model" "AltErgoLib.Model"
+  let optimize = Logs.Src.create ~doc:"Optimize" "AltErgoLib.Optimize"
+  let split = Logs.Src.create ~doc:"Split" "AltErgoLib.Split"
+  let triggers = Logs.Src.create ~doc:"Triggers" "AltErgoLib.Triggers"
+  let types = Logs.Src.create ~doc:"Types" "AltErgoLib.Types"
+  let typing = Logs.Src.create ~doc:"Typing" "AltErgoLib.Typing"
+  let unsat_core = Logs.Src.create ~doc:"Unsat_core" "AltErgoLib.Unsat_core"
+end
 
 (* Declaration of all the options as refs with default values *)
 
-type model = MNone | MDefault | MAll | MComplete
 type instantiation_heuristic = INormal | IAuto | IGreedy
+type interpretation = INone | IFirst | IEvery | ILast
 
-type input_format = Native | Smtlib2 | Why3 (* | SZS *) | Unknown of string
+(* As in Dolmen *)
+type smtlib2_version = [ `Latest | `V2_6 | `Poly ]
+
+type input_format =
+  | Native
+  | Smtlib2 of smtlib2_version
+  | Why3
+  (* | SZS *)
+  | Unknown of string
 type output_format = input_format
+
+type model_type = Value | Constraints
 
 let match_extension e =
   match e with
   | ".ae" -> Native
-  | ".smt2" | ".psmt2" -> Smtlib2
+  | ".smt2" -> Smtlib2 `Latest
+  | ".psmt2" -> Smtlib2 `Poly
   | ".why" | ".mlw" -> Why3
   (* | ".szs" -> SZS *)
   | s -> Unknown s
@@ -104,6 +162,7 @@ let debug_combine = ref false
 let debug_constr = ref false
 let debug_explanations = ref false
 let debug_fm = ref false
+let debug_intervals = ref false
 let debug_fpa = ref 0
 let debug_gc = ref false
 let debug_interpretation = ref false
@@ -111,14 +170,14 @@ let debug_ite = ref false
 let debug_matching = ref 0
 let debug_sat = ref false
 let debug_split = ref false
-let debug_sum = ref false
 let debug_triggers = ref false
 let debug_types = ref false
-let debug_typing = ref false
 let debug_uf = ref false
 let debug_unsat_core = ref false
 let debug_use = ref false
 let debug_warnings = ref false
+let debug_commands = ref false
+let debug_optimize = ref false
 let rule = ref (-1)
 
 let set_debug b = debug := b
@@ -132,6 +191,7 @@ let set_debug_combine b = debug_combine := b
 let set_debug_constr b = debug_constr := b
 let set_debug_explanations b = debug_explanations := b
 let set_debug_fm b = debug_fm := b
+let set_debug_intervals b = debug_intervals := b
 let set_debug_fpa i = debug_fpa := i
 let set_debug_gc b = debug_gc := b
 let set_debug_interpretation b = debug_interpretation := b
@@ -139,14 +199,14 @@ let set_debug_ite b = debug_ite := b
 let set_debug_matching i = debug_matching := i
 let set_debug_sat b = debug_sat := b
 let set_debug_split b = debug_split := b
-let set_debug_sum b = debug_sum := b
 let set_debug_triggers b = debug_triggers := b
 let set_debug_types b = debug_types := b
-let set_debug_typing b = debug_typing := b
 let set_debug_uf b = debug_uf := b
 let set_debug_unsat_core b = debug_unsat_core := b
 let set_debug_use b = debug_use := b
 let set_debug_warnings b = debug_warnings := b
+let set_debug_commands b = debug_commands := b
+let set_debug_optimize b = debug_optimize := b
 let set_rule b = rule := b
 
 let get_debug () = !debug
@@ -160,6 +220,7 @@ let get_debug_combine () = !debug_combine
 let get_debug_constr () = !debug_constr
 let get_debug_explanations () = !debug_explanations
 let get_debug_fm () = !debug_fm
+let get_debug_intervals () = !debug_intervals
 let get_debug_fpa () = !debug_fpa
 let get_debug_gc () = !debug_gc
 let get_debug_interpretation () = !debug_interpretation
@@ -167,32 +228,35 @@ let get_debug_ite () = !debug_ite
 let get_debug_matching () = !debug_matching
 let get_debug_sat () = !debug_sat
 let get_debug_split () = !debug_split
-let get_debug_sum () = !debug_sum
 let get_debug_triggers () = !debug_triggers
 let get_debug_types () = !debug_types
-let get_debug_typing () = !debug_typing
 let get_debug_uf () = !debug_uf
 let get_debug_unsat_core () = !debug_unsat_core
 let get_debug_use () = !debug_use
 let get_debug_warnings () = !debug_warnings
+let get_debug_commands () = !debug_commands
+let get_debug_optimize () = !debug_optimize
 let get_rule () = !rule
 
 (** Case split options *)
 
 let case_split_policy = ref Util.AfterTheoryAssume
 let enable_adts_cs = ref false
+let enable_sat_cs = ref false
 let max_split = ref (Numbers.Q.from_int 1000000)
 
 (* Case split setters *)
 
 let set_case_split_policy p = case_split_policy := p
 let set_enable_adts_cs b = enable_adts_cs := b
+let set_enable_sat_cs b = enable_sat_cs := b
 let set_max_split n = max_split := n
 
 (* Case split getters *)
 
 let get_case_split_policy () = !case_split_policy
 let get_enable_adts_cs () = !enable_adts_cs
+let get_enable_sat_cs () = !enable_sat_cs
 let get_max_split () = !max_split
 
 (** Context options *)
@@ -219,12 +283,11 @@ let output_with_colors = ref false
 let output_with_headers = ref true
 let output_with_formatting = ref true
 let output_with_forced_flush = ref true
-let frontend = ref "legacy"
-let input_format = ref Native
-let infer_input_format = ref true
+let frontend = ref "dolmen"
+let input_format = ref None
 let parse_only = ref false
-let parsers = ref []
 let preludes = ref []
+let theory_preludes = ref Theories.default_preludes
 let type_only = ref false
 let type_smt2 = ref false
 
@@ -235,10 +298,10 @@ let set_output_with_formatting b = output_with_formatting := b
 let set_output_with_forced_flush b = output_with_forced_flush := b
 let set_frontend f = frontend := f
 let set_input_format f = input_format := f
-let set_infer_input_format f = infer_input_format := (f = None)
 let set_parse_only b = parse_only := b
-let set_parsers p = parsers := p
 let set_preludes p = preludes := p
+
+let set_theory_preludes t = theory_preludes := t
 let set_type_only b = type_only := b
 let set_type_smt2 b = type_smt2 := b
 
@@ -249,10 +312,9 @@ let get_output_with_formatting () = !output_with_formatting
 let get_output_with_forced_flush () = !output_with_forced_flush
 let get_frontend () = !frontend
 let get_input_format () = !input_format
-let get_infer_input_format () = !infer_input_format
 let get_parse_only () = !parse_only
-let get_parsers () = !parsers
 let get_preludes () = !preludes
+let get_theory_preludes () = !theory_preludes
 let get_type_only () = !type_only
 let get_type_smt2 () = !type_smt2
 
@@ -261,14 +323,17 @@ let get_type_smt2 () = !type_smt2
 let disable_weaks = ref false
 let enable_assertions = ref false
 let warning_as_error = ref false
+let exit_on_error = ref true
 
 let set_disable_weaks b = disable_weaks := b
 let set_enable_assertions b = enable_assertions := b
 let set_warning_as_error b = warning_as_error := b
+let set_exit_on_error b = exit_on_error := b
 
 let get_disable_weaks () = !disable_weaks
 let get_enable_assertions () = !enable_assertions
 let get_warning_as_error () = !warning_as_error
+let get_exit_on_error () = !exit_on_error
 
 (** Limit options *)
 
@@ -276,7 +341,8 @@ let age_bound = ref 50
 let fm_cross_limit = ref (Numbers.Q.from_int 10_000)
 let steps_bound = ref (-1)
 let timelimit = ref 0.
-let timelimit_interpretation = ref (if Sys.win32 then 0. else 1.)
+(* let timelimit_interpretation = ref (if Sys.win32 then 0. else 1.) *)
+let timelimit_interpretation = ref 0.
 let timelimit_per_goal = ref false
 
 let set_age_bound i = age_bound := i
@@ -295,23 +361,57 @@ let get_timelimit_per_goal () = !timelimit_per_goal
 
 (** Output options *)
 
-let interpretation = ref 0
-let model = ref MNone
+let interpretation = ref INone
+let strict_mode = ref false
+let dump_models = ref false
+let interpretation_use_underscore = ref false
+let objectives_in_interpretation = ref false
 let output_format = ref Native
+let model_type = ref Value
 let infer_output_format = ref true
 let unsat_core = ref false
 
 let set_interpretation b = interpretation := b
-let set_model b = model := b
+let set_strict_mode b = strict_mode := b
+let set_dump_models b = dump_models := b
+let set_interpretation_use_underscore b = interpretation_use_underscore := b
+let set_objectives_in_interpretation b = objectives_in_interpretation := b
 let set_output_format b = output_format := b
-let set_infer_output_format f = infer_output_format := f = None
+let set_model_type t = model_type := t
+let set_infer_output_format b = infer_output_format := b
 let set_unsat_core b = unsat_core := b
 
-let get_interpretation () = !interpretation
-let get_model () = !model = MDefault || !model = MComplete
-let get_complete_model () = !model = MComplete
-let get_all_models () = !model = MAll
+let equal_mode a b =
+  match a, b with
+  | INone, INone -> true
+  | INone, _ | _, INone -> false
+  | IFirst, IFirst -> true
+  | IFirst, _ | _, IFirst -> false
+  | IEvery, IEvery -> true
+  | IEvery, _ | _, IEvery -> false
+  | ILast, ILast -> true
+
+let equal_mode_type a b =
+  match a, b with
+  | Constraints, Constraints -> true
+  | Constraints, _ | _, Constraints -> false
+  | Value, Value -> true
+
+let get_interpretation () = not @@ equal_mode !interpretation INone
+let get_strict_mode () = !strict_mode
+let get_dump_models () = !dump_models
+let get_first_interpretation () = equal_mode !interpretation IFirst
+let get_every_interpretation () = equal_mode !interpretation IEvery
+let get_last_interpretation () = equal_mode !interpretation ILast
+let get_interpretation_use_underscore () = !interpretation_use_underscore
+let get_objectives_in_interpretation () = !objectives_in_interpretation
 let get_output_format () = !output_format
+let get_output_smtlib () =
+  match !output_format with
+  | Smtlib2 _ -> true
+  | _ -> false
+let get_model_type () = !model_type
+let get_model_type_constraints () = equal_mode_type !model_type Constraints
 let get_infer_output_format () = !infer_output_format
 let get_unsat_core () = !unsat_core || !save_used_context || !debug_unsat_core
 
@@ -339,6 +439,7 @@ let get_verbose () = !verbose
 
 (** Quantifiers options *)
 
+
 let instantiation_heuristic = ref IAuto
 let instantiate_after_backjump = ref false
 let max_multi_triggers_size = ref 4
@@ -347,6 +448,7 @@ let no_ematching = ref false
 let no_user_triggers = ref false
 let normalize_instances = ref false
 let triggers_var = ref false
+
 
 let set_instantiation_heuristic i = instantiation_heuristic := i
 let set_instantiate_after_backjump b = instantiate_after_backjump := b
@@ -357,8 +459,15 @@ let set_no_user_triggers b = no_user_triggers := b
 let set_normalize_instances b = normalize_instances := b
 let set_triggers_var b = triggers_var := b
 
+let equal_heuristic a b =
+  match a, b with
+  | IGreedy, IGreedy | INormal, INormal | IAuto, IAuto -> true
+  | IGreedy, (INormal | IAuto)
+  | INormal, (IGreedy | IAuto)
+  | IAuto, (IGreedy | INormal) -> false
+
 let get_instantiation_heuristic () = !instantiation_heuristic
-let get_greedy () = !instantiation_heuristic = IGreedy
+let get_greedy () = equal_heuristic !instantiation_heuristic IGreedy
 let get_instantiate_after_backjump () = !instantiate_after_backjump
 let get_max_multi_triggers_size () = !max_multi_triggers_size
 let get_nb_triggers () = !nb_triggers
@@ -383,7 +492,6 @@ let no_decisions_on = ref Util.SS.empty
 let no_sat_learning = ref false
 let sat_plugin = ref ""
 let sat_solver = ref Util.CDCL_Tableaux
-let tableaux_cdcl = ref false
 
 let set_arith_matching b = arith_matching := b
 let set_bottom_classes b = bottom_classes := b
@@ -400,7 +508,6 @@ let set_no_decisions_on s = no_decisions_on := s
 let set_no_sat_learning b = no_sat_learning := b
 let set_sat_plugin p = sat_plugin := p
 let set_sat_solver s = sat_solver := s
-let set_tableaux_cdcl b = tableaux_cdcl := b
 
 let get_arith_matching () = !arith_matching
 let get_bottom_classes () = !bottom_classes
@@ -423,14 +530,17 @@ let get_no_sat_learning () = !no_sat_learning
 let get_sat_learning () = not (!no_sat_learning)
 let get_sat_plugin () = !sat_plugin
 let get_sat_solver () = !sat_solver
-let get_tableaux_cdcl () = !tableaux_cdcl
+let get_tableaux_cdcl () =
+  match !sat_solver with
+  | Tableaux_CDCL -> true
+  | _ -> false
 
 (** Term options *)
 
 let disable_ites = ref false
 let inline_lets = ref false
 let rewriting = ref false
-let term_like_pp = ref false
+let term_like_pp = ref true
 
 let set_disable_ites b = disable_ites := b
 let set_inline_lets b = inline_lets := b
@@ -445,7 +555,6 @@ let get_term_like_pp () = !term_like_pp
 (** Theory options *)
 
 let disable_adts = ref false
-let inequalities_plugin = ref ""
 let no_ac = ref false
 let no_contracongru = ref false
 let no_fm = ref false
@@ -454,10 +563,8 @@ let no_tcp = ref false
 let no_theory = ref false
 let restricted = ref false
 let tighten_vars = ref false
-let use_fpa = ref false
 
 let set_disable_adts b = disable_adts := b
-let set_inequalities_plugin b = inequalities_plugin := b
 let set_no_ac b = no_ac := b
 let set_no_contracongru b = no_contracongru := b
 let set_no_fm b = no_fm := b
@@ -466,10 +573,8 @@ let set_no_tcp b = no_tcp := b
 let set_no_theory b = no_theory := b
 let set_restricted b = restricted := b
 let set_tighten_vars b = tighten_vars := b
-let set_use_fpa b = use_fpa := b
 
 let get_disable_adts () = !disable_adts
-let get_inequalities_plugin () = !inequalities_plugin
 let get_no_ac () = !no_ac
 let get_no_contracongru () = !no_contracongru
 let get_no_fm () = !no_fm
@@ -478,7 +583,6 @@ let get_no_tcp () = !no_tcp
 let get_no_theory () = !no_theory
 let get_restricted () = !restricted
 let get_tighten_vars () = !tighten_vars
-let get_use_fpa () = !use_fpa
 
 (** Other options *)
 
@@ -518,7 +622,8 @@ let exec_thread_yield () = !thread_yield ()
 let exec_timeout () = !timeout ()
 
 let tool_req n msg =
-  if get_rule () = n then Format.fprintf (get_fmt_dbg ()) "[rule] %s@." msg
+  if get_rule () = n then
+    Format.fprintf (Output.get_fmt_diagnostic ()) "[rule] %s@." msg
 
 (** Simple Timer module **)
 module Time = struct
@@ -526,45 +631,44 @@ module Time = struct
   let u = ref 0.0
 
   let start () =
-    u := MyUnix.cur_time()
+    u := My_unix.cur_time()
 
   let value () =
-    MyUnix.cur_time() -. !u
+    My_unix.cur_time () -. !u
 
-  let set_timeout ~is_gui tm = MyUnix.set_timeout ~is_gui tm
+  let set_timeout tm = My_unix.set_timeout tm
 
-  let unset_timeout ~is_gui =
-    if get_timelimit() <> 0. then
-      MyUnix.unset_timeout ~is_gui
+  let unset_timeout () =
+    if Float.compare (get_timelimit ()) 0. <> 0 then
+      My_unix.unset_timeout ()
 
+  let with_timeout tm f =
+    Fun.protect
+      ~finally:unset_timeout
+      (fun () ->
+         set_timeout tm;
+         f())
 end
+
+let with_timelimit_if cond f =
+  if cond then
+    Time.with_timeout (get_timelimit ()) f
+  else
+    f ()
 
 (** globals **)
 
-(** open Options in every module to hide polymorphic versions of Stdlib **)
-let (<>) (a: int) (b: int) = a <> b
-let (=)  (a: int) (b: int) = a = b
-let (<)  (a: int) (b: int) = a < b
-let (>)  (a: int) (b: int) = a > b
-let (<=) (a: int) (b: int) = a <= b
-let (>=) (a: int) (b: int) = a >= b
-
-let compare  (a: int) (b: int) = Stdlib.compare a b
-
-
 (* extra **)
-
-let is_gui = ref false
-
-let set_is_gui b = is_gui := b
-let get_is_gui () = !is_gui
 
 let set_file_for_js filename =
   set_file filename;
   set_js_mode true
 
 (* Printer **)
-let print_output_format fmt msg =
+let pp_comment fmt msg =
   match get_output_format () with
-  | Smtlib2 -> Format.fprintf fmt "; %s" msg;
+  | Smtlib2 _ -> Format.fprintf fmt "; %s" msg;
   | Native | Why3 | Unknown _ -> Format.fprintf fmt "%s" msg
+
+let[@inline always] heavy_assert p =
+  assert (not @@ get_enable_assertions () || p ())

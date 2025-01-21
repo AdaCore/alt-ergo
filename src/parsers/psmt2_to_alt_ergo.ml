@@ -1,12 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 open AltErgoLib
 
@@ -20,7 +37,6 @@ module Smtlib_parser = Psmt2Frontend.Smtlib_parser
 module Smtlib_lexer = Psmt2Frontend.Smtlib_lexer
 
 open Smtlib_syntax
-open Options
 open Parsed_interface
 
 
@@ -95,29 +111,16 @@ module Translate = struct
     in
     aux sort.ty
 
-  let better_num_of_string s =
-    begin match String.split_on_char '.' s with
-      | [n] | [n;""] -> Num.num_of_string n
-      | [n; d] ->
-        let l = String.length d in
-        let n = if (String.length n) = 0 then Num.Int 0
-          else Num.num_of_string n in
-        let d = Num.num_of_string d in
-        let e = Num.power_num (Num.Int 10) (Num.Int l) in
-        Num.add_num n (Num.div_num d e)
-      | _ -> assert false
-    end
-
   let translate_constant cst t =
     let loc = pos t in
     match cst with
-    | Const_Dec(s) -> mk_real_const loc (better_num_of_string s)
+    | Const_Dec(s) -> mk_real_const loc (Numbers.Q.from_string s)
     | Const_Num(s) ->
       let open Smtlib_ty in
       let ty = shorten t.ty in
       begin match ty.desc with (*TODO: do shorten earlier and better*)
         | TInt  -> mk_int_const loc s
-        | TReal -> mk_real_const loc (better_num_of_string s)
+        | TReal -> mk_real_const loc (Numbers.Q.from_string s)
         | _ ->
           Printer.print_err "%s" (to_string ty);
           assert false
@@ -368,6 +371,11 @@ module Translate = struct
       ~warning:(Options.get_verbose () || Options.get_debug_warnings ())
       "%S : Not yet supported" s
 
+  let requires_dolmen s =
+    Printer.print_wrn
+      ~warning:(Options.get_verbose () || Options.get_debug_warnings ())
+      "%S : Requires --frontend dolmen" s
+
   let translate_prop_literal x =
     match x.c with
     | PropLit sy ->
@@ -392,10 +400,26 @@ module Translate = struct
     in
     mk_goal loc gname e
 
+  let translate_optimize =
+    fun ~is_maximize pos term ->
+    Printer.print_wrn
+      "optimize commands only work if the file contains check-sat@.";
+    assert (name_of_assert term == None);
+    let e = translate_term [] term in
+    mk_optimize pos e is_maximize
+
   let translate_command acc command =
     match command.c with
     | Cmd_Assert(assert_term) ->
       (translate_assert (pos command) assert_term) :: acc
+
+    | Cmd_Maximize t ->
+      (translate_optimize ~is_maximize:true (pos command) t) :: acc
+
+
+    | Cmd_Minimize t ->
+      (translate_optimize ~is_maximize:false (pos command) t) :: acc
+
     | Cmd_CheckEntailment(assert_term) ->
       (translate_goal (pos command) assert_term) :: acc
     | Cmd_CheckSat ->
@@ -423,7 +447,10 @@ module Translate = struct
     | Cmd_DefineFunsRec(fun_def_list,term_list) ->
       let l = List.map2 translate_fun_def fun_def_list term_list in
       l @ acc
+    | Cmd_Reset -> Reset (pos command) :: acc
+    | Cmd_Exit -> Exit (pos command) :: acc
     | Cmd_DefineSort _ -> acc
+    | Cmd_GetModel -> requires_dolmen "get-model"; acc
     | Cmd_Echo _ -> not_supported "echo"; acc
     | Cmd_GetAssert -> not_supported "get-assertions"; acc
     | Cmd_GetProof -> not_supported "get-proof"; acc
@@ -432,9 +459,7 @@ module Translate = struct
     | Cmd_GetAssign -> not_supported "get-assign"; acc
     | Cmd_GetOption _ -> not_supported "get-option"; acc
     | Cmd_GetInfo _ -> not_supported "get-info"; acc
-    | Cmd_GetModel -> not_supported "get-model"; acc
     | Cmd_GetUnsatAssumptions -> not_supported "get-unsat-assumptions"; acc
-    | Cmd_Reset -> not_supported "reset"; assert false
     | Cmd_ResetAssert -> not_supported "reset-asserts"; assert false
     | Cmd_SetLogic _ -> not_supported "set-logic"; acc
     | Cmd_SetOption _ -> not_supported "set-option"; acc
@@ -442,9 +467,6 @@ module Translate = struct
     | Cmd_Push n -> translate_push_pop mk_push n (pos command) :: acc
     | Cmd_Pop n -> translate_push_pop mk_pop n (pos command) :: acc
     | Cmd_CheckAllSat _ -> not_supported "check-all-sat"; acc
-    | Cmd_Maximize _ -> not_supported "maximize"; acc
-    | Cmd_Minimize _ -> not_supported "minimize"; acc
-    | Cmd_Exit -> acc
 
   let init () =
     if Psmt2Frontend.Options.get_is_int_real () then
@@ -472,7 +494,7 @@ module Translate = struct
       []
     end
     else begin
-      let l = List.fold_left translate_command [] (List.rev commands) in
+      let l = List.rev @@ List.fold_left translate_command [] commands in
       (init ()) @ l
     end
 
@@ -497,7 +519,8 @@ let aux aux_fun token lexbuf =
     let loc = (Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf) in
     let lex = Lexing.lexeme lexbuf in
     Parsing.clear_parser ();
-    Smtlib_error.print (Options.get_fmt_err ()) (Options.get_file ())
+    Smtlib_error.print (Options.Output.get_fmt_diagnostic ())
+      (Options.get_file ())
       (Syntax_error (lex)) loc;
     Errors.error (Errors.Syntax_error (loc,""))
   | Smtlib_error.Error (e , p) ->
@@ -507,7 +530,8 @@ let aux aux_fun token lexbuf =
         Some loc -> loc
       | None -> Lexing.dummy_pos,Lexing.dummy_pos
     in
-    Smtlib_error.print (get_fmt_err ()) (Options.get_file ()) e loc;
+    Smtlib_error.print (Options.Output.get_fmt_diagnostic ())
+      (Options.get_file ()) e loc;
     Errors.error (Errors.Syntax_error (loc,""))
 
 let file_parser token lexbuf =

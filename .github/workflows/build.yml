@@ -1,0 +1,91 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+# Restrict the GITHUB_TOKEN
+permissions: {}
+
+env:
+  OCAML_DEFAULT_VERSION: 4.14.2
+  # Add OPAMYES=true to the environment, this is usefill to replace `-y` option
+  # in any opam call
+  OPAMYES: true
+  # Alt-Ergo's depext crashs with with-test flag to yes
+  #   # The with-test flag is set to true to force installation of deps and
+  #   # depext needed to run the alt-ergo tests
+  #   OPAMWITHTEST: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - ubuntu-latest
+          - windows-latest
+        ocaml-compiler:
+          - 4.08.1
+          - 4.14.2
+          - 5.0.0
+        exclude:
+          # No longer seems to be available
+          - os: macos-latest
+            ocaml-compiler: 4.08.1
+          # Opam 2.2 requires at least OCaml 4.13
+          - os: windows-latest
+            ocaml-compiler: 4.08.1
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Use OCaml ${{ matrix.ocaml-compiler }}
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          dune-cache: true
+
+      - name: Install dependencies
+        run: opam exec -- make test-deps
+
+      - name: Build alt-ergo with opam
+        run: opam exec -- opam reinstall .
+
+      - name: Run tests
+        run: opam exec -- make runtest-ci
+
+  make:
+    name: Make all
+    env:
+      OPAMLOCKED: locked
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Use OCaml ${{ env.OCAML_DEFAULT_VERSION }}
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: ${{ env.OCAML_DEFAULT_VERSION }}
+          dune-cache: true
+
+      - name: Install dependencies
+        run: opam exec -- make deps js-deps
+
+      - name: Build the project
+        run: opam exec -- dune build --profile ci @check
+
+      - name: Monitor changes
+        uses: getsentry/action-git-diff-suggestions@main
+        with:
+          message: 'The following changes have been made after `make`:'

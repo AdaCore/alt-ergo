@@ -1,30 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 open Format
 open Options
@@ -37,11 +36,9 @@ module Q = Numbers.Q
 module L = Xliteral
 
 module Sy = Symbols
-module I = Intervals
+module I = Intervals.Legacy
 
-module OracleContainer =
-  (val (Inequalities.get_current ()) : Inequalities.Container_SIG)
-
+open Inequalities
 
 module X = Shostak.Combine
 
@@ -53,7 +50,16 @@ module SX = Shostak.SXH
 module MX0 = Shostak.MXH
 module MPL = Expr.Map
 
-module Oracle = OracleContainer.Make(P)
+let src = Logs.Src.create ~doc:"IntervalCalculus" __MODULE__
+module Log = (val Logs.src_log src : Logs.LOG)
+
+let oracle =
+  lazy (
+    let module OracleContainer = (val Inequalities.get_current ()) in
+    let module Oracle = OracleContainer.Make(P) in
+    (module Oracle : Inequalities.S with type p = P.t))
+
+let get_oracle () = Lazy.force oracle
 
 module SE = Expr.Set
 module ME = Expr.Map
@@ -69,14 +75,7 @@ module EM = Matching.Make
       let term_repr env t ~init_term:_ = Uf.term_repr env t
     end)
 
-type r = P.r
 module LR = Uf.LX
-
-module MR = Map.Make(
-  struct
-    type t = r L.view
-    let compare a b = LR.compare (LR.make a) (LR.make b)
-  end)
 
 let alien_of p = Shostak.Arith.is_mine p
 
@@ -98,21 +97,25 @@ module SimVar = struct
     else fprintf fmt "s!%d" (X.hash x) (* slake vars *)
 end
 
+
 module Sim = OcplibSimplex.Basic.Make(SimVar)(Numbers.Q)(Explanation)
 
-type used_by = {
-  pow : SE.t;
-}
+let timer = Timers.M_Arith
 
 type t = {
-  inequations : Oracle.t MPL.t;
+  inequations : P.t Inequalities.t MPL.t;
   monomes: (I.t * SX.t) MX0.t;
   polynomes : I.t MP0.t;
-  used_by : used_by MX0.t;
+  delayed : Rel_utils.Delayed.t;
   known_eqs : SX.t;
   improved_p : SP.t;
   improved_x : SX.t;
   classes : SE.t list;
+  (* State of the union-find represented by all its equivalence classes.
+     This state is kept for debugging purposes only. It is updated after
+     assuming literals of the theory and returned by queries in case of
+     inconsistency. *)
+
   size_splits : Q.t;
   int_sim : Sim.Core.t;
   rat_sim : Sim.Core.t;
@@ -148,38 +151,38 @@ module Sim_Wrap = struct
 
 
   let solve env i =
-    if Options.get_timers() then
-      try
-        Timers.exec_timer_start Timers.M_Simplex Timers.F_solve;
-        let res = solve env i in
-        Timers.exec_timer_pause Timers.M_Simplex Timers.F_solve;
-        res
-      with e ->
-        Timers.exec_timer_pause Timers.M_Simplex Timers.F_solve;
-        raise e
-    else solve env i
-
+    Timers.with_timer Timers.M_Simplex Timers.F_solve @@ fun () ->
+    solve env i
 
   let extract_bound i get_lb =
     let func, q =
-      if get_lb then I.borne_inf, Q.one else I.borne_sup, Q.m_one in
+      if get_lb
+      then I.borne_inf, Sim.Core.R2.lower
+      else I.borne_sup, Sim.Core.R2.upper
+    in
     try
-      let bnd, expl, large = func i in
-      Some (bnd, if large then Q.zero else q), expl
-    with I.No_finite_bound -> None, Explanation.empty
+      let bnd, explanation, large = func i in
+      let bvalue =
+        if large
+        then Sim.Core.R2.of_r bnd
+        else q bnd
+      in
+      Some Sim.Core.{bvalue; explanation}
+    with I.No_finite_bound -> None
 
   let same_bnds _old _new =
     match _old, _new with
     | None, None -> true
     | None, Some _ | Some _, None -> false
-    | Some(s,t), Some(u, v) -> Q.equal s u && Q.equal t v
+    | Some Sim.Core.{bvalue = r1; _}, Some Sim.Core.{bvalue = r2; _} ->
+      Sim.Core.R2.equal r1 r2
 
   let add_if_better p _old _new simplex =
     (* p is in normal form pos *)
-    let old_mn, _old_mn_ex = extract_bound _old true in
-    let old_mx, _old_mx_ex = extract_bound _old false in
-    let new_mn, new_mn_ex = extract_bound _new true in
-    let new_mx, new_mx_ex = extract_bound _new false in
+    let old_mn = extract_bound _old true in
+    let old_mx = extract_bound _old false in
+    let new_mn = extract_bound _new true in
+    let new_mx = extract_bound _new false in
     if same_bnds old_mn new_mn && same_bnds old_mx new_mx then simplex
     else
       let l, z = P.to_list p in
@@ -189,11 +192,17 @@ module Sim_Wrap = struct
           [] -> assert false
         | [c, x] ->
           assert (Q.is_one c);
-          Sim.Assert.var simplex x new_mn new_mn_ex new_mx new_mx_ex
+          Sim.(Assert.var
+                 simplex x
+                 ?min:new_mn
+                 ?max:new_mx
+              )
         | _ ->
           let l = List.rev_map (fun (c, x) -> x, c) l in
-          Sim.Assert.poly simplex (Sim.Core.P.from_list l) (alien_of p)
-            new_mn new_mn_ex new_mx new_mx_ex
+          Sim.(Assert.poly simplex (Core.P.from_list l) (alien_of p)
+                 ?min:new_mn
+                 ?max:new_mx
+              )
       in
       (* we don't solve immediately. It may be expensive *)
       simplex
@@ -202,14 +211,13 @@ module Sim_Wrap = struct
   let finite_non_point_dom info =
     match info.Sim.Core.mini, info.Sim.Core.maxi with
     | None, _ | _, None -> None
-    | Some (a, b), Some(x,y) ->
-      assert (Q.is_zero b); (*called on integers only *)
-      assert (Q.is_zero y);
-      let c = Q.compare a x in
+    | Some {bvalue = a; _}, Some {bvalue = x; _} ->
+      assert (Sim.Core.R2.is_pure_rational a);
+      assert (Sim.Core.R2.is_pure_rational x);
+      let c = Sim.Core.R2.compare a x in
       assert (c <= 0); (* because simplex says sat *)
-      if c = 0 then None else Some (Q.sub x a)
+      if c = 0 then None else Some (Q.sub x.v a.v)
 
-  (* not used for the moment *)
   let case_split =
     let gen_cs x n s orig =
       if get_debug_fm () then
@@ -229,8 +237,8 @@ module Sim_Wrap = struct
           (Sim.Core.equals_optimum info.Sim.Core.value info.Sim.Core.mini ||
            Sim.Core.equals_optimum info.Sim.Core.value info.Sim.Core.maxi)
           && Uf.is_normalized uf x ->
-        let v, _ = info.Sim.Core.value in
-        assert (Q.is_int v);
+        let v = info.Sim.Core.value in
+        assert (Q.is_int v.v);
         begin
           match acc with
           | Some (_,_,s') when Q.compare s' s <= 0 -> acc
@@ -239,16 +247,16 @@ module Sim_Wrap = struct
       | _ -> acc
     in
     let aux_2 env uf x (info,_) acc =
-      let v, _ = info.Sim.Core.value in
+      let v = info.Sim.Core.value in
       assert (X.type_info x == Ty.Tint);
       match finite_non_point_dom info with
-      | Some s when Q.is_int v && Uf.is_normalized uf x ->
+      | Some s when Q.is_int v.v && Uf.is_normalized uf x ->
         let fnd1, cont1 =
-          try true, I.contains (fst (MX0.find x env.monomes)) v
+          try true, I.contains (fst (MX0.find x env.monomes)) v.v
           with Not_found -> false, true
         in
         let fnd2, cont2 =
-          try true, I.contains (MP0.find (poly_of x) env.polynomes) v
+          try true, I.contains (MP0.find (poly_of x) env.polynomes) v.v
           with Not_found -> false, true
         in
         if (fnd1 || fnd2) && cont1 && cont2 then
@@ -269,7 +277,7 @@ module Sim_Wrap = struct
         Sim.Core.MX.fold (aux_1 uf) int_sim.Sim.Core.basic acc
       in
       match acc with
-      | Some (x, n, s) -> gen_cs x n s 1
+      | Some (x, n, s) -> gen_cs x n.v s 1
       (*!!!disable case-split that separates and interval into two parts*)
       | None ->
         let acc =
@@ -279,7 +287,7 @@ module Sim_Wrap = struct
           Sim.Core.MX.fold (aux_2 env uf) int_sim.Sim.Core.basic acc
         in
         match acc with
-        | Some (x, n, s) -> gen_cs x n s 2
+        | Some (x, n, s) -> gen_cs x n.v s 2
         | None -> []
 
 
@@ -294,8 +302,8 @@ module Sim_Wrap = struct
       | Sim.Core.Unsat _ -> assert false (* we know sim is SAT *)
       | Sim.Core.Unbounded _ -> i
       | Sim.Core.Max(mx,_sol) ->
-        let {Sim.Core.max_v; is_le; reason} = Lazy.force mx in
-        set_new_bound reason (Q.mult q max_v) ~is_le:is_le i
+        let {Sim.Core.max_v; is_le} = Lazy.force mx in
+        set_new_bound max_v.explanation (Q.mult q max_v.bvalue.v) ~is_le:is_le i
     in
     if get_debug_fpa () >= 2 then
       Printer.print_dbg
@@ -484,8 +492,8 @@ let generic_add x j use is_mon env =
     let p, c = P.separate_constant p0 in
     let p, c0, d = P.normal_form_pos p in
     assert (Q.sign d <> 0 && Q.sign c0 = 0);
-    let j = I.add j (I.point (Q.minus c) ty Explanation.empty) in
-    let j = I.scale (Q.inv d) j in
+    (* x = (p + c0) * d <-> p = x * 1/d - c0 / d *)
+    let j = I.affine_scale ~coef:(Q.inv d) ~const:(Q.div (Q.minus c) d) j in
     try MP.n_add p j (MP.n_find p env.polynomes) env
     with Not_found -> MP.n_add p j (I.undefined ty) env
 
@@ -518,7 +526,7 @@ module Debug = struct
         ~module_name:"IntervalCalculus" ~function_name:"env"
         "@ ------------ FM: inequations-------------------------@ ";
       MPL.iter
-        (fun a { Oracle.ple0 = p; is_le = is_le; _ } ->
+        (fun a { ple0 = p; is_le = is_le; _ } ->
            print_dbg ~flushed:false ~header:false "%a%s0  |  %a@ "
              P.print p (if is_le then "<=" else "<") E.print a
         )env.inequations;
@@ -543,9 +551,13 @@ module Debug = struct
 
   let implied_equalities l =
     if get_debug_fm () then
-      let print fmt (ra, _, ex, _) =
+      let pp_literal ppf = function
+        | Literal.LTerm e -> Expr.print ppf e
+        | LSem ra -> LR.print ppf (LR.make ra)
+      in
+      let print fmt (ra, ex, _) =
         fprintf fmt "@,%a %a"
-          LR.print (LR.make ra)
+          pp_literal ra
           Explanation.print ex
       in
       print_dbg
@@ -578,8 +590,8 @@ module Debug = struct
       print_dbg
         ~module_name:"IntervalCalculus" ~function_name:"added_inequation"
         "I derived the (%s) inequality: %a %s 0@ "
-        kind P.print ineq.Oracle.ple0
-        (if ineq.Oracle.is_le then "<=" else "<");
+        kind P.print ineq.ple0
+        (if ineq.is_le then "<=" else "<");
       print_dbg ~flushed:false ~header:false
         "from the following combination:@ ";
       Util.MI.iter
@@ -587,7 +599,7 @@ module Debug = struct
            print_dbg ~flushed:false ~header:false
              "\t%a * (%a %s 0) +"
              Q.print coef P.print ple0 (if is_le then "<=" else "<")
-        )ineq.Oracle.dep;
+        )ineq.dep;
       print_dbg ~header:false "\t0"
     end
 
@@ -633,29 +645,107 @@ module Debug = struct
 end
 (*BISECT-IGNORE-END*)
 
-let empty classes = {
+let calc_pow a b ty uf =
+  let ra, expl_a = Uf.find uf a in
+  let rb, expl_b = Uf.find uf b in
+  let pa = poly_of ra in
+  let pb = poly_of rb in
+  try
+    match P.is_const pb with
+    | Some c_y ->
+      let res =
+        (* x ** 1 -> x *)
+        if Q.equal c_y Q.one then
+          ra
+          (* x ** 0 -> 1 *)
+        else if Q.equal c_y Q.zero then
+          alien_of (P.create [] Q.one ty)
+        else
+          match P.is_const pa with
+          | Some c_x ->
+            (* x ** y *)
+            let res = Arith.calc_power c_x c_y ty  in
+            alien_of (P.create [] res ty)
+          | None -> raise Exit
+      in
+      Some (res,Ex.union expl_a expl_b)
+    | None -> None
+  with Exit -> None
+
+let delayed_pow uf _op = function
+  | [ a; b ] -> calc_pow a b (E.type_info a) uf
+  | _ -> assert false
+
+let delayed_op1 ~ty fn uf _op = function
+  | [ x ] ->
+    let rx, exx = Uf.find uf x in
+    Option.bind (P.is_const (poly_of rx)) @@ fun cx ->
+    Some (alien_of (P.create [] (fn cx) ty), exx)
+  | _ -> assert false
+
+let delayed_op2 ~ty fn uf _op = function
+  | [ x; y ] ->
+    let rx, exx = Uf.find uf x in
+    let ry, exy = Uf.find uf y in
+    Option.bind (P.is_const (poly_of rx)) @@ fun cx ->
+    Option.bind (P.is_const (poly_of ry)) @@ fun cy ->
+    Some (alien_of (P.create [] (fn cx cy) ty), Ex.union exx exy)
+  | _ -> assert false
+
+let delayed_integer_log2 uf _op = function
+  | [ x ] -> (
+      let rx, exx = Uf.find uf x in
+      let px = poly_of rx in
+      match P.is_const px with
+      | None -> None
+      | Some cb ->
+        if Q.compare cb Q.zero <= 0 then None
+        else
+          let res =
+            alien_of @@
+            P.create [] (Q.from_int (Fpa_rounding.integer_log_2 cb)) Treal
+          in
+          Some (res, exx)
+    )
+  | _ -> assert false
+
+(* These are the partially interpreted functions that we know how to compute.
+   They will be computed immediately if possible, or as soon as we learn the
+   value of their arguments. *)
+let dispatch = function
+  | Symbols.Pow -> Some delayed_pow
+  | Symbols.Integer_log2 -> Some delayed_integer_log2
+  | Symbols.Int_floor -> Some (delayed_op1 ~ty:Tint Numbers.Q.floor)
+  | Symbols.Int_ceil -> Some (delayed_op1 ~ty:Tint Numbers.Q.ceiling)
+  | Symbols.Min_int -> Some (delayed_op2 ~ty:Tint Q.min)
+  | Symbols.Max_int -> Some (delayed_op2 ~ty:Tint Q.max)
+  | Symbols.Min_real -> Some (delayed_op2 ~ty:Treal Q.min)
+  | Symbols.Max_real -> Some (delayed_op2 ~ty:Treal Q.max)
+  | _ -> None
+
+let empty uf = {
   inequations = MPL.empty;
   monomes = MX.empty ;
   polynomes = MP.empty ;
-  used_by = MX0.empty;
+  delayed = Rel_utils.Delayed.create ~is_ready:X.is_constant dispatch;
   known_eqs = SX.empty ;
   improved_p = SP.empty ;
   improved_x = SX.empty ;
-  classes = classes;
+  classes = Uf.cl_extract uf;
   size_splits = Q.one;
-  new_uf = Uf.empty ();
+  new_uf = Uf.empty;
 
   rat_sim =
     Sim.Solve.solve
-      (Sim.Core.empty ~is_int:false ~check_invs:false ~debug:0);
+      (Sim.Core.empty ~is_int:false ~check_invs:false);
   int_sim =
     Sim.Solve.solve
-      (Sim.Core.empty ~is_int:true ~check_invs:false ~debug:0);
+      (Sim.Core.empty ~is_int:true ~check_invs:false);
 
   th_axioms = ME.empty;
   linear_dep = ME.empty;
   syntactic_matching = [];
-}
+}, Uf.domains uf
 
 (*let up_improved env p oldi newi =
   if I.is_strict_smaller newi oldi then
@@ -719,14 +809,14 @@ let rec init_monomes_of_poly are_eq env p use_p expl =
          update_monome are_eq expl use_p env x
     ) env (fst (P.to_list p))
 
-and init_alien are_eq expl p (normal_p, c, d) ty use_x env =
+and init_alien are_eq expl p (normal_p, c, d) use_x env =
   let env = init_monomes_of_poly are_eq env p use_x expl in
   let i = intervals_from_monomes env p in
   let i =
     try
+      (* p = (normal_p + c) * d *)
       let old_i = MP.n_find normal_p env.polynomes in
-      let old_i = I.scale d
-          (I.add old_i (I.point c ty Explanation.empty)) in
+      let old_i = I.affine_scale ~const:(Q.mult c d) ~coef:d old_i in
       I.intersect i old_i
     with Not_found -> i
   in
@@ -755,8 +845,7 @@ and update_monome are_eq expl use_x env x =
         let use_x = SX.singleton x in
         begin
           match E.term_view t with
-          | E.Not_a_term _ -> assert false
-          | E.Term { E.f = (Sy.Op Sy.Div); xs = [a; b]; _ } ->
+          | { E.f = (Sy.Op Sy.Div); xs = [a; b]; _ } ->
             let ra, ea =
               let (ra, _) as e = Uf.find env.new_uf a in
               if List.filter (X.equal x) (X.leaves ra) == [] then e
@@ -773,10 +862,10 @@ and update_monome are_eq expl use_x env x =
             let (pa', ca, da) as npa = P.normal_form_pos pa in
             let (pb', cb, db) as npb = P.normal_form_pos pb in
             let env, ia =
-              init_alien are_eq expl pa npa ty use_x env in
+              init_alien are_eq expl pa npa use_x env in
             let ia = I.add_explanation ia ea in (* take repr into account*)
             let env, ib =
-              init_alien are_eq expl pb npb ty use_x env in
+              init_alien are_eq expl pb npb use_x env in
             let ib = I.add_explanation ib eb in (* take repr into account*)
             let ia, ib = match cannot_be_equal_to_zero env pb ib with
               | Some (ex, _) when Q.equal ca cb
@@ -818,7 +907,7 @@ let rec tighten_ac are_eq x env expl =
       let env =
         if is_alien x then
           (* identity *)
-          let u = I.root n u in
+          let u = I.coerce ty (I.root n (I.coerce Treal u)) in
           let (pu, use_px) =
             try MX.n_find x env.monomes (* we know that x is a monome *)
             with Not_found -> I.undefined ty, SX.empty
@@ -835,7 +924,7 @@ let rec tighten_ac are_eq x env expl =
         Symbols.equal h (Symbols.Op Symbols.Mult) && n > 2 ->
       let env =
         if is_alien x then
-          let u = I.root n u in
+          let u = I.coerce ty (I.root n (I.coerce Treal u)) in
           let pu, use_px =
             try MX.n_find x env.monomes (* we know that x is a monome *)
             with Not_found -> I.undefined ty, SX.empty
@@ -871,19 +960,19 @@ and tighten_non_lin are_eq x use_x env expl =
 
 let update_monomes_from_poly p i env =
   let lp, _ = P.to_list p in
-  let ty = P.type_info p in
   List.fold_left (fun env (a,x) ->
       let np = P.remove x p in
       let (np,c,d) = P.normal_form_pos np in
+      (* a * x + (np + c) * d = 0 -> a * x = -d * np - d * c *)
       try
         let inp = MP.n_find np env.polynomes in
         let new_ix =
           I.scale
-            (Q.div Q.one a)
+            (Q.inv a)
             (I.add i
-               (I.scale (Q.minus d)
-                  (I.add inp
-                     (I.point c ty Explanation.empty)))) in
+               (I.affine_scale
+                  ~coef:(Q.minus d) ~const:(Q.mult (Q.minus d) c) inp))
+        in
         let old_ix, ux = MX.n_find x env.monomes in
         let ix = I.intersect old_ix new_ix in
         MX.n_add x (ix, ux) old_ix env
@@ -939,7 +1028,7 @@ type ineq_status =
   | Monome of Q.t * P.r * Q.t
   | Other
 
-let ineq_status { Oracle.ple0 = p ; is_le; _ } =
+let ineq_status { ple0 = p ; is_le; _ } =
   match P.is_monomial p with
     Some (a, x, v) -> Monome (a, x, v)
   | None ->
@@ -966,7 +1055,7 @@ let mk_equality p =
   let r2 = alien_of (P.create [] Q.zero (P.type_info p)) in
   LR.mkv_eq r1 r2
 
-let fm_equalities eqs { Oracle.dep; expl = ex; _ } =
+let fm_equalities eqs { dep; expl = ex; _ } =
   Util.MI.fold
     (fun _ (_, p, _) eqs ->
        (mk_equality p, None, ex, Th_util.Other) :: eqs
@@ -1064,7 +1153,7 @@ let register_relationship c x pi expl (x_rels, p_rels) =
 let add_inequations are_eq acc x_opt lin =
   List.fold_left
     (fun ((env, eqs, rels) as acc) ineq ->
-       let expl = ineq.Oracle.expl in
+       let expl = ineq.expl in
        match ineq_status ineq with
        | Bottom           ->
          Debug.added_inequation "Bottom" ineq;
@@ -1083,7 +1172,7 @@ let add_inequations are_eq acc x_opt lin =
                   match pp with
                   | Some _ -> n+1, None
                   | None when n=0 -> 1, Some p
-                  | _ -> n+1, None) ineq.Oracle.dep (0,None)
+                  | _ -> n+1, None) ineq.dep (0,None)
          in
          let env =
            Util.MI.fold
@@ -1095,7 +1184,7 @@ let add_inequations are_eq acc x_opt lin =
                 in
                 let p' = P.sub (P.create [] (Q.div c coef) ty) p in
                 update_ple0 are_eq env p' is_le expl
-             ) ineq.Oracle.dep env
+             ) ineq.dep env
          in
          env, eqs, rels
 
@@ -1103,7 +1192,7 @@ let add_inequations are_eq acc x_opt lin =
          Debug.added_inequation "Monome" ineq;
          let env, eqs =
            update_intervals
-             are_eq env eqs expl (a, x, v) ineq.Oracle.is_le
+             are_eq env eqs expl (a, x, v) ineq.is_le
          in
          env, eqs, rels
 
@@ -1111,23 +1200,22 @@ let add_inequations are_eq acc x_opt lin =
          match x_opt with
          | None -> acc
          | Some x ->
-           let ple0 = ineq.Oracle.ple0 in
+           let ple0 = ineq.ple0 in
            let c = try P.find x ple0 with Not_found -> assert false in
            let ple0 = P.remove x ple0 in
-           env, eqs, register_relationship c x ple0 ineq.Oracle.expl rels
+           env, eqs, register_relationship c x ple0 ineq.expl rels
     ) acc lin
 
-let split_problem env ineqs aliens =
-  let current_age = Oracle.current_age () in
+let split_problem current_age env ineqs aliens =
   let l, all_lvs =
     List.fold_left
-      (fun (acc, all_lvs) ({ Oracle.ple0 = p; _ } as ineq) ->
+      (fun (acc, all_lvs) ({ ple0 = p; _ } as ineq) ->
 
 
          match ineq_status ineq with
          | Trivial_eq | Trivial_ineq _ -> (acc, all_lvs)
          | Bottom ->
-           raise (Ex.Inconsistent (ineq.Oracle.expl, env.classes))
+           raise (Ex.Inconsistent (ineq.expl, env.classes))
          | _ ->
            let lvs =
              List.fold_left (fun acc e -> SX.add e acc) SX.empty (aliens p)
@@ -1153,7 +1241,7 @@ let split_problem env ineqs aliens =
     List.filter
       (fun (ineqs, _) ->
          List.exists
-           (fun ineq -> Z.equal current_age ineq.Oracle.age) ineqs
+           (fun ineq -> Z.equal current_age ineq.age) ineqs
       )ll
   in
   List.fast_sort (fun (a,_) (b,_) -> List.length a - List.length b) ll
@@ -1183,7 +1271,7 @@ let better_upper_bound_from_intervals env p =
   with I.No_finite_bound | Not_found ->
     assert false (*env.polynomes is up to date w.r.t. ineqs *)
 
-let better_bound_from_intervals env ({ Oracle.ple0; is_le; dep; _ } as v) =
+let better_bound_from_intervals env ({ ple0; is_le; dep; _ } as v) =
   let p, c = P.separate_constant ple0 in
   assert (not (P.is_empty p));
   let cur_up_bnd = Q.minus c in
@@ -1198,13 +1286,13 @@ let better_bound_from_intervals env ({ Oracle.ple0; is_le; dep; _ } as v) =
     | false, false | true, true -> v (* no change *)
     | true , false -> (* better bound, Large ineq becomes Strict *)
       {v with
-       Oracle.ple0 = new_p;
+       ple0 = new_p;
        expl = expl;
        is_le = false;
        dep = Util.MI.singleton a (Q.one, new_p, false)}
   else (* new bound is better. i.e. i_up_bnd < cur_up_bnd *)
     {v with
-     Oracle.ple0 = new_p;
+     ple0 = new_p;
      expl = expl;
      is_le = is_large;
      dep = Util.MI.singleton a (Q.one, new_p, is_large)}
@@ -1214,7 +1302,7 @@ let args_of p = List.rev_map snd (fst (P.to_list p))
 let update_linear_dep env rclass_of ineqs =
   let terms =
     List.fold_left
-      (fun st { Oracle.ple0; _ } ->
+      (fun st { ple0; _ } ->
          List.fold_left
            (fun st (_, x) -> SE.union st (rclass_of x))
            st (fst (P.to_list ple0))
@@ -1294,7 +1382,7 @@ let polynomes_relational_deductions env p_rels =
     )p_rels env
 
 
-let fm uf are_eq rclass_of env eqs =
+let fm (module Oracle : S with type p = P.t) uf are_eq rclass_of env eqs =
   if get_debug_fm () then
     Printer.print_dbg
       ~module_name:"IntervalCalculus"
@@ -1303,13 +1391,12 @@ let fm uf are_eq rclass_of env eqs =
   Options.tool_req 4 "TR-Arith-Fm";
   let ineqs =
     MPL.fold (fun _ v acc ->
-        if Options.get_enable_assertions() then
-          assert (is_normalized_poly uf v.Oracle.ple0);
+        Options.heavy_assert (fun () -> is_normalized_poly uf v.ple0);
         (better_bound_from_intervals env v) :: acc
       ) env.inequations []
   in
-  (*let pbs = split_problem env ineqs (fun p -> P.leaves p) in*)
-  let pbs = split_problem env ineqs args_of in
+  let current_age = Oracle.current_age () in
+  let pbs = split_problem current_age env ineqs args_of in
   let res = List.fold_left
       (fun (env, eqs) (ineqs, _) ->
          let env = update_linear_dep env rclass_of ineqs in
@@ -1342,25 +1429,23 @@ let add_disequality are_eq env eqs p expl =
     env, eqs
   | ([a, x], v) ->
     let b = Q.div (Q.minus v) a in
-    let i1 = I.point b ty expl in
     let i2, use2 =
       try
         MX.n_find x env.monomes
       with Not_found -> I.undefined ty, SX.empty
     in
-    let i = I.exclude i1 i2 in
+    let i = I.exclude ~ex:expl b i2 in
     let env = MX.n_add x (i,use2) i2 env in
     let env = tighten_non_lin are_eq x use2 env expl in
     env, find_eq eqs x i env
   | _ ->
     let p, c, _ = P.normal_form_pos p in
-    let i1 = I.point (Q.minus c) ty expl in
     let i2 =
       try
         MP.n_find p env.polynomes
       with Not_found -> I.undefined ty
     in
-    let i = I.exclude i1 i2 in
+    let i = I.exclude ~ex:expl (Q.minus c) i2 in
     let env =
       if I.is_strict_smaller i i2 then
         update_monomes_from_poly p i (MP.n_add p i i2 env)
@@ -1426,18 +1511,6 @@ let normal_form a = match a with
 
   | _ -> a
 
-let remove_trivial_eqs eqs la =
-  let la =
-    List.fold_left (fun m ((a, _, _, _) as e) -> MR.add a e m) MR.empty la
-  in
-  let eqs, _ =
-    List.fold_left
-      (fun ((eqs, m) as acc) ((sa, _, _, _) as e) ->
-         if MR.mem sa m then acc else e :: eqs, MR.add sa e m
-      )([], la) eqs
-  in
-  eqs
-
 let equalities_from_polynomes env eqs =
   let known, eqs =
     MP.fold
@@ -1502,7 +1575,25 @@ let tighten_eq_bounds env r1 r2 p1 p2 origin_eq expl =
       Debug.tighten_interval_modulo_eq_begin p1 p2;
       let i1, us1, is_mon_1 = generic_find r1 env in
       let i2, us2, is_mon_2 = generic_find r2 env in
-      let j = I.add_explanation (I.intersect i1 i2) expl in
+      (* We are assuming [origin_eq] with explanation [expl], where [origin_eq]
+       * is an equality between terms [r1] and [r2] with respective intervals
+       * [i1] and [i2].
+       *
+       * The shared interval for both [r1] and [r2] after the assumption
+       * becomes the intersection of [i1] and [i2], and must account for the
+       * additional explanation [expl] (since [origin_eq] is only valid under
+       * [expl]).
+       *
+       * [I.intersect] raises a "not consistent" exception if the two intervals
+       * are disjoint, but it does so *before* the additional explanation is
+       * added to the intervals' bounds, so we must add it explicitly in that
+       * case.
+      *)
+      let intersect i1 i2 =
+        try I.intersect i1 i2
+        with I.NotConsistent ex -> raise (I.NotConsistent (Ex.union ex expl))
+      in
+      let j = I.add_explanation (intersect i1 i2) expl in
       Debug.tighten_interval_modulo_eq_middle p1 p2 i1 i2 j;
       let impr_i1 = I.is_strict_smaller j i1 in
       let impr_i2 = I.is_strict_smaller j i2 in
@@ -1523,55 +1614,8 @@ let rec loop_update_intervals are_eq env cpt =
   then env
   else loop_update_intervals are_eq env cpt
 
-let calc_pow a b ty uf =
-  let ra, expl_a = Uf.find uf a in
-  let rb, expl_b = Uf.find uf b in
-  let pa = poly_of ra in
-  let pb = poly_of rb in
-  try
-    match P.is_const pb with
-    | Some c_y ->
-      let res =
-        (* x ** 1 -> x *)
-        if Q.equal c_y Q.one then
-          ra
-          (* x ** 0 -> 1 *)
-        else if Q.equal c_y Q.zero then
-          alien_of (P.create [] Q.one ty)
-        else
-          match P.is_const pa with
-          | Some c_x ->
-            (* x ** y *)
-            let res = Arith.calc_power c_x c_y ty  in
-            alien_of (P.create [] res ty)
-          | None -> raise Exit
-      in
-      Some (res,Ex.union expl_a expl_b)
-    | None -> None
-  with Exit -> None
-
-(** Update and compute value of terms in relation with r1 if it is possible *)
-let update_used_by_pow env r1 p2 orig  eqs =
-  try
-    if orig != Th_util.Subst then raise Exit;
-    if P.is_const p2 == None then raise Exit;
-    let s = (MX0.find r1 env.used_by).pow in
-    SE.fold (fun t eqs ->
-        match E.term_view t with
-        | E.Term
-            { E.f = (Sy.Op Sy.Pow); xs = [a; b]; ty; _ } ->
-          begin
-            match calc_pow a b ty env.new_uf with
-              None -> eqs
-            | Some (y,ex) ->
-              let eq = L.Eq (X.term_embed t,y) in
-              (eq, None, ex, Th_util.Other) :: eqs
-          end
-        | _ -> assert false
-      ) s eqs
-  with Exit | Not_found -> eqs
-
 let assume ~query env uf la =
+  let module Oracle = (val get_oracle ()) in
   Oracle.incr_age ();
   let env = count_splits env la in
   let are_eq = Uf.are_equal uf ~added_terms:true in
@@ -1609,12 +1653,12 @@ let assume ~query env uf la =
                | Other ->
                  let env =
                    init_monomes_of_poly
-                     are_eq env ineq.Oracle.ple0 SX.empty
+                     are_eq env ineq.ple0 SX.empty
                      Explanation.empty
                  in
                  let env =
                    update_ple0
-                     are_eq env ineq.Oracle.ple0 (n == L.LE) expl
+                     are_eq env ineq.ple0 (n == L.LE) expl
                  in
                  {env with inequations=add_ineq root ineq env.inequations},
                  eqs, true, rm
@@ -1649,7 +1693,9 @@ let assume ~query env uf la =
              in
              let env, eqs = add_equality are_eq env eqs p expl in
              let env = tighten_eq_bounds env r1 r2 p1 p2 orig expl in
-             let eqs = update_used_by_pow env r1 p2 orig eqs in
+             let eqs =
+               Rel_utils.Delayed.update env.delayed env.new_uf r1 r2 orig eqs
+             in
              env, eqs, new_ineqs, rm
 
            | _ -> acc
@@ -1668,7 +1714,7 @@ let assume ~query env uf la =
       (* we only call fm when new ineqs are assumed *)
       let env, eqs =
         if new_ineqs && not (Options.get_no_fm ()) then
-          fm uf are_eq rclass_of env eqs
+          fm (module Oracle) uf are_eq rclass_of env eqs
         else env, eqs
       in
       let env = Sim_Wrap.solve env 1 in
@@ -1676,12 +1722,8 @@ let assume ~query env uf la =
       let env, eqs = equalities_from_intervals env eqs in
 
       Debug.env env;
-      let eqs = remove_trivial_eqs eqs la in
-      Debug.implied_equalities eqs;
-      let to_assume =
-        List.rev_map (fun (sa, _, ex, orig) ->
-            (Sig_rel.LSem sa, ex, orig)) eqs
-      in
+      let to_assume = Rel_utils.assume_nontrivial_eqs eqs la in
+      Debug.implied_equalities to_assume;
       env, {Sig_rel.assume = to_assume; remove = to_remove}
   with I.NotConsistent expl ->
     Debug.inconsistent_interval expl ;
@@ -1696,38 +1738,13 @@ let assume ~query env uf la =
          if Uf.is_normalized uf (alien_of p) then mp else MP.remove p mp)
       env.polynomes env.polynomes
   in
-  {env with polynomes = polys}, res
+  {env with polynomes = polys}, Uf.domains uf, res
 
 let query env uf a_ex =
   try
     ignore(assume ~query:true env uf [a_ex]);
     None
   with Ex.Inconsistent (expl, classes) -> Some (expl, classes)
-
-
-let assume env uf la =
-  if Options.get_timers() then
-    try
-      Timers.exec_timer_start Timers.M_Arith Timers.F_assume;
-      let res =assume ~query:false env uf la in
-      Timers.exec_timer_pause Timers.M_Arith Timers.F_assume;
-      res
-    with e ->
-      Timers.exec_timer_pause Timers.M_Arith Timers.F_assume;
-      raise e
-  else assume ~query:false env uf la
-
-let query env uf la =
-  if Options.get_timers() then
-    try
-      Timers.exec_timer_start Timers.M_Arith Timers.F_query;
-      let res = query env uf la in
-      Timers.exec_timer_pause Timers.M_Arith Timers.F_query;
-      res
-    with e ->
-      Timers.exec_timer_pause Timers.M_Arith Timers.F_query;
-      raise e
-  else query env uf la
 
 let case_split_polynomes env =
   let o = MP.fold
@@ -1805,38 +1822,6 @@ let default_case_split env uf ~for_model =
     end
   | res -> res
 
-(** Add relation between term x and the terms in it. This can allow use to track
-    if x is computable when its subterms values are known.
-    This is currently only done for power *)
-let add_used_by t r env =
-  match E.term_view t with
-  | E.Not_a_term _ -> assert false
-  | E.Term
-      { E.f = (Sy.Op Sy.Pow); xs = [a; b]; ty; _ } ->
-    begin
-      match calc_pow a b ty env.new_uf with
-      | Some (res,ex) ->
-        if X.equal res r then
-          (* in this case, Arith.make already reduced "t" to a constant "r" *)
-          env, []
-        else
-          env, [L.Eq(res, r), ex]
-      | None ->
-        let ra = Uf.make env.new_uf a in
-        let rb = Uf.make env.new_uf b in
-        let sra =
-          try (MX0.find ra env.used_by).pow
-          with Not_found -> SE.empty in
-        let used_by_ra = MX0.add ra {pow = (SE.add t sra)} env.used_by in
-        let srb =
-          try (MX0.find rb used_by_ra).pow
-          with Not_found -> SE.empty in
-        let used_by_rb = MX0.add rb {pow = (SE.add t srb)} used_by_ra in
-        {env with used_by = used_by_rb}, []
-    end
-  | _ -> env, []
-         [@ocaml.ppwarning "TODO: add other terms such as div!"]
-
 let add =
   let are_eq t1 t2 =
     if E.equal t1 t2 then Some (Explanation.empty, []) else None
@@ -1851,8 +1836,11 @@ let add =
         let env =
           init_monomes_of_poly are_eq env p SX.empty Explanation.empty
         in
-        add_used_by t r env
-      else env, []
+        let delayed, eqs =
+          Rel_utils.Delayed.add env.delayed env.new_uf r t
+        in
+        { env with delayed }, Uf.domains new_uf, eqs
+      else env, Uf.domains new_uf, []
     with I.NotConsistent expl ->
       Debug.inconsistent_interval expl;
       raise (Ex.Inconsistent (expl, env.classes))
@@ -1865,42 +1853,20 @@ let add =
         env.improved MP.empty
 *)
 
-let print_model fmt env rs = match rs with
-  | [] -> ()
-  | _ ->
-    fprintf fmt "Relation:";
-    List.iter (fun (t, r) ->
-        let p = poly_of r in
-        let ty = P.type_info p in
-        if ty == Ty.Tint || ty == Ty.Treal then
-          let p', c, d = P.normal_form_pos p in
-          let pu' =
-            try MP.n_find p' env.polynomes
-            with Not_found -> I.undefined ty
-          in
-          let pm' =
-            try intervals_from_monomes ~monomes_inited:false env p'
-            with Not_found -> I.undefined ty
-          in
-          let u' = I.intersect pu' pm' in
-          if I.is_point u' == None && I.is_undefined u' then
-            let u =
-              I.scale d
-                (I.add u'
-                   (I.point c ty Explanation.empty)) in
-            fprintf fmt "\n %a ∈ %a" E.print t I.pretty_print u
-      ) rs;
-    fprintf fmt "\n@."
-
 let new_terms _ = SE.empty
 
 let case_split_union_of_intervals =
   let aux acc uf i z =
-    if Uf.is_normalized uf z then
-      match I.bounds_of i with
-      | [] -> assert false
-      | [_] -> ()
-      | (_,(v, ex))::_ -> acc := Some (z, v, ex); raise Exit
+    if Uf.is_normalized uf z then (
+      ignore @@
+      I.fold (fun prev { lb = _ ; ub } ->
+          match prev, ub with
+          | None, Open ub -> Some (L.LT, ub)
+          | None, Closed ub -> Some (L.LE, ub)
+          | Some bnd, _ -> acc := Some (z, bnd); raise Exit
+          | None, _ -> None
+        ) None i
+    )
   in fun env uf ->
     let cs = ref None in
     try
@@ -1910,13 +1876,9 @@ let case_split_union_of_intervals =
     with Exit ->
     match !cs with
     | None -> assert false
-    | Some(_,None, _) -> assert false
-    | Some(r1,Some (n, eps), _) ->
+    | Some (r1, (pred, n)) ->
       let ty = X.type_info r1 in
       let r2 = alien_of (P.create [] n ty) in
-      let pred =
-        if Q.is_zero eps then L.LE else (assert (Q.is_m_one eps); L.LT)
-      in
       [LR.mkv_builtin true pred [r1; r2], true,
        Th_util.CS (Th_util.Th_arith, Q.one)]
 
@@ -1927,7 +1889,7 @@ let int_constraints_from_map_intervals =
   let aux p xp i uf acc =
     if Uf.is_normalized uf xp && I.is_point i == None
        && P.type_info p == Ty.Tint
-    then (p, I.bounds_of i) :: acc
+    then (p, I.integer_hull i) :: acc
     else acc
   in
   fun env uf ->
@@ -1936,53 +1898,32 @@ let int_constraints_from_map_intervals =
     in
     MX.fold (fun x (i,_) acc -> aux (poly_of x) x i uf acc) env.monomes acc
 
+let bnd_to_simplex_bnd (bnd, ex) =
+  Sim.Core.{ bvalue = R2.of_r (Q.from_z bnd) ; explanation = ex }
 
 let fm_simplex_unbounded_integers_encoding env uf =
-  let simplex = Sim.Core.empty ~is_int:true ~check_invs:true ~debug:0 in
+  let simplex = Sim.Core.empty ~is_int:true ~check_invs:true in
   let int_ctx = int_constraints_from_map_intervals env uf in
   List.fold_left
-    (fun simplex (p, uints) ->
-       match uints with
-       | [] ->
-         Printer.print_err "Intervals already empty !!!";
-         assert false
-       | _::_::_ ->
-         Printer.print_err
-           "case-split over unions of intervals is needed !!!";
-         assert false
-
-       | [(mn, ex_mn), (mx, ex_mx)] ->
-         let l, c = P.to_list p in
+    (fun simplex (p, (lb, ub)) ->
+       let l, c = P.to_list p in
+       assert (Q.is_zero c);
+       let min = Option.map bnd_to_simplex_bnd lb in
+       let max = Option.map bnd_to_simplex_bnd ub in
+       match l with
+       | [] -> assert false
+       | [c, x] ->
+         assert (Q.is_one c);
+         Sim.Assert.var simplex x ?min ?max |> fst
+       | _ ->
          let l = List.rev_map (fun (c, x) -> x, c) (List.rev l) in
-         assert (Q.sign c = 0);
-         let cst0 =
-           List.fold_left (fun z (_, c) -> Q.add z (Q.abs c))Q.zero l
+         let xp = alien_of p in
+         let sim_p =
+           match Sim.Core.poly_of_slake simplex xp with
+           | Some res -> res
+           | None -> Sim.Core.P.from_list l
          in
-         let cst = Q.div cst0 (Q.from_int 2) in
-         assert (mn == None || mx == None);
-         let mn =
-           match mn with
-           | None -> None
-           | Some (q, q') -> Some (Q.add q cst, q')
-         in
-         let mx =
-           match mx with
-           | None -> None
-           | Some (q, q') -> Some (Q.sub q cst, q')
-         in
-         match l with
-         | [] -> assert false
-         | [x, c] ->
-           assert (Q.is_one c);
-           Sim.Assert.var simplex x mn ex_mn mx ex_mx |> fst
-         | _ ->
-           let xp = alien_of p in
-           let sim_p =
-             match Sim.Core.poly_of_slake simplex xp with
-             | Some res -> res
-             | None -> Sim.Core.P.from_list l
-           in
-           Sim.Assert.poly simplex sim_p xp mn ex_mn mx ex_mx |> fst
+         Sim.Assert.poly simplex sim_p xp ?min ?max |> fst
 
     ) simplex int_ctx
 
@@ -2007,7 +1948,7 @@ let model_from_simplex sim is_int env uf =
     raise (Ex.Inconsistent(Lazy.force ex, env.classes))
 
   | Sim.Core.Sat sol ->
-    let {Sim.Core.main_vars; slake_vars; int_sol} = Lazy.force sol in
+    let {Sim.Core.main_vars; slake_vars; int_sol; epsilon=_} = Lazy.force sol in
     let main_vars, _slake_vars =
       if int_sol || not is_int then main_vars, slake_vars
       else round_to_integers main_vars, round_to_integers slake_vars
@@ -2033,7 +1974,7 @@ let model_from_simplex sim is_int env uf =
       )[] (List.rev main_vars)
 
 
-let model_from_unbounded_domains =
+let model_from_infinite_domains =
   let mk_cs acc (x, v, _ex) =
     ((LR.view (LR.mk_eq x v)), true,
      Th_util.CS (Th_util.Th_arith, Q.from_int 2)) :: acc
@@ -2050,6 +1991,11 @@ let model_from_unbounded_domains =
     let l2 = model_from_simplex int_sim true  env uf in
     List.fold_left mk_cs (List.fold_left mk_cs [] l1) l2
 
+let mk_const_term c ty =
+  match ty with
+  | Ty.Tint -> E.Ints.of_Z (Q.to_z c)
+  | Ty.Treal -> E.Reals.of_Q c
+  | _ -> assert false
 
 let case_split env uf ~for_model =
   let res = default_case_split env uf ~for_model in
@@ -2059,11 +2005,150 @@ let case_split env uf ~for_model =
     else
       begin
         match case_split_union_of_intervals env uf with
-        | [] -> model_from_unbounded_domains env uf
+        | [] -> model_from_infinite_domains env uf
         | l -> l
       end
   | _ -> res
 
+(* Helper function used in [optimizing_objective] to pick a value
+   for the polynomial [p] in its interval. We use this function to split the
+   search space and bias it towards the optimum in the case the value produced
+   by the optimization procedure doesn't satisfy some constraints that involve
+   strict inequalities or the problem is unbounded. *)
+let middle_value env ~is_max ty p bound =
+  let interval =
+    match MP0.find_opt p env.polynomes, bound with
+    | Some i, Some bound ->
+      begin
+        try
+          if is_max then
+            I.new_borne_sup Ex.empty bound ~is_le:false i
+          else
+            I.new_borne_inf Ex.empty bound ~is_le:false i
+        with I.NotConsistent _ -> assert false
+      end
+    | Some i, None -> i
+    | None, _ -> I.point Q.zero ty Ex.empty
+  in
+  let q = I.pick ~is_max interval in
+  alien_of (P.create [] q ty)
+
+let optimizing_objective_for_ty ~is_max ty env uf e =
+  (* soundness: if there are expressions to optmize, this should be
+     done without waiting for ~for_model flag to be true *)
+  let repr, _ = Uf.find uf e in
+  let r1 = Uf.make uf e in (* instead of repr, which may be a constant *)
+  let p = poly_of repr in
+  match P.is_const p with
+  | Some optim ->
+    if Options.get_debug_optimize () then
+      Printer.print_dbg "%a has the value %a@."
+        E.print e
+        Q.print optim;
+
+    let r2 = alien_of (P.create [] optim  ty) in
+    Debug.case_split r1 r2;
+    let t2 = mk_const_term optim ty in
+    let value = Objective.Value.Value t2 in
+    let case_split =
+      LR.mkv_eq r1 r2, true, Th_util.CS (Th_util.Th_arith, Q.one)
+    in
+    Th_util.{ value; case_split }
+
+  | None ->
+    begin
+      let sim = if ty == Ty.Tint then env.int_sim else env.rat_sim in
+      let p = if is_max then p else P.mult_const Q.m_one p in
+      let l, c = P.to_list p in
+      let l = List.rev_map (fun (x, y) -> y, x) (List.rev l) in
+      let sim, mx_res = Sim.Solve.maximize sim (Sim.Core.P.from_list l) in
+      match Sim.Result.get mx_res sim with
+      | Sim.Core.Unknown ->
+        (* The decision procedure is complete. *)
+        assert false
+
+      | Sim.Core.Sat _   ->
+        (* This answer is only returned by OcplibSimplex if we only want to
+           check the satisfability of the linear program. *)
+        assert false
+
+      | Sim.Core.Unsat _ ->
+        (* We know that the linear program is satisfisable as we check it
+           before. *)
+        assert false
+
+      | Sim.Core.Unbounded _ ->
+        let value =
+          if is_max then
+            Objective.Value.Pinfinity
+          else
+            Objective.Value.Minfinity
+        in
+        (* As the problem is unbounded, we need to produce a value for the
+           objective function. Rather than picking a value directly, we add a
+           constraint to let the case split mechanism pick a "large" (or
+           "small") value in the interval (otherwise, later objectives are
+           computed while assuming that the middle value is forced, which is
+           incorrect). *)
+        let case_split =
+          LR.mkv_builtin false LT
+            [r1; middle_value env ~is_max ty p None],
+          true,
+          Th_util.CS (Th_util.Th_arith, Q.one)
+        in
+        Th_util.{ value; case_split }
+
+      | Sim.Core.Max (lazy Sim.Core.{ max_v; is_le }, _sol) ->
+        let max_p = Q.add max_v.bvalue.v c in
+        let optim = if is_max then max_p else Q.mult Q.m_one max_p in
+        if Options.get_debug_optimize () then
+          begin
+            if is_le then
+              Printer.print_dbg "%a has a %s: %a@." Expr.print e
+                (if is_max then "maximum" else "minimum") Q.print optim
+            else
+              Printer.print_dbg "%a is a %s bound of %a" Q.print optim
+                (if is_max then "upper" else "lower") Expr.print e
+          end;
+        let r2 = alien_of (P.create [] optim ty) in
+        Debug.case_split r1 r2;
+        let t2 = mk_const_term optim ty in
+        let value =
+          if is_le then
+            Objective.Value.Value t2
+          else
+            begin
+              if is_max then Objective.Value.Limit (Below, t2)
+              else Objective.Value.Limit (Above, t2)
+            end
+        in
+        let r2 =
+          if is_le then
+            r2
+          else
+            (* As some bounds are strict, the value [r2] does not satisfy the
+               constraints of the problem. In this case, we pick a value
+               in the domain of the polynomial [p]. But we propagate the new
+               value [value] for this objective. Indeed, we want to be able
+               to print it while using the statement [get-objective]. *)
+            let q =
+              match P.is_const (poly_of r2) with
+              | Some q -> q
+              | None -> assert false
+            in
+            middle_value env ~is_max ty p (Some q)
+        in
+        let case_split =
+          LR.mkv_eq r1 r2, true, Th_util.CS (Th_util.Th_arith, Q.one)
+        in
+        { value; case_split }
+    end
+
+let optimizing_objective env uf Objective.Function.{ e; is_max; _ } =
+  match E.type_info e with
+  | Tint | Treal as ty ->
+    Some (optimizing_objective_for_ty ~is_max ty env uf e)
+  | _ -> None
 
 (*** part dedicated to FPA reasoning ************************************)
 
@@ -2106,8 +2191,7 @@ let integrate_mapsTo_bindings sbs maps_to =
     let sbs =
       List.fold_left
         (fun ((sbt, sty) as sbs) (x, tx) ->
-           let x = Sy.Var x in
-           assert (not (Symbols.Map.mem x sbt));
+           assert (not (Var.Map.mem x sbt));
            let t = E.apply_subst sbs tx in
            let mk, _ = X.make t in
            match P.is_const (poly_of mk) with
@@ -2118,11 +2202,11 @@ let integrate_mapsTo_bindings sbs maps_to =
                  ~function_name:"integrate_maps_to_bindings"
                  "bad semantic trigger %a |-> %a@,\
                   left-hand side is not a constant!"
-                 Sy.print x E.print tx;
+                 Var.print x E.print tx;
              raise Exit
            | Some c ->
              let tc = mk_const_term (E.type_info t) c in
-             Symbols.Map.add x tc sbt, sty
+             Var.Map.add x tc sbt, sty
         )sbs maps_to
     in
     Some sbs
@@ -2134,11 +2218,9 @@ let extend_with_domain_substitution =
   let aux idoms sbt =
     Var.Map.fold
       (fun v_hs (lv, uv, ty) sbt ->
-         let s = Hstring.view (Var.view v_hs).Var.hs in
-         match s.[0] with
-         | '?' -> sbt
-         | _ ->
-           let lb_var = Sy.var v_hs in
+         if Var.is_local v_hs then sbt
+         else
+           let lb_var = v_hs in
            let lb_val = match lv, uv with
              | None, None -> raise Exit
              | Some (q1, false), Some (q2, false) when Q.equal q1 q2 ->
@@ -2149,7 +2231,7 @@ let extend_with_domain_substitution =
                  "[Error] %a <= %a <= %a@,\
                   Which value should we choose?"
                  Q.print q1
-                 Sy.print lb_var
+                 Var.print lb_var
                  Q.print q2;
                assert (Q.compare q2 q1 >= 0);
                assert false
@@ -2160,7 +2242,7 @@ let extend_with_domain_substitution =
              | None, Some (q, is_strict) -> (* hs < q or hs <= q *)
                mk_const_term ty (if is_strict then Q.sub q eps else q)
            in
-           Sy.Map.add lb_var lb_val sbt
+           Var.Map.add lb_var lb_val sbt
       ) idoms sbt
   in
   fun (sbt, sbty) idoms ->
@@ -2200,8 +2282,7 @@ let domain_matching _lem_name tr sbt env uf optimized =
              let p = poly_of rr in
              let p', c', d = P.normal_form_pos p in
              let env, i' = best_interval_of optimized env p' in
-             let ic = I.point c' (P.type_info p') Explanation.empty in
-             let i = I.scale d (I.add i' ic) in
+             let i = I.affine_scale ~coef:d ~const:(Q.mult d c') i' in
              begin match I.match_interval lb ub i idoms with
                | None -> raise (Sem_match_fails env)
                | Some idoms -> idoms, maps_to, env, uf
@@ -2251,7 +2332,7 @@ let record_this_instance f accepted lorig =
     | E.Lemma { E.name; loc; _ } ->
       Profiling.new_instance_of name f loc accepted
     | E.Unit _ | E.Clause _ | E.Literal _ | E.Skolem _
-    | E.Let _ | E.Iff _ | E.Xor _ | E.Not_a_form -> assert false
+    | E.Let _ | E.Iff _ | E.Xor _ -> assert false
 
 let profile_produced_terms menv lorig nf s trs =
   if Options.get_profiling() then
@@ -2262,7 +2343,7 @@ let profile_produced_terms menv lorig nf s trs =
     let name, loc, _ = match E.form_view lorig with
       | E.Lemma { E.name; main; loc; _ } -> name, loc, main
       | E.Unit _ | E.Clause _ | E.Literal _ | E.Skolem _
-      | E.Let _ | E.Iff _ | E.Xor _ | E.Not_a_form -> assert false
+      | E.Let _ | E.Iff _ | E.Xor _ -> assert false
     in
     let st1 = E.max_ground_terms_rec_of_form nf in
     let diff = SE.diff st1 st0 in
@@ -2295,22 +2376,19 @@ let new_facts_for_axiom
               ~module_name:"IntervalCalculus"
               ~function_name:"new_facts_for_axiom"
               "try to extend synt sbt %a of ax %a@ "
-              (Symbols.Map.print E.print) sbs E.print orig;
-          match tr.E.guard with
-          | Some _ -> assert false (*guards not supported for TH axioms*)
-
-          | None when tr.E.semantic == [] && not do_syntactic_matching ->
+              (Var.Map.pp E.print) sbs E.print orig;
+          if tr.E.semantic == [] && not do_syntactic_matching then
             (* pure syntactic insts already generated *)
             env, acc
 
-          | None when not (terms_linear_dep env torig) ->
+          else if not (terms_linear_dep env torig) then (
             if get_debug_fpa () >= 2 then
               Printer.print_dbg
                 ~header:false
                 "semantic matching failed(1)";
             env, acc
 
-          | None ->
+          ) else
             match semantic_matching lem_name tr s env uf optimized with
             | env, None ->
               if get_debug_fpa () >= 2 then
@@ -2323,11 +2401,11 @@ let new_facts_for_axiom
                 Printer.print_dbg
                   ~header:false
                   "semantic matching succeeded:@ %a"
-                  (Symbols.Map.print E.print) (fst sbs);
+                  (Var.Map.pp E.print) (fst sbs);
               let nf = E.apply_subst sbs f in
               (* incrementality/push. Although it's not supported for
                  theories *)
-              let nf = E.mk_imp trigger_increm_guard nf 0 in
+              let nf = E.mk_imp trigger_increm_guard nf in
               let accepted = selector nf orig in
               record_this_instance nf accepted lorig;
               if accepted then begin
@@ -2423,82 +2501,30 @@ let instantiate ~do_syntactic_matching match_terms env uf selector =
   env, insts
 
 
-let separate_semantic_triggers =
-  let not_theory_const = Hstring.make "not_theory_constant" in
-  let is_theory_const = Hstring.make "is_theory_constant" in
-  let linear_dep = Hstring.make "linear_dependency" in
-  fun th_form ->
-    let { E.user_trs; _ } as q =
-      match E.form_view th_form with
-      | E.Lemma q -> q
-      | E.Unit _ | E.Clause _ | E.Literal _ | E.Skolem _
-      | E.Let _ | E.Iff _ | E.Xor _ | E.Not_a_form -> assert false
-    in
-    let r_triggers =
-      List.rev_map
-        (fun tr ->
-           (* because sem-triggers will be set by theories *)
-           assert (tr.E.semantic == []);
-           let syn, sem =
-             List.fold_left
-               (fun (syn, sem) t ->
-                  match E.term_view t with
-                  | E.Not_a_term _ -> assert false
-                  | E.Term { E.f = Symbols.In (lb, ub); xs = [x]; _ } ->
-                    syn, (E.Interval (x, lb, ub)) :: sem
-
-                  | E.Term { E.f = Symbols.MapsTo x; xs = [t]; _ } ->
-                    syn, (E.MapsTo (x, t)) :: sem
-
-                  | E.Term { E.f = Sy.Name (hs,_); xs = [x]; _ }
-                    when Hstring.equal hs not_theory_const ->
-                    syn, (E.NotTheoryConst x) :: sem
-
-                  | E.Term { E.f = Sy.Name (hs,_); xs = [x]; _ }
-                    when Hstring.equal hs is_theory_const ->
-                    syn, (E.IsTheoryConst x) :: sem
-
-                  | E.Term { E.f = Sy.Name (hs,_); xs = [x;y]; _ }
-                    when Hstring.equal hs linear_dep ->
-                    syn, (E.LinearDependency(x,y)) :: sem
-
-                  | _ -> t::syn, sem
-               )([], []) (List.rev tr.E.content)
-           in
-           {tr with E.content = syn; semantic = sem}
-        )user_trs
-    in
-    E.mk_forall
-      q.E.name q.E.loc q.E.binders (List.rev r_triggers) q.E.main
-      (E.id th_form) ~toplevel:true ~decl_kind:E.Dtheory
-
 let assume_th_elt t th_elt dep =
   let { Expr.axiom_kind; ax_form; th_name; extends; _ } = th_elt in
   let kd_str =
     if axiom_kind == Util.Propagator then "Th propagator" else "Th CS"
   in
   match extends with
-  | Util.NIA | Util.NRA | Util.FPA ->
-    let th_form = separate_semantic_triggers ax_form in
-    let th_elt = {th_elt with Expr.ax_form} in
+  | Util.NIA | Util.NRA | Util.FPA | Util.RIA ->
     if get_debug_fpa () >= 2 then
       Printer.print_dbg
         ~module_name:"IntervalCalculus" ~function_name:"assume_th_elt"
         "[Theory %s][%s] %a"
-        th_name kd_str E.print th_form;
-    assert (not (ME.mem th_form t.th_axioms));
-    {t with th_axioms = ME.add th_form (th_elt, dep) t.th_axioms}
+        th_name kd_str E.print ax_form;
+    assert (not (ME.mem ax_form t.th_axioms));
+    {t with th_axioms = ME.add ax_form (th_elt, dep) t.th_axioms}
 
   | _ -> t
 
+let assume = assume ~query:false
+
 let instantiate ~do_syntactic_matching env uf selector =
-  if Options.get_timers() then
-    try
-      Timers.exec_timer_start Timers.M_Arith Timers.F_instantiate;
-      let res = instantiate ~do_syntactic_matching env uf selector in
-      Timers.exec_timer_pause Timers.M_Arith Timers.F_instantiate;
-      res
-    with e ->
-      Timers.exec_timer_pause Timers.M_Arith Timers.F_instantiate;
-      raise e
-  else instantiate ~do_syntactic_matching env uf selector
+  Timers.with_timer timer Timers.F_instantiate @@ fun () ->
+  instantiate ~do_syntactic_matching env uf selector
+
+let reinit_cache () =
+  let module Oracle = (val get_oracle ()) in
+  Oracle.reset_age_cpt ();
+  EM.reinit_caches ()

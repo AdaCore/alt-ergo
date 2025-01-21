@@ -1,43 +1,42 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
-
-open Format
-open Options
-open Sig
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 module Sy = Symbols
 module E = Expr
 
+module ZA = Z
 module Z = Numbers.Z
 module Q = Numbers.Q
 
+let src = Logs.Src.create ~doc:"Arith" __MODULE__
+module Log = (val Logs.src_log src : Logs.LOG)
+
 let is_mult h = Sy.equal (Sy.Op Sy.Mult) h
-let mod_symb = Sy.name "@mod"
+let mod_symb = Sy.name ~ns:Internal "@mod"
 
 let calc_power (c : Q.t) (d : Q.t) (ty : Ty.t) =
   (* d must be integral and if we work on integer exponentation,
@@ -88,11 +87,13 @@ module Shostak
 
   let name = "arith"
 
+  let timer = Timers.M_Arith
+
   (*BISECT-IGNORE-BEGIN*)
   module Debug = struct
 
     let solve_aux r1 r2 =
-      if get_debug_arith () then
+      if Options.get_debug_arith () then
         Printer.print_dbg
           ~module_name:"Arith" ~function_name:"solve_aux"
           "we solve %a=%a" X.print r1 X.print r2
@@ -101,9 +102,9 @@ module Shostak
       let c = ref 0 in
       let print fmt (p,v) =
         incr c;
-        fprintf fmt  "%d) %a |-> %a@." !c X.print p X.print v
+        Format.fprintf fmt  "%d) %a |-> %a@." !c X.print p X.print v
       in
-      if get_debug_arith () then
+      if Options.get_debug_arith () then
         Printer.print_dbg
           ~module_name:"Arith" ~function_name:"solve_one"
           "solving %a = %a yields:@,%a"
@@ -112,16 +113,16 @@ module Shostak
   end
   (*BISECT-IGNORE-END*)
 
-  let is_mine_symb sy _ty =
+  let is_mine_symb sy =
     let open Sy in
     match sy with
     | Int _ | Real _ -> true
     | Op (Plus | Minus | Mult | Div | Modulo
-         | Float | Fixed | Abs_int | Abs_real | Sqrt_real
+         | Float | Abs_int | Abs_real | Sqrt_real
          | Sqrt_real_default | Sqrt_real_excess
          | Real_of_int | Int_floor | Int_ceil
          | Max_int | Max_real | Min_int | Min_real
-         | Pow | Integer_log2
+         | Pow | Integer_log2 | Int2BV _
          | Integer_round) -> true
     | _ -> false
 
@@ -135,39 +136,42 @@ module Shostak
     | Some p -> p
     | _ -> P.create [Q.one, r] Q.zero (X.type_info r)
 
-  (* t1 % t2 = md  <->
-     c1. 0 <= md ;
-     c2. md < t2 ;
-     c3. exists k. t1 = t2 * k + t ;
-     c4. t2 <> 0 (already checked) *)
-  let mk_modulo md t1 t2 p2 ctx =
-    let zero = E.int "0" in
-    let c1 = E.mk_builtin ~is_pos:true Symbols.LE [zero; md] in
-    let c2 =
-      match P.is_const p2 with
-      | Some n2 ->
-        let an2 = Q.abs n2 in
-        assert (Q.is_int an2);
-        let t2 = E.int (Q.to_string an2) in
-        E.mk_builtin ~is_pos:true Symbols.LT [md; t2]
-      | None ->
-        E.mk_builtin ~is_pos:true Symbols.LT [md; t2]
-    in
-    let k  = E.fresh_name Ty.Tint in
-    let t3 = E.mk_term (Sy.Op Sy.Mult) [t2;k] Ty.Tint in
-    let t3 = E.mk_term (Sy.Op Sy.Plus) [t3;md] Ty.Tint in
-    let c3 = E.mk_eq ~iff:false t1 t3 in
-    c3 :: c2 :: c1 :: ctx
+  (* Add range information for [t = t1 / t2], where `/` is euclidean division.
 
-  let mk_euc_division p p2 t1 t2 ctx =
-    match P.to_list p2 with
-    | [], coef_p2 ->
-      let md = E.mk_term (Sy.Op Sy.Modulo) [t1;t2] Ty.Tint in
-      let r, ctx' = X.make md in
-      let rp =
-        P.mult_const (Q.div Q.one coef_p2) (embed r) in
-      P.sub p rp, ctx' @ ctx
-    | _ -> assert false
+     Requires: [t], [t1], [t2] have type [Tint]
+     Requires: [p2] is the term representative for [t2]
+     Requires: [p2] is a non-zero constant *)
+  let mk_euc_division t t1 p2 ctx =
+    assert (E.type_info t == Tint);
+
+    match P.is_const p2 with
+    | Some n2 ->
+      let n2 = Q.to_z n2 in
+      assert (Z.sign n2 <> 0);
+      let a2 = Z.abs n2 in
+
+      (* 0 <= t1 % t2 = t1 - t2 * (t1 / t2) < |t2| *)
+      let t1_mod_t2 = E.Ints.(t1 - ~$$n2 * t) in
+      let c1 = E.Ints.(~$0 <= t1_mod_t2) in
+      let c2 = E.Ints.(t1_mod_t2 < ~$$a2) in
+      P.create [Q.one, X.term_embed t] Q.zero Tint, c2 :: c1 :: ctx
+    | None -> assert false
+
+
+  (* Compute the remainder of euclidean division [t1 % t2] as
+     [t1 - t2 * (t1 / t2)], where `a / b` is euclidean division.
+
+     Requires: [t1], [t2] have type [Tint]
+     Requires: [p1] is the representative for [t1]
+     Requires: [p2] is the representative for [t2]
+     Requires: [p2] is a non-zero constant *)
+  let mk_euc_modulo t1 t2 p1 p2 ctx =
+    match P.is_const p2 with
+    | Some n2 ->
+      assert (Q.sign n2 <> 0);
+      let div, ctx = mk_euc_division E.Ints.(t1 / t2) t1 p2 ctx in
+      P.sub p1 (P.mult_const n2 div), ctx
+    | None -> assert false
 
 
   let exact_sqrt_or_Exit q =
@@ -226,23 +230,24 @@ module Shostak
       P.add (P.create [coef, (X.term_embed t)] Q.zero ty) p_acc
 
   let rec mke coef p t ctx =
-    let { E.f = sb ; xs; ty; _ } =
-      match E.term_view t with
-      | E.Not_a_term _ -> assert false
-      | E.Term tt -> tt
-    in
+    let { E.f = sb ; xs; ty; _ } = E.term_view t in
     match sb, xs with
-    | (Sy.Int n | Sy.Real n) , _  ->
-      let c = Q.mult coef (Q.from_string (Hstring.view n)) in
+    | Sy.Int n, _ ->
+      let c = Q.mult coef (Q.from_z n) in
+      P.add_const c p, ctx
+    | Sy.Real q, _  ->
+      let c = Q.mult coef q in
       P.add_const c p, ctx
 
     | Sy.Op Sy.Mult, [t1;t2] ->
       let p1, ctx = mke coef (empty_polynome ty) t1 ctx in
       let p2, ctx = mke Q.one (empty_polynome ty) t2 ctx in
-      if get_no_nla() && P.is_const p1 == None && P.is_const p2 == None
+      if Options.get_no_nla() && P.is_const p1 == None && P.is_const p2 == None
       then
         (* becomes uninterpreted *)
-        let tau = E.mk_term (Sy.name ~kind:Sy.Ac "@*") [t1; t2] ty in
+        let tau =
+          E.mk_term (Sy.name ~kind:Sy.Ac ~ns:Internal "@*") [t1; t2] ty
+        in
         let xtau, ctx' = X.make tau in
         P.add p (P.create [coef, xtau] Q.zero ty), List.rev_append ctx' ctx
       else
@@ -251,20 +256,19 @@ module Shostak
     | Sy.Op Sy.Div, [t1;t2] ->
       let p1, ctx = mke Q.one (empty_polynome ty) t1 ctx in
       let p2, ctx = mke Q.one (empty_polynome ty) t2 ctx in
-      if get_no_nla() &&
+      if Options.get_no_nla() &&
          (P.is_const p2 == None ||
           (ty == Ty.Tint && P.is_const p1 == None)) then
         (* becomes uninterpreted *)
-        let tau = E.mk_term (Sy.name "@/") [t1; t2] ty in
+        let tau = E.mk_term (Sy.name ~ns:Internal "@/") [t1; t2] ty in
         let xtau, ctx' = X.make tau in
         P.add p (P.create [coef, xtau] Q.zero ty), List.rev_append ctx' ctx
       else
         let p3, ctx =
-          try
-            let p, approx = P.div p1 p2 in
-            if approx then mk_euc_division p p2 t1 t2 ctx
-            else p, ctx
-          with Division_by_zero | Polynome.Maybe_zero ->
+          match P.div p1 p2 with
+          | p, approx ->
+            if approx then mk_euc_division t t1 p2 ctx else p, ctx
+          | exception Division_by_zero | exception Polynome.Maybe_zero ->
             P.create [Q.one, X.term_embed t] Q.zero ty, ctx
         in
         P.add p (P.mult_const coef p3), ctx
@@ -279,29 +283,28 @@ module Shostak
     | Sy.Op Sy.Modulo , [t1;t2] ->
       let p1, ctx = mke Q.one (empty_polynome ty) t1 ctx in
       let p2, ctx = mke Q.one (empty_polynome ty) t2 ctx in
-      if get_no_nla() &&
+      if Options.get_no_nla() &&
          (P.is_const p1 == None || P.is_const p2 == None)
       then
         (* becomes uninterpreted *)
-        let tau = E.mk_term (Sy.name "@%") [t1; t2] ty in
+        let tau = E.mk_term (Sy.name ~ns:Internal "@%") [t1; t2] ty in
         let xtau, ctx' = X.make tau in
         P.add p (P.create [coef, xtau] Q.zero ty), List.rev_append ctx' ctx
       else
         let p3, ctx =
           try P.modulo p1 p2, ctx
-          with e ->
-            let t = E.mk_term mod_symb [t1; t2] Ty.Tint in
-            let ctx = match e with
-              | Division_by_zero | Polynome.Maybe_zero -> ctx
-              | Polynome.Not_a_num -> mk_modulo t t1 t2 p2 ctx
-              | _ -> assert false
-            in
+          with
+          | Polynome.Not_a_num -> mk_euc_modulo t1 t2 p1 p2 ctx
+          | Division_by_zero | Polynome.Maybe_zero ->
+            let t = E.mk_term mod_symb [t1; t2] Tint in
             P.create [Q.one, X.term_embed t] Q.zero ty, ctx
         in
         P.add p (P.mult_const coef p3), ctx
 
     (*** <begin>: partial handling of some arith/FPA operators **)
-    | Sy.Op Sy.Float, [prec; exp; mode; x] ->
+    | Sy.Op Float, [prec; exp; mode; x] ->
+      let prec = E.int_view prec and exp = E.int_view exp in
+      let mode = E.rounding_mode_view mode in
       let aux_func e =
         let res, _, _ = Fpa_rounding.float_of_rational prec exp mode e in
         res
@@ -309,7 +312,10 @@ module Shostak
       mk_partial_interpretation_1 aux_func coef p ty t x, ctx
 
     | Sy.Op Sy.Integer_round, [mode; x] ->
-      let aux_func = Fpa_rounding.round_to_integer mode in
+      let aux_func =
+        Fpa_rounding.round_to_integer
+          (E.rounding_mode_view mode)
+      in
       mk_partial_interpretation_1 aux_func coef p ty t x, ctx
 
     | Sy.Op (Sy.Abs_int | Sy.Abs_real) , [x] ->
@@ -352,10 +358,6 @@ module Shostak
       mk_partial_interpretation_2
         (fun x y -> calc_power x y ty) coef p ty t x y, ctx
 
-    | Sy.Op Sy.Fixed, _ ->
-      (* Fixed-Point arithmetic currently not implemented *)
-      assert false
-
     (*** <end>: partial handling of some arith/FPA operators **)
 
     | _ ->
@@ -366,16 +368,20 @@ module Shostak
       | _ -> P.add p (P.create [coef, a] Q.zero ty), ctx
 
   let make t =
-    tool_req 4 "TR-Arith-Make";
-    let ty = E.type_info t in
-    let p, ctx = mke Q.one (empty_polynome ty) t [] in
-    is_mine p, ctx
+    Options.tool_req 4 "TR-Arith-Make";
+    match E.term_view t with
+    | { f = Op (Int2BV _); _ } ->
+      X.term_embed t, []
+    | _ ->
+      let ty = E.type_info t in
+      let p, ctx = mke Q.one (empty_polynome ty) t [] in
+      is_mine p, ctx
 
   let rec expand p n acc =
     assert (n >=0);
     if n = 0 then acc else expand p (n-1) (p::acc)
 
-  let unsafe_ac_to_arith { l = rl; t = ty; _ } =
+  let unsafe_ac_to_arith Sig.{ l = rl; t = ty; _ } =
     let mlt = List.fold_left (fun l (r,n) -> expand (embed r)n l) [] rl in
     List.fold_left P.mult (P.create [] Q.one ty) mlt
 
@@ -407,7 +413,7 @@ module Shostak
     List.exists
       (fun x ->
          match X.term_extract x with
-         | Some t, _ -> E.is_fresh t
+         | Some t, _ -> E.is_fresh_ac_name t
          | _ -> false
       ) (X.leaves xp)
 
@@ -418,7 +424,7 @@ module Shostak
       (fst (P.to_list p))
 
   let color ac =
-    match ac.l with
+    match ac.Sig.l with
     | [(_, 1)] -> assert false
     | _ ->
       let p = unsafe_ac_to_arith ac in
@@ -439,6 +445,8 @@ module Shostak
   module SX = Set.Make(struct type t = r let compare = X.hash_cmp end)
 
   let leaves p = P.leaves p
+
+  let is_constant p = Option.is_some (P.is_const p)
 
   let subst x t p =
     let p = P.subst x (embed t) p in
@@ -490,7 +498,7 @@ module Shostak
     List.fold_left
       (fun (l, sb) (b, y) ->
          if X.ac_extract y != None && X.str_cmp y x > 0 then
-           let k = X.term_embed (E.fresh_name Ty.Tint) in
+           let k = X.term_embed (E.fresh_ac_name Ty.Tint) in
            (b, k) :: l, (y, embed k)::sb
          else (b, y) :: l, sb)
       ([], []) l
@@ -598,7 +606,7 @@ module Shostak
     with Not_found -> is_null p
 
 
-  let unsafe_ac_to_arith { l = rl; t = ty; _ } =
+  let unsafe_ac_to_arith Sig.{ l = rl; t = ty; _ } =
     let mlt = List.fold_left (fun l (r, n) -> expand (embed r) n l) [] rl in
     List.fold_left P.mult (P.create [] Q.one ty) mlt
 
@@ -619,7 +627,7 @@ module Shostak
     else pp
 
   let solve_aux r1 r2 unsafe_mode =
-    tool_req 4 "TR-Arith-Solve";
+    Options.tool_req 4 "TR-Arith-Solve";
     Debug.solve_aux r1 r2;
     let p = P.sub (embed r1) (embed r2) in
     let pp = polynome_distribution p unsafe_mode in
@@ -657,8 +665,8 @@ module Shostak
     let sbs = List.filter (fun (p,_) -> SX.mem p lvs || is_non_lin p) sbs in
       (*
         This assert is not TRUE because of AC and distributivity of '*'
-        assert (not (get_enable_assertions ()) ||
-        X.equal (apply_subst a sbs) (apply_subst b sbs));
+        Options.heavy_assert
+          (fun () -> X.equal (apply_subst a sbs) (apply_subst b sbs));
       *)
     List.iter
       (fun (p, _) ->
@@ -670,50 +678,26 @@ module Shostak
     let sbt = solve_aux r1 r2 unsafe_mode in
     let sbt = make_idemp r1 r2 sbt lvs unsafe_mode in (*may raise Unsafe*)
     Debug.solve_one r1 r2 sbt;
-    {pb with sbt = List.rev_append sbt pb.sbt}
+    Sig.{pb with sbt = List.rev_append sbt pb.sbt}
 
   let solve r1 r2 pb =
     let lvs = List.fold_right SX.add (X.leaves r1) SX.empty in
     let lvs = List.fold_right SX.add (X.leaves r2) lvs in
     try
-      if get_debug_arith () then
+      if Options.get_debug_arith () then
         Printer.print_dbg
           ~module_name:"Arith" ~function_name:"solve"
           "Try solving with unsafe mode.";
       solve_one pb r1 r2 lvs true (* true == unsafe mode *)
     with Unsafe ->
     try
-      if get_debug_arith () then
+      if Options.get_debug_arith () then
         Printer.print_dbg
           ~module_name:"Arith" ~function_name:"solve"
           "Cancel unsafe solving mode. Try safe mode";
       solve_one pb r1 r2 lvs false (* false == safe mode *)
     with Unsafe ->
       assert false
-
-  let make t =
-    if get_timers() then
-      try
-        Timers.exec_timer_start Timers.M_Arith Timers.F_make;
-        let res = make t in
-        Timers.exec_timer_pause Timers.M_Arith Timers.F_make;
-        res
-      with e ->
-        Timers.exec_timer_pause Timers.M_Arith Timers.F_make;
-        raise e
-    else make t
-
-  let solve r1 r2 pb =
-    if get_timers() then
-      try
-        Timers.exec_timer_start Timers.M_Arith Timers.F_solve;
-        let res = solve r1 r2 pb in
-        Timers.exec_timer_pause Timers.M_Arith Timers.F_solve;
-        res
-      with e ->
-        Timers.exec_timer_pause Timers.M_Arith Timers.F_solve;
-        raise e
-    else solve r1 r2 pb
 
   let print = P.print
 
@@ -747,11 +731,8 @@ module Shostak
       else
       if List.exists
           (fun (t,x) ->
-             let symb, ty = match E.term_view t with
-               | E.Not_a_term _ -> assert false
-               | E.Term tt -> tt.E.f, tt.E.ty
-             in
-             is_mine_symb symb ty && X.leaves x == []
+             let E.{f; _} = E.term_view t in
+             is_mine_symb f && X.leaves x == []
           ) eq
       then None
       else
@@ -763,42 +744,11 @@ module Shostak
         cpt := Q.add Q.one (max_constant distincts !cpt);
         Some (term_of_cst (Q.to_string !cpt), true)
 
-
-
-  let pprint_const_for_model =
-    let pprint_positive_const c =
-      let num = Q.num c in
-      let den = Q.den c in
-      if Z.is_one den then Z.to_string num
-      else Format.sprintf "(/ %s %s)" (Z.to_string num) (Z.to_string den)
-    in
-    fun r ->
-      match P.is_const (embed r) with
-      | None -> assert false
-      | Some c ->
-        let sg = Q.sign c in
-        if sg = 0 then "0"
-        else if sg > 0 then pprint_positive_const c
-        else Format.sprintf "(- %s)" (pprint_positive_const (Q.abs c))
-
-  let choose_adequate_model t r l =
-    if get_debug_interpretation () then
-      Printer.print_dbg
-        ~module_name:"Arith" ~function_name:"choose_adequate_model"
-        "choose_adequate_model for %a" E.print t;
-    let l = List.filter (fun (_, r) -> P.is_const (embed r) != None) l in
-    let r =
-      match l with
-      | [] ->
-        (* We do this, because terms of some semantic values created
-           by CS are not created and added to UF *)
-        assert (P.is_const (embed r) != None);
-        r
-
-      | (_,r)::l ->
-        List.iter (fun (_,x) -> assert (X.equal x r)) l;
-        r
-    in
-    r, pprint_const_for_model r
-
+  let to_model_term r =
+    match P.is_const (embed r), X.type_info r with
+    | Some i, Ty.Tint ->
+      assert (Z.equal (Q.den i) Z.one);
+      Some (Expr.Ints.of_Z (Q.num i))
+    | Some q, Ty.Treal -> Some (Expr.Reals.of_Q q)
+    | _ -> None
 end

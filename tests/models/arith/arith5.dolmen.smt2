@@ -1,0 +1,13 @@
+(set-option :produce-models true)
+(set-logic ALL)
+(declare-const x Real)
+(declare-const y Real)
+(declare-const z Real)
+; This linear program is bounded.
+(assert (= (+ (* 5.0 x) (* 2.0 y) (* (- 0.0 3.0) z)) 2.0))
+(assert (= (+ (* (- 0.0 2.0) x) (* 4.0 y)) 0.0))
+(assert (= (+ (* 2.0 x) (* 4.0 y) (* 1.0 z)) (- 0.0 1.0)))
+(maximize x)
+(check-sat)
+(get-model)
+(get-objectives)

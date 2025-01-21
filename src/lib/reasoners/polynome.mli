@@ -1,30 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 exception Not_a_num
 exception Maybe_zero
@@ -79,6 +78,42 @@ module type T = sig
   val abstract_selectors : t -> (r * r) list -> t * (r * r) list
 
   val separate_constant : t -> t * Numbers.Q.t
+
+  module Set : Set.S with type elt = t
+  module Map : Map.S with type key = t
+
+  module Ints : sig
+    (** Helper functions for manipulating polynomials of type [Tint]. *)
+
+    val of_bigint : Z.t -> t
+    (** Conversion from [Z.t]. *)
+
+    val zero : t
+    (** The constant [0]. *)
+
+    (** {2 Prefix and infix operators} *)
+
+    val (~-) : t -> t
+    (** Negation. *)
+
+    val (+) : t -> t -> t
+    (** Addition [add]. *)
+
+    val (-) : t -> t -> t
+    (** Subtraction [sub]. *)
+
+    val (~$$) : Z.t -> t
+    (** Conversion from [Z.t]. *)
+
+    val (+$$) : t -> Z.t -> t
+    (** Addition with a constant.
+
+        {b Note}: [p +$$ n] is equivalent to [p + ~$$n], but might be more
+        efficient. *)
+
+    val ( *$$ ) : t -> Z.t -> t
+    (** Multiplication with a constant. *)
+  end
 end
 
 module type EXTENDED_Polynome = sig
@@ -88,4 +123,3 @@ module type EXTENDED_Polynome = sig
 end
 
 module Make (X : S) : T with type r = X.r
-

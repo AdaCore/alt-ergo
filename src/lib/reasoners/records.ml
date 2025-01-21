@@ -1,41 +1,36 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
-open Format
-open Options
-open Sig
-module Hs = Hstring
 module E = Expr
-
+module Sy = Symbols
 
 type 'a abstract =
-  | Record of (Hs.t * 'a abstract) list * Ty.t
-  | Access of Hs.t * 'a abstract * Ty.t
+  | Record of (Uid.term_cst * 'a abstract) list * Ty.t
+  | Access of Uid.term_cst * 'a abstract * Ty.t
   | Other of 'a * Ty.t
 
 module type ALIEN = sig
@@ -50,6 +45,8 @@ module Shostak (X : ALIEN) = struct
 
   let name = "records"
 
+  let timer = Timers.M_Records
+
   type t = X.r abstract
   type r = X.r
 
@@ -58,16 +55,16 @@ module Shostak (X : ALIEN) = struct
 
     let rec print fmt = function
       | Record (lbs, _) ->
-        fprintf fmt "{";
+        Format.fprintf fmt "{";
         let _ = List.fold_left
             (fun first (lb, e) ->
-               fprintf fmt "%s%s = %a"
-                 (if first then "" else "; ") (Hs.view lb) print e;
+               Format.fprintf fmt "%s%a = %a"
+                 (if first then "" else "; ") Uid.pp lb print e;
                false
             ) true lbs in
-        fprintf fmt "}"
+        Format.fprintf fmt "}"
       | Access(a, e, _) ->
-        fprintf fmt "%a.%s" print e (Hs.view a)
+        Format.fprintf fmt "%a.%a" print e Uid.pp a
       | Other(t, _) -> X.print fmt t
 
   end
@@ -86,7 +83,7 @@ module Shostak (X : ALIEN) = struct
       let c = Ty.compare ty1 ty2 in
       if c <> 0 then c
       else
-        let c = Hs.compare s1 s2 in
+        let c = Uid.compare s1 s2 in
         if c <> 0 then c
         else raw_compare u1 u2
     | Access _, _ -> -1
@@ -110,11 +107,11 @@ module Shostak (X : ALIEN) = struct
       begin
         let lbs_n = List.map (fun (lb, x) -> lb, normalize x) lbs in
         match lbs_n with
-        | (lb1, Access(lb2, x, _)) :: l when Hs.equal lb1 lb2 ->
+        | (lb1, Access(lb2, x, _)) :: l when Uid.equal lb1 lb2 ->
           if List.for_all
               (function
                 | (lb1, Access(lb2, y, _)) ->
-                  Hs.equal lb1 lb2 && raw_compare x y = 0
+                  Uid.equal lb1 lb2 && raw_compare x y = 0
                 | _ -> false) l
           then x
           else Record (lbs_n, ty)
@@ -123,7 +120,7 @@ module Shostak (X : ALIEN) = struct
     | Access (a, x, ty) ->
       begin
         match normalize x with
-        | Record (lbs, _) -> Hs.list_assoc a lbs
+        | Record (lbs, _) -> My_list.assoc Uid.equal a lbs
         | x_n -> Access (a, x_n, ty)
       end
     | Other _ -> v
@@ -143,7 +140,7 @@ module Shostak (X : ALIEN) = struct
       Ty.equal ty1 ty2 && X.equal u1 u2
 
     | Access (s1, u1, ty1), Access (s2, u2, ty2) ->
-      Hs.equal s1 s2 && Ty.equal ty1 ty2 && equal u1 u2
+      Uid.equal s1 s2 && Ty.equal ty1 ty2 && equal u1 u2
 
     | Record (lbs1, ty1), Record (lbs2, ty2) ->
       Ty.equal ty1 ty2 && equal_list lbs1 lbs2
@@ -164,11 +161,7 @@ module Shostak (X : ALIEN) = struct
 
   let make t =
     let rec make_rec t ctx =
-      let { E.f; xs; ty; _ } =
-        match E.term_view t with
-        | E.Not_a_term _ -> assert false
-        | E.Term tt -> tt
-      in
+      let { E.f; xs; ty; _ } = E.term_view t in
       match f, ty with
       | Symbols.Op (Symbols.Record), Ty.Trecord { Ty.lbs; _ } ->
         assert (List.length xs = List.length lbs);
@@ -220,13 +213,22 @@ module Shostak (X : ALIEN) = struct
     in
     XS.elements (leaves t)
 
+  let is_constant =
+    let rec is_constant t =
+      match normalize t with
+      | Record (lbs, _) ->
+        List.for_all (fun (_, x) -> is_constant x) lbs
+      | Access (_, x, _) -> is_constant x
+      | Other (x, _) -> X.is_constant x
+    in is_constant
+
   let rec hash  = function
     | Record (lbs, ty) ->
       List.fold_left
-        (fun h (lb, x) -> 17 * hash x + 13 * Hs.hash lb + h)
+        (fun h (lb, x) -> 17 * hash x + 13 * Uid.hash lb + h)
         (Ty.hash ty) lbs
     | Access (a, x, ty) ->
-      19 * hash x + 17 * Hs.hash a + Ty.hash ty
+      19 * hash x + 17 * Uid.hash a + Ty.hash ty
     | Other (x, ty) ->
       Ty.hash ty + 23 * X.hash x
 
@@ -242,16 +244,15 @@ module Shostak (X : ALIEN) = struct
 
   let subst p v r = is_mine (subst_rec p v r)
 
-  let is_mine_symb_aux sy = match sy with
+  let is_mine_symb sy =
+    match sy with
     | Symbols.Op (Symbols.Record | Symbols.Access _) -> true
     | _ -> false
-
-  let is_mine_symb sy _ty = is_mine_symb_aux sy
 
   let abstract_access field e ty acc =
     let xe = is_mine e in
     let abs_right_xe, acc =
-      try List.assoc xe acc, acc
+      try My_list.assoc X.equal xe acc, acc
       with Not_found ->
         let left_abs_xe2, acc = X.abstract_selectors xe acc in
         match X.type_info left_abs_xe2 with
@@ -262,7 +263,9 @@ module Shostak (X : ALIEN) = struct
           in
           let record = is_mine (Record (flds, tyr)) in
           record, (left_abs_xe2, record) :: acc
-        | _ -> assert false
+        | ty ->
+          Fmt.failwith
+            "Not a record type: `%a" Ty.print_full ty
     in
     let abs_access = normalize (Access (field, embed abs_right_xe, ty)) in
     is_mine abs_access, acc
@@ -298,7 +301,7 @@ module Shostak (X : ALIEN) = struct
       List.map
         (fun (lb, ty) ->
            match info with
-           | Some (a, v) when Hs.equal lb a -> lb, v
+           | Some (a, v) when Uid.equal lb a -> lb, v
            | _ -> let n = embed (X.term_embed (E.fresh_name ty)) in lb, n)
         lbs
      in
@@ -319,12 +322,12 @@ module Shostak (X : ALIEN) = struct
      | Record (lbs, ty) ->
       Record (List.map (fun (n,e') -> n, subst_access x s e') lbs, ty)
      | Access (lb, e', _) when compare_mine x e' = 0 ->
-      Hs.list_assoc lb s
+      My_list.assoc Uid.equal lb s
      | Access (lb', e', ty) -> Access (lb', subst_access x s e', ty)
      | Other _ -> e
   *)
 
-  let fully_interpreted = is_mine_symb_aux
+  let fully_interpreted = is_mine_symb
 
   let rec term_extract r =
     match X.extract r with
@@ -356,16 +359,16 @@ module Shostak (X : ALIEN) = struct
 
 
   let orient_solved p v pb =
-    if List.mem p (X.leaves v) then raise Util.Unsolvable;
-    { pb with sbt = (p,v) :: pb.sbt }
+    if List.exists (X.equal p) (X.leaves v) then raise Util.Unsolvable;
+    Sig.{ pb with sbt = (p,v) :: pb.sbt }
 
-  let solve r1 r2 pb =
+  let solve r1 r2 (pb : _ Sig.solve_pb) =
     match embed r1, embed r2 with
     | Record (l1, _), Record (l2, _) ->
       let eqs =
         List.fold_left2
           (fun eqs (a,b) (x,y) ->
-             assert (Hs.compare a x = 0);
+             assert (Uid.compare a x = 0);
              (is_mine y, is_mine b) :: eqs
           )pb.eqs l1 l2
       in
@@ -380,36 +383,12 @@ module Shostak (X : ALIEN) = struct
     | Access _ , _ -> assert false
     | _ , Access _ -> assert false
 
-  let make t =
-    if Options.get_timers() then
-      try
-        Timers.exec_timer_start Timers.M_Records Timers.F_make;
-        let res = make t in
-        Timers.exec_timer_pause Timers.M_Records Timers.F_make;
-        res
-      with e ->
-        Timers.exec_timer_pause Timers.M_Records Timers.F_make;
-        raise e
-    else make t
-
-  let solve r1 r2 pb =
-    if Options.get_timers() then
-      try
-        Timers.exec_timer_start Timers.M_Records Timers.F_solve;
-        let res = solve r1 r2 pb in
-        Timers.exec_timer_pause Timers.M_Records Timers.F_solve;
-        res
-      with e ->
-        Timers.exec_timer_pause Timers.M_Records Timers.F_solve;
-        raise e
-    else solve r1 r2 pb
-
   let assign_value t _ eq =
     match embed t with
     | Access _ -> None
 
     | Record (_, ty) ->
-      if List.exists (fun (t,_) -> Expr.const_term t) eq
+      if List.exists (fun (t,_) -> Expr.is_model_term t) eq
       then None
       else Some (Expr.fresh_name ty, false)
 
@@ -421,20 +400,20 @@ module Shostak (X : ALIEN) = struct
         Some (s, false) (* false <-> not a case-split *)
       | _ -> assert false
 
-  let choose_adequate_model _ _ l =
-    let acc =
-      List.fold_left
-        (fun acc (s, r) ->
-           if not (Expr.const_term s) then acc
-           else
-             match acc with
-             | Some(s', _) when Expr.compare s' s > 0 -> acc
-             | _ -> Some (s, r)
-        ) None l
-    in
-    match acc with
-    | Some (_,r) ->
-      r, asprintf "%a" X.print r  (* it's a EUF constant *)
-    | _ -> assert false
+  let to_model_term =
+    let rec to_model_term r =
+      match r with
+      | Record (fields, ty) ->
+        (* We can ignore the names of fields as they are inlined in the
+           type [ty] of the record. *)
+        let l =
+          My_list.try_map (fun (_name, rf) -> to_model_term rf) fields
+        in
+        Option.bind l @@ fun l ->
+        Some (E.mk_term Sy.(Op Record) l ty)
 
+      | Other (a, _) ->
+        X.to_model_term a
+      | Access _ -> None
+    in fun r -> to_model_term (embed r)
 end
