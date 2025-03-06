@@ -1,13 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2018-2020 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the license indicated      *)
-(*     in the file 'License.OCamlPro'. If 'License.OCamlPro' is not           *)
-(*     present, please contact us to clarify licensing.                       *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 open AltErgoLib
 open Worker_interface
@@ -23,7 +39,7 @@ let get_input_format = function
   | None -> None
   | Some f -> match f with
     | Native -> Some Options.Native
-    | Smtlib2 -> Some Options.Smtlib2
+    | Smtlib2 -> Some (Options.Smtlib2 `Poly)
     | Why3 -> Some Options.Why3
     | Unknown s -> Some (Options.Unknown s)
 
@@ -31,7 +47,7 @@ let get_output_format = function
   | None -> None
   | Some f -> match f with
     | Native -> Some Options.Native
-    | Smtlib2 -> Some Options.Smtlib2
+    | Smtlib2 -> Some (Options.Smtlib2 `Poly)
     | Why3 -> Some Options.Why3
     | Unknown s -> Some (Options.Unknown s)
 
@@ -49,6 +65,14 @@ let get_instantiation_heuristic = function
     | INormal -> Some Options.INormal
     | IAuto -> Some Options.IAuto
     | IGreedy -> Some Options.IGreedy
+
+let get_interpretation = function
+  | None -> None
+  | Some m -> match m with
+    | INone -> Some Options.INone
+    | IFirst -> Some Options.IFirst
+    | IEvery -> Some Options.IEvery
+    | ILast -> Some Options.ILast
 
 let get_no_decisions_on = function
   | None -> None
@@ -91,10 +115,8 @@ let set_options r =
   set_options_opt Options.set_debug_matching r.debug_matching;
   set_options_opt Options.set_debug_sat r.debug_sat;
   set_options_opt Options.set_debug_split r.debug_split;
-  set_options_opt Options.set_debug_sum r.debug_sum;
   set_options_opt Options.set_debug_triggers r.debug_triggers;
   set_options_opt Options.set_debug_types r.debug_types;
-  set_options_opt Options.set_debug_typing r.debug_typing;
   set_options_opt Options.set_debug_uf r.debug_uf;
   set_options_opt Options.set_debug_unsat_core r.debug_unsat_core;
   set_options_opt Options.set_debug_use r.debug_use;
@@ -113,11 +135,8 @@ let set_options r =
   set_options_opt Options.set_save_used_context r.save_used_context;
 
   set_options_opt Options.set_answers_with_loc r.answers_with_loc;
-  set_options_opt Options.set_input_format
-    (get_input_format r.input_format);
-  Options.set_infer_input_format (get_input_format r.input_format);
+  Options.set_input_format (get_input_format r.input_format);
   set_options_opt Options.set_parse_only r.parse_only;
-  set_options_opt Options.set_parsers r.parsers;
   set_options_opt Options.set_preludes r.preludes;
   set_options_opt Options.set_type_only r.type_only;
   set_options_opt Options.set_type_smt2 r.type_smt2;
@@ -129,11 +148,13 @@ let set_options r =
   set_options_opt Options.set_fm_cross_limit (get_numbers r.fm_cross_limit);
   set_options_opt Options.set_steps_bound r.steps_bound;
 
-  set_options_opt Options.set_interpretation r.interpretation;
+  set_options_opt Options.set_interpretation
+    (get_interpretation r.interpretation);
 
   set_options_opt Options.set_output_format
     (get_output_format r.output_format);
-  Options.set_infer_output_format (get_input_format r.output_format);
+  Options.set_infer_output_format
+    (get_input_format r.output_format |> Option.is_none);
   set_options_opt Options.set_unsat_core r.unsat_core;
 
   set_options_opt Options.set_verbose r.verbose;
@@ -164,7 +185,6 @@ let set_options r =
     (get_no_decisions_on r.no_decisions_on);
   set_options_opt Options.set_no_sat_learning r.no_sat_learning;
   set_options_opt Options.set_sat_solver (get_sat_solver r.sat_solver);
-  set_options_opt Options.set_tableaux_cdcl r.tableaux_cdcl;
 
   set_options_opt Options.set_disable_ites r.disable_ites;
   set_options_opt Options.set_inline_lets r.inline_lets;
@@ -180,7 +200,6 @@ let set_options r =
   set_options_opt Options.set_no_theory r.no_theory;
   set_options_opt Options.set_restricted r.restricted;
   set_options_opt Options.set_tighten_vars r.tighten_vars;
-  set_options_opt Options.set_use_fpa r.use_fpa;
   set_options_opt Options.set_timers r.timers;
 
   set_options_opt Options.set_file r.file;

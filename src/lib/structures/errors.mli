@@ -1,30 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 (** {1 Errors module} *)
 
@@ -37,6 +36,7 @@
 type typing_error =
   | BitvExtract of int*int
   | BitvExtractRange of int*int
+  | NonPositiveBitvType of int
   | ClashType of string
   | ClashLabel of string * string
   | ClashParam of string
@@ -79,14 +79,26 @@ type typing_error =
   | NotAdtConstr of string * Ty.t
   | BadPopCommand of {pushed : int; to_pop : int}
   | ShouldBePositive of int
+  | PolymorphicEnum of string
+  | ShouldBeIntLiteral of string
 
 (** Errors that can be raised at solving*)
 type run_error =
   | Invalid_steps_count of int
-  | Steps_limit of int
   | Failed_check_unsat_core
   | Unsupported_feature of string
   | Dynlink_error of string
+  | Stack_underflow
+
+(** Errors raised when performing actions forbidden in some modes. *)
+type mode_error =
+  | Invalid_set_option of string
+  | Forbidden_command of string
+
+(** Errors raised while using models. *)
+type model_error =
+  | Subst_type_clash of Id.t * Ty.t * Ty.t
+  | Subst_not_model_term of Expr.t
 
 (** All types of error that can be raised *)
 type error =
@@ -96,6 +108,14 @@ type error =
   | Typing_error of Loc.t * typing_error (** Error used at typing *)
   | Run_error of run_error (** Error used during solving *)
   | Warning_as_error
+  | Dolmen_error of (int * string)
+  (** Error code + description raised by dolmen. *)
+
+  | Mode_error of Util.mode * mode_error
+  (** Error used when performing actions forbidden in some modes. *)
+
+  | Model_error of model_error
+  (** Error raised while using models. *)
 
 (** {2 Exceptions } *)
 
@@ -116,6 +136,14 @@ val run_error : run_error -> 'a
     if the option warning-as-error is set
     This function can be use after warning *)
 val warning_as_error : unit -> unit
+
+(** Raise [Mode_error (Invalid_set_option str)] as {!Error} if an option is
+    being set when it should be immutable. *)
+val invalid_set_option : Util.mode -> string -> 'a
+
+(** Raise [Mode_error (Forbidden_command str)] as {!Error} if a command is
+    being used in a mode where it should not be available. *)
+val forbidden_command : Util.mode -> string -> 'a
 
 (** {2 Printing } *)
 

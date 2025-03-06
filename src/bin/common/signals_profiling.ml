@@ -1,43 +1,38 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 open AltErgoLib
-open Options
-
-let timers = Timers.empty ()
-
-let get_timers () = timers
 
 let init_sigterm_6 () =
   (* what to do with Ctrl+C ? *)
   Sys.set_signal Sys.sigint(*-6*)
     (Sys.Signal_handle (fun _ ->
-         if Options.get_profiling() then Profiling.switch (get_fmt_err ())
+         if Options.get_profiling() then
+           Profiling.switch (Options.Output.get_fmt_diagnostic ())
          else begin
            Printer.print_wrn "User wants me to stop.";
            Printer.print_std "unknown";
@@ -56,7 +51,7 @@ let init_sigterm_11_9 () =
            (Sys.Signal_handle
               (fun _ ->
                  Profiling.print true (Steps.get_steps ())
-                   timers (get_fmt_err ());
+                   (Options.Output.get_fmt_diagnostic ());
                  exit 1
               )
            )
@@ -69,23 +64,20 @@ let init_sigterm_21 () =
     Sys.set_signal Sys.sigprof (*-21*)
       (Sys.Signal_handle
          (fun _ ->
-            Profiling.print false (Steps.get_steps ()) timers (get_fmt_err ());
+            Profiling.print false (Steps.get_steps ())
+              (Options.Output.get_fmt_diagnostic ());
          )
       )
 
 let init_sigalarm () =
-  if not (get_model ()) then
-    try
-      Sys.set_signal Sys.sigvtalrm
-        (Sys.Signal_handle (fun _ -> Options.exec_timeout ()))
-    with Invalid_argument _ -> ()
+  try
+    Sys.set_signal Sys.sigvtalrm
+      (Sys.Signal_handle (fun _ -> Options.exec_timeout ()))
+  with Invalid_argument _ -> ()
 
 let init_profiling () =
   if Options.get_profiling () then begin
-    Timers.reset timers;
     assert (Options.get_timers());
-    Timers.set_timer_start (Timers.start timers);
-    Timers.set_timer_pause (Timers.pause timers);
     Profiling.init ();
   end
 

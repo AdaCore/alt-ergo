@@ -1,1 +1,2 @@
 docs/sphinx_docs/* no-precommit-check
+*.sh text eol=lf

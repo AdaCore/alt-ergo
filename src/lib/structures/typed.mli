@@ -1,30 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 (** Typed AST
 
@@ -54,12 +53,12 @@ val mk : ?annot:int -> 'a -> ('a, int) annoted
 
 type tconstant =
   (* TODO: make Tint hold an arbitrary precision integer ? *)
-  | Tint of string      (** An integer constant. *)
-  | Treal of Num.num    (** Real constant. *)
-  | Tbitv of string     (** Bitvector constant. *)
-  | Ttrue               (** The true boolean (or proposition ?) *)
-  | Tfalse              (** The false boolean *)
-  | Tvoid               (** The only value of type unit *)
+  | Tint of string        (** An integer constant. *)
+  | Treal of Numbers.Q.t  (** Real constant. *)
+  | Tbitv of string       (** Bitvector constant. *)
+  | Ttrue                 (** The true boolean (or proposition ?) *)
+  | Tfalse                (** The false boolean *)
+  | Tvoid                 (** The only value of type unit *)
 (** Typed constants. *)
 
 type oplogic =
@@ -73,7 +72,7 @@ type oplogic =
 (** Logic operators. *)
 
 type pattern =
-  | Constr of { name : Hstring.t ; args : (Var.t * Hstring.t * Ty.t) list}
+  | Constr of { name : Uid.term_cst ; args : (Var.t * Uid.term_cst * Ty.t) list}
   | Var of Var.t
 
 
@@ -112,7 +111,7 @@ and 'a tt_desc =
   (** Get operation on arrays *)
   | TTset of 'a atterm * 'a atterm * 'a atterm
   (** Set operation on arrays *)
-  | TTextract of 'a atterm * 'a atterm * 'a atterm
+  | TTextract of 'a atterm * int * int
   (** Extract a sub-bitvector *)
   | TTconcat of 'a atterm * 'a atterm
   (* Concatenation of bitvectors *)
@@ -129,10 +128,8 @@ and 'a tt_desc =
   (** Conditional branching, of the form
       [TTite (condition, then_branch, else_branch)]. *)
 
-  | TTproject of bool * 'a atterm  * Hstring.t
-  (** Field (conditional) access on ADTs. The boolean is true when the
-      projection is 'guarded' and cannot be simplified (because
-      functions are total) *)
+  | TTproject of 'a atterm  * Hstring.t
+  (** Field (conditional) access on ADTs. *)
 
   | TTmatch of 'a atterm * (pattern * 'a atterm) list
   (** pattern matching on ADTs *)
@@ -178,8 +175,6 @@ and 'a tatom =
 and 'a quant_form = {
   qf_bvars : (Symbols.t * Ty.t) list;
   (** Variables that are quantified by this formula. *)
-  qf_upvars : (Symbols.t * Ty.t) list;
-  (** Free variables that occur in the formula. *)
   qf_triggers : ('a atterm list * bool) list;
   (** Triggers associated wiht the formula.
       For each trigger, the boolean specifies whether the trigger
@@ -204,11 +199,9 @@ and 'a tform =
   (** Universal quantification. *)
   | TFexists of 'a quant_form
   (** Existencial quantification. *)
-  | TFlet of (Symbols.t * Ty.t) list *
-             (Symbols.t * 'a tlet_kind) list *
+  | TFlet of (Var.t * 'a tlet_kind) list *
              'a atform
-  (** Let binding.
-      TODO: what is in the first list ? *)
+  (** Let binding. *)
   | TFnamed of Hstring.t * 'a atform
   (** Attach a name to a formula. *)
 
@@ -235,29 +228,6 @@ type 'a rwt_rule = {
 (** Rewrite rules.
     Polymorphic to allow for different representation of terms. *)
 
-
-type goal_sort =
-  | Cut
-  (** Introduce a cut in a goal. Once the cut proved,
-      it's added as a hypothesis. *)
-  | Check
-  (** Check if some intermediate assertion is prouvable *)
-  | Thm
-  (** The goal to be proved *)
-(** Goal sort. Used in typed declarations. *)
-
-val fresh_hypothesis_name : goal_sort -> string
-(** create a fresh hypothesis name given a goal sort. *)
-
-val is_local_hyp : string -> bool
-(** Assuming a name generated by {!fresh_hypothesis_name},
-    answers whether the name design a local hypothesis ? *)
-
-val is_global_hyp : string -> bool
-(** Assuming a name generated by {!fresh_hypothesis_name},
-    does the name design a global hypothesis ? *)
-
-
 type tlogic_type =
   | TPredicate of Ty.t list       (** Predicate type declarations *)
   | TFunction of Ty.t list * Ty.t (** Function type declarations *)
@@ -277,7 +247,7 @@ and 'a tdecl =
   (** New axiom that can be used in proofs. *)
   | TRewriting of Loc.t * string * ('a atterm rwt_rule) list
   (** New rewrite rule that can be used. *)
-  | TGoal of Loc.t * goal_sort * string * 'a atform
+  | TGoal of Loc.t * Ty.goal_sort * string * 'a atform
   (** New goal to prove. *)
   | TLogic of Loc.t * string list * tlogic_type
   (** Function (or predicate) type declaration. *)
@@ -301,6 +271,15 @@ and 'a tdecl =
   (** [push (loc,n)] pushs n new assertions levels onto the assertion stack *)
   | TPop of Loc.t * int
   (** [pop (loc,n)] pops n assertions levels from the assertion stack *)
+  | TReset of Loc.t
+  (** Resets all the context. *)
+  | TExit of Loc.t
+  (** Exits the solver. *)
+
+  | TOptimize of Loc.t * 'a atterm * bool
+  (** Optimization declaration.
+      [TOptimize (loc, obj, is_max)] declares an objective function [obj]. The
+      flag [is_max] determines if we try to maximize of minimize [obj]. *)
 
 (** Typed declarations. *)
 (* TODO: wrap this in a record to factorize away
@@ -321,10 +300,10 @@ val print_binders : Format.formatter -> (Symbols.t * Ty.t) list -> unit
 val print_triggers : Format.formatter -> ('a atterm list * bool) list -> unit
 (** Print a list of triggers. *)
 
-val print_goal_sort : Format.formatter -> goal_sort -> unit
-(** Print a goal sort *)
-
 val print_rwt :
   (Format.formatter -> 'a -> unit) ->
   Format.formatter -> 'a rwt_rule -> unit
 (** Print a rewrite rule *)
+
+val print_atdecl : Format.formatter -> _ atdecl -> unit
+(** Print an annoted term decl. *)

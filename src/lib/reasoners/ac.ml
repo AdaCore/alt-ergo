@@ -1,36 +1,35 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
-
-open Options
-open Format
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 module HS = Hstring
 module Sy = Symbols
+
+let src = Logs.Src.create ~doc:"Ac" __MODULE__
+module Log = (val Logs.src_log src : Logs.LOG)
 
 module type S = sig
 
@@ -43,8 +42,8 @@ module type S = sig
   (* builds an embeded semantic value from an AC term *)
   val make : Expr.t -> r * Expr.t list
 
-  (* tells whether the given term is AC*)
-  val is_mine_symb : Sy.t -> Ty.t -> bool
+  (* Tells whether the given symbol is AC. *)
+  val is_mine_symb : Sy.t -> bool
 
   (* compares two AC semantic values *)
   val compare : t -> t -> int
@@ -59,7 +58,7 @@ module type S = sig
   val type_info : t -> Ty.t
 
   (* prints the AC semantic value *)
-  val print : formatter -> t -> unit
+  val print : Format.formatter -> t -> unit
 
   (* returns the leaves of the given AC semantic value *)
   val leaves : t -> r list
@@ -76,6 +75,10 @@ module type S = sig
   val abstract_selectors : t -> (r * r) list -> r * (r * r) list
 
   val compact : (r * int) list -> (r * int) list
+
+  val assign_value :
+    r -> r list -> (Expr.t * r) list -> (Expr.t * bool) option
+
 end
 
 module Make (X : Sig.X) = struct
@@ -92,26 +95,26 @@ module Make (X : Sig.X) = struct
 
     let print_x fmt v =
       match X.leaves v with
-      | [w] when X.equal v w -> fprintf fmt "%a" X.print v
-      | _ -> fprintf fmt "(%a)" X.print v
+      | [w] when X.equal v w -> Format.fprintf fmt "%a" X.print v
+      | _ -> Format.fprintf fmt "(%a)" X.print v
 
 
     let rec pr_elt sep fmt (e,n) =
       assert (n >=0);
       if n = 0 then ()
-      else fprintf fmt "%s%a%a" sep print_x e (pr_elt sep) (e,n-1)
+      else Format.fprintf fmt "%s%a%a" sep print_x e (pr_elt sep) (e,n-1)
 
     let pr_xs sep fmt = function
       | [] -> assert false
       | (p,n)::l  ->
-        fprintf fmt "%a" print_x p;
-        List.iter (fprintf fmt "%a" (pr_elt sep))((p,n-1)::l)
+        Format.fprintf fmt "%a" print_x p;
+        List.iter (Format.fprintf fmt "%a" (pr_elt sep))((p,n-1)::l)
 
     let print fmt { h; l; _ } =
       if Sy.equal h (Sy.Op Sy.Mult) then
-        fprintf fmt "%a" (pr_xs "'*'") l
+        Format.fprintf fmt "%a" (pr_xs "'*'") l
       else
-        fprintf fmt "%a(%a)" Sy.print h (pr_xs ",") l
+        Format.fprintf fmt "%a(%a)" Sy.print h (pr_xs ",") l
 
     let assert_compare a b c1 c2 =
       assert (
@@ -129,7 +132,7 @@ module Make (X : Sig.X) = struct
       )
 
     let subst p v tm =
-      if get_debug_ac () then
+      if Options.get_debug_ac () then
         print_dbg
           "[ac] subst %a by %a in %a"
           X.print p X.print v X.print (X.ac_embed tm)
@@ -160,45 +163,85 @@ module Make (X : Sig.X) = struct
   let fold_flatten sy f =
     List.fold_left (fun z (rt,n) -> flatten sy ((f rt),n) z) []
 
-  let abstract2 sy t r acc =
+  let is_other_ac_symbol sy r =
     match X.ac_extract r with
-    | Some ac when Sy.equal sy ac.h -> r, acc
-    | None -> r, acc
-    | Some _ -> match Expr.term_view t with
-      | Expr.Term { Expr.f = Sy.Name (hs, Sy.Ac); xs; ty; _ } ->
-        let aro_sy = Sy.name ("@" ^ (HS.view hs)) in
+    | Some ac -> not (Sy.equal sy ac.h)
+    | None -> false
+
+  (* This implements a variant of the term abstraction process described in
+     section 6 of the AC(X) paper [1].
+
+     The abstraction process given in the paper requires to abstract all AC
+     symbols appearing in a non-AC context, but the implementation does not
+     know about the context at the time the abstraction is performed (note that
+     rules Abstract1 and Abstract2 are concerned with *equations* while the
+     abstraction process here occurs at the time of building semantic values,
+     which is earlier). Further, the implementation seems to implicitly rely on
+     term ordering (older terms are ordered before newer terms, so in
+     particular subterms are always smaller than terms that contains them) to
+     cheaply prevent loops rather than introducing all the abstracted variables
+     that the theoretical presentation in the paper would require.
+
+     So the implementation below of the Abstract2 rules deviates from the
+     presentation in the paper to accomodate those differences, globally,
+     between the implementation and theoretical description of AC(X).
+
+     More precisely, `abstract2` will abstract terms that *contain* AC leaves
+     when they appear as argument of an AC symbol. This ensures that AC terms
+     satisfy the T_AC definition from page 22 of the paper, although
+     correctness of the corresponding abstraction process has not been proven.
+     See also https://github.com/OCamlPro/alt-ergo/issues/989
+
+     [1]: Canonized Rewriting and Ground AC Completion Modulo Shostak Theories:
+            Design and Implementation.
+          Sylvain Conchon, Evelyne Contejean, Mohamed Iguernelala.
+          lmcs:1034 - Logical Methods in Computer Science, September 14, 2012,
+            Volume 8, Issue 3.
+          doi:10.2168/LMCS-8(3:16)2012
+          https://arxiv.org/pdf/1207.3262.pdf *)
+  let abstract2 sy t r acc =
+    if List.exists (is_other_ac_symbol sy) (X.leaves r) then
+      match X.ac_extract r, Expr.term_view t with
+      | Some ac, { f = Name { hs; kind = Ac; _ } ; xs; ty; _ } ->
+        (* It should have been abstracted when building [r] *)
+        assert (not (Sy.equal sy ac.h));
+        let aro_sy = Sy.name ~ns:Internal ("@" ^ (HS.view hs)) in
         let aro_t = Expr.mk_term aro_sy xs ty  in
         let eq = Expr.mk_eq ~iff:false aro_t t in
         X.term_embed aro_t, eq::acc
-      | Expr.Term { Expr.f = Sy.Op Sy.Mult; xs; ty; _ } ->
-        let aro_sy = Sy.name "@*" in
+      | Some ac, { f = Op Mult; xs; ty; _ } ->
+        (* It should have been abstracted when building [r] *)
+        assert (not (Sy.equal sy ac.h));
+        let aro_sy = Sy.name ~ns:Internal "@*" in
         let aro_t = Expr.mk_term aro_sy xs ty  in
         let eq = Expr.mk_eq ~iff:false aro_t t in
         X.term_embed aro_t, eq::acc
-      | Expr.Term { Expr.ty; _ } ->
-        let k = Expr.fresh_name ty in
+      | _, { ty; _ } ->
+        let k = Expr.fresh_ac_name ty in
         let eq = Expr.mk_eq ~iff:false k t in
         X.term_embed k, eq::acc
-      | Expr.Not_a_term _ -> assert false
+
+    else
+      r, acc
 
   let make t =
-    Timers.exec_timer_start Timers.M_AC Timers.F_make;
-    let x = match Expr.term_view t with
-      | Expr.Term { Expr.f = sy; xs = [a;b]; ty; _ } when Sy.is_ac sy ->
-        let ra, ctx1 = X.make a in
-        let rb, ctx2 = X.make b in
-        let ra, ctx = abstract2 sy a ra (ctx1 @ ctx2) in
-        let rb, ctx = abstract2 sy b rb ctx in
-        let rxs = [ ra,1 ; rb,1 ] in
-        X.ac_embed {h=sy; l=compact (fold_flatten sy (fun x -> x) rxs); t=ty;
-                    distribute = true},
-        ctx
-      | _ -> assert false
-    in
-    Timers.exec_timer_pause Timers.M_AC Timers.F_make;
-    x
+    match Expr.term_view t with
+    | { Expr.f = sy; xs = [a;b]; ty; _ } when Sy.is_ac sy ->
+      let ra, ctx1 = X.make a in
+      let rb, ctx2 = X.make b in
+      let ra, ctx = abstract2 sy a ra (ctx1 @ ctx2) in
+      let rb, ctx = abstract2 sy b rb ctx in
+      let rxs = [ ra,1 ; rb,1 ] in
+      X.ac_embed {h=sy; l=compact (fold_flatten sy (fun x -> x) rxs); t=ty;
+                  distribute = true},
+      ctx
+    | {xs; _} ->
+      Printer.print_err
+        "AC theory expects only terms with 2 arguments; \
+         got %i (%a)." (List.length xs) Expr.print_list xs;
+      assert false
 
-  let is_mine_symb sy _ = get_no_ac() == false && Sy.is_ac sy
+  let is_mine_symb sy = (not @@ Options.get_no_ac ()) && Sy.is_ac sy
 
   let type_info { t = ty; _ } = ty
 
@@ -272,18 +315,13 @@ module Make (X : Sig.X) = struct
 
   let subst p v ({ h; l; _ } as tm)  =
     Options.exec_thread_yield ();
-    Timers.exec_timer_start Timers.M_AC Timers.F_subst;
+    Timers.with_timer Timers.M_AC Timers.F_subst @@ fun () ->
     Debug.subst p v tm;
-    let t = X.color {tm with l=compact (fold_flatten h (X.subst p v) l)} in
-    Timers.exec_timer_pause Timers.M_AC Timers.F_subst;
-    t
-
+    X.color {tm with l=compact (fold_flatten h (X.subst p v) l)}
 
   let add h arg arg_l =
-    Timers.exec_timer_start Timers.M_AC Timers.F_add;
-    let r = compact (flatten h arg arg_l) in
-    Timers.exec_timer_pause Timers.M_AC Timers.F_add;
-    r
+    Timers.with_timer Timers.M_AC Timers.F_add @@ fun () ->
+    compact (flatten h arg arg_l)
 
   let fully_interpreted _ = true
 
@@ -298,10 +336,55 @@ module Make (X : Sig.X) = struct
     let xac = X.ac_embed {ac with l = compact args} in
     xac, acc
 
-  (* Ne suffit pas. Il faut aussi prevoir le collapse ? *)
-  (*try List.assoc xac acc, acc
-    with Not_found ->
-    let v = X.term_embed (Expr.fresh_name ac.t) in
-    v, (xac, v) :: acc*)
+  let assign_value _r _distincts _eq =
+    None
+    (* Models Gen for AC symbols is not done yet.  The code below would
+       work, but the way models are currently generated makes the result
+       of 'assign_value' not visible in the printed models, because we
+       inspect the 'make : Expr.t -> X.r' to extract the
+       model. Unfortunately, some AC expressions introduced by the AC(X)
+       algorithm don't have their corresponding terms and don't appear
+       in the 'make' map *)
 
+    (*
+    let is_fresh (r, _) =
+    match X.term_extract r with
+    | Some t, true -> Expr.is_fresh t
+    | _ -> false
+
+  let assign_value =
+    let cache = ref Ty.Map.empty in
+    let module SX = Set.Make(struct type t=r let compare = X.hash_cmp end) in
+    let exception Found of Expr.t in
+    fun r distincts eq ->
+      if List.exists (fun (t,(_:r)) -> Expr.is_model_term t) eq then
+        None
+      else
+        (*match X.ac_extract r with
+        | None -> assert false
+        | Some ac ->
+          if List.for_all is_fresh ac.Sig.l then None
+            else*) begin
+            let ty = X.type_info r in
+            let q = ref (Queue.create ()) in
+            try
+              let qc = Ty.Map.find ty !cache in
+              let sdist =
+                List.fold_left (fun s r -> SX.add r s) SX.empty distincts in
+              Queue.iter
+                (fun (kt, kx) ->
+                   if not (SX.mem kx sdist) then raise (Found kt)
+                )qc;
+              q := qc;
+              raise Not_found
+            with
+            | Found kt ->
+              Some (kt , true)
+            | Not_found ->
+              let fresh = Expr.fresh_name ty in
+              Queue.push (fresh, X.term_embed fresh) !q;
+              cache := Ty.Map.add ty !q !cache;
+              Some (fresh , false)
+          end
+*)
 end

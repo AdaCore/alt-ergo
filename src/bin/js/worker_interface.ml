@@ -1,17 +1,34 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2018-2020 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the license indicated      *)
-(*     in the file 'License.OCamlPro'. If 'License.OCamlPro' is not           *)
-(*     present please contact us to clarify licensing.                        *)
-(*                                                                            *)
-(******************************************************************************)
-open Js_of_ocaml
-open Data_encoding
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 (** Types extract from AltErgoLib Utils.util and Utils.options *)
+
+open Js_of_ocaml
+open Data_encoding
 
 type input_format = Native | Smtlib2 | Why3 (* | SZS *) | Unknown of string
 type output_format = input_format
@@ -113,6 +130,7 @@ let frontend_encoding =
   ]
 
 type instantiation_heuristic =  INormal | IAuto | IGreedy
+type interpretation = INone | IFirst | IEvery | ILast
 
 let instantiation_heuristic_encoding =
   union [
@@ -131,6 +149,30 @@ let instantiation_heuristic_encoding =
       (constant "IGreedy")
       (function IGreedy -> Some () | _ -> None)
       (fun () -> IGreedy);
+  ]
+
+let interpretation_encoding =
+  union [
+    case(Tag 1)
+      ~title:"INone"
+      (constant "INone")
+      (function INone -> Some () | _ -> None)
+      (fun () -> INone);
+    case(Tag 2)
+      ~title:"IFirst"
+      (constant "IFirst")
+      (function IFirst -> Some () | _ -> None)
+      (fun () -> IFirst);
+    case(Tag 3)
+      ~title:"IEvery"
+      (constant "IEvery")
+      (function IEvery -> Some () | _ -> None)
+      (fun () -> IEvery);
+    case(Tag 4)
+      ~title:"ILast"
+      (constant "ILast")
+      (function ILast -> Some () | _ -> None)
+      (fun () -> ILast);
   ]
 
 type options = {
@@ -152,10 +194,8 @@ type options = {
   debug_matching : int option;
   debug_sat : bool option;
   debug_split : bool option;
-  debug_sum : bool option;
   debug_triggers : bool option;
   debug_types : bool option;
-  debug_typing : bool option;
   debug_uf : bool option;
   debug_unsat_core : bool option;
   debug_use : bool option;
@@ -175,7 +215,6 @@ type options = {
   frontend : frontend option;
   input_format : input_format option;
   parse_only : bool option;
-  parsers : (string list) option;
   preludes : (string list) option;
   type_only : bool option;
   type_smt2 : bool option;
@@ -187,7 +226,7 @@ type options = {
   fm_cross_limit : int option;
   steps_bound : int option;
 
-  interpretation : int option;
+  interpretation : interpretation option;
 
   output_format : output_format option;
   unsat_core : bool option;
@@ -217,7 +256,6 @@ type options = {
   no_decisions_on : (string list) option;
   no_sat_learning : bool option;
   sat_solver : sat_solver option;
-  tableaux_cdcl : bool option;
 
   disable_ites : bool option;
   inline_lets : bool option;
@@ -233,7 +271,6 @@ type options = {
   no_theory : bool option;
   restricted : bool option;
   tighten_vars : bool option;
-  use_fpa : bool option;
   timers : bool option;
 
   file : string option;
@@ -258,10 +295,8 @@ let init_options () = {
   debug_matching = None;
   debug_sat = None;
   debug_split = None;
-  debug_sum = None;
   debug_triggers = None;
   debug_types = None;
-  debug_typing = None;
   debug_uf = None;
   debug_unsat_core = None;
   debug_use = None;
@@ -281,7 +316,6 @@ let init_options () = {
   frontend = None;
   input_format = None;
   parse_only = None;
-  parsers = None;
   preludes = None;
   type_only = None;
   type_smt2 = None;
@@ -323,7 +357,6 @@ let init_options () = {
   no_decisions_on = None;
   no_sat_learning = None;
   sat_solver = None;
-  tableaux_cdcl = None;
 
   disable_ites = None;
   inline_lets = None;
@@ -339,7 +372,6 @@ let init_options () = {
   no_theory = None;
   restricted = None;
   tighten_vars = None;
-  use_fpa = None;
   timers = None;
 
   file = None;
@@ -367,7 +399,7 @@ let opt_dbg2_encoding =
   conv
     (fun dbg2 -> dbg2)
     (fun dbg2 -> dbg2)
-    (obj10
+    (obj9
        (opt "debug_fm" bool)
        (opt "debug_fpa" int31)
        (opt "debug_gc" bool)
@@ -376,7 +408,6 @@ let opt_dbg2_encoding =
        (opt "debug_matching" int31)
        (opt "debug_sat" bool)
        (opt "debug_split" bool)
-       (opt "debug_sum" bool)
        (opt "debug_triggers" bool)
     )
 
@@ -384,9 +415,8 @@ let opt_dbg3_encoding =
   conv
     (fun dbg3 -> dbg3)
     (fun dbg3 -> dbg3)
-    (obj6
+    (obj5
        (opt "debug_types" bool)
-       (opt "debug_typing" bool)
        (opt "debug_uf" bool)
        (opt "debug_unsat_core" bool)
        (opt "debug_use" bool)
@@ -412,12 +442,11 @@ let opt2_encoding =
   conv
     (fun opt2 -> opt2)
     (fun opt2 -> opt2)
-    (obj8
+    (obj7
        (opt "answers_with_loc" bool)
        (opt "frontend" frontend_encoding)
        (opt "input_format" format_encoding)
        (opt "parse_only" bool)
-       (opt "parsers" (list string))
        (opt "preludes" (list string))
        (opt "type_only" bool)
        (opt "type_smt2" bool)
@@ -433,7 +462,7 @@ let opt3_encoding =
        (opt "age_bound" int31)
        (opt "fm_cross_limit" int31)
        (opt "steps_bound" int31)
-       (opt "interpretation" int31)
+       (opt "interpretation" interpretation_encoding)
        (opt "output_format" format_encoding)
        (opt "unsat_core" bool)
     )
@@ -475,11 +504,10 @@ let opt6_encoding =
   conv
     (fun opt6 -> opt6)
     (fun opt6 -> opt6)
-    (obj10
+    (obj9
        (opt "no_decisions_on" (list string))
        (opt "no_sat_learning" bool)
        (opt "sat_solver" sat_solver_encoding)
-       (opt "tableaux_cdcl" bool)
        (opt "disable_ites" bool)
        (opt "inline_lets" bool)
        (opt "rewriting" bool)
@@ -492,7 +520,7 @@ let opt7_encoding =
   conv
     (fun opt7 -> opt7)
     (fun opt7 -> opt7)
-    (obj10
+    (obj9
        (opt "no_contracongru" bool)
        (opt "no_fm" bool)
        (opt "no_nla" bool)
@@ -500,7 +528,6 @@ let opt7_encoding =
        (opt "no_theory" bool)
        (opt "restricted" bool)
        (opt "tighten_vars" bool)
-       (opt "use_fpa" bool)
        (opt "timers" bool)
        (opt "file" string)
     )
@@ -539,12 +566,10 @@ let options_to_json opt =
      opt.debug_matching,
      opt.debug_sat,
      opt.debug_split,
-     opt.debug_sum,
      opt.debug_triggers)
   in
   let dbg_opt3 =
     (opt.debug_types,
-     opt.debug_typing,
      opt.debug_uf,
      opt.debug_unsat_core,
      opt.debug_use,
@@ -565,7 +590,6 @@ let options_to_json opt =
      opt.frontend,
      opt.input_format,
      opt.parse_only,
-     opt.parsers,
      opt.preludes,
      opt.type_only,
      opt.type_smt2)
@@ -607,7 +631,6 @@ let options_to_json opt =
     (opt.no_decisions_on,
      opt.no_sat_learning,
      opt.sat_solver,
-     opt.tableaux_cdcl,
      opt. disable_ites,
      opt.inline_lets,
      opt.rewriting,
@@ -623,7 +646,6 @@ let options_to_json opt =
      opt.no_theory,
      opt.restricted,
      opt.tighten_vars,
-     opt.use_fpa,
      opt.timers,
      opt.file)
   in
@@ -673,10 +695,8 @@ let options_from_json options =
          debug_matching,
          debug_sat,
          debug_split,
-         debug_sum,
          debug_triggers) = dbg_opt2 in
     let (debug_types,
-         debug_typing,
          debug_uf,
          debug_unsat_core,
          debug_use,
@@ -693,7 +713,6 @@ let options_from_json options =
          frontend,
          input_format,
          parse_only,
-         parsers,
          preludes,
          type_only,
          type_smt2) = all_opt2 in
@@ -727,7 +746,6 @@ let options_from_json options =
     let (no_decisions_on,
          no_sat_learning,
          sat_solver,
-         tableaux_cdcl,
          disable_ites,
          inline_lets,
          rewriting,
@@ -741,7 +759,6 @@ let options_from_json options =
          no_theory,
          restricted,
          tighten_vars,
-         use_fpa,
          timers,
          file) = all_opt7 in
     {
@@ -763,10 +780,8 @@ let options_from_json options =
       debug_matching;
       debug_sat;
       debug_split;
-      debug_sum;
       debug_triggers;
       debug_types;
-      debug_typing;
       debug_uf;
       debug_unsat_core;
       debug_use;
@@ -783,7 +798,6 @@ let options_from_json options =
       frontend;
       input_format;
       parse_only;
-      parsers;
       preludes;
       type_only;
       type_smt2;
@@ -817,7 +831,6 @@ let options_from_json options =
       no_decisions_on;
       no_sat_learning;
       sat_solver;
-      tableaux_cdcl;
       disable_ites;
       inline_lets;
       rewriting;
@@ -830,7 +843,6 @@ let options_from_json options =
       no_theory;
       restricted;
       tighten_vars;
-      use_fpa;
       timers;
       file
     }
@@ -911,47 +923,31 @@ let status_encoding =
 type results = {
   worker_id : int option;
   status : status;
-  results : string list option;
-  errors : string list option;
-  warnings : string list option;
-  debugs : string list option;
+  regular : string list option;
+  diagnostic : string list option;
   statistics : statistics option;
-  model : string list option;
-  unsat_core : string list option;
 }
 
 let init_results () = {
   worker_id = None;
   status = Unknown (-1);
-  results = None;
-  errors = None;
-  warnings = None;
-  debugs = None;
+  regular = None;
+  diagnostic = None;
   statistics = None;
-  model = None;
-  unsat_core = None;
 }
 
 let results_encoding =
   conv
-    (fun {worker_id; status; results; errors; warnings;
-          debugs; statistics; model; unsat_core } ->
-      (worker_id, status, results, errors, warnings,
-       debugs, statistics, model, unsat_core))
-    (fun (worker_id, status, results, errors, warnings,
-          debugs, statistics, model, unsat_core) ->
-      {worker_id; status; results; errors; warnings;
-       debugs; statistics; model; unsat_core })
-    (obj9
+    (fun {worker_id; status; regular; diagnostic; statistics} ->
+       (worker_id, status, regular, diagnostic, statistics))
+    (fun (worker_id, status, regular, diagnostic, statistics) ->
+       {worker_id; status; regular; diagnostic; statistics })
+    (obj5
        (opt "worker_id" int31)
        (req "status" status_encoding)
-       (opt "results" (list string))
-       (opt "errors" (list string))
-       (opt "warnings" (list string))
-       (opt "debugs" (list string))
-       (opt "statistics" statistics_encoding)
-       (opt "model" (list string))
-       (opt "unsat_core" (list string)))
+       (opt "regular" (list string))
+       (opt "diagnostic" (list string))
+       (opt "statistics" statistics_encoding))
 
 let results_to_json res =
   let json_results = Json.construct results_encoding res in

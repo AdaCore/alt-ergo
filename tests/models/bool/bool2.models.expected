@@ -1,0 +1,8 @@
+
+unknown
+(
+  (define-fun x () Bool false)
+  (define-fun y () Bool (as @a0 Bool))
+)
+((notx true))
+

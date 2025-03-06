@@ -1,36 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
-
-open Format
-open Options
-open Sig
-
-module H = Hashtbl.Make(Expr)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 (*** Combination module of Shostak theories ***)
 
@@ -38,42 +31,124 @@ module H = Hashtbl.Make(Expr)
 module rec CX : sig
   include Sig.X
 
-  val extract1 : r -> X1.t option
-  val embed1 : X1.t -> r
+  val top : unit -> r
+  val bot : unit -> r
 
-  val extract2 : r -> X2.t option
-  val embed2 : X2.t -> r
+  val extract1 : r -> ARITH.t option
+  val embed1 : ARITH.t -> r
 
-  val extract3 : r -> X3.t option
-  val embed3 : X3.t -> r
+  val extract2 : r -> RECORDS.t option
+  val embed2 : RECORDS.t -> r
 
-  val extract4 : r -> X4.t option
-  val embed4 : X4.t -> r
+  val extract3 : r -> BITV.t option
+  val embed3 : BITV.t -> r
 
-  val extract5 : r -> X5.t option
-  val embed5 : X5.t -> r
-
-  val extract6 : r -> X6.t option
-  val embed6 : X6.t -> r
-
-  val extract7 : r -> X7.t option
-  val embed7 : X7.t -> r
+  val extract4 : r -> ADT.t option
+  val embed4 : ADT.t -> r
 
 end =
 struct
 
   type rview =
-    | Term  of Expr.t
-    | Ac    of AC.t
-    | X1    of X1.t
-    | X2    of X2.t
-    | X3    of X3.t
-    | X4    of X4.t
-    | X5    of X5.t
-    | X6    of X6.t
-    | X7    of X7.t
+    | Term of Expr.t
+    | Ac of AC.t
+    | Arith of ARITH.t
+    | Records of RECORDS.t
+    | Bitv of BITV.t
+    | Adt of ADT.t
 
   type r = {v : rview ; id : int}
+
+  (*BISECT-IGNORE-BEGIN*)
+  module Debug = struct
+    open Printer
+
+    let print fmt r =
+      let open Format in
+      if Options.get_term_like_pp () then begin
+        match r.v with
+        | Arith t -> fprintf fmt "%a" ARITH.print t
+        | Records t -> fprintf fmt "%a" RECORDS.print t
+        | Bitv t -> fprintf fmt "%a" BITV.print t
+        | Adt t -> fprintf fmt "%a" ADT.print t
+        | Term t -> fprintf fmt "%a" Expr.print t
+        | Ac t -> fprintf fmt "%a" AC.print t
+      end
+      else begin
+        match r.v with
+        | Arith t ->
+          fprintf fmt "Arith(%s):[%a]" ARITH.name ARITH.print t
+        | Records t ->
+          fprintf fmt "Records(%s):[%a]" RECORDS.name RECORDS.print t
+        | Bitv t ->
+          fprintf fmt "Bitv(%s):[%a]" BITV.name BITV.print t
+        | Adt t ->
+          fprintf fmt "Adt(%s):[%a]" ADT.name ADT.print t
+        | Term t ->
+          fprintf fmt "FT:[%a]" Expr.print t
+        | Ac t ->
+          fprintf fmt "Ac:[%a]" AC.print t
+      end
+
+    let print_sbt msg sbs =
+      let c = ref 0 in
+      let print fmt (p,v) =
+        incr c;
+        Format.fprintf fmt "<%d) %a |-> %a@ "
+          !c print p print v
+      in
+      if Options.get_debug_combine () then
+        print_dbg
+          ~module_name:"Shostak" ~function_name:"print_sbt"
+          "@[<v 2>%s subst:@ %a@]"
+          msg
+          (pp_list_no_space print) sbs
+
+    let debug_abstraction_result oa ob a b acc =
+      let c = ref 0 in
+      let print fmt (p,v) =
+        incr c;
+        Format.fprintf fmt "(%d) %a |-> %a@ "
+          !c CX.print p CX.print v
+      in
+      if Options.get_debug_combine () then
+        print_dbg
+          ~module_name:"Shostak" ~function_name:"abstraction_result"
+          "@[<v 0>== get_debug_abstraction_result ==@ \
+           Initial equaliy:   %a = %a@ \
+           abstracted equality: %a = %a@ \
+           @[<v 2>selectors elimination result:@ \
+           %a@]@]"
+          CX.print oa CX.print ob CX.print a CX.print b
+          (pp_list_no_space print) acc
+
+    let solve_one a b =
+      if Options.get_debug_combine () then
+        print_dbg
+          ~module_name:"Shostak" ~function_name:"solve_one"
+          "solve one %a = %a" CX.print a CX.print b
+
+    let debug_abstract_selectors a =
+      if Options.get_debug_combine () then
+        print_dbg
+          ~module_name:"Shostak" ~function_name:"abstract_selectors"
+          "abstract selectors of %a" CX.print a
+
+    let assert_have_mem_types tya tyb =
+      Options.heavy_assert (fun () ->
+          if not (Ty.compare tya tyb = 0) then begin
+            print_err "@[<v 0>@ Tya = %a  and @ Tyb = %a@]"
+              Ty.print tya Ty.print tyb;
+            false
+          end
+          else true
+        )
+
+  end
+  (*BISECT-IGNORE-END*)
+
+  let print = Debug.print
+
 
   (* begin: Hashconsing modules and functions *)
 
@@ -85,29 +160,23 @@ struct
 
     let hash r =
       let res = match r.v with
-        | X1 x   -> 1 + 10 * X1.hash x
-        | X2 x   -> 2 + 10 * X2.hash x
-        | X3 x   -> 3 + 10 * X3.hash x
-        | X4 x   -> 4 + 10 * X4.hash x
-        | X5 x   -> 5 + 10 * X5.hash x
-        | X6 x   -> 6 + 10 * X6.hash x
-        | X7 x   -> 7 + 10 * X7.hash x
-        | Ac ac  -> 9 + 10 * AC.hash ac
+        | Arith x -> 1 + 10 * ARITH.hash x
+        | Records x -> 2 + 10 * RECORDS.hash x
+        | Bitv x -> 3 + 10 * BITV.hash x
+        | Adt x -> 6 + 10 * ADT.hash x
+        | Ac ac -> 9 + 10 * AC.hash ac
         | Term t -> 8 + 10 * Expr.hash t
       in
       abs res
 
     let eq  r1 r2 =
       match r1.v, r2.v with
-      | X1 x, X1 y -> X1.equal x y
-      | X2 x, X2 y -> X2.equal x y
-      | X3 x, X3 y -> X3.equal x y
-      | X4 x, X4 y -> X4.equal x y
-      | X5 x, X5 y -> X5.equal x y
-      | X6 x, X6 y -> X6.equal x y
-      | X7 x, X7 y -> X7.equal x y
-      | Term x  , Term y  -> Expr.equal x y
-      | Ac x    , Ac    y -> AC.equal x y
+      | Arith x, Arith y -> ARITH.equal x y
+      | Records x, Records y -> RECORDS.equal x y
+      | Bitv x, Bitv y -> BITV.equal x y
+      | Adt x, Adt y -> ADT.equal x y
+      | Term x, Term y -> Expr.equal x y
+      | Ac x, Ac y -> AC.equal x y
       | _ -> false
 
     let initial_size = 9001
@@ -118,17 +187,20 @@ struct
 
   module HC = Hconsing.Make(View)
 
+  let save_cache () =
+    HC.save_cache ()
+
+  let reinit_cache () =
+    HC.reinit_cache ()
+
   let hcons v = HC.make v
 
   (* end: Hconsing modules and functions *)
 
-  let embed1 x = hcons {v = X1 x; id = -1000 (* dummy *)}
-  let embed2 x = hcons {v = X2 x; id = -1000 (* dummy *)}
-  let embed3 x = hcons {v = X3 x; id = -1000 (* dummy *)}
-  let embed4 x = hcons {v = X4 x; id = -1000 (* dummy *)}
-  let embed5 x = hcons {v = X5 x; id = -1000 (* dummy *)}
-  let embed6 x = hcons {v = X6 x; id = -1000 (* dummy *)}
-  let embed7 x = hcons {v = X7 x; id = -1000 (* dummy *)}
+  let embed1 x = hcons {v = Arith x; id = -1000 (* dummy *)}
+  let embed2 x = hcons {v = Records x; id = -1000 (* dummy *)}
+  let embed3 x = hcons {v = Bitv x; id = -1000 (* dummy *)}
+  let embed4 x = hcons {v = Adt x; id = -1000 (* dummy *)}
 
   let ac_embed ({ Sig.l; _ } as t) =
     match l with
@@ -142,13 +214,10 @@ struct
 
   let term_embed t = hcons {v = Term t; id = -1000 (* dummy *)}
 
-  let extract1 = function { v=X1 r; _ } -> Some r | _ -> None
-  let extract2 = function { v=X2 r; _ } -> Some r | _ -> None
-  let extract3 = function { v=X3 r; _ } -> Some r | _ -> None
-  let extract4 = function { v=X4 r; _ } -> Some r | _ -> None
-  let extract5 = function { v=X5 r; _ } -> Some r | _ -> None
-  let extract6 = function { v=X6 r; _ } -> Some r | _ -> None
-  let extract7 = function { v=X7 r; _ } -> Some r | _ -> None
+  let extract1 = function { v=Arith r; _ } -> Some r | _ -> None
+  let extract2 = function { v=Records r; _ } -> Some r | _ -> None
+  let extract3 = function { v=Bitv r; _ } -> Some r | _ -> None
+  let extract4 = function { v=Adt r; _ } -> Some r | _ -> None
 
   let ac_extract = function
     | { v = Ac t; _ }   -> Some t
@@ -156,41 +225,47 @@ struct
 
   let term_extract r =
     match r.v with
-    | X1 _ -> X1.term_extract r
-    | X2 _ -> X2.term_extract r
-    | X3 _ -> X3.term_extract r
-    | X4 _ -> X4.term_extract r
-    | X5 _ -> X5.term_extract r
-    | X6 _ -> X6.term_extract r
-    | X7 _ -> X7.term_extract r
+    | Arith _ -> ARITH.term_extract r
+    | Records _ -> RECORDS.term_extract r
+    | Bitv _ -> BITV.term_extract r
+    | Adt _ -> ADT.term_extract r
     | Ac _ -> None, false (* SYLVAIN : TODO *)
     | Term t -> Some t, true
+
+  let to_model_term r =
+    let res =
+      match r.v with
+      | Arith _ -> ARITH.to_model_term r
+      | Records _ -> RECORDS.to_model_term r
+      | Bitv _ -> BITV.to_model_term r
+      | Adt _ -> ADT.to_model_term r
+      | Term t when Expr.is_model_term t -> Some t
+      | Ac _ | Term _ -> None
+    in
+    Option.bind res @@ fun t ->
+    assert (Expr.is_model_term t);
+    Some t
 
   let top () = term_embed Expr.vrai
   let bot () = term_embed Expr.faux
 
   let type_info = function
-    | { v = X1 t; _ }   -> X1.type_info t
-    | { v = X2 t; _ }   -> X2.type_info t
-    | { v = X3 t; _ }   -> X3.type_info t
-    | { v = X4 t; _ }   -> X4.type_info t
-    | { v = X5 t; _ }   -> X5.type_info t
-    | { v = X6 t; _ }   -> X6.type_info t
-    | { v = X7 t; _ }   -> X7.type_info t
-    | { v = Ac x; _ }   -> AC.type_info x
+    | { v = Arith t; _ } -> ARITH.type_info t
+    | { v = Records t; _ } -> RECORDS.type_info t
+    | { v = Bitv t; _ } -> BITV.type_info t
+    | { v = Adt t; _ } -> ADT.type_info t
+    | { v = Ac x; _ } -> AC.type_info x
     | { v = Term t; _ } -> Expr.type_info t
 
-  (* Xi < Term < Ac *)
+  (* Constraint that must be maintained:
+     all theories should have Xi < Term < Ac *)
   let theory_num x = match x with
-    | Ac _    -> -1
+    | Ac _ -> -1
     | Term  _ -> -2
-    | X1 _    -> -3
-    | X2 _    -> -4
-    | X3 _    -> -5
-    | X4 _    -> -6
-    | X5 _    -> -7
-    | X6 _    -> -8
-    | X7 _    -> -9
+    | Arith _ -> -3
+    | Records _ -> -4
+    | Bitv _ -> -5
+    | Adt _ -> -7
 
   let compare_tag a b = theory_num a - theory_num b
 
@@ -198,16 +273,13 @@ struct
     if CX.equal a b then 0
     else
       match a.v, b.v with
-      | X1 _, X1 _ -> X1.compare a b
-      | X2 _, X2 _ -> X2.compare a b
-      | X3 _, X3 _ -> X3.compare a b
-      | X4 _, X4 _ -> X4.compare a b
-      | X5 _, X5 _ -> X5.compare a b
-      | X6 _, X6 _ -> X6.compare a b
-      | X7 _, X7 _ -> X7.compare a b
-      | Term x  , Term y  -> Expr.compare x y
-      | Ac x    , Ac y    -> AC.compare x y
-      | va, vb            -> compare_tag va vb
+      | Arith _, Arith _ -> ARITH.compare a b
+      | Records _, Records _ -> RECORDS.compare a b
+      | Bitv _, Bitv _ -> BITV.compare a b
+      | Adt _, Adt _ -> ADT.compare a b
+      | Term x, Term y -> Expr.compare x y
+      | Ac x, Ac y -> AC.compare x y
+      | va, vb -> compare_tag va vb
 
   (*** implementations before hash-consing semantic values
 
@@ -216,11 +288,11 @@ struct
        let hash r = match r.v with
        | Term  t -> Expr.hash t
        | Ac x -> AC.hash x
-       | X1 x -> X1.hash x
-       | X2 x -> X2.hash x
-       | X3 x -> X3.hash x
-       | X4 x -> X4.hash x
-       | X5 x -> X5.hash x
+       | Arith x -> ARITH.hash x
+       | Records x -> RECORDS.hash x
+       | Bitv x -> BITV.hash x
+       | Arrays x -> ARRAYS.hash x
+       | Adt x -> ADT.hash x
 
    ***)
 
@@ -245,98 +317,103 @@ struct
 
   let leaves r =
     match r.v with
-    | X1 t -> X1.leaves t
-    | X2 t -> X2.leaves t
-    | X3 t -> X3.leaves t
-    | X4 t -> X4.leaves t
-    | X5 t -> X5.leaves t
-    | X6 t -> X6.leaves t
-    | X7 t -> X7.leaves t
+    | Arith t -> ARITH.leaves t
+    | Records t -> RECORDS.leaves t
+    | Bitv t -> BITV.leaves t
+    | Adt t -> ADT.leaves t
     | Ac t -> r :: (AC.leaves t)
     | Term _ -> [r]
+
+  let is_constant r =
+    match r.v with
+    | Arith t -> ARITH.is_constant t
+    | Records t -> RECORDS.is_constant t
+    | Bitv t -> BITV.is_constant t
+    | Adt t -> ADT.is_constant t
+    | Term t ->
+      begin
+        let Expr.{ f; xs; _ } = Expr.term_view t in
+        (* Constant terms that have no theories. *)
+        match f, xs with
+        | Symbols.(True | False), [] -> true
+        | _ -> false
+      end
+    | Ac _ -> false
 
   let subst p v r =
     if equal p v then r
     else match r.v with
-      | X1 t   -> X1.subst p v t
-      | X2 t   -> X2.subst p v t
-      | X3 t   -> X3.subst p v t
-      | X4 t   -> X4.subst p v t
-      | X5 t   -> X5.subst p v t
-      | X6 t   -> X6.subst p v t
-      | X7 t   -> X7.subst p v t
-      | Ac t   -> if equal p r then v else AC.subst p v t
+      | Arith t -> ARITH.subst p v t
+      | Records t -> RECORDS.subst p v t
+      | Bitv t -> BITV.subst p v t
+      | Adt t -> ADT.subst p v t
+      | Ac t -> if equal p r then v else AC.subst p v t
       | Term _ -> if equal p r then v else r
 
   let make t =
-    let { Expr.f = sb; ty; _ } =
-      match Expr.term_view t with
-      | Expr.Not_a_term _ -> assert false
-      | Expr.Term tt -> tt
-    in
-    let not_restricted = not (get_restricted ()) in
+    let { Expr.f = sb; _ } = Expr.term_view t in
+    let not_restricted = not @@ Options.get_restricted () in
     match
-      X1.is_mine_symb sb ty,
-      not_restricted && X2.is_mine_symb sb ty,
-      not_restricted && X3.is_mine_symb sb ty,
-      not_restricted && X4.is_mine_symb sb ty,
-      not_restricted && X5.is_mine_symb sb ty,
-      not_restricted && X6.is_mine_symb sb ty,
-      not_restricted && X7.is_mine_symb sb ty,
-      AC.is_mine_symb sb ty
+      ARITH.is_mine_symb sb,
+      not_restricted && RECORDS.is_mine_symb sb,
+      not_restricted && BITV.is_mine_symb sb,
+      not_restricted && ADT.is_mine_symb sb,
+      AC.is_mine_symb sb
     with
-    | true  , false , false , false, false, false, false, false -> X1.make t
-    | false , true  , false , false, false, false, false, false -> X2.make t
-    | false , false , true  , false, false, false, false, false -> X3.make t
-    | false , false , false , true , false, false, false, false -> X4.make t
-    | false , false , false , false, true , false, false, false -> X5.make t
-    | false , false , false , false, false, true , false, false -> X6.make t
-    | false , false , false , false, false, false, true , false -> X7.make t
-    | false , false , false , false, false, false, false, true  -> AC.make t
-    | false , false , false , false, false, false, false, false ->
+    | true, false, false, false, false ->
+      Timers.with_timer Timers.M_Arith Timers.F_make @@ fun () ->
+      ARITH.make t
+
+    | false, true, false, false, false ->
+      Timers.with_timer Timers.M_Records Timers.F_make @@ fun () ->
+      RECORDS.make t
+
+    | false, false, true, false, false ->
+      Timers.with_timer Timers.M_Bitv Timers.F_make @@ fun () ->
+      BITV.make t
+
+    | false, false, false, true, false ->
+      Timers.with_timer Timers.M_Adt Timers.F_make @@ fun () ->
+      ADT.make t
+
+    | false, false, false, false, true  ->
+      Timers.with_timer Timers.M_AC Timers.F_make @@ fun () ->
+      AC.make t
+
+    | false, false, false, false, false ->
       term_embed t, []
+
     | _ -> assert false
 
-  let fully_interpreted sb ty =
-    let not_restricted = not (get_restricted ()) in
+  let fully_interpreted sb =
+    let not_restricted = not @@ Options.get_restricted () in
     match
-      X1.is_mine_symb sb ty,
-      not_restricted && X2.is_mine_symb sb ty,
-      not_restricted && X3.is_mine_symb sb ty,
-      not_restricted && X4.is_mine_symb sb ty,
-      not_restricted && X5.is_mine_symb sb ty,
-      not_restricted && X6.is_mine_symb sb ty,
-      not_restricted && X7.is_mine_symb sb ty,
-      AC.is_mine_symb sb ty
+      ARITH.is_mine_symb sb,
+      not_restricted && RECORDS.is_mine_symb sb,
+      not_restricted && BITV.is_mine_symb sb,
+      not_restricted && ADT.is_mine_symb sb,
+      AC.is_mine_symb sb
     with
-    | true  , false , false , false, false, false, false, false ->
-      X1.fully_interpreted sb
-    | false , true  , false , false, false, false, false, false ->
-      X2.fully_interpreted sb
-    | false , false , true  , false, false, false, false, false ->
-      X3.fully_interpreted sb
-    | false , false , false , true , false, false, false, false ->
-      X4.fully_interpreted sb
-    | false , false , false , false, true , false, false, false ->
-      X5.fully_interpreted sb
-    | false , false , false , false, false, true , false, false ->
-      X6.fully_interpreted sb
-    | false , false , false , false, false, false, true , false ->
-      X7.fully_interpreted sb
-    | false , false , false , false, false, false, false, true  ->
+    | true, false, false, false, false ->
+      ARITH.fully_interpreted sb
+    | false, true, false, false, false ->
+      RECORDS.fully_interpreted sb
+    | false, false, true, false, false ->
+      BITV.fully_interpreted sb
+    | false, false, false, true, false ->
+      ADT.fully_interpreted sb
+    | false, false, false, false, true  ->
       AC.fully_interpreted sb
-    | false , false , false , false, false, false, false, false ->
+    | false, false, false, false, false ->
       false
     | _ -> assert false
 
-  let is_solvable_theory_symbol sb ty =
-    X1.is_mine_symb sb ty ||
-    not (get_restricted ()) &&
-    (X2.is_mine_symb sb ty ||
-     X3.is_mine_symb sb ty ||
-     X4.is_mine_symb sb ty ||
-     X5.is_mine_symb sb ty)
-
+  let is_solvable_theory_symbol sb =
+    ARITH.is_mine_symb sb ||
+    not (Options.get_restricted ()) &&
+    (RECORDS.is_mine_symb sb ||
+     BITV.is_mine_symb sb ||
+     ADT.is_mine_symb sb)
 
   let is_a_leaf r = match r.v with
     | Term _ | Ac _ -> true
@@ -347,125 +424,32 @@ struct
     | [] -> assert false
     | [r,1] -> r
     | _ ->
-      let ty = ac.Sig.t in
       match
-        X1.is_mine_symb ac.Sig.h ty,
-        X2.is_mine_symb ac.Sig.h ty,
-        X3.is_mine_symb ac.Sig.h ty,
-        X4.is_mine_symb ac.Sig.h ty,
-        X5.is_mine_symb ac.Sig.h ty,
-        X6.is_mine_symb ac.Sig.h ty,
-        X7.is_mine_symb ac.Sig.h ty,
-        AC.is_mine_symb ac.Sig.h ty with
+        ARITH.is_mine_symb ac.Sig.h,
+        RECORDS.is_mine_symb ac.Sig.h,
+        BITV.is_mine_symb ac.Sig.h,
+        ADT.is_mine_symb ac.Sig.h,
+        AC.is_mine_symb ac.Sig.h with
       (*AC.is_mine may say F if Options.get_no_ac is set to F dynamically *)
-      | true  , false , false , false, false, false, false, false -> X1.color ac
-      | false , true  , false , false, false, false, false, false -> X2.color ac
-      | false , false , true  , false, false, false, false, false -> X3.color ac
-      | false , false , false , true , false, false, false, false -> X4.color ac
-      | false , false , false , false, true , false, false, false -> X5.color ac
-      | false , false , false , false, false, true , false, false -> X6.color ac
-      | false , false , false , false, false, false, true , false -> X7.color ac
+      | true, false, false, false, false ->
+        ARITH.color ac
+      | false, true, false, false, false ->
+        RECORDS.color ac
+      | false, false, true, false, false ->
+        BITV.color ac
+      | false, false, false, true, false ->
+        ADT.color ac
       | _  -> ac_embed ac
-
-
-  (*BISECT-IGNORE-BEGIN*)
-  module Debug = struct
-    open Printer
-
-    let print fmt r =
-      if get_term_like_pp () then
-        match r.v with
-        | X1 t    -> fprintf fmt "%a" X1.print t
-        | X2 t    -> fprintf fmt "%a" X2.print t
-        | X3 t    -> fprintf fmt "%a" X3.print t
-        | X4 t    -> fprintf fmt "%a" X4.print t
-        | X5 t    -> fprintf fmt "%a" X5.print t
-        | X6 t    -> fprintf fmt "%a" X6.print t
-        | X7 t    -> fprintf fmt "%a" X7.print t
-        | Term t  -> fprintf fmt "%a" Expr.print t
-        | Ac t    -> fprintf fmt "%a" AC.print t
-      else
-        match r.v with
-        | X1 t    -> fprintf fmt "X1(%s):[%a]" X1.name X1.print t
-        | X2 t    -> fprintf fmt "X2(%s):[%a]" X2.name X2.print t
-        | X3 t    -> fprintf fmt "X3(%s):[%a]" X3.name X3.print t
-        | X4 t    -> fprintf fmt "X4(%s):[%a]" X4.name X4.print t
-        | X5 t    -> fprintf fmt "X5(%s):[%a]" X5.name X5.print t
-        | X6 t    -> fprintf fmt "X6(%s):[%a]" X6.name X6.print t
-        | X7 t    -> fprintf fmt "X7(%s):[%a]" X7.name X7.print t
-        | Term t  -> fprintf fmt "FT:[%a]" Expr.print t
-        | Ac t    -> fprintf fmt "Ac:[%a]" AC.print t
-
-    let print_sbt msg sbs =
-      let c = ref 0 in
-      let print fmt (p,v) =
-        incr c;
-        fprintf fmt "<%d) %a |-> %a@ "
-          !c print p print v
-      in
-      if get_debug_combine () then
-        print_dbg
-          ~module_name:"Shostak" ~function_name:"print_sbt"
-          "@[<v 2>%s subst:@ %a@]"
-          msg
-          (pp_list_no_space print) sbs
-
-    let debug_abstraction_result oa ob a b acc =
-      let c = ref 0 in
-      let print fmt (p,v) =
-        incr c;
-        fprintf fmt "(%d) %a |-> %a@ "
-          !c CX.print p CX.print v
-      in
-      if get_debug_combine () then
-        print_dbg
-          ~module_name:"Shostak" ~function_name:"abstraction_result"
-          "@[<v 0>== get_debug_abstraction_result ==@ \
-           Initial equaliy:   %a = %a@ \
-           abstracted equality: %a = %a@ \
-           @[<v 2>selectors elimination result:@ \
-           %a@]@]"
-          CX.print oa CX.print ob CX.print a CX.print b
-          (pp_list_no_space print) acc
-
-    let solve_one a b =
-      if get_debug_combine () then
-        print_dbg
-          ~module_name:"Shostak" ~function_name:"solve_one"
-          "solve one %a = %a" CX.print a CX.print b
-
-    let debug_abstract_selectors a =
-      if get_debug_combine () then
-        print_dbg
-          ~module_name:"Shostak" ~function_name:"abstract_selectors"
-          "abstract selectors of %a" CX.print a
-
-    let assert_have_mem_types tya tyb =
-      assert (
-        not (Options.get_enable_assertions()) ||
-        if not (Ty.compare tya tyb = 0) then (
-          print_err "@[<v 0>@ Tya = %a  and @ Tyb = %a@]"
-            Ty.print tya Ty.print tyb;
-          false)
-        else true)
-
-  end
-  (*BISECT-IGNORE-END*)
-
-  let print = Debug.print
 
   let abstract_selectors a acc =
     Debug.debug_abstract_selectors a;
     match a.v with
-    | X1 a   -> X1.abstract_selectors a acc
-    | X2 a   -> X2.abstract_selectors a acc
-    | X3 a   -> X3.abstract_selectors a acc
-    | X4 a   -> X4.abstract_selectors a acc
-    | X5 a   -> X5.abstract_selectors a acc
-    | X6 a   -> X6.abstract_selectors a acc
-    | X7 a   -> X7.abstract_selectors a acc
+    | Arith a -> ARITH.abstract_selectors a acc
+    | Records a -> RECORDS.abstract_selectors a acc
+    | Bitv a -> BITV.abstract_selectors a acc
+    | Adt a -> ADT.abstract_selectors a acc
     | Term _ -> a, acc
-    | Ac a   -> AC.abstract_selectors a acc
+    | Ac a -> AC.abstract_selectors a acc
 
   let abstract_equality a b =
     let aux r acc =
@@ -508,22 +492,22 @@ struct
     Debug.print_sbt "Triangular and cleaned" sbs;
     (*
       This assert is not TRUE because of AC and distributivity of '*'
-      assert (not (Options.get_enable_assertions()) ||
-      equal (apply_subst a sbs) (apply_subst b sbs));
+      Options.heavy_assert
+        (fun () -> equal (apply_subst a sbs) (apply_subst b sbs));
     *)
     sbs
 
   let apply_subst_right r sbt =
     List.fold_right (fun (p,v)r  -> CX.subst p v r) sbt r
 
-  let solve_uninterpreted r1 r2 pb = (* r1 != r2*)
-    if get_debug_combine () then
+  let solve_uninterpreted r1 r2 (pb : r Sig.solve_pb) = (* r1 != r2*)
+    if Options.get_debug_combine () then
       Printer.print_dbg
         "solve uninterpreted %a = %a" print r1 print r2;
     if CX.str_cmp r1 r2 > 0 then { pb with sbt = (r1,r2)::pb.sbt }
     else { pb with sbt = (r2,r1)::pb.sbt }
 
-  let rec solve_list pb =
+  let rec solve_list (pb : r Sig.solve_pb) =
     match pb.eqs with
     | [] ->
       Debug.print_sbt "Should be triangular and cleaned" pb.sbt;
@@ -539,13 +523,27 @@ struct
         let tyb = CX.type_info rb in
         Debug.assert_have_mem_types tya tyb;
         let pb = match tya with
-          | Ty.Tint | Ty.Treal -> X1.solve ra rb pb
-          | Ty.Trecord _       -> X2.solve ra rb pb
-          | Ty.Tbitv _         -> X3.solve ra rb pb
-          | Ty.Tsum _          -> X5.solve ra rb pb
+          | Ty.Tint | Ty.Treal ->
+            Timers.with_timer ARITH.timer Timers.F_solve @@ fun () ->
+            ARITH.solve ra rb pb
+
+          | Ty.Trecord _       ->
+            Timers.with_timer RECORDS.timer Timers.F_solve @@ fun () ->
+            RECORDS.solve ra rb pb
+
+          | Ty.Tbitv _         ->
+            Timers.with_timer BITV.timer Timers.F_solve @@ fun () ->
+            BITV.solve ra rb pb
+
           (*| Ty.Tunit           -> pb *)
-          | Ty.Tadt _ when not (Options.get_disable_adts()) -> X6.solve ra rb pb
-          | _                  -> solve_uninterpreted ra rb pb
+
+          | Ty.Tadt _ when not (Options.get_disable_adts()) ->
+            Timers.with_timer ADT.timer Timers.F_solve @@ fun () ->
+            ADT.solve ra rb pb
+
+          | _                  ->
+            Timers.with_timer Timers.M_Combine Timers.F_solve @@ fun () ->
+            solve_uninterpreted ra rb pb
         in
         solve_list pb
         [@ocaml.ppwarning "TODO: a simple way of handling equalities \
@@ -573,104 +571,78 @@ struct
            c
         )sbs
 
+  let is_bool_const r = equal r (top()) || equal r (bot())
+
   let assign_value r distincts eq =
     let opt = match r.v, type_info r with
       | _, Ty.Tint
-      | _, Ty.Treal     -> X1.assign_value r distincts eq
-      | _, Ty.Trecord _ -> X2.assign_value r distincts eq
-      | _, Ty.Tbitv _   -> X3.assign_value r distincts eq
-      | _, Ty.Tfarray _ -> X4.assign_value r distincts eq
-      | _, Ty.Tsum _    -> X5.assign_value r distincts eq
+      | _, Ty.Treal     -> ARITH.assign_value r distincts eq
+      | _, Ty.Trecord _ -> RECORDS.assign_value r distincts eq
+      | _, Ty.Tbitv _   -> BITV.assign_value r distincts eq
+      | Term t, Ty.Tfarray _ ->
+        begin
+          if List.exists (fun (t,_) -> Expr.is_model_term t) eq then None
+          else
+            Some (Expr.fresh_name (Expr.type_info t), false)
+        end
+
       | _, Ty.Tadt _    when not (Options.get_disable_adts()) ->
-        X6.assign_value r distincts eq
+        ADT.assign_value r distincts eq
+
+      | Term _t, Ty.Tbool ->
+        if is_bool_const r then None
+        else
+          begin
+            let eq = List.filter (fun (_t, r) -> is_bool_const r) eq in
+            match eq with
+            | (e,_r)::_ -> Some (e, false) (* false <-> not a case-split *)
+            | [] ->
+              let dist = List.filter (fun r -> is_bool_const r) distincts in
+              match dist with
+              | {v = Term e; _}::_ ->
+                Some (Expr.neg e, true) (* safety: consider it as case-split *)
+              | _::_ ->
+                assert false
+              | [] ->
+                Some (Expr.faux, true) (* true <-> make a case split *)
+          end
+
       | Term t, ty      -> (* case disable_adts() handled here *)
-        if Expr.const_term t ||
-           List.exists (fun (t,_) -> Expr.const_term t) eq then None
+        if Expr.is_model_term t ||
+           List.exists (fun (t,_) -> Expr.is_model_term t) eq then None
         else Some (Expr.fresh_name ty, false) (* false <-> not a case-split *)
-      | _               -> assert false
+      | _               ->
+        (* There is no model-generation support for the AC symbols yet.
+           The function [AC.assign_value] always returns [None]. *)
+        AC.assign_value r distincts eq
     in
-    if get_debug_interpretation () then
+    if Options.get_debug_interpretation () then
       Printer.print_dbg
         ~module_name:"Shostak" ~function_name:"assign_value"
         "assign value to representative %a : %s"
         print r
         (match opt with
-         | None -> asprintf "None"
-         | Some(res, _is_cs) -> asprintf "%a" Expr.print res);
+         | None -> Format.asprintf "None"
+         | Some(res, _is_cs) -> Format.asprintf "%a" Expr.print res);
     opt
-
-  let choose_adequate_model t rep l =
-    let r, pprint =
-      match Expr.type_info t with
-      | Ty.Tint
-      | Ty.Treal     -> X1.choose_adequate_model t rep l
-      | Ty.Tbitv _   -> X3.choose_adequate_model t rep l
-      | Ty.Tsum _    -> X5.choose_adequate_model t rep l
-      | Ty.Tadt _    when not (Options.get_disable_adts()) ->
-        X6.choose_adequate_model t rep l
-      | Ty.Trecord _ -> X2.choose_adequate_model t rep l
-      | Ty.Tfarray _ -> X4.choose_adequate_model t rep l
-      | _            ->
-        let acc =
-          List.fold_left
-            (fun acc (s, r) ->
-               if Expr.const_term s then
-                 match acc with
-                 | Some(s', _) when Expr.compare s' s > 0 -> acc
-                 | _ -> Some (s, r)
-               else
-                 acc
-            ) None l
-        in
-        let r =
-          match acc with
-          | Some (_,r) -> r
-          | None ->
-            match term_extract rep with
-            | Some t, true when Expr.const_term t -> rep
-            | _ ->
-              let print_aux fmt (t,r) =
-                fprintf fmt "> impossible case: %a -- %a@ "
-                  Expr.print t
-                  print r
-              in
-              if get_debug_interpretation () then
-                Printer.print_dbg
-                  ~module_name:"Shostak" ~function_name:"choose_adequate_model"
-                  "@[<v 2>What to choose for term %a with rep %a?\
-                   %a@]"
-                  Expr.print t
-                  print rep
-                  (Printer.pp_list_no_space print_aux) l;
-              assert false
-        in
-        r, asprintf "%a" print r (* it's a EUF constant *)
-    in
-    if get_debug_interpretation () then
-      Printer.print_dbg
-        ~module_name:"Shostak" ~function_name:"choose_adequate_model"
-        "%a selected as a model for %a"
-        print r Expr.print t;
-    r, pprint
-
 end
 
-and TX1 : Polynome.T
+and TARITH : Polynome.T
   with type r = CX.r =
   Arith.Type(CX)
 
-and X1 : Sig.SHOSTAK
-  with type t = TX1.t
+and ARITH : Sig.SHOSTAK
+  with type t = TARITH.t
    and type r = CX.r =
   Arith.Shostak
     (CX)
     (struct
-      include TX1
+      include TARITH
       let extract = CX.extract1
       let embed =  CX.embed1
     end)
 
-and X2 : Sig.SHOSTAK
+and RECORDS : Sig.SHOSTAK
   with type r = CX.r
    and type t = CX.r Records.abstract =
   Records.Shostak
@@ -680,7 +652,7 @@ and X2 : Sig.SHOSTAK
       let embed = embed2
     end)
 
-and X3 : Sig.SHOSTAK
+and BITV : Sig.SHOSTAK
   with type r = CX.r
    and type t = CX.r Bitv.abstract =
   Bitv.Shostak
@@ -690,44 +662,14 @@ and X3 : Sig.SHOSTAK
       let embed = embed3
     end)
 
-and X4 : Sig.SHOSTAK
-  with type r = CX.r
-   and type t = CX.r Arrays.abstract =
-  Arrays.Shostak
-    (struct
-      include CX
-      let extract = extract4
-      let embed = embed4
-    end)
-
-and X5 : Sig.SHOSTAK
-  with type r = CX.r
-   and type t = CX.r Enum.abstract =
-  Enum.Shostak
-    (struct
-      include CX
-      let extract = extract5
-      let embed = embed5
-    end)
-
-and X6 : Sig.SHOSTAK
+and ADT : Sig.SHOSTAK
   with type r = CX.r
    and type t = CX.r Adt.abstract =
   Adt.Shostak
     (struct
       include CX
-      let extract = extract6
-      let embed = embed6
-    end)
-
-and X7 : Sig.SHOSTAK
-  with type r = CX.r
-   and type t = CX.r Ite.abstract =
-  Ite.Shostak
-    (struct
-      include CX
-      let extract = extract7
-      let embed = embed7
+      let extract = extract4
+      let embed = embed4
     end)
 
 (* Its signature is not Sig.SHOSTAK because it does not provide a solver *)
@@ -738,22 +680,41 @@ and AC : Ac.S
 module Combine = struct
   include CX
 
-  let make =
-    let cache = H.create 1024 in
-    fun t ->
-      match H.find_opt cache t with
-      | None -> let res = make t in H.add cache t res; res
-      | Some res -> res
+  let src = Logs.Src.create ~doc:"Combine" "AltErgoLib__Combine"
+  module Log = (val Logs.src_log src : Logs.LOG)
+
+  module H = Ephemeron.K1.Make(Expr)
+
+  let make, save_cache, reinit_cache =
+    let cache = ref (H.create 1024) in
+    let cache_copy = ref None in
+    let make t =
+      match H.find !cache t with
+      | r -> r
+      | exception Not_found ->
+        let r = make t in
+        H.add !cache t r;
+        r
+    in
+    let save_cache_aux () =
+      save_cache ();
+      cache_copy := (Some (H.copy !cache));
+    in
+    let reinit_cache_aux () =
+      reinit_cache ();
+      cache := H.copy (Option.get !cache_copy);
+    in
+    make, save_cache_aux, reinit_cache_aux
+
+  let top = top ()
+  let bot = bot ()
 end
 
-module Arith = X1
-module Records = X2
-module Bitv = X3
-module Arrays = X4
-module Enum = X5
-module Adt = X6
-module Ite = X7
-module Polynome = TX1
+module Arith = ARITH
+module Records = RECORDS
+module Bitv = BITV
+module Adt = ADT
+module Polynome = TARITH
 module Ac = AC
 
 (** map of semantic values using Combine.hash_cmp *)
@@ -764,10 +725,18 @@ module MXH =
 module SXH =
   Set.Make(struct type t = Combine.r let compare = Combine.hash_cmp end)
 
-(** map of semantic values using structural compare Combine.str_cmp *)
-module MXS =
-  Map.Make(struct type t = Combine.r let compare = Combine.hash_cmp end)
+module L = Xliteral.Make(struct
+    type t = Combine.r
 
-(** set of semantic values using structural compare Combine.str_cmp *)
-module SXS =
-  Set.Make(struct type t = Combine.r let compare = Combine.hash_cmp end)
+    include Combine
+
+    let compare = hash_cmp
+  end)
+
+module Literal = Literal.Make(L)
+
+module HX = Hashtbl.Make(struct
+    type t = Combine.r
+    let equal = Combine.equal
+    let hash = Combine.hash
+  end)

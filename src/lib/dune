@@ -1,49 +1,68 @@
-(executable
- (name formatshims)
- (modules formatshims)
- (libraries dune.configurator))
-
-(rule
- (targets format_shims.ml)
- (deps ./formatshims.exe)
- (action
-  (run ./formatshims.exe)))
-
-(include_subdirs  unqualified)
+(include_subdirs unqualified)
 
 (documentation
-  (package alt-ergo-lib)
+ (package alt-ergo-lib)
 )
 
 (library
-  (name             AltErgoLib)
-  (public_name      alt-ergo-lib)
-
+  (name AltErgoLib)
+  (public_name alt-ergo-lib)
+  (flags (:standard -open Alt_ergo_prelude))
   ; external dependencies
   (libraries
-     seq unix num str zarith dynlink ocplib-simplex stdlib-shims)
+    seq
+    unix
+    str
+    zarith
+    dynlink
+    ocplib-simplex
+    stdlib-shims
+    camlzip
+    dolmen
+    dolmen_type
+    dolmen_loop
+    dune-build-info
+    alt_ergo_prelude
+    fmt
+    logs
+    logs.fmt
+  )
+  (preprocess
+    (pps
+      ppx_blob
+      ppx_deriving.ord
+      ppx_deriving.eq
+      ppx_deriving.show
+      ppx_deriving.enum
+      ppx_deriving.fold
+    )
+  )
+
+  (preprocessor_deps (glob_files ../preludes/*.ae))
 
   ; .mli only modules *also* need to be in this field
-  (modules_without_implementation matching_types numbersInterface sig sig_rel)
+  (modules_without_implementation matching_types sig sig_rel)
 
   ; modules that make up the lib
   (modules
     ; frontend
-    Cnf Input Frontend Parsed_interface Typechecker
+    Cnf D_cnf D_loop D_state_option Input Frontend Parsed_interface Typechecker
+    Models
     ; reasoners
-    Ac Arith Arrays Arrays_rel Bitv Ccx Shostak Relation Enum Enum_rel
-    Fun_sat Inequalities Bitv_rel Th_util Adt Adt_rel
-    Instances IntervalCalculus Intervals Ite_rel Ite Matching Matching_types
-    Polynome Records Records_rel Satml_frontend_hybrid Satml_frontend Satml
-    Sat_solver Sat_solver_sig Sig Sig_rel Theory Uf Use
+    Ac Arith Arrays_rel Bitv Ccx Shostak Relation
+    Fun_sat Fun_sat_frontend Inequalities Bitv_rel Th_util Adt Adt_rel
+    Instances IntervalCalculus Intervals_intf Intervals_core Intervals
+    Ite_rel Matching Matching_types Polynome Records Records_rel
+    Satml_frontend_hybrid Satml_frontend Satml Sat_solver Sat_solver_sig
+    Sig Sig_rel Theory Uf Use Domains Domains_intf Rel_utils Bitlist
     ; structures
     Commands Errors Explanation Fpa_rounding
     Parsed Profiling Satml_types Symbols
-    Expr Var Ty Typed Xliteral
+    Expr Var Ty Typed Xliteral ModelMap Id Uid Objective Literal
     ; util
-    Config Emap Gc_debug Hconsing Hstring Iheap Lists Loc
-    MyDynlink MyUnix Numbers NumsNumbers NumbersInterface
-    Options Timers Util Vec Version ZarithNumbers Steps Printer Format_shims
+    Emap Gc_debug Hconsing Hstring Heap Loc Numbers Uqueue
+    Options Timers Util Vec Version Steps Printer
+    My_zip My_unix My_list Theories Nest Compat
   )
 
  (js_of_ocaml

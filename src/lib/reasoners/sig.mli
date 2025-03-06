@@ -1,30 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 type 'a ac =
   {h: Symbols.t ; t: Ty.t ; l: ('a * int) list; distribute: bool}
@@ -42,8 +41,10 @@ module type SHOSTAK = sig
   (** Name of the theory*)
   val name : string
 
-  (** return true if the symbol and the type are owned by the theory*)
-  val is_mine_symb : Symbols.t -> Ty.t -> bool
+  val timer : Timers.ty_module
+
+  val is_mine_symb : Symbols.t -> bool
+  (** Return [true] if the symbol is owned by the theory. *)
 
   (** Give a representant of a term of the theory*)
   val make : Expr.t -> r * Expr.t list
@@ -59,6 +60,21 @@ module type SHOSTAK = sig
 
   (** Give the leaves of a term of the theory *)
   val leaves : t -> r list
+
+  (** Determines whether the semantic value is a constant value. [is_constant t]
+      is equivalent to [leaves t == []] (except for the special cases below),
+      but is more efficient.
+
+      In addition, some terms (e.g. [true], [false], [void]) that have no
+      associated theories are considered as constant by this function.
+
+      Semantic value for which [is_constant] returns [true] contains no free
+      names and thus have the same concrete value in all contexts.
+
+      Note that for some theories (e.g. records, arrays) the constant may not be
+      pure: it may involve nested (constant) terms of other theories. *)
+  val is_constant : t -> bool
+
   val subst : r -> r -> t -> r
 
   val compare : r -> r -> int
@@ -73,26 +89,72 @@ module type SHOSTAK = sig
 
   val print : Format.formatter -> t -> unit
 
+  (** return true if the symbol is fully interpreted by the theory, i.e. it
+      is fully embedded into semantic values and does not need term-level
+      congruence *)
   val fully_interpreted : Symbols.t -> bool
 
   val abstract_selectors : t -> (r * r) list -> r * (r * r) list
 
-  (* the returned bool is true when the returned term in a constant of the
-     theory. Otherwise, the term contains aliens that should be assigned
-     (eg. records). In this case, it's a unit fact, not a decision
-  *)
   val assign_value :
     r -> r list -> (Expr.t * r) list -> (Expr.t * bool) option
+  (**[assign_value r distincts eq] selects the value to assign to [r] in the
+     model as a term [t], and returns [Some (t, is_cs)]. [is_cs] is described
+     below.
 
-  (* choose the value to print and how to print it for the given term.
-     The second term is its representative. The list is its equivalence class
-  *)
-  val choose_adequate_model : Expr.t -> r -> (Expr.t * r) list -> r * string
+     If no appropriate value can be chosen here, return [None] (only do this if
+     either [r] is already a value, or there is a mechanism somewhere else in
+     the code, such as the [case_split] function of a relation module, that
+     ensures completeness of the generated model).
 
+     [r] is the current class representative that a value should be chosen for.
+     No assumptions should be made on the shape of [r], but do return [None] if
+     it is already a value.
+
+     [distincts] is a list of term representatives that the returned value must
+     be distinct from (choosing a value that is present in [distincts] will
+     cause the solver to loop infinitely).
+
+     [eq] is a list of pairs [(t, r)] of terms and their initial representative
+     (i.e., [r] is [fst (X.make t)] for each pair) that encode the equivalence
+     class of [r].
+
+     The returned bool serves a similar purpose as the [is_cs] flag in
+     [Th_util.case_split].
+
+     It should usually be [true], which indicates that the returned term is not
+     forced.
+
+     Use [false] only when the returned term contains aliens that should be
+     assigned (e.g. records).
+
+     **When returning [false], you must ensure that the equality between the
+     first argument and the return value always hold (i.e. is a *unit* fact).
+     In particular, the equality *must not* depend on [distincts] -- doing so
+     would be unsound.**
+
+     In other words, if [assign_value r distincts eq] returns
+     [Some (t, false)], then there must be no context in which
+     [solve r (fst X.make t)] raises [Unsolvable]. You have been warned! *)
+
+  val to_model_term : r -> Expr.t option
+  (** [to_model_term r] creates a model term if [r] is constant.
+      The function cannot fail if [r] is a constant (that is statisfied the
+      predicate [X.is_constant]).
+
+      The returned value always satisfies the predicate
+      [Expr.is_model_term]. See its documentation for more details about
+      model terms. *)
 end
 
 module type X = sig
   type r
+
+  val save_cache : unit -> unit
+  (** saves the module's current cache *)
+
+  val reinit_cache : unit -> unit
+  (** restores the module's cache *)
 
   val make : Expr.t -> r * Expr.t list
 
@@ -108,6 +170,8 @@ module type X = sig
 
   val leaves : r -> r list
 
+  val is_constant : r -> bool
+
   val subst : r -> r -> r -> r
 
   val solve : r -> r ->  (r * r) list
@@ -122,7 +186,7 @@ module type X = sig
 
   val color : (r ac) -> r
 
-  val fully_interpreted : Symbols.t -> Ty.t -> bool
+  val fully_interpreted : Symbols.t -> bool
 
   val is_a_leaf : r -> bool
 
@@ -130,10 +194,7 @@ module type X = sig
 
   val abstract_selectors : r -> (r * r) list -> r * (r * r) list
 
-  val top : unit -> r
-  val bot : unit -> r
-
-  val is_solvable_theory_symbol : Symbols.t -> Ty.t -> bool
+  val is_solvable_theory_symbol : Symbols.t -> bool
 
   (* the returned bool is true when the returned term in a constant of the
      theory. Otherwise, the term contains aliens that should be assigned
@@ -142,8 +203,12 @@ module type X = sig
   val assign_value :
     r -> r list -> (Expr.t * r) list -> (Expr.t * bool) option
 
-  (* choose the value to print and how to print it for the given term.
-     The second term is its representative. The list is its equivalence class
-  *)
-  val choose_adequate_model : Expr.t -> r -> (Expr.t * r) list -> r * string
+  val to_model_term : r -> Expr.t option
+  (** [to_model_term r] creates a model term if [r] is constant.
+      The function cannot fail if [r] is a constant (that is statisfied the
+      predicate [X.is_constant]).
+
+      The returned value always satisfies the predicate
+      [Expr.is_model_term]. See its documentation for more details about
+      model terms. *)
 end

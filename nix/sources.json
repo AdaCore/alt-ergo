@@ -1,0 +1,66 @@
+{
+    "dolmen": {
+        "branch": "v0.10",
+        "description": "Dolmen provides a library and a binary to parse, typecheck, and evaluate languages used in automated deduction",
+        "homepage": "",
+        "owner": "Gbury",
+        "repo": "dolmen",
+        "rev": "c33632daab31fb3bb719031169baa6c984bb860f",
+        "sha256": "1vvlg72sbwmpnh0kvwkbvnxxgwrdqcy5adqp26n3hpq3mix4sp7d",
+        "type": "tarball",
+        "url": "https://github.com/Gbury/dolmen/archive/c33632daab31fb3bb719031169baa6c984bb860f.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz",
+        "version": "0.10"
+    },
+    "landmarks": {
+        "branch": "b0c753cd2a4c4aa00dffdd3be187d8ed592fabf7",
+        "description": "A Simple Profiling Library for OCaml",
+        "homepage": "https://github.com/LexiFi/landmarks",
+        "owner": "LexiFi",
+        "repo": "landmarks",
+        "rev": "b0c753cd2a4c4aa00dffdd3be187d8ed592fabf7",
+        "sha256": "02lr5grxcczikkdvz75vhrpgpfnq7z9svzgxxvimll0ijplgp6js",
+        "type": "tarball",
+        "url": "https://github.com/LexiFi/landmarks/archive/b0c753cd2a4c4aa00dffdd3be187d8ed592fabf7.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz",
+        "version": "dev"
+    },
+    "nixpkgs": {
+        "branch": "release-24.05",
+        "description": "Nix Packages collection",
+        "homepage": null,
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "b260a95463a8f5f9094527c05329d79527e5a4aa",
+        "sha256": "0qlnwrha950kflbnfsl39mrdkkll3663bssjlxrrm7w1qnbbbp1n",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/b260a95463a8f5f9094527c05329d79527e5a4aa.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "ocplib-simplex": {
+        "branch": "v0.5.1",
+        "description": "A library implementing a simplex algorithm, in a functional style, for solving systems of linear inequalities",
+        "homepage": "",
+        "owner": "OCamlPro",
+        "repo": "ocplib-simplex",
+        "rev": "12e7c1fd994d4c40cf7159008a67579f470df616",
+        "sha256": "0jkyqvcia4950cr1ip4n4xnjgaqlliljw48b40n95j75wjvy3d3w",
+        "type": "tarball",
+        "url": "https://github.com/OCamlPro/ocplib-simplex/archive/12e7c1fd994d4c40cf7159008a67579f470df616.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz",
+        "version": "0.5.1"
+    },
+    "pp_loc": {
+        "branch": "v2.1.0",
+        "description": "Pretty-printing for error source locations",
+        "homepage": "https://armael.github.io/pp_loc/pp_loc/",
+        "owner": "Armael",
+        "repo": "pp_loc",
+        "rev": "d8162fd289849ea2f4125054ab88540416bdaa25",
+        "sha256": "1wf5pqfxbfbjlwg24n3w99xm29qn1xjjjqn2z01vr5wgxcj9nfvd",
+        "type": "tarball",
+        "url": "https://github.com/Armael/pp_loc/archive/d8162fd289849ea2f4125054ab88540416bdaa25.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz",
+        "version": "2.1.0"
+    }
+}

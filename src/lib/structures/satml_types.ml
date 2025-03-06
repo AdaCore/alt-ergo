@@ -1,22 +1,33 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the license indicated      *)
-(*     in the file 'License.OCamlPro'. If 'License.OCamlPro' is not           *)
-(*     present, please contact us to clarify licensing.                       *)
-(*                                                                            *)
-(******************************************************************************)
-
-open Format
-open Options
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 module ME = Expr.Map
 module E = Expr
 module Hs = Hstring
-
-
 
 module type ATOM = sig
 
@@ -25,16 +36,16 @@ module type ATOM = sig
        pa : atom;
        na : atom;
        mutable weight : float;
-       mutable sweight : int;
        mutable seen : bool;
        mutable level : int;
        mutable index : int;
+       mutable hindex : int;
        mutable reason: reason;
        mutable vpremise : premise}
 
   and atom =
     { var : var;
-      lit : E.t;
+      lit : Shostak.Literal.t;
       neg : atom;
       mutable watched : clause Vec.t;
       mutable is_true : bool;
@@ -65,14 +76,13 @@ module type ATOM = sig
   val pr_clause : Format.formatter -> clause -> unit
   val get_atom : hcons_env -> E.t ->  atom
 
-  val literal : atom -> E.t
+  val literal : atom -> Shostak.Literal.t
   val weight : atom -> float
   val is_true : atom -> bool
   val neg : atom -> atom
   val vrai_atom  : atom
   val faux_atom  : atom
   val level : atom -> int
-  val index : atom -> int
   val reason : atom -> reason
   val reason_atoms : atom -> atom list
 
@@ -89,17 +99,23 @@ module type ATOM = sig
 
   val fresh_dname : unit -> string
 
-  val make_clause : string -> atom list -> E.t -> int -> bool ->
+  val make_clause : string -> atom list -> E.t -> bool ->
     premise-> clause
 
   (*val made_vars_info : unit -> int * var list*)
+
+  val equal_var : var -> var -> bool
+  val compare_var : var -> var -> int
+  val hash_var : var -> int
 
   val cmp_atom : atom -> atom -> int
   val eq_atom   : atom -> atom -> bool
   val hash_atom  : atom -> int
   val tag_atom   : atom -> int
 
-  val add_atom : hcons_env -> E.t -> var list -> atom * var list
+  val add_atom :
+    hcons_env -> Shostak.Literal.t -> var list -> atom * var list
+  val add_expr_atom : hcons_env -> E.t -> var list -> atom * var list
 
   module Set : Set.S with type elt = atom
   module Map : Map.S with type key = atom
@@ -162,16 +178,16 @@ module Atom : ATOM = struct
        pa : atom;
        na : atom;
        mutable weight : float;
-       mutable sweight : int;
        mutable seen : bool;
        mutable level : int;
        mutable index : int;
+       mutable hindex : int;
        mutable reason: reason;
        mutable vpremise : premise}
 
   and atom =
     { var : var;
-      lit : E.t;
+      lit : Shostak.Literal.t;
       neg : atom;
       mutable watched : clause Vec.t;
       mutable is_true : bool;
@@ -202,15 +218,15 @@ module Atom : ATOM = struct
       na = dummy_atom;
       level = -1;
       index = -1;
+      hindex = -1;
       reason = None;
       weight = -1.;
-      sweight = 0;
       seen = false;
       vpremise = [] }
   and dummy_atom =
     { var = dummy_var;
       timp = 0;
-      lit = dummy_lit;
+      lit = Shostak.Literal.make @@ LTerm dummy_lit;
       watched = {Vec.dummy=dummy_clause; data=[||]; sz=0};
       neg = dummy_atom;
       is_true = false;
@@ -233,59 +249,48 @@ module Atom : ATOM = struct
     let level a =
       match a.var.level, a.var.reason with
       | n, _ when n < 0 -> assert false
-      | 0, Some c -> sprintf "->0/%s" c.name
+      | 0, Some c -> Format.sprintf "->0/%s" c.name
       | 0, None   -> "@0"
-      | n, Some c -> sprintf "->%d/%s" n c.name
-      | n, None   -> sprintf "@@%d" n
+      | n, Some c -> Format.sprintf "->%d/%s" n c.name
+      | n, None   -> Format.sprintf "@@%d" n
 
     let value a =
-      if a.is_true then sprintf "[T%s]" (level a)
-      else if a.neg.is_true then sprintf "[F%s]" (level a)
+      if a.is_true then Format.sprintf "[T%s]" (level a)
+      else if a.neg.is_true then Format.sprintf "[F%s]" (level a)
       else ""
 
     let premise fmt v =
-      List.iter (fun { name = name; _ } -> fprintf fmt "%s," name) v
+      List.iter (fun { name = name; _ } -> Format.fprintf fmt "%s," name) v
 
     let atom fmt a =
-      fprintf fmt "%s%d%s [index=%d | lit:%a] vpremise={{%a}}"
-        (sign a) (a.var.vid+1) (value a) a.var.index E.print a.lit
+      Format.fprintf fmt "%s%d%s [index=%d | lit:%a] vpremise={{%a}}"
+        (sign a) (a.var.vid+1) (value a) a.var.index Shostak.Literal.pp a.lit
         premise a.var.vpremise
 
-
-    let atoms_vec fmt vec =
-      for i = 0 to Vec.size vec - 1 do
-        fprintf fmt "%a ; " atom (Vec.get vec i)
-      done
+    let atoms_vec = Vec.pp atom
 
     let clause fmt { name; atoms=arr; cpremise=cp; _ } =
-      fprintf fmt "%s:{ %a} cpremise={{%a}}" name atoms_vec arr premise cp
-
+      Format.fprintf fmt "%s:@[@[{ %a@]}@ cpremise={{%a}}@]" name atoms_vec
+        arr premise cp
   end
 
   let pr_atom = Debug.atom
   let pr_clause = Debug.clause
-
-  let normal_form lit = (* XXX do better *)
-    let is_pos = E.is_positive lit in
-    (if is_pos then lit else E.neg lit), not is_pos
-
-  let max_depth a = E.depth a
 
   let literal a = a.lit
   let weight a = a.var.weight
 
   let is_true a = a.is_true
   let level a = a.var.level
-  let index a = a.var.index
   let neg a = a.neg
 
-  module HT = Hashtbl.Make(E)
+  module HT = Shostak.Literal.Table
 
   type hcons_env = { tbl : var HT.t ; cpt : int ref }
 
   let make_var =
     fun hcons lit acc ->
-    let lit, negated = normal_form lit in
+    let lit, negated = Shostak.Literal.normal_form lit in
     try HT.find hcons.tbl lit, negated, acc
     with Not_found ->
       let cpt = !(hcons.cpt) in
@@ -296,16 +301,16 @@ module Atom : ATOM = struct
           na = na;
           level = -1;
           index = -1;
+          hindex = -1;
           reason = None;
           weight = 0.;
-          sweight = max_depth lit;
           seen = false;
           vpremise = [];
         }
       and pa =
         { var = var;
           lit = lit;
-          watched = Vec.make 10 dummy_clause;
+          watched = Vec.make 10 ~dummy:dummy_clause;
           neg = na;
           is_true = false;
           is_guard = false;
@@ -313,8 +318,8 @@ module Atom : ATOM = struct
           aid = cpt_fois_2 (* aid = vid*2 *) }
       and na =
         { var = var;
-          lit = E.neg lit;
-          watched = Vec.make 10 dummy_clause;
+          lit = Shostak.Literal.neg lit;
+          watched = Vec.make ~dummy:dummy_clause 10;
           neg = pa;
           is_true = false;
           is_guard = false;
@@ -328,6 +333,9 @@ module Atom : ATOM = struct
     let var, negated, acc = make_var hcons lit acc in
     (if negated then var.na else var.pa), acc
 
+  let add_expr_atom hcons lit acc =
+    add_atom hcons (Shostak.Literal.make @@ LTerm lit) acc
+
   (* with this code, all envs created with empty_hcons_env () will be
      initialized with the good reference to "vrai" *)
   let copy_hcons_env hcons =
@@ -335,7 +343,7 @@ module Atom : ATOM = struct
 
   let empty_hcons_env, vrai_atom =
     let empty_hcons = { tbl= HT.create 5048 ; cpt = ref (-1) } in
-    let a, _ = add_atom empty_hcons E.vrai [] in
+    let a, _ = add_expr_atom empty_hcons E.vrai [] in
     a.is_true <- true;
     a.var.level <- 0;
     a.var.reason <- None;
@@ -347,13 +355,14 @@ module Atom : ATOM = struct
   let nb_made_vars hcons = !(hcons.cpt)
 
   let get_atom hcons lit =
+    let lit = Shostak.Literal.make (LTerm lit) in
     try (HT.find hcons.tbl lit).pa
     with Not_found ->
-    try (HT.find hcons.tbl (E.neg lit)).na
+    try (HT.find hcons.tbl (Shostak.Literal.neg lit)).na
     with Not_found -> assert false
 
-  let make_clause name ali f sz_ali is_learnt premise =
-    let atoms = Vec.from_list ali sz_ali dummy_atom in
+  let make_clause name ali f is_learnt premise =
+    let atoms = Vec.of_list ali ~dummy:dummy_atom in
     { name  = name;
       atoms = atoms;
       removed = false;
@@ -379,12 +388,9 @@ module Atom : ATOM = struct
 
   let to_int f = int_of_float f
 
-  (* unused --
-     let cmp_var v1 v2 = v1.vid - v2.vid
-     let eq_var v1 v2 = v1.vid - v2.vid = 0
-     let tag_var v = v.vid
-     let h_var v = v.vid
-  *)
+  let equal_var v1 v2 = v1.vid = v2.vid
+  let compare_var v1 v2 = v1.vid - v2.vid
+  let hash_var v = Hashtbl.hash v.vid
 
   let cmp_atom a1 a2 = a1.aid - a2.aid
   let eq_atom   a1 a2 = a1.aid - a2.aid = 0
@@ -400,11 +406,12 @@ module Atom : ATOM = struct
     | Some c ->
       let cpt = ref 0 in
       let l = ref [] in
-      for i = 0 to Vec.size c.atoms - 1 do
-        let b = Vec.get c.atoms i in
-        if eq_atom a b then incr cpt
-        else l := b :: !l
-      done;
+      Vec.iter (fun (atom : atom) ->
+          if eq_atom a atom then
+            incr cpt
+          else
+            l := atom :: !l
+        ) c.atoms;
       if !cpt <> 1 then begin
         Printer.print_err
           "cpt = %d@ a = %a@ c = %a"
@@ -425,6 +432,12 @@ module type FLAT_FORMULA = sig
   type view = private UNIT of Atom.atom | AND of t list | OR of t list
   type hcons_env
 
+  type proxy_defn
+
+  type proxies
+
+  val empty_proxies : proxies
+
   val equal   : t -> t -> bool
   val compare : t -> t -> int
   val print   : Format.formatter -> t -> unit
@@ -440,6 +453,7 @@ module type FLAT_FORMULA = sig
   val empty_hcons_env : unit -> hcons_env
   val nb_made_vars : hcons_env -> int
   val get_atom : hcons_env -> E.t -> Atom.atom
+  val atom_hcons_env : hcons_env -> Atom.hcons_env
 
   val simplify :
     hcons_env ->
@@ -449,22 +463,22 @@ module type FLAT_FORMULA = sig
     t * (E.t * (t * Atom.atom)) list
     * Atom.var list
 
-  val get_proxy_of : t ->
-    (Atom.atom * Atom.atom list * bool) Util.MI.t -> Atom.atom option
+  val get_proxy_of : t -> proxies -> Atom.atom option
 
   val cnf_abstr :
     hcons_env ->
     t ->
-    (Atom.atom * Atom.atom list * bool) Util.MI.t ->
+    proxies ->
     Atom.var list ->
     Atom.atom
-    * (Atom.atom * Atom.atom list * bool) list
-    * (Atom.atom * Atom.atom list * bool) Util.MI.t
+    * proxy_defn list
+    * proxies
     * Atom.var list
 
   val expand_proxy_defn :
-    Atom.atom list list ->
-    Atom.atom * Atom.atom list * bool -> Atom.atom list list
+    Atom.atom list list -> proxy_defn -> Atom.atom list list
+
+  val reinit_cpt : unit -> unit
 
   module Set : Set.S with type elt = t
   module Map : Map.S with type key = t
@@ -486,25 +500,25 @@ module Flat_Formula : FLAT_FORMULA = struct
   let sp() = let s = ref "" in for _ = 1 to !cpt do s := " " ^ !s done; !s ^ !s
 
   let rec print fmt fa = match fa.view with
-    | UNIT a -> fprintf fmt "%a" Atom.pr_atom a
+    | UNIT a -> Format.fprintf fmt "%a" Atom.pr_atom a
     | AND s  ->
       incr cpt;
-      fprintf fmt "(and%a" print_list s;
+      Format.fprintf fmt "(and%a" print_list s;
       decr cpt;
-      fprintf fmt "@.%s)" (sp())
+      Format.fprintf fmt "@.%s)" (sp())
 
     | OR s   ->
       incr cpt;
-      fprintf fmt "(or%a" print_list s;
+      Format.fprintf fmt "(or%a" print_list s;
       decr cpt;
-      fprintf fmt "@.%s)" (sp())
+      Format.fprintf fmt "@.%s)" (sp())
 
   and print_list fmt l =
     match l with
     | [] -> assert false
     | e::l ->
-      fprintf fmt "@.%s%a" (sp()) print e;
-      List.iter(fprintf fmt "@.%s%a" (sp()) print) l
+      Format.fprintf fmt "@.%s%a" (sp()) print e;
+      List.iter(Format.fprintf fmt "@.%s%a" (sp()) print) l
 
 
   let print fmt f = cpt := 0; print fmt f
@@ -522,6 +536,34 @@ module Flat_Formula : FLAT_FORMULA = struct
     | AND _ -> true
     | OR  _ -> false
     | UNIT at -> at == at.Atom.var.Atom.pa
+
+  type proxy_defn = Atom.atom * Atom.atom list * bool
+  (** A proxy definition, represented as a triple [p, l, is_and].
+
+      [l] is a list of atoms that represent the "components" of the proxied
+      formula. The meaning of [l] depends on the value of [is_and]: if [is_and]
+      is [true], then [p] is a proxy for [l_1 /\ ... /\ l_n]; otherwise, [p] is
+      a proxy for [l_1 \/ ... \/ l_n]. *)
+
+  type proxies = proxy_defn Util.MI.t
+  (** Map from flat formula tags to their proxy definitions. If flat formula [f]
+      is associated to [p, l, is_and], then [p] is an atom that represents [f]
+      (so that deciding on [p] forces [f] to take the same truth value).
+
+      Only [AND] and [OR] flat formulas are present in a [proxies] map: [UNIT]
+      flat formulas do not need a proxy, as they are already atoms.
+
+      Note: Integer maps (keyed on tags) are used for historical reasons (and
+      possibly slight performance boost).
+
+      Note: If [ff] is a flat formula of shape [OR fl] (resp. [AND fl]),
+      then the corresponding [is_and] entry is [false] (resp. [true]), and
+      the list [l] contains the atoms or proxies for the values in [fl].
+
+      Note: the [proxies] map contains either a flat formula or its
+      negation; [get_proxy_of] tries both possibilities. *)
+
+  let empty_proxies = Util.MI.empty
 
   module HT =
     Hashtbl.Make
@@ -591,9 +633,9 @@ module Flat_Formula : FLAT_FORMULA = struct
   let complements f1 f2 = f1.tag == f2.neg.tag
 
   let mk_lit hcons a acc =
-    let at, acc = Atom.add_atom hcons.atoms a acc in
+    let at, acc = Atom.add_expr_atom hcons.atoms a acc in
     let at =
-      if get_disable_flat_formulas_simplification () then at
+      if Options.get_disable_flat_formulas_simplification () then at
       else
       if at.Atom.var.Atom.level = 0 then
         if at.Atom.is_true then Atom.vrai_atom
@@ -621,6 +663,8 @@ module Flat_Formula : FLAT_FORMULA = struct
     f_empty_hcons, vrai
 
   let faux = mk_not vrai
+
+  let atom_hcons_env { atoms; _ } = atoms
 
   let nb_made_vars hcons = Atom.nb_made_vars hcons.atoms
 
@@ -662,7 +706,7 @@ module Flat_Formula : FLAT_FORMULA = struct
              match e.view with
              | AND l -> merge_and_check so l, nso
              | UNIT a when
-                 not (get_disable_flat_formulas_simplification ()) &&
+                 not (Options.get_disable_flat_formulas_simplification ()) &&
                  a.Atom.var.Atom.level = 0 ->
                begin
                  if a.Atom.neg.Atom.is_true then (aaz a; raise Exit); (* XXX*)
@@ -746,14 +790,14 @@ module Flat_Formula : FLAT_FORMULA = struct
     | [], [] -> assert false
 
     | _::_::_, _ ->
-      if get_debug_sat () then
+      if Options.get_debug_sat () then
         Printer.print_dbg
           ~module_name:"Satml_types" ~function_name:"extract_common"
           "Failure: many distinct atoms";
       None
 
     | [_] as common, _ ->
-      if get_debug_sat () then
+      if Options.get_debug_sat () then
         Printer.print_dbg
           ~module_name:"Satml_types" ~function_name:"extract_common"
           "TODO: Should have one toplevel common atom";
@@ -766,7 +810,7 @@ module Flat_Formula : FLAT_FORMULA = struct
       end
 
     | [], ad::ands' ->
-      if get_debug_sat () then
+      if Options.get_debug_sat () then
         Printer.print_dbg
           ~module_name:"Satml_types" ~function_name:"extract_common"
           "Should look for internal common parts";
@@ -785,7 +829,7 @@ module Flat_Formula : FLAT_FORMULA = struct
              match e.view with
              | OR l  -> merge_and_check so l, nso
              | UNIT a  when
-                 not (get_disable_flat_formulas_simplification ()) &&
+                 not (Options.get_disable_flat_formulas_simplification ()) &&
                  a.Atom.var.Atom.level = 0 ->
                begin
                  if a.Atom.is_true then (aaz a; raise Exit); (* XXX *)
@@ -846,7 +890,7 @@ module Flat_Formula : FLAT_FORMULA = struct
       else
         let lit = E.fresh_name Ty.Tbool in
         let xlit, new_v = mk_lit hcons lit !new_vars in
-        let at_lit, new_v = Atom.add_atom hcons.atoms lit new_v in
+        let at_lit, new_v = Atom.add_expr_atom hcons.atoms lit new_v in
         new_vars := new_v;
         lem := (f, (xlit, at_lit)) :: !lem
                [@ocaml.ppwarning "xlit or at_lit is probably redundant"]
@@ -858,7 +902,6 @@ module Flat_Formula : FLAT_FORMULA = struct
     let new_vars = ref new_vars in
     let rec simp topl ~parent_disj f =
       match E.form_view f with
-      | E.Not_a_form -> assert false
       | E.Literal a ->
         let ff, l = mk_lit hcons a !new_vars in
         new_vars := l;
@@ -891,10 +934,10 @@ module Flat_Formula : FLAT_FORMULA = struct
 
       | E.Iff(f1, f2) ->
         simp topl ~parent_disj @@
-        E.elim_iff f1 f2 (E.id f) ~with_conj:(not parent_disj)
+        E.elim_iff f1 f2 ~with_conj:(not parent_disj)
 
       | E.Xor(f1, f2) ->
-        let g = E.neg @@ E.elim_iff f1 f2 (E.id f) ~with_conj:parent_disj in
+        let g = E.neg @@ E.elim_iff f1 f2 ~with_conj:parent_disj in
         simp topl ~parent_disj g
 
       | E.Let letin ->
@@ -906,12 +949,11 @@ module Flat_Formula : FLAT_FORMULA = struct
   (* CNF_ABSTR a la Tseitin *)
 
   let atom_of_lit hcons lit is_neg new_vars =
-    let a, l = Atom.add_atom hcons.atoms lit new_vars in
+    let a, l = Atom.add_expr_atom hcons.atoms lit new_vars in
     if is_neg then a.Atom.neg,l else a,l
 
   let mk_new_proxy n =
-    let hs = Hs.make ("PROXY__" ^ (string_of_int n)) in
-    let sy = Symbols.Name(hs, Symbols.Other) in
+    let sy = Symbols.name ~ns:Internal @@ "PROXY__" ^ string_of_int n in
     E.mk_term sy [] Ty.Tbool
 
   let get_proxy_of f proxies_mp =
@@ -961,9 +1003,11 @@ module Flat_Formula : FLAT_FORMULA = struct
 
   let get_atom hcons a = Atom.get_atom hcons.atoms a
 
-  module Set = Set.Make(struct type t'=t type t=t' let compare=compare end)
-  module Map = Map.Make(struct type t'=t type t=t' let compare=compare end)
+  let reinit_cpt () =
+    cpt := 0
 
+  module Set = Set.Make (struct type nonrec t = t let compare = compare end)
+  module Map = Map.Make (struct type nonrec t = t let compare = compare end)
 end
 
 module Proxy_formula = struct
@@ -972,11 +1016,11 @@ module Proxy_formula = struct
     with Not_found -> None
 
   let atom_of_lit hcons lit is_neg new_vars =
-    let a, l = Atom.add_atom hcons lit new_vars in
+    let a, l = Atom.add_expr_atom hcons lit new_vars in
     if is_neg then a.Atom.neg,l else a,l
 
   let mk_new_proxy n =
-    let sy = Symbols.name @@ "PROXY__" ^ (string_of_int n) in
+    let sy = Symbols.name ~ns:Internal @@ "PROXY__" ^ (string_of_int n) in
     E.mk_term sy [] Ty.Tbool
 
   let rec mk_cnf hcons f ((proxies, inv_proxies, new_vars, cnf) as accu) =
@@ -1016,6 +1060,4 @@ module Proxy_formula = struct
         | E.Let _ | E.Skolem _ | E.Lemma _ | E.Literal _ | E.Iff _
         | E.Xor _ ->
           a, (proxies, inv_proxies, new_vars, cnf)
-
-        | E.Not_a_form -> assert false
 end

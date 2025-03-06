@@ -1,30 +1,29 @@
-/******************************************************************************/
-/*                                                                            */
-/*     The Alt-Ergo theorem prover                                            */
-/*     Copyright (C) 2006-2013                                                */
-/*                                                                            */
-/*     Sylvain Conchon                                                        */
-/*     Evelyne Contejean                                                      */
-/*                                                                            */
-/*     Francois Bobot                                                         */
-/*     Mohamed Iguernelala                                                    */
-/*     Stephane Lescuyer                                                      */
-/*     Alain Mebsout                                                          */
-/*                                                                            */
-/*     CNRS - INRIA - Universite Paris Sud                                    */
-/*                                                                            */
-/*     This file is distributed under the terms of the Apache Software        */
-/*     License version 2.0                                                    */
-/*                                                                            */
-/*  ------------------------------------------------------------------------  */
-/*                                                                            */
-/*     Alt-Ergo: The SMT Solver For Software Verification                     */
-/*     Copyright (C) 2013-2017 --- OCamlPro SAS                               */
-/*                                                                            */
-/*     This file is distributed under the terms of the Apache Software        */
-/*     License version 2.0                                                    */
-/*                                                                            */
-/******************************************************************************/
+/**************************************************************************/
+/*                                                                        */
+/*     Alt-Ergo: The SMT Solver For Software Verification                 */
+/*     Copyright (C) --- OCamlPro SAS                                     */
+/*                                                                        */
+/*     This file is distributed under the terms of OCamlPro               */
+/*     Non-Commercial Purpose License, version 1.                         */
+/*                                                                        */
+/*     As an exception, Alt-Ergo Club members at the Gold level can       */
+/*     use this file under the terms of the Apache Software License       */
+/*     version 2.0.                                                       */
+/*                                                                        */
+/*     ---------------------------------------------------------------    */
+/*                                                                        */
+/*     The Alt-Ergo theorem prover                                        */
+/*                                                                        */
+/*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 */
+/*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              */
+/*                                                                        */
+/*     CNRS - INRIA - Universite Paris Sud                                */
+/*                                                                        */
+/*     ---------------------------------------------------------------    */
+/*                                                                        */
+/*     More details can be found in the directory licenses/               */
+/*                                                                        */
+/**************************************************************************/
 
 %{
   [@@@ocaml.warning "-33"]
@@ -38,13 +37,13 @@
 %token <string> ID
 %token <string> QM_ID
 %token <string> INTEGER
-%token <Num.num> NUM
+%token <AltErgoLib.Numbers.Q.t> NUM
 %token <string> STRING
 %token MATCH WITH THEORY EXTENDS END QM
 %token AND LEFTARROW RIGHTARROW AC AT AXIOM CASESPLIT REWRITING
 %token BAR HAT
 %token BOOL COLON COMMA PV DISTINCT DOT SHARP ELSE OF EOF EQUAL
-%token EXISTS FALSE VOID FORALL FUNC GE GOAL GT CHECK CUT
+%token EXISTS FALSE VOID FORALL FUNC GE GOAL CHECK_SAT GT CHECK CUT
 %token IF IN INT BITV MAPS_TO
 %token LE LET LEFTPAR LEFTSQ LEFTBR LOGIC LRARROW XOR LT MINUS
 %token NOT NOTEQ OR PERCENT PLUS PRED PROP
@@ -105,7 +104,7 @@ decl:
     { mk_abstract_type_decl ($startpos, $endpos) ty_vars ty }
 
 | TYPE ty_vars = type_vars ty = ident EQUAL enum = list1_constructors_sep_bar
-   others = and_recursive_opt
+   others = and_recursive_ty_opt
     {
       match others with
         | [] ->
@@ -132,14 +131,23 @@ decl:
 
 | FUNC app=named_ident LEFTPAR args=list0_logic_binder_sep_comma RIGHTPAR
    COLON ret_ty = primitive_type EQUAL body = lexpr
-   { mk_function_def ($startpos, $endpos) app args ret_ty body }
+   others = and_recursive_def_opt
+   { match others with
+     | [] -> mk_function_def ($startpos, $endpos) app args ret_ty body
+     | _ ->
+       mk_mut_rec_def
+         ((($startpos, $endpos), app, args, Some ret_ty, body) :: others)}
 
 | PRED app = named_ident EQUAL body = lexpr
    { mk_ground_predicate_def ($startpos, $endpos) app body }
 
 | PRED app = named_ident LEFTPAR args = list0_logic_binder_sep_comma RIGHTPAR
-   EQUAL body = lexpr
-   { mk_non_ground_predicate_def ($startpos, $endpos) app args body }
+   EQUAL body = lexpr others = and_recursive_def_opt
+   { match others with
+     | [] -> mk_non_ground_predicate_def ($startpos, $endpos) app args body
+     | _ ->
+       mk_mut_rec_def
+         ((($startpos, $endpos), app, args, None, body) :: others)}
 
 | AXIOM name = ident COLON body = lexpr
    { mk_generic_axiom ($startpos, $endpos) name body }
@@ -149,6 +157,9 @@ decl:
 
 | GOAL name = ident COLON body = lexpr
    { mk_goal ($startpos, $endpos) name body }
+
+| CHECK_SAT name = ident COLON body = lexpr
+   { mk_check_sat ($startpos, $endpos) name body }
 
 theory_elts:
 | /* */  { [] }
@@ -226,11 +237,21 @@ algebraic_args:
 | { [] }
 | OF record_type { $2 }
 
-and_recursive_opt:
+and_recursive_ty_opt:
   | { [] }
   | AND ty_vars = type_vars ty = ident EQUAL enum = list1_constructors_sep_bar
-others = and_recursive_opt
-    { (($startpos, $endpos), ty_vars, ty, enum) :: others}
+      others = and_recursive_ty_opt
+      { (($startpos, $endpos), ty_vars, ty, enum) :: others}
+
+and_recursive_def_opt:
+  | { [] }
+  | AND PRED app=named_ident LEFTPAR args=list0_logic_binder_sep_comma RIGHTPAR
+      EQUAL body = lexpr others = and_recursive_def_opt
+      { (($startpos, $endpos), app, args, None, body) :: others }
+  | AND FUNC app=named_ident LEFTPAR args=list0_logic_binder_sep_comma RIGHTPAR
+      COLON ret_ty = primitive_type EQUAL body = lexpr
+      others = and_recursive_def_opt
+      { (($startpos, $endpos), app, args, Some ret_ty, body) :: others }
 
 lexpr:
 
@@ -355,7 +376,6 @@ lexpr:
 | MATCH e = lexpr WITH cases = list1_match_cases END
     { mk_match ($startpos, $endpos) e (List.rev cases) }
 
-
 list1_match_cases:
 |     p = simple_pattern RIGHTARROW e = lexpr { [p, e]}
 | BAR p = simple_pattern RIGHTARROW e = lexpr { [p, e]}
@@ -425,7 +445,7 @@ simple_expr :
     { mk_algebraic_test ($startpos, $endpos) se id }
 
 | se = simple_expr SHARP label = ident
-   { mk_algebraic_project ($startpos, $endpos) ~guarded:true se label }
+   { mk_algebraic_project ($startpos, $endpos) se label }
 array_assignements:
 | assign = array_assignement
    { [assign] }
@@ -553,4 +573,3 @@ list1_string_sep_comma:
 named_ident:
 | id = ID { id, "" }
 | id = ID str = STRING { id, str }
-

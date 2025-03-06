@@ -1,30 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 open Options
 
@@ -74,6 +73,8 @@ module type S = sig
 
   val matching_terms_info :
     t -> Matching_types.info Expr.Map.t * Expr.t list Expr.Map.t Symbols.Map.t
+
+  val reinit_em_cache : unit -> unit
 
 end
 
@@ -125,7 +126,6 @@ module Make(X : Theory.S) : S with type tbox = X.t = struct
           | E.Lemma { E.name = s; _ } -> s
           | E.Unit _ | E.Clause _ | E.Literal _ | E.Skolem _
           | E.Let _ | E.Iff _ | E.Xor _ -> "!(no-name)"
-          | E.Not_a_form -> assert false
         in
         print_dbg
           ~module_name:"Instances" ~function_name:"new_facts_of_axiom"
@@ -194,7 +194,7 @@ module Make(X : Theory.S) : S with type tbox = X.t = struct
         predicates = ME.add f (guard, age, ex) env.predicates;
         guards = ME.add guard ((f, false) :: guarded) env.guards
       }
-    | E.Not_a_form | E.Unit _ | E.Clause _ | E.Xor _
+    | E.Unit _ | E.Clause _ | E.Xor _
     | E.Skolem _ | E.Let _ ->
       assert false
 
@@ -226,7 +226,7 @@ module Make(X : Theory.S) : S with type tbox = X.t = struct
     | E.Lemma { E.name; loc; _ } ->
       Profiling.new_instance_of name f loc accepted
     | E.Unit _ | E.Clause _ | E.Literal _ | E.Skolem _
-    | E.Let _ | E.Iff _ | E.Xor _ | E.Not_a_form -> assert false
+    | E.Let _ | E.Iff _ | E.Xor _ -> assert false
 
   let profile_produced_terms env lorig nf s trs =
     let st0 =
@@ -236,7 +236,7 @@ module Make(X : Theory.S) : S with type tbox = X.t = struct
     let name, loc, _ = match Expr.form_view lorig with
       | E.Lemma { E.name; main; loc; _ } -> name, loc, main
       | E.Unit _ | E.Clause _ | E.Literal _ | E.Skolem _
-      | E.Let _ | E.Iff _ | E.Xor _ | E.Not_a_form -> assert false
+      | E.Let _ | E.Iff _ | E.Xor _ -> assert false
     in
     let st1 = E.max_ground_terms_rec_of_form nf in
     let diff = Expr.Set.diff st1 st0 in
@@ -267,7 +267,7 @@ module Make(X : Theory.S) : S with type tbox = X.t = struct
     ME.add orig (mp_orig_ok, SE.add f mp_orig_ko) insts
 
 
-  let new_facts _env tbox selector substs =
+  let new_facts _env _tbox selector substs =
     List.fold_left
       (fun acc ({Matching_types.trigger_formula=f;
                  trigger_age=age; trigger_dep=dep; trigger_orig=orig;
@@ -285,43 +285,40 @@ module Make(X : Theory.S) : S with type tbox = X.t = struct
              s_lem_orig = lorig} ->
             incr cpt;
             let s = sbs, sty in
-            match tr.E.guard with
-            | Some a when X.query (Expr.apply_subst s a) tbox==None -> acc
-            | _ ->
-              let nf = E.apply_subst s f in
-              (* add the incrementaly guard to nf, if any *)
-              let nf = E.mk_imp trigger_increm_guard nf 0 in
-              if inst_is_seen_during_this_round orig nf acc then acc
+            let nf = E.apply_subst s f in
+            (* add the incrementaly guard to nf, if any *)
+            let nf = E.mk_imp trigger_increm_guard nf in
+            if inst_is_seen_during_this_round orig nf acc then acc
+            else
+              let accepted = selector nf orig in
+              if not accepted then add_rejected_to_acc orig nf acc
               else
-                let accepted = selector nf orig in
-                if not accepted then add_rejected_to_acc orig nf acc
-                else
-                  let p =
-                    { Expr.ff = nf;
-                      origin_name = E.name_of_lemma lorig;
-                      gdist = -1;
-                      hdist = -1;
-                      trigger_depth = tr.Expr.t_depth;
-                      nb_reductions = 0;
-                      age = 1+(max g age);
-                      mf = true;
-                      gf = b;
-                      lem = Some lorig;
-                      from_terms = torig;
-                      theory_elim = true
-                    }
-                  in
-                  let dep =
-                    if not (Options.get_unsat_core() ||
-                            Options.get_profiling()) then
-                      dep
-                    else
-                      (* Dep lorig used to track conflicted instances
-                         in profiling mode *)
-                      Ex.union dep (Ex.singleton (Ex.Dep lorig))
-                  in
-                  incr kept;
-                  add_accepted_to_acc orig nf (p, dep, s, tr.E.content) acc
+                let p =
+                  { Expr.ff = nf;
+                    origin_name = E.name_of_lemma lorig;
+                    gdist = -1;
+                    hdist = -1;
+                    trigger_depth = tr.Expr.t_depth;
+                    nb_reductions = 0;
+                    age = 1+(max g age);
+                    mf = true;
+                    gf = b;
+                    lem = Some lorig;
+                    from_terms = torig;
+                    theory_elim = true
+                  }
+                in
+                let dep =
+                  if not (Options.get_unsat_core() ||
+                          Options.get_profiling()) then
+                    dep
+                  else
+                    (* Dep lorig used to track conflicted instances
+                       in profiling mode *)
+                    Ex.union dep (Ex.singleton (Ex.Dep lorig))
+                in
+                incr kept;
+                add_accepted_to_acc orig nf (p, dep, s, tr.E.content) acc
           ) acc subst_list
       ) ME.empty substs
 
@@ -353,7 +350,6 @@ module Make(X : Theory.S) : S with type tbox = X.t = struct
       | E.Unit(f1,f2) -> max (size f1) (size f2)
       | E.Lemma _ | E.Clause _ | E.Literal _ | E.Skolem _
       | E.Let _ | E.Iff _ | E.Xor _ -> E.size f
-      | E.Not_a_form -> assert false
     in
     fun lf ->
       List.fast_sort
@@ -364,16 +360,8 @@ module Make(X : Theory.S) : S with type tbox = X.t = struct
         ) lf
 
   let new_facts env tbox selector substs =
-    if Options.get_timers() then
-      try
-        Timers.exec_timer_start Timers.M_Match Timers.F_new_facts;
-        let res = new_facts env tbox selector substs in
-        Timers.exec_timer_pause Timers.M_Match Timers.F_new_facts;
-        res
-      with e ->
-        Timers.exec_timer_pause Timers.M_Match Timers.F_new_facts;
-        raise e
-    else new_facts env tbox selector substs
+    Timers.with_timer Timers.M_Match Timers.F_new_facts @@ fun () ->
+    new_facts env tbox selector substs
 
   let mround env axs tbox selector ilvl kind mconf =
     Debug.new_mround ilvl kind;
@@ -407,68 +395,30 @@ module Make(X : Theory.S) : S with type tbox = X.t = struct
     in
     { env with lemmas = ME.add orig (guard, age,dep) env.lemmas }
 
+  let matching_terms_info env = EM.terms_info env.matching
+
+  let reinit_em_cache () = EM.reinit_caches ()
+
   (*** add wrappers to profile exported functions ***)
 
   let add_terms env s gf =
-    if Options.get_timers() then
-      try
-        Timers.exec_timer_start Timers.M_Match Timers.F_add_terms;
-        let res = add_terms env s gf in
-        Timers.exec_timer_pause Timers.M_Match Timers.F_add_terms;
-        res
-      with e ->
-        Timers.exec_timer_pause Timers.M_Match Timers.F_add_terms;
-        raise e
-    else add_terms env s gf
+    Timers.with_timer Timers.M_Match Timers.F_add_terms @@ fun () ->
+    add_terms env s gf
 
   let add_lemma env gf dep =
-    if Options.get_timers() then
-      try
-        Timers.exec_timer_start Timers.M_Match Timers.F_add_lemma;
-        let res = add_lemma env gf dep in
-        Timers.exec_timer_pause Timers.M_Match Timers.F_add_lemma;
-        res
-      with e ->
-        Timers.exec_timer_pause Timers.M_Match Timers.F_add_lemma;
-        raise e
-    else add_lemma env gf dep
+    Timers.with_timer Timers.M_Match Timers.F_add_lemma @@ fun () ->
+    add_lemma env gf dep
 
   let add_predicate env ~guard ~name gf =
-    if Options.get_timers() then
-      try
-        Timers.exec_timer_start Timers.M_Match Timers.F_add_predicate;
-        let res = add_predicate env ~guard ~name gf in
-        Timers.exec_timer_pause Timers.M_Match Timers.F_add_predicate;
-        res
-      with e ->
-        Timers.exec_timer_pause Timers.M_Match Timers.F_add_predicate;
-        raise e
-    else add_predicate env ~guard ~name gf
+    Timers.with_timer Timers.M_Match Timers.F_add_predicate @@ fun () ->
+    add_predicate env ~guard ~name gf
 
   let m_lemmas mconf env tbox selector ilvl =
-    if Options.get_timers() then
-      try
-        Timers.exec_timer_start Timers.M_Match Timers.F_m_lemmas;
-        let res = m_lemmas env tbox selector ilvl mconf in
-        Timers.exec_timer_pause Timers.M_Match Timers.F_m_lemmas;
-        res
-      with e ->
-        Timers.exec_timer_pause Timers.M_Match Timers.F_m_lemmas;
-        raise e
-    else m_lemmas env tbox selector ilvl mconf
+    Timers.with_timer Timers.M_Match Timers.F_m_lemmas @@ fun () ->
+    m_lemmas env tbox selector ilvl mconf
 
   let m_predicates mconf env tbox selector ilvl =
-    if Options.get_timers() then
-      try
-        Timers.exec_timer_start Timers.M_Match Timers.F_m_predicates;
-        let res = m_predicates env tbox selector ilvl mconf in
-        Timers.exec_timer_pause Timers.M_Match Timers.F_m_predicates;
-        res
-      with e ->
-        Timers.exec_timer_pause Timers.M_Match Timers.F_m_predicates;
-        raise e
-    else m_predicates env tbox selector ilvl mconf
-
-  let matching_terms_info env = EM.terms_info env.matching
+    Timers.with_timer Timers.M_Match Timers.F_m_predicates @@ fun () ->
+    m_predicates env tbox selector ilvl mconf
 
 end

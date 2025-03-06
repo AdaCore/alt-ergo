@@ -1,33 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
-
-open Format
-open Options
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 module Z = Numbers.Z
 module Q = Numbers.Q
@@ -77,6 +73,20 @@ module type T = sig
   val abstract_selectors : t -> (r * r) list -> t * (r * r) list
 
   val separate_constant : t -> t * Numbers.Q.t
+
+  module Set : Set.S with type elt = t
+  module Map : Map.S with type key = t
+
+  module Ints : sig
+    val of_bigint : Z.t -> t
+    val zero : t
+    val (~-) : t -> t
+    val (+) : t -> t -> t
+    val (-) : t -> t -> t
+    val (~$$) : Z.t -> t
+    val (+$$) : t -> Z.t -> t
+    val ( *$$ ) : t -> Z.t -> t
+  end
 end
 
 module type EXTENDED_Polynome = sig
@@ -155,23 +165,24 @@ module Make (X : S) = struct
              else "-", Q.to_string (Q.minus n), "*"
            in
            zero := false;
-           fprintf fmt "%s%s%s%a" s n op X.print x
+           Format.fprintf fmt "%s%s%s%a" s n op X.print x
         ) p.m;
       let s, n =
         if Q.sign p.c > 0 then (if !zero then "" else "+"), Q.to_string p.c
         else if Q.sign p.c < 0 then "-", Q.to_string (Q.minus p.c)
         else (if !zero then "","0" else "","") in
-      fprintf fmt "%s%s" s n
+      Format.fprintf fmt "%s%s" s n
 
     let print fmt p =
       if Options.get_term_like_pp () then pprint fmt p
       else begin
-        M.iter
-          (fun t n -> fprintf fmt "%s*%a " (Q.to_string n) X.print t) p.m;
-        fprintf fmt "%s%s"
+        M.iter (fun t n ->
+            Format.fprintf fmt "%s*%a " (Q.to_string n) X.print t
+          ) p.m;
+        Format.fprintf fmt "%s%s"
           (if Q.compare_to_0 p.c >= 0 then "+ " else "")
           (Q.to_string p.c);
-        fprintf fmt " [%a]" Ty.print p.ty
+        Format.fprintf fmt " [%a]" Ty.print p.ty
       end
   end
   (*BISECT-IGNORE-END*)
@@ -354,4 +365,19 @@ module Make (X : S) = struct
 
   let separate_constant t = { t with c = Q.zero}, t.c
 
+  (* Operators and helpers for readability *)
+
+  module Set = Set.Make(struct type nonrec t = t let compare = compare end)
+  module Map = Map.Make(struct type nonrec t = t let compare = compare end)
+
+  module Ints = struct
+    let of_bigint n = create [] (Q.from_z n) Tint
+    let (~$$) = of_bigint
+    let zero = ~$$Z.zero
+    let (~-) = mult_const Q.m_one
+    let (+) = add
+    let (-) = sub
+    let (+$$) p n = add_const (Q.from_z n) p
+    let ( *$$ ) p n = mult_const (Q.from_z n) p
+  end
 end

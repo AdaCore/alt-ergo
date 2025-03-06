@@ -1,13 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2018-2020 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the license indicated      *)
-(*     in the file 'License.OCamlPro'. If 'License.OCamlPro' is not           *)
-(*     present, please contact us to clarify licensing.                       *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 open Js_of_ocaml
 open Js_of_ocaml_lwt
@@ -23,8 +39,9 @@ type 'a state = {
 }
 
 (* If the buffer is not empty split the string in strings at each newline *)
-let check_buffer_content b =
-  let buf_cont = Buffer.contents b in
+let check_buffer_content (buf, output) =
+  Format.pp_print_flush (Options.Output.to_formatter output) ();
+  let buf_cont = Buffer.contents buf in
   if String.equal buf_cont "" then
     None
   else
@@ -36,22 +53,22 @@ let check_context_content c =
   | [] -> None
   | _ -> Some c
 
+let create_buffer () =
+  let buf = Buffer.create 10 in
+  let output =
+    Format.formatter_of_buffer buf
+    |> Options.Output.of_formatter
+  in
+  buf, output
+
 let main worker_id content =
   try
     (* Create buffer for each formatter
        The content of this buffers are then retrieved and send as results *)
-    let buf_std = Buffer.create 10 in
-    Options.set_fmt_std (Format.formatter_of_buffer buf_std);
-    let buf_err = Buffer.create 10 in
-    Options.set_fmt_err (Format.formatter_of_buffer buf_err);
-    let buf_wrn = Buffer.create 10 in
-    Options.set_fmt_wrn (Format.formatter_of_buffer buf_wrn);
-    let buf_dbg = Buffer.create 10 in
-    Options.set_fmt_dbg (Format.formatter_of_buffer buf_dbg);
-    let buf_mdl = Buffer.create 10 in
-    Options.set_fmt_mdl (Format.formatter_of_buffer buf_mdl);
-    let buf_usc = Buffer.create 10 in
-    Options.set_fmt_usc (Format.formatter_of_buffer buf_usc);
+    let buf_regular = create_buffer () in
+    Options.Output.set_regular (snd buf_regular);
+    let buf_diagnostic = create_buffer () in
+    Options.Output.set_diagnostic (snd buf_diagnostic);
 
     (* Status updated regarding if AE succed or failed
        (error or steplimit reached) *)
@@ -90,29 +107,39 @@ let main worker_id content =
     let get_status_and_print status n =
       returned_status :=
         begin match status with
-          | FE.Unsat _ -> Worker_interface.Unsat n
-          | FE.Inconsistent _ -> Worker_interface.Inconsistent n
-          | FE.Sat _ -> Worker_interface.Sat n
-          | FE.Unknown _ -> Worker_interface.Unknown n
-          | FE.Timeout _ -> Worker_interface.LimitReached "timeout"
-          | FE.Preprocess -> Worker_interface.Unknown n
+          | Frontend.Unsat _ -> Worker_interface.Unsat n
+          | Inconsistent _ -> Worker_interface.Inconsistent n
+          | Sat _ -> Worker_interface.Sat n
+          | Unknown _ -> Worker_interface.Unknown n
+          | Timeout _ -> Worker_interface.LimitReached "timeout"
+          | Preprocess -> Worker_interface.Unknown n
         end;
-      FE.print_status status n
+      Frontend.print_status status n
     in
 
     let solve all_context (cnf, goal_name) =
-      let used_context = FE.choose_used_context all_context ~goal_name in
-      let consistent_dep_stack = Stack.create () in
+      let used_context = Frontend.choose_used_context all_context ~goal_name in
       SAT.reset_refs ();
-      let _,_,dep =
-        List.fold_left
-          (FE.process_decl
-             get_status_and_print used_context consistent_dep_stack)
-          (SAT.empty_with_inst add_inst, true, Explanation.empty) cnf in
-
+      let sat_env = SAT.empty ~selector:add_inst () in
+      let ftnd_env = FE.init_env ~sat_env used_context in
+      List.iter
+        (FE.process_decl ~hook_on_status:get_status_and_print ftnd_env)
+        cnf;
       if Options.get_unsat_core () then begin
-        unsat_core := Explanation.get_unsat_core dep;
+        unsat_core := Explanation.get_unsat_core ftnd_env.FE.expl;
       end;
+      let () =
+        match ftnd_env.FE.res with
+        | `Sat | `Unknown ->
+          begin
+            if Options.(get_interpretation () && get_dump_models ()) then
+              FE.print_model
+                (Options.Output.get_fmt_models ())
+                ftnd_env.sat_env;
+          end
+        | `Unsat -> ()
+      in
+      ()
     in
 
     let typed_loop all_context state td =
@@ -122,14 +149,14 @@ let main worker_id content =
         let cnf = List.rev @@ Cnf.make l td in
         let () = solve all_context (cnf, name) in
         begin match kind with
-          | Typed.Check
-          | Typed.Cut -> { state with local = []; }
-          | _ -> { state with global = []; local = []; }
+          | Ty.Check
+          | Ty.Cut -> { state with local = []; }
+          | Ty.Thm | Ty.Sat -> { state with global = []; local = []; }
         end
-      | Typed.TAxiom (_, s, _, _) when Typed.is_global_hyp s ->
+      | Typed.TAxiom (_, s, _, _) when Ty.is_global_hyp s ->
         let cnf = Cnf.make state.global td in
         { state with global = cnf; }
-      | Typed.TAxiom (_, s, _, _) when Typed.is_local_hyp s ->
+      | Typed.TAxiom (_, s, _, _) when Ty.is_local_hyp s ->
         let cnf = Cnf.make state.local td in
         { state with local = cnf; }
       | _ ->
@@ -141,7 +168,6 @@ let main worker_id content =
     let parsed () =
       try
         Options.Time.start ();
-        Options.set_is_gui false;
         I.parse_file ~content ~format:None
       with
       | Parsing.Parse_error ->
@@ -150,19 +176,14 @@ let main worker_id content =
         raise Exit
       | Errors.Error e ->
         begin match e with
-          | Errors.Run_error r -> begin
-              match r with
-              | Steps_limit _ ->
-                returned_status :=
-                  Worker_interface.LimitReached "Steps limit"
-              | _ -> returned_status := Worker_interface.Error "Run error"
-            end
+          | Errors.Run_error _ ->
+            returned_status := Worker_interface.Error "Run error"
           | _ -> returned_status := Worker_interface.Error "Error"
         end;
         Printer.print_err "%a" Errors.report e;
         raise Exit
     in
-    let all_used_context = FE.init_all_used_context () in
+    let all_used_context = Frontend.init_all_used_context () in
     let assertion_stack = Stack.create () in
     let typing_loop state p =
       try
@@ -215,14 +236,10 @@ let main worker_id content =
     {
       Worker_interface.worker_id = worker_id;
       Worker_interface.status = !returned_status;
-      Worker_interface.results = check_buffer_content buf_std;
-      Worker_interface.errors = check_buffer_content buf_err;
-      Worker_interface.warnings = check_buffer_content buf_wrn;
-      Worker_interface.debugs = check_buffer_content buf_dbg;
+      Worker_interface.regular = check_buffer_content buf_regular;
+      Worker_interface.diagnostic = check_buffer_content buf_diagnostic;
       Worker_interface.statistics =
         check_context_content (compute_statistics ());
-      Worker_interface.model = check_buffer_content buf_mdl;
-      Worker_interface.unsat_core = check_buffer_content buf_usc;
     }
 
   with
@@ -231,7 +248,7 @@ let main worker_id content =
     { res with
       Worker_interface.worker_id = worker_id;
       Worker_interface.status = Error "Assertion failure";
-      Worker_interface.errors =
+      Worker_interface.diagnostic =
         Some [Format.sprintf "assertion failed: %s line %d char %d" s l p];
     }
   | Errors.Error e ->
@@ -239,7 +256,7 @@ let main worker_id content =
     { res with
       Worker_interface.worker_id = worker_id;
       Worker_interface.status = Error "";
-      Worker_interface.errors =
+      Worker_interface.diagnostic =
         Some [Format.asprintf "%a" Errors.report e]
     }
   | _ ->
@@ -254,6 +271,7 @@ let main worker_id content =
     and the corresponding set of options
     Return a couple of list for status (one per goal) and errors *)
 let () =
+  at_exit Options.Output.close_all;
   Worker.set_onmessage (fun (json_file,json_options) ->
       Lwt_js_events.async (fun () ->
           let filename,worker_id,filecontent =
