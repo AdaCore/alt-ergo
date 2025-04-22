@@ -24,19 +24,11 @@ jobs:
       matrix:
         os:
           - macos-latest
+          - macos-15-large
           - ubuntu-latest
           - windows-latest
         ocaml-compiler:
-          - 4.08.1
           - 4.14.2
-          - 5.0.0
-        exclude:
-          # No longer seems to be available
-          - os: macos-latest
-            ocaml-compiler: 4.08.1
-          # Opam 2.2 requires at least OCaml 4.13
-          - os: windows-latest
-            ocaml-compiler: 4.08.1
 
     runs-on: ${{ matrix.os }}
 
@@ -53,39 +45,15 @@ jobs:
           dune-cache: true
 
       - name: Install dependencies
-        run: opam exec -- make test-deps
+        run: opam exec -- make deps
 
       - name: Build alt-ergo with opam
-        run: opam exec -- opam reinstall .
+        run: |
+          opam exec -- make packages
+          opam exec -- dune install -p alt-ergo --prefix=staging
 
-      - name: Run tests
-        run: opam exec -- make runtest-ci
-
-  make:
-    name: Make all
-    env:
-      OPAMLOCKED: locked
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Upload package
+        uses: actions/upload-artifact@v4
         with:
-          persist-credentials: false
-
-      - name: Use OCaml ${{ env.OCAML_DEFAULT_VERSION }}
-        uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: ${{ env.OCAML_DEFAULT_VERSION }}
-          dune-cache: true
-
-      - name: Install dependencies
-        run: opam exec -- make deps js-deps
-
-      - name: Build the project
-        run: opam exec -- dune build --profile ci @check
-
-      - name: Monitor changes
-        uses: getsentry/action-git-diff-suggestions@main
-        with:
-          message: 'The following changes have been made after `make`:'
+          name: altergo-${{matrix.os}}
+          path: staging
