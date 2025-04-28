@@ -1,3 +1,9 @@
+## v2.6.1
+
+ - Consistent output of steps limit error (#1245)
+ - Prevent potential long-running loop without steps increase (#1316)
+ - Report correct number of steps when limit is exceeded (#1317)
+
 ## v2.6.0
 
 ### Command-line interface
