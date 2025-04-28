@@ -31,7 +31,7 @@ See more details on https://alt-ergo.ocamlpro.com/")
   (alt-ergo-parsers (= :version))
   menhir
   dune-site
-  (cmdliner (>= 1.1.0))
+  (cmdliner (and (>= 1.1.0) (< 2.0)))
   (odoc :with-doc)
  )
 
