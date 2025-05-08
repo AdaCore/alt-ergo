@@ -1,32 +1,38 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
-module Combine : Sig.X
+module Combine : sig
+  include Sig.X
+
+  val src : Logs.src
+
+  val top : r
+  val bot : r
+end
 
 module Polynome : Polynome.T
   with type r = Combine.r
@@ -40,17 +46,8 @@ module Records : Sig.SHOSTAK
 module Bitv : Sig.SHOSTAK
   with type r = Combine.r and type t = Combine.r Bitv.abstract
 
-module Arrays : Sig.SHOSTAK
-  with type r = Combine.r and type t = Combine.r Arrays.abstract
-
-module Enum : Sig.SHOSTAK
-  with type r = Combine.r and type t = Combine.r Enum.abstract
-
 module Adt : Sig.SHOSTAK
   with type r = Combine.r and type t = Combine.r Adt.abstract
-
-module Ite : Sig.SHOSTAK
-  with type r = Combine.r and type t = Combine.r Ite.abstract
 
 module Ac : Ac.S with type r = Combine.r and type t = Combine.r Sig.ac
 
@@ -60,8 +57,8 @@ module MXH : Map.S with type key = Combine.r
 (** set of semantic values using Combine.hash_cmp *)
 module SXH : Set.S with type elt = Combine.r
 
-(** map of semantic values using structural compare Combine.str_cmp *)
-module MXS : Map.S with type key = Combine.r
+module L : Xliteral.S with type elt = Combine.r
 
-(** set of semantic values using structural compare Combine.str_cmp *)
-module SXS : Set.S with type elt = Combine.r
+module Literal : Literal.S with type elt = L.t
+
+module HX : Hashtbl.S with type key = Combine.r

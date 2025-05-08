@@ -1,154 +1,337 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the license indicated      *)
-(*     in the file 'License.OCamlPro'. If 'License.OCamlPro' is not           *)
-(*     present, please contact us to clarify licensing.                       *)
-(*                                                                            *)
-(******************************************************************************)
-
-open Options
-open Format
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 module X = Shostak.Combine
-module Sh = Shostak.Adt
-open Sh
-
-type r = X.r
-type uf = Uf.t
-
 module Ex = Explanation
 module E = Expr
 module SE = E.Set
-module Hs = Hstring
-module HSS = Hs.Set
 module Sy = Symbols
-
 module MX = Shostak.MXH
+module SX = Shostak.SXH
 module LR = Uf.LX
+module Th = Shostak.Adt
 module SLR = Set.Make(LR)
-module MHs = Hs.Map
 
-type t =
-  {
-    classes : E.Set.t list;
-    domains : (HSS.t * Explanation.t) MX.t;
-    seen_destr : SE.t;
-    seen_access : SE.t;
-    seen_testers : HSS.t MX.t;
-    [@ocaml.ppwarning "selectors should be improved. only representatives \
-                       in it. No true or false _is"]
+module DE = Dolmen.Std.Expr
+module DT = Dolmen.Std.Expr.Ty
+module B = Dolmen.Std.Builtin
 
-    selectors : (E.t * Ex.t) list MHs.t MX.t;
-    size_splits : Numbers.Q.t;
-    new_terms : SE.t;
-    pending_deds :
-      (r Sig_rel.literal * Ex.t * Th_util.lit_origin) list
+let src = Logs.Src.create ~doc:"Adt_rel" __MODULE__
+module Log = (val Logs.src_log src : Logs.LOG)
+
+module TSet =
+  Set.Make
+    (struct
+      type t = Uid.term_cst
+
+      (* We use a dedicated total order on the constructors to ensure
+         the termination of model generation. *)
+      let compare id1 id2 =
+        Nest.perfect_hash id1 - Nest.perfect_hash id2
+    end)
+
+let timer = Timers.M_Adt
+
+module Domain = struct
+  (* Set of possible constructors. The explanation justifies that any value
+     assigned to the semantic value has to use a constructor lying in the
+     domain. *)
+  type t = {
+    constrs : TSet.t;
+    ex : Ex.t;
   }
 
-let empty classes = {
-  classes;
-  domains = MX.empty;
-  seen_destr = SE.empty;
-  seen_access = SE.empty;
-  seen_testers = MX.empty;
-  selectors = MX.empty;
-  size_splits = Numbers.Q.one;
-  new_terms = SE.empty;
-  pending_deds = [];
+  exception Inconsistent of Ex.t
+
+  let[@inline always] cardinal { constrs; _ } = TSet.cardinal constrs
+
+  let[@inline always] choose { constrs; _ } =
+    (* We choose the minimal element to ensure the termination of
+       model generation. *)
+    TSet.min_elt constrs
+
+  let[@inline always] as_singleton { constrs; ex } =
+    if TSet.cardinal constrs = 1 then
+      Some (TSet.choose constrs, ex)
+    else
+      None
+
+  let domain ~constrs ex =
+    if TSet.is_empty constrs then
+      raise @@ Inconsistent ex
+    else
+      { constrs; ex }
+
+  let[@inline always] singleton ~ex c =
+    { constrs = TSet.singleton c; ex }
+
+  let[@inline always] subset d1 d2 = TSet.subset d1.constrs d2.constrs
+
+  let unknown ty =
+    match ty with
+    | Ty.Tadt (name, params) ->
+      (* Return the list of all the constructors of the type of [r]. *)
+      let cases = Ty.type_body name params in
+      let constrs =
+        List.fold_left
+          (fun acc Ty.{ constr; _ } ->
+             TSet.add constr acc
+          ) TSet.empty cases
+      in
+      assert (not @@ TSet.is_empty constrs);
+      { constrs; ex = Ex.empty }
+    | _ ->
+      (* Only ADT values can have a domain. This case shouldn't happen since
+         we check the type of semantic values in both [add] and [assume]. *)
+      assert false
+
+  let equal d1 d2 = TSet.equal d1.constrs d2.constrs
+
+  let pp ppf d =
+    Fmt.(braces @@
+         iter ~sep:comma TSet.iter Uid.pp) ppf d.constrs;
+    if Options.(get_verbose () || get_unsat_core ()) then
+      Fmt.pf ppf " %a" (Fmt.box Ex.print) d.ex
+
+  let intersect ~ex d1 d2 =
+    let constrs = TSet.inter d1.constrs d2.constrs in
+    let ex = ex |> Ex.union d1.ex |> Ex.union d2.ex in
+    domain ~constrs ex
+
+  let remove ~ex c d =
+    let constrs = TSet.remove c d.constrs in
+    let ex = Ex.union ex d.ex in
+    domain ~constrs ex
+
+  let for_all f { constrs; _ } = TSet.for_all f constrs
+end
+
+let is_adt_ty = function
+  | Ty.Tadt _ -> true
+  | _ -> false
+
+let is_adt r = is_adt_ty (X.type_info r)
+
+module Domains = struct
+  (** The type of simple domain maps. A domain map maps each representative
+      (semantic value, of type [X.r]) to its associated domain. *)
+  type t = {
+    domains : Domain.t MX.t;
+    (** Map from tracked representatives to their domain.
+
+        We don't store domains for constructors and selectors. *)
+
+    enums: SX.t;
+    (** Set of tracked representatives whose the domain only contains
+        enum constructors, that is constructors without payload.
+
+        This field is used by the case split mechanism, see [pick_enum]. *)
+
+    changed : SX.t;
+    (** Representatives whose domain has changed since the last flush
+        in [propagation]. *)
+  }
+
+  type _ Uf.id += Id : t Uf.id
+
+  let pp ppf t =
+    Fmt.(iter_bindings ~sep:semi MX.iter
+           (box @@ pair ~sep:(any " ->@ ") X.print Domain.pp)
+         |> braces
+        )
+      ppf t.domains
+
+  let empty = { domains = MX.empty; enums = SX.empty; changed = SX.empty }
+
+  let filter_ty = is_adt_ty
+
+  (* TODO: This test is slow because we have to retrieve the list of
+     destructors of the constructor [c] by searching in the list [cases].
+
+     A better predicate will be easy to implement after getting rid of
+     the legacy frontend and switching from [Uid.t] to
+     [Dolmen.Std.Expr.term_cst] to store the constructors. Indeed, [term_cst]
+     contains the type of constructor and in particular its arity. *)
+  let is_enum_constr r c =
+    match X.type_info r with
+    | Tadt (name, args) ->
+      let cases = Ty.type_body name args in
+      Compat.List.is_empty @@ Ty.assoc_destrs c cases
+    | _ -> assert false
+
+  let internal_update r nd t =
+    let domains = MX.add r nd t.domains in
+    let is_enum_domain = Domain.for_all (is_enum_constr r) nd in
+    let enums = if is_enum_domain then SX.add r t.enums else t.enums in
+    let changed = SX.add r t.changed in
+    { domains; enums; changed }
+
+  let get r t =
+    match Th.embed r with
+    | Constr { c_name; _ } ->
+      (* For sake of efficiency, we don't look in the map if the
+         semantic value is a constructor. *)
+      Domain.singleton ~ex:Explanation.empty c_name
+    | _ ->
+      try MX.find r t.domains
+      with Not_found ->
+        Domain.unknown (X.type_info r)
+
+  let init r t =
+    match Th.embed r with
+    | Alien _ when not (MX.mem r t.domains) ->
+      (* We have to add a default domain if the key `r` is not in map in order
+         to be sure that the case split mechanism will attempt to choose a
+         value for it. *)
+      let nd = Domain.unknown (X.type_info r) in
+      internal_update r nd t
+    | Alien _ | Constr _ | Select _ -> t
+
+  (** [tighten r d t] replaces the domain of [r] in [t] by a domain [d]
+      contained in the current domain of [r]. The representative [r] is marked
+      [changed] after this call if the domain [d] is strictly smaller. *)
+  let tighten r d t =
+    let od = get r t in
+    (* For sake of completeness, the domain [d] has to be a subset of the old
+       domain of [r]. *)
+    Options.heavy_assert (fun () -> Domain.subset d od);
+    if Domain.equal od d then
+      t
+    else
+      internal_update r d t
+
+  let remove r t =
+    let domains = MX.remove r t.domains in
+    let enums = SX.remove r t.enums in
+    let changed = SX.remove r t.changed in
+    { domains; enums; changed }
+
+  exception Inconsistent = Domain.Inconsistent
+
+  (** [subst ~ex p v d] replaces all the instances of [p] with [v] in all
+      domains, merging the corresponding domains as appropriate.
+
+      The explanation [ex] justifies the equality [p = v].
+
+      @raise Domain.Inconsistent if this causes any domain in [d] to become
+             empty. *)
+  let subst ~ex r nr t =
+    match MX.find r t.domains with
+    | d ->
+      let nd = Domain.intersect ~ex d (get nr t) in
+      let t = remove r t in
+      tighten nr nd t
+
+    | exception Not_found -> init nr t
+
+  (* [propagate f a t] iterates on all the changed domains of [t] since the
+     last call of [propagate]. The list of changed domains is flushed after
+     this call. *)
+  let propagate f acc t =
+    let acc =
+      SX.fold
+        (fun r acc ->
+           let d = get r t in
+           f acc r d
+        ) t.changed acc
+    in
+    acc, { t with changed = SX.empty }
+
+  let fold f t = MX.fold f t.domains
+
+  let fold_enums f t = SX.fold f t.enums
+end
+
+let calc_destructor d e uf =
+  let r, ex = Uf.find uf e in
+  match Th.embed r with
+  | Constr { c_args; _ } ->
+    begin match My_list.assoc Uid.equal d c_args with
+      | v -> Some (v, ex)
+      | exception Not_found -> None
+    end
+
+  | _ ->
+    None
+
+let delayed_destructor uf op = function
+  | [e] ->
+    begin match op with
+      | Sy.Destruct d ->
+        calc_destructor d e uf
+      | _ -> assert false
+    end
+  | _ -> assert false
+
+let is_ready r =
+  match Th.embed r with
+  | Constr _ -> true
+  | _ -> false
+
+let dispatch = function
+  | Symbols.Destruct _ -> Some delayed_destructor
+  | _ -> None
+
+type t = {
+  delayed : Rel_utils.Delayed.t;
+  (* Set of delayed destructor applications. The computation of a destructor
+     application [d r] is forced if we see the tester `(_ is d) r` of the
+     associated constructor [c] of [d]. *)
+
+  size_splits : Numbers.Q.t;
+  (* Product of the size of all the facts learnt by CS assumed in
+     the theory.
+
+     Currently this field is unused. *)
+
+  new_terms : SE.t;
+  (* Set of all the constructor applications built by the theory.
+     See the function [deduce_is_constr]. *)
 }
 
+let empty uf = {
+  delayed = Rel_utils.Delayed.create ~is_ready dispatch;
+  size_splits = Numbers.Q.one;
+  new_terms = SE.empty;
+}, Uf.GlobalDomains.add (module Domains) Domains.empty (Uf.domains uf)
 
 (* ################################################################ *)
 (*BISECT-IGNORE-BEGIN*)
 module Debug = struct
-  open Printer
-
-  let assume a =
-    if get_debug_adt () then
-      print_dbg
-        ~module_name:"Adt_rel"
-        ~function_name:"assume"
-        " we assume %a" LR.print (LR.make a)
-
-  let print_env loc env =
-    if get_debug_adt () then begin
-      print_dbg ~flushed:false ~module_name:"Adt_rel" ~function_name:"print_env"
-        "@ @[<v 2>--ADT env %s ---------------------------------@ " loc;
-      MX.iter
-        (fun r (hss, ex) ->
-           print_dbg ~flushed:false ~header:false
-             "%a 's domain is " X.print r;
-           begin
-             match HSS.elements hss with
-               []      -> ()
-             | hs :: l ->
-               print_dbg ~flushed:false ~header:false
-                 "{ %s" (Hs.view hs);
-               List.iter (fun hs ->
-                   print_dbg ~flushed:false ~header:false
-                     " | %s" (Hs.view hs)) l
-           end;
-           print_dbg ~flushed:false ~header:false " } %a@ " Ex.print ex;
-
-        ) env.domains;
-      print_dbg ~flushed:false ~header:false
-        "@]@ @[<v 2>-- seen testers ---------------------------@ ";
-      MX.iter
-        (fun r hss ->
-           HSS.iter
-             (fun hs ->
-                print_dbg ~flushed:false ~header:false
-                  "(%a is %a)@ " X.print r Hs.print hs
-             )hss
-        )env.seen_testers;
-      print_dbg ~flushed:false ~header:false
-        "@]@ @[<v 2>-- selectors ------------------------------@ ";
-      MX.iter
-        (fun r mhs ->
-           MHs.iter
-             (fun hs l ->
-                List.iter (fun (a, _) ->
-                    print_dbg ~flushed:false ~header:false
-                      "(%a is %a) ==> %a@ "
-                      X.print r Hs.print hs E.print a
-                  ) l
-             )mhs
-        )env.selectors;
-      print_dbg ~header:false
-        "@]@ -------------------------------------------";
-    end
-
-  (* unused --
-     let case_split r r' =
-     if get_debug_adt () then
-       Printer.print_dbg
-          "[ADT.case-split] %a = %a" X.print r X.print r'
-  *)
-
-  let no_case_split () =
-    if get_debug_adt () then
-      print_dbg
-        ~module_name:"Adt_rel"
-        ~function_name:"case-split"
-        "nothing"
-
-  let add r =
-    if get_debug_adt () then
-      print_dbg
-        ~module_name:"Adt_rel"
-        ~function_name:"add"
-        "%a" X.print r
-
+  let assume l =
+    Log.debug
+      (fun k -> k "assume the literal:@ %a" (Xliteral.print_view X.print) l)
 end
 (*BISECT-IGNORE-END*)
 (* ################################################################ *)
 
 
-let print_model _ _ _ = ()
-let new_terms env = env.new_terms
+let[@inline always] new_terms env = env.new_terms
+
 let instantiate ~do_syntactic_matching:_ _ env _ _ = env, []
 
 let assume_th_elt t th_elt _ =
@@ -157,563 +340,357 @@ let assume_th_elt t th_elt _ =
     failwith "This Theory does not support theories extension"
   | _ -> t
 
-let seen_tester r hs env =
-  try HSS.mem hs (MX.find r env.seen_testers)
-  with Not_found -> false
+(* Update the domains of the semantic values [r1] and [r2] according to the
+   disequality [r1 <> r2].
 
+   This function alone is not sufficient to produce a complete decision
+   procedure for the ADT theory. For instance, let's assume we have three
+   semantic values [r1], [r2] and [r3] whose the domain is `{C1, C2}`. It's
+   clear that `(distinct r1 r2 r3)` is unsatisfiable but we have not enough
+   information to discover this contradiction.
 
-let deduce_is_constr uf r h eqs env ex =
-  let r, ex' = try Uf.find_r uf r with Not_found -> assert false in
-  let ex = Ex.union ex ex' in
-  match embed r with
-  | Adt.Alien r ->
-    begin match X.term_extract r with
-      | Some t, _ ->
-        let eqs =
-          if seen_tester r h env then eqs
-          else
-            let is_c = E.mk_builtin ~is_pos:true (Sy.IsConstr h) [t] in
-            if get_debug_adt () then
-              Printer.print_dbg
-                ~module_name:"Adt_rel"
-                ~function_name:"deduce_is_constr"
-                "%a" E.print is_c;
-            (Sig_rel.LTerm is_c, ex, Th_util.Other) :: eqs
+   We plan to support model generation for ADT. As a by-product, we will got
+   a complete decision procedure for the ADT through the case-split mechanism
+   as we did in the Enum theory.
+
+   @raise Domain.Inconsistent if the disequality is inconsistent with
+          the current environment [env]. *)
+let assume_distinct =
+  let aux ~ex r1 r2 domains =
+    match Th.embed r1 with
+    | Constr { c_args; _ } when List.length c_args = 0 ->
+      begin
+        let d1 = Domains.get r1 domains in
+        let d2 = Domains.get r2 domains in
+        match Domain.as_singleton d1 with
+        | Some (c, ex') ->
+          let ex = Ex.union ex ex' in
+          let nd = Domain.remove ~ex c d2 in
+          Domains.tighten r2 nd domains
+        | None -> domains
+      end
+    | _ ->
+      (* If `d1` is a singleton domain but its constructor has a payload,
+         we cannot tighten the domain of `r2` because they could have
+         distinct payloads. *)
+      domains
+  in fun ~ex r1 r2 domains ->
+    aux ~ex r1 r2 domains |> aux ~ex r2 r1
+
+(* Assumes the tester `((_ is c) r)` where [r] can be a constructor
+   application or a uninterpreted semantic value.
+
+   @raise Domain.Inconsistent if we already know that the value of [r]
+          cannot be an application of the constructor [c]. *)
+let assume_is_constr ~ex r c domains =
+  let d1 = Domains.get r domains in
+  let d2 = Domain.singleton ~ex:Explanation.empty c in
+  let nd = Domain.intersect ~ex d1 d2 in
+  Domains.tighten r nd domains
+
+(* Assume `(not ((_ is c) r))` where [r] can be a constructor application
+   or a uninterpreted semantic value.
+
+   We remove the destructor equations associated with [r] and [c].
+
+   @raise Domain.Inconsistent if we already know that the value of [r] has to
+          be an application of the constructor [c]. *)
+let assume_not_is_constr ~ex r c domains =
+  let d = Domains.get r domains in
+  let nd = Domain.remove ~ex c d in
+  Domains.tighten r nd domains
+
+let add r uf domains =
+  match X.type_info r with
+  | Ty.Tadt _ ->
+    Log.debug (fun k -> k "add %a" X.print r);
+    let rr, _ = Uf.find_r uf r in
+    Domains.init rr domains
+  | _ ->
+    domains
+
+let add_rec r uf domains =
+  List.fold_left (fun env lf -> add lf uf env) domains (X.leaves r)
+
+let add env uf r t =
+  if Options.get_disable_adts () then
+    env, Uf.domains uf, []
+  else
+    let delayed, eqs = Rel_utils.Delayed.add env.delayed uf r t in
+    { env with delayed }, Uf.domains uf, eqs
+
+let assume_literals la uf domains =
+  List.fold_left
+    (fun domains lit ->
+       let open Xliteral in
+       match lit with
+       | Distinct (false, [r1; r2]) as l, _, ex, _ when is_adt r2 ->
+         Debug.assume l;
+         let rr1, ex1 = Uf.find_r uf r1 in
+         let rr2, ex2 = Uf.find_r uf r2 in
+         (* The explanation [ex] explains why [r1] and [r2] are distinct,
+            which is not sufficient to justify why [rr1] and [rr2] are
+            distinct. *)
+         let ex = Ex.union ex1 @@ Ex.union ex2 ex in
+         (* Needed for models generation because fresh terms are not added with
+            the function add. *)
+         let env = add_rec rr1 uf domains in
+         let env = add_rec rr2 uf env in
+         assume_distinct ~ex rr1 rr2 env
+
+       | Builtin (true, Sy.IsConstr c, [r]) as l, _, ex, _ ->
+         Debug.assume l;
+         let r, ex1 = Uf.find_r uf r in
+         let ex = Ex.union ex1 ex in
+         assume_is_constr ~ex r c domains
+
+       | Builtin (false, Sy.IsConstr c, [r]) as l, _, ex, _ ->
+         Debug.assume l;
+         let r, ex1 = Uf.find_r uf r in
+         let ex = Ex.union ex1 ex in
+         assume_not_is_constr ~ex r c domains
+
+       | _ -> domains
+    ) domains la
+
+(* For a uninterpreted semantic value [r] and [c] a constructor of the form:
+     (cons (d1 ty1) ... (dn tyn))
+   this function creates the equation:
+     [t = cons x1 ... xn]
+   where x1, ..., xn are fresh names of type respectively ty1, ..., tyn
+   and [t] is the term associated with the uninterpreted semantic value [r].
+
+   Assume that [r] is a contructor application of an alien semantic value
+   of type [Ty.Adt]. *)
+let build_constr_eq r c =
+  match Th.embed r with
+  | Alien r ->
+    begin match X.type_info r with
+      | Ty.Tadt (name, params) as ty ->
+        let cases = Ty.type_body name params in
+        let ds =
+          try Ty.assoc_destrs c cases with Not_found -> assert false
         in
-        begin
-          match E.term_view t with
-          | E.Not_a_term _ -> assert false
-          | E.Term { E.ty = Ty.Tadt (name,params) as ty; _ } ->
-            (* Only do this deduction for finite types ??
-                 may not terminate in some cases otherwise.
-                 eg. type t = A of t
-                 goal g: forall e,e' :t. e = C(e') -> false
-                 + should not be guareded by "seen_tester"
-            *)
-            let cases = match Ty.type_body name params with
-              | Ty.Adt cases -> cases
-            in
-            let {Ty.destrs; _} =
-              try List.find (
-                  fun { Ty.constr = c; _ } -> Hstring.equal h c
-                ) cases
-              with Not_found -> assert false
-            in
-            let xs = List.map (fun (_, ty) -> E.fresh_name ty) destrs in
-            let cons = E.mk_term (Sy.constr (Hs.view h)) xs ty in
-            let env = {env with new_terms = SE.add cons env.new_terms} in
-            let eq = E.mk_eq t cons ~iff:false in
-            if get_debug_adt () then
-              Printer.print_dbg
-                ~module_name:"Adt_rel"
-                ~function_name:"deduce equal to constr"
-                "%a" E.print eq;
-            let eqs = (Sig_rel.LTerm eq, ex, Th_util.Other) :: eqs in
-            env, eqs
-          | _ -> env, eqs
-        end
-      | _ ->
-        Printer.print_err "%a" X.print r;
-        assert false
+        let xs = List.map (fun (_, ty) -> E.fresh_name ty) ds in
+        let cons = E.mk_constr c xs ty in
+        let r', ctx = X.make cons in
+        (* In the current implementation of `X.make`, we produce
+           a nonempty context only for interpreted semantic values
+           of the `Arith` and `Records` theories. The semantic
+           values `cons` never involves such values. *)
+        assert (Compat.List.is_empty ctx);
+        let eq = Shostak.L.(view @@ mk_eq r r') in
+        Some (eq, E.mk_constr c xs ty)
+
+      | _ -> assert false
     end
-  | _ -> env,eqs
 
-let values_of ty =
-  match ty with
-  | Ty.Tadt (name,params) ->
-    let l = match Ty.type_body name params with
-      | Ty.Adt cases -> cases
-    in
-    Some
-      (List.fold_left (fun st {Ty.constr; _} -> HSS.add constr st) HSS.empty l)
-  | _ -> None
+  | Constr _ ->
+    (* The semantic value [r] is already a constructor application, so
+       we don't need to produce a new equation in this case. *)
+    None
 
-let add_adt env uf t r sy ty =
-  if MX.mem r env.domains then env
-  else
-    match sy, ty with
-    | Sy.Op Sy.Constr hs, Ty.Tadt _ ->
-      if get_debug_adt () then
-        Printer.print_dbg
-          ~module_name:"Adt_rel" ~function_name:"add_adt"
-          "new ADT expr(C): %a" E.print t;
-      { env with domains =
-                   MX.add r (HSS.singleton hs, Ex.empty) env.domains }
+  | Select _ ->
+    assert false
 
-    | _, Ty.Tadt _ ->
-      if get_debug_adt () then
-        Printer.print_dbg
-          ~module_name:"Adt_rel" ~function_name:"add_adt"
-          "new ADT expr: %a" E.print t;
-      let constrs =
-        match values_of ty with None -> assert false | Some s -> s
-      in
-      let env =
-        { env with domains = MX.add r (constrs, Ex.empty) env.domains }
-      in
-      if HSS.cardinal constrs = 1 then
-        let h' = HSS.choose constrs in
-        let env, pending_deds =
-          deduce_is_constr uf r h' env.pending_deds env Ex.empty
-        in
-        {env with pending_deds}
-      else
-        env
+let propagate_domains new_terms domains =
+  Domains.propagate
+    (fun (eqs, new_terms) rr d ->
+       match Domain.as_singleton d with
+       | Some (c, ex) ->
+         begin match build_constr_eq rr c with
+           | Some (eq, cons) ->
+             let new_terms = SE.add cons new_terms in
+             (Literal.LSem eq, ex, Th_util.Other) :: eqs, new_terms
+           | None ->
+             eqs, new_terms
+         end
+       | None ->
+         eqs, new_terms
+    ) ([], new_terms) domains
 
-    | _ -> env
-
-let update_tester r hs env =
-  let old = try MX.find r env.seen_testers with Not_found -> HSS.empty in
-  {env with seen_testers = MX.add r (HSS.add hs old) env.seen_testers}
-
-let trivial_tester r hs =
-  match embed r with (* can filter further/better *)
-  | Adt.Constr { c_name; _ } -> Hstring.equal c_name hs
-  | _ -> false
-
-let constr_of_destr ty dest =
-  if get_debug_adt () then
-    Printer.print_dbg
-      ~module_name:"Adt_rel" ~function_name:"constr_of_destr"
-      "ty = %a" Ty.print ty;
-  match ty with
-  | Ty.Tadt (name, params) ->
-    let cases =
-      match Ty.type_body name params with
-      | Ty.Adt cases -> cases
-    in
-    begin
-      try
-        List.find
-          (fun {Ty.destrs; _} ->
-             List.exists (fun (d, _) -> Hstring.equal dest d) destrs
-          )cases
-      with Not_found -> assert false (* invariant *)
-    end
-  | _ -> assert false
-
-
-[@@ocaml.ppwarning "XXX improve. For each selector, store its \
-                    corresponding constructor when typechecking ?"]
-let add_guarded_destr env uf t hs e t_ty =
-  if get_debug_adt () then
-    Printer.print_dbg ~flushed:false
-      ~module_name:"Adt_rel" ~function_name:"add_guarded_destr"
-      "new (guarded) Destr: %a@ " E.print t;
-  let env = { env with seen_destr = SE.add t env.seen_destr } in
-  let {Ty.constr = c; _} = constr_of_destr (E.type_info e) hs in
-  let access = E.mk_term (Sy.destruct (Hs.view hs) ~guarded:false) [e] t_ty in
-  (* XXX : Never add non-guarded access to list of new terms !
-     This may/will introduce bugs when instantiating
-     let env = {env with new_terms = SE.add access env.new_terms} in
-  *)
-  let is_c = E.mk_builtin ~is_pos:true (Sy.IsConstr c) [e] in
-  let eq = E.mk_eq access t ~iff:false in
-  if get_debug_adt () then
-    Printer.print_dbg ~header:false
-      "associated with constr %a@,%a => %a"
-      Hstring.print c
-      E.print is_c
-      E.print eq;
-  let r_e, ex_e = try Uf.find uf e with Not_found -> assert false in
-  if trivial_tester r_e c then
-    {env with pending_deds =
-                (Sig_rel.LTerm eq, ex_e, Th_util.Other) :: env.pending_deds}
-  else
-  if seen_tester r_e c env then
-    {env with pending_deds =
-                (Sig_rel.LTerm eq, ex_e, Th_util.Other) :: env.pending_deds}
-  else
-    let m_e = try MX.find r_e env.selectors with Not_found -> MHs.empty in
-    let old = try MHs.find c m_e with Not_found -> [] in
-    { env with selectors =
-                 MX.add r_e (MHs.add c ((eq, ex_e)::old) m_e)
-                   env.selectors }
-
-
-[@@ocaml.ppwarning "working with X.term_extract r would be sufficient ?"]
-let add_aux env (uf:uf) (r:r) t =
-  if get_disable_adts () then env
-  else
-    let { E.f = sy; xs; ty; _ } = match E.term_view t with
-      | E.Term t -> t
-      | E.Not_a_term _ -> assert false
-    in
-    let env = add_adt env uf t r sy ty in
-    match sy, xs with
-    | Sy.Op Sy.Destruct (hs, true), [e] -> (* guarded *)
-      if get_debug_adt () then
-        Printer.print_dbg
-          ~module_name:"Adt_rel" ~function_name:"add_aux"
-          "add guarded destruct: %a" E.print t;
-      if (SE.mem t env.seen_destr) then env
-      else add_guarded_destr env uf t hs e ty
-
-    | Sy.Op Sy.Destruct (_, false), [_] ->
-      (* not guarded *)
-      if get_debug_adt () then
-        Printer.print_dbg
-          ~module_name:"Adt_rel" ~function_name:"add_aux"
-          "[ADTs] add unguarded destruct: %a" E.print t;
-      { env with seen_access = SE.add t env.seen_access }
-
-    | Sy.Op Sy.Destruct _, _ ->
-      assert false (* not possible *)
-
-    (*| Sy.Op Sy.IsConstr _, _ ->
-      if get_debug_adt () then
-      Printer.print_dbg
-      "new Tester: %a" E.print t;
-       { env with seen_testers = SE.add t env.seen_testers }
-    *)
-    | _ -> env
-
-let add env (uf:uf) (r:r) t =
-  add_aux env (uf:uf) (r:r) t, []
-
-
+(* Update the counter of case split size in [env]. *)
 let count_splits env la =
-  let nb =
-    List.fold_left
-      (fun nb (_,_,_,i) ->
-         match i with
-         | Th_util.CS (Th_util.Th_sum, n) -> Numbers.Q.mult nb n
-         | _ -> nb
-      )env.size_splits la
-  in
-  {env with size_splits = nb}
-
-let add_diseq uf hss sm1 sm2 dep env eqs =
-  match sm1, sm2 with
-  | Adt.Alien r , Adt.Constr { c_name = h; c_args = []; _ }
-  | Adt.Constr { c_name = h; c_args = []; _ }, Adt.Alien r  ->
-    (* not correct with args *)
-    let enum, ex =
-      try MX.find r env.domains with Not_found -> hss, Ex.empty
-    in
-    let enum = HSS.remove h enum in
-    let ex = Ex.union ex dep in
-    if HSS.is_empty enum then raise (Ex.Inconsistent (ex, env.classes))
-    else
-      let env = { env with domains = MX.add r (enum, ex) env.domains } in
-      if HSS.cardinal enum = 1 then
-        let h' = HSS.choose enum in
-        let env, eqs = deduce_is_constr uf r h' eqs env ex in
-        env, eqs
-      else env, eqs
-
-  | Adt.Alien _ , Adt.Constr _ | Adt.Constr _, Adt.Alien _  ->
-    env, eqs
-
-  | Adt.Alien r1, Adt.Alien r2 ->
-    let enum1,ex1=
-      try MX.find r1 env.domains with Not_found -> hss,Ex.empty in
-    let enum2,ex2=
-      try MX.find r2 env.domains with Not_found -> hss,Ex.empty in
-
-    let env, eqs =
-      if HSS.cardinal enum1 = 1 then
-        let ex = Ex.union dep ex1 in
-        let h' = HSS.choose enum1 in
-        deduce_is_constr uf r1 h' eqs env ex
-      else env, eqs
-    in
-    let env, eqs =
-      if HSS.cardinal enum2 = 1 then
-        let ex = Ex.union dep ex2 in
-        let h' = HSS.choose enum2 in
-        deduce_is_constr uf r2 h' eqs env ex
-      else env, eqs
-    in
-    env, eqs
-
-  |  _ -> env, eqs
-
-let assoc_and_remove_selector hs r env =
-  try
-    let mhs = MX.find r env.selectors in
-    let deds = MHs.find hs mhs in
-    let mhs = MHs.remove hs mhs in
-    deds,
-    (if MHs.is_empty mhs then {env with selectors = MX.remove r env.selectors}
-     else {env with selectors = MX.add r mhs env.selectors})
-
-  with Not_found ->
-    [], env
-
-let assume_is_constr uf hs r dep env eqs =
-  match embed r with
-  | Adt.Constr{ c_name; _ } when not (Hs.equal c_name hs) ->
-    raise (Ex.Inconsistent (dep, env.classes));
-  | _ ->
-    if get_debug_adt () then
-      Printer.print_dbg
-        ~module_name:"Adt_rel" ~function_name:"assume_is_constr"
-        "assume is constr %a %a" X.print r Hs.print hs;
-    if seen_tester r hs env then
-      env, eqs
-    else
-      let deds, env = assoc_and_remove_selector hs r env in
-      let eqs =
-        List.fold_left
-          (fun eqs (ded, dep') ->
-             (Sig_rel.LTerm ded, Ex.union dep dep', Th_util.Other) :: eqs
-          )eqs deds
-      in
-      let env = update_tester r hs env in
-
-      let enum, ex =
-        try MX.find r env.domains
-        with Not_found ->
-        (*Cannot just put assert false !
-          some terms are not well inited *)
-        match values_of (X.type_info r) with
-        | None -> assert false
-        | Some s -> s, Ex.empty
-      in
-      let ex = Ex.union ex dep in
-      if not (HSS.mem hs enum) then raise (Ex.Inconsistent (ex, env.classes));
-      let env, eqs = deduce_is_constr uf r hs eqs env ex in
-      {env with domains = MX.add r (HSS.singleton hs, ex) env.domains} , eqs
-
-let assume_not_is_constr uf hs r dep env eqs =
-  match embed r with
-  | Adt.Constr{ c_name; _ } when Hs.equal c_name hs ->
-    raise (Ex.Inconsistent (dep, env.classes));
-  | _ ->
-
-    let _, env = assoc_and_remove_selector hs r env in
-    let enum, ex =
-      try MX.find r env.domains with
-        Not_found ->
-        (* semantic values may be not inited with function add *)
-        match values_of (X.type_info r) with
-        | Some s -> s, Ex.empty
-        | None -> assert false
-    in
-    if not (HSS.mem hs enum) then env, eqs
-    else
-      let enum = HSS.remove hs enum in
-      let ex = Ex.union ex dep in
-      if HSS.is_empty enum then raise (Ex.Inconsistent (ex, env.classes))
-      else
-        let env = { env with domains = MX.add r (enum, ex) env.domains } in
-        if HSS.cardinal enum = 1 then
-          let h' = HSS.choose enum in
-          let env, eqs = deduce_is_constr uf r h' eqs env ex in
-          env, eqs
-        else env, eqs
-
-
-
-(* dot it modulo equivalence class ? or is it sufficient ? *)
-let add_eq uf hss sm1 sm2 dep env eqs =
-  match sm1, sm2 with
-  | Adt.Alien r, Adt.Constr { c_name = h; _ }
-  | Adt.Constr { c_name = h; _ }, Adt.Alien r  ->
-    let enum, ex =
-      try MX.find r env.domains with Not_found -> hss, Ex.empty
-    in
-    let ex = Ex.union ex dep in
-    if not (HSS.mem h enum) then raise (Ex.Inconsistent (ex, env.classes));
-    let env, eqs = deduce_is_constr uf r h eqs env ex in
-    {env with domains = MX.add r (HSS.singleton h, ex) env.domains} , eqs
-
-  | Adt.Alien r1, Adt.Alien r2   ->
-    let enum1,ex1 =
-      try MX.find r1 env.domains with Not_found -> hss, Ex.empty in
-    let enum2,ex2 =
-      try MX.find r2 env.domains with Not_found -> hss, Ex.empty in
-    let ex = Ex.union dep (Ex.union ex1 ex2) in
-    let diff = HSS.inter enum1 enum2 in
-    if HSS.is_empty diff then raise (Ex.Inconsistent (ex, env.classes));
-    let domains = MX.add r1 (diff, ex) env.domains in
-    let env = {env with domains = MX.add r2 (diff, ex) domains } in
-    if HSS.cardinal diff = 1 then begin
-      let h' = HSS.choose diff in
-      let env, eqs = deduce_is_constr uf r1 h' eqs env ex in
-      let env, eqs = deduce_is_constr uf r2 h' eqs env ex in
-      env, eqs
-    end
-    else env, eqs
-
-  |  _ -> env, eqs
-
-
-let add_aux env r =
-  Debug.add r;
-  match embed r with
-  | Adt.Alien r when not (MX.mem r env.domains) ->
-    begin match values_of (X.type_info r) with
-      | Some s -> { env with domains = MX.add r (s, Ex.empty) env.domains }
-      | None ->
-        env
-    end
-  | _ -> env
-
-(* needed for models generation because fresh terms are not
-   added with function add *)
-let add_rec env r = List.fold_left add_aux env (X.leaves r)
-
-let update_cs_modulo_eq r1 r2 ex env eqs =
-  (* PB Here: even if Subst, we are not sure that it was
-     r1 |-> r2, because LR.mkv_eq may swap r1 and r2 *)
-  try
-    let old = MX.find r1 env.selectors in
-    if get_debug_adt () then
-      Printer.print_dbg ~flushed:false
-        ~module_name:"Adt_rel" ~function_name:"update_cs_modulo_eq"
-        "update selectors modulo eq: %a |-> %a@ "
-        X.print r1 X.print r2;
-    let mhs = try MX.find r2 env.selectors with Not_found -> MHs.empty in
-    let eqs = ref eqs in
-    let _new =
-      MHs.fold
-        (fun hs l mhs ->
-           if trivial_tester r2 hs then begin
-             if get_debug_adt () then
-               Printer.print_dbg
-                 ~flushed:false ~header:false
-                 "make deduction because %a ? %a is trivial@ "
-                 X.print r2 Hs.print hs;
-             List.iter
-               (fun (a, dep) ->
-                  eqs := (Sig_rel.LTerm a, dep, Th_util.Other) :: !eqs) l;
-           end;
-           let l = List.rev_map (fun (a, dep) -> a, Ex.union ex dep) l in
-           MHs.add hs l mhs
-        )old mhs
-    in
-    if get_debug_adt () then
-      Printer.print_dbg ~header:false "";
-    { env with selectors = MX.add r2 _new env.selectors }, !eqs
-  with Not_found -> env, eqs
-
-let remove_redundancies la =
-  let cache = ref SLR.empty in
-  List.filter
-    (fun (a, _, _, _) ->
-       let a = LR.make a in
-       if SLR.mem a !cache then false
-       else begin
-         cache := SLR.add a !cache;
-         true
-       end
-    )la
+  List.fold_left
+    (fun nb (_, _, _, i) ->
+       match i with
+       | Th_util.CS (Th_util.Th_adt, n) -> Numbers.Q.mult nb n
+       | _ -> nb
+    ) env.size_splits la
 
 let assume env uf la =
-  if get_disable_adts () then
-    env, { Sig_rel.assume = []; remove = [] }
-  else
-    let la = remove_redundancies la in (* should be done globally in CCX *)
-    let env = count_splits env la in
-    let classes = Uf.cl_extract uf in
-    let env = { env with classes = classes } in
-    let aux bol r1 r2 dep env eqs = function
-      | None     -> env, eqs
-      | Some hss ->
-        if bol then
-          add_eq uf hss (embed r1) (embed r2) dep env eqs
-        else
-          add_diseq uf hss (embed r1) (embed r2) dep env eqs
-    in
-    Debug.print_env "before assume" env;
-    let env, eqs =
-      List.fold_left
-        (fun (env,eqs) (a, b, c, d) ->
-           Debug.assume a;
-           match a, b, c, d with
-           | Xliteral.Eq(r1,r2), _, ex, orig ->
-             (* needed for models generation because fresh terms are not
-                added with function add *)
-             let env = add_rec (add_rec env r1) r2 in
-             let env, eqs =
-               if orig == Th_util.Subst then
-                 update_cs_modulo_eq r1 r2 ex env eqs
-               else
-                 env, eqs
-             in
-             aux true  r1 r2 ex env eqs (values_of (X.type_info r1))
-
-           | Xliteral.Distinct(false, [r1;r2]), _, ex, _ ->
-             (* needed for models generation because fresh terms are not
-                added with function add *)
-             let env = add_rec (add_rec env r1) r2 in
-             aux false r1 r2 ex env eqs (values_of (X.type_info r1))
-
-           | Xliteral.Builtin(true, Sy.IsConstr hs, [e]), _, ex, _ ->
-             assume_is_constr uf hs e ex env eqs
-
-           | Xliteral.Builtin(false, Sy.IsConstr hs, [e]), _, ex, _
-             [@ocaml.ppwarning "XXX: assume not (. ? .): reasoning missing ?"]
-             ->
-             assume_not_is_constr uf hs e ex env eqs
-
-           | _ -> env, eqs
-
-        ) (env,[]) la
-    in
-    let eqs = List.rev_append env.pending_deds eqs in
-    let env = {env with pending_deds = []} in
-    Debug.print_env "after assume" env;
-    let print fmt (a,_,_) =
-      match a with
-      | Sig_rel.LTerm a -> fprintf fmt "%a" E.print a;
-      | _ -> assert false
-    in
-    if get_debug_adt () then
-      Printer.print_dbg ~module_name:"Adt_rel" ~function_name:"assume"
-        "assume deduced %d equalities@ %a" (List.length eqs)
-        (Printer.pp_list_no_space print) eqs;
-    env, { Sig_rel.assume = eqs; remove = [] }
-
+  let ds = Uf.domains uf in
+  let domains = Uf.GlobalDomains.find (module Domains) ds in
+  Log.debug (fun k -> k "environment before assume:@ %a" Domains.pp domains);
+  let delayed, result = Rel_utils.Delayed.assume env.delayed uf la in
+  let domains =
+    try
+      assume_literals la uf domains
+    with Domain.Inconsistent ex ->
+      raise_notrace (Ex.Inconsistent (ex, Uf.cl_extract uf))
+  in
+  let (assume, new_terms), domains = propagate_domains env.new_terms domains in
+  let assume = List.rev_append assume result.assume in
+  let env = {
+    delayed;
+    size_splits = count_splits env la;
+    new_terms;
+  }
+  in
+  Log.debug (fun k -> k "environment after assume:@ %a" Domains.pp domains);
+  env,
+  Uf.GlobalDomains.add (module Domains) domains ds,
+  Sig_rel.{ assume; remove = [] }
 
 (* ################################################################ *)
 
 let two = Numbers.Q.from_int 2
 
-let case_split env _ ~for_model =
-  if get_disable_adts () || not (get_enable_adts_cs()) then []
-  else
+(* Find the constructor associated with the destructor [d] in the ADT [ty].
+
+   requires: [d] is a destructor of [ty]. *)
+(* TODO: we should compute this reverse map in `Ty` and store it there. *)
+let constr_of_destr ty d =
+  match ty with
+  | Ty.Tadt (name, params) ->
     begin
-      assert (not for_model);
-      if get_debug_adt () then Debug.print_env "before cs" env;
+      let cases = Ty.type_body name params in
       try
-        let r, mhs = MX.choose env.selectors in
-        if get_debug_adt () then
-          Printer.print_dbg ~flushed:false
-            ~module_name:"Adt_rel" ~function_name:"case_split"
-            "found r = %a@ " X.print r;
-        let hs, _ = MHs.choose mhs in
-        if get_debug_adt () then
-          Printer.print_dbg ~header:false
-            "found hs = %a" Hs.print hs;
-        (* cs on negative version would be better in general *)
-        let cs =  LR.mkv_builtin false (Sy.IsConstr hs) [r] in
-        [ cs, true, Th_util.CS(Th_util.Th_adt, two) ]
-      with Not_found ->
-        Debug.no_case_split ();
-        []
+        let r =
+          List.find
+            (fun Ty.{ destrs; _ } ->
+               List.exists (fun (d', _) -> Uid.equal d d') destrs
+            ) cases
+        in
+        r.constr
+      with Not_found -> assert false
     end
 
-let query env uf (ra, _, ex, _) =
-  if get_disable_adts () then None
+  | _ -> assert false
+
+exception Found of X.r * Uid.term_cst
+
+let can_split env n =
+  let m = Options.get_max_split () in
+  Numbers.Q.(compare (mult n env.size_splits) m) <= 0
+  || Numbers.Q.sign m < 0
+
+let (let*) = Option.bind
+
+(* Do a case split by choosing a semantic value [r] and constructor [c]
+   for which there are delayed destructor applications and propagate the
+   literal [(not (_ is c) r)]. *)
+let split_delayed_destructor env =
+  if not @@ Options.get_enable_adts_cs () then
+    None
   else
     try
+      Rel_utils.Delayed.iter_delayed
+        (fun r sy _e ->
+           match sy with
+           | Sy.Destruct destr -> raise_notrace @@ Found (r, destr)
+           | _ -> ()
+        ) env.delayed;
+      None
+    with Found (r, d) ->
+      let c = constr_of_destr (X.type_info r) d in
+      Some (LR.mkv_builtin false (Sy.IsConstr c) [r])
+
+(* Pick a constructor in a tracked domain with minimal cardinal.
+   Returns [None] if there is no such constructor. *)
+let pick_best ds =
+  Domains.fold
+    (fun r d best ->
+       let cd = Domain.cardinal d in
+       match Th.embed r, best with
+       | Constr _, _ -> best
+       | _, Some (n, _, _) when n <= cd -> best
+       | _ ->
+         let c = Domain.choose d in
+         Some (cd, r, c)
+    ) ds None
+
+(* Pick a constructor in a tracked domain whose the domain is of minimal
+   cardinal among tracked domains of enum types. Returns [None] if there is no
+   such constructor. *)
+let pick_enum ds =
+  Domains.fold_enums
+    (fun r best ->
+       let d = Domains.get r ds in
+       let cd = Domain.cardinal d in
+       match Th.embed r, best with
+       | Constr _, _ -> best
+       | _, Some (n, _, _) when n <= cd -> best
+       | _ ->
+         let c = Domain.choose d in
+         Some (cd, r, c)
+    ) ds None
+
+let pick_domain ~for_model uf =
+  let ds = Uf.(GlobalDomains.find (module Domains) @@ domains uf) in
+  match pick_enum ds with
+  | None when for_model -> pick_best ds
+  | r -> r
+
+let split_domain ~for_model env uf =
+  let* cd, r, c = pick_domain ~for_model uf in
+  if for_model || can_split env (Numbers.Q.from_int cd) then
+    let _, cons = Option.get @@ build_constr_eq r c in
+    let nr, ctx = X.make cons in
+    (* In the current implementation of `X.make`, we produce
+       a nonempty context only for interpreted semantic values
+       of the `Arith` and `Records` theories. The semantic
+       values `cons` never involves such values. *)
+    assert (Compat.List.is_empty ctx);
+    Some (LR.mkv_eq r nr)
+  else
+    None
+
+let next_case_split ~for_model env uf =
+  match split_delayed_destructor env with
+  | None -> split_domain ~for_model env uf
+  | r -> r
+
+let case_split env uf ~for_model =
+  if Options.get_disable_adts () then
+    []
+  else begin
+    match next_case_split ~for_model env uf with
+    | Some cs ->
+      Log.debug
+        (fun k -> k "environment before case split:@ %a"
+            Domains.pp
+            (Uf.GlobalDomains.find (module Domains) (Uf.domains uf)));
+      Log.debug
+        (fun k -> k "assume by case splitting:@ %a"
+            (Xliteral.print_view X.print) cs);
+      [ cs, true, Th_util.CS (Th_util.Th_adt, two)]
+    | None ->
+      Log.debug (fun k -> k "no case split done");
+      []
+  end
+
+let optimizing_objective _env _uf _o = None
+
+let query _env uf (ra, _, ex, _) =
+  if Options.get_disable_adts () then None
+  else
+    let domains = Uf.GlobalDomains.find (module Domains) (Uf.domains uf) in
+    try
       match ra with
-      | Xliteral.Builtin(true, Sy.IsConstr hs, [e]) ->
-        ignore (assume_is_constr uf hs e ex env []);
+      | Xliteral.Builtin(true, Sy.IsConstr c, [r]) ->
+        let rr, _ = Uf.find_r uf r in
+        ignore (assume_is_constr ~ex rr c domains);
         None
 
-      | Xliteral.Builtin(false, Sy.IsConstr hs, [e])
-        [@ocaml.ppwarning "XXX: assume not (. ? .): reasoning missing ?"]
-        ->
-        ignore (assume_not_is_constr uf hs e ex env []);
+      | Xliteral.Builtin(false, Sy.IsConstr c, [r]) ->
+        let rr, _ = Uf.find_r uf r in
+        ignore (assume_not_is_constr ~ex rr c domains);
         None
+
       | _ ->
         None
     with
-    | Ex.Inconsistent (expl, classes) -> Some (expl, classes)
-
+    | Domain.Inconsistent ex -> Some (ex, Uf.cl_extract uf)
 
 (* ################################################################ *)

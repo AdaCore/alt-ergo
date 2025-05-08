@@ -1,39 +1,34 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
-
-open Hconsing
-open Options
-
-
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 type builtin = Symbols.builtin =
     LE | LT | (* arithmetic *)
-    IsConstr of Hstring.t (* ADT tester *)
+    IsConstr of Uid.term_cst (* ADT tester *)
+  | BVULE (* unsigned bit-vector arithmetic *)
 
 type 'a view =
   | Eq of 'a * 'a
@@ -52,8 +47,8 @@ module type OrderedType = sig
   val compare : t -> t -> int
   val hash :  t -> int
   val print : Format.formatter -> t -> unit
-  val top : unit -> t
-  val bot : unit -> t
+  val top : t
+  val bot : t
   val type_info : t -> Ty.t
 end
 
@@ -88,6 +83,10 @@ module type S = sig
   val uid : t -> int
   val elements : t -> elt list
 
+  val save_cache : unit -> unit
+
+  val reinit_cache : unit -> unit
+
   module Map : Map.S with type key = t
   module Set : Set.S with type elt = t
 
@@ -118,9 +117,18 @@ let print_view ?(lbl="") pr_elt fmt vw =
   | Builtin (_, (LE | LT), _) ->
     assert false (* not reachable *)
 
+  | Builtin (true, BVULE, [v1;v2]) ->
+    Format.fprintf fmt "%s %a <= %a" lbl pr_elt v1 pr_elt v2
+
+  | Builtin (false, BVULE, [v1;v2]) ->
+    Format.fprintf fmt "%s %a > %a" lbl pr_elt v1 pr_elt v2
+
+  | Builtin (_, BVULE, _) ->
+    assert false (* not reachable *)
+
   | Builtin (pos, IsConstr hs, [e]) ->
     Format.fprintf fmt "%s(%a ? %a)"
-      (if pos then "" else "not ") pr_elt e Hstring.print hs
+      (if pos then "" else "not ") pr_elt e Uid.pp hs
 
   | Builtin (_, IsConstr _, _) ->
     assert false (* not reachable *)
@@ -142,7 +150,7 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
 
   type t = { at : atom; neg : bool; tpos : int; tneg : int }
 
-  let compare a1 a2 = Stdlib.compare a1.tpos a2.tpos
+  let compare a1 a2 = Int.compare a1.tpos a2.tpos
   let equal a1 a2 = a1.tpos = a2.tpos (* XXX == *)
   let hash a1 = a1.tpos
   let uid a1 = a1.tpos
@@ -185,7 +193,7 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
   let equal_builtins n1 n2 =
     match n1, n2 with
     | LT, LT | LE, LE -> true
-    | IsConstr h1, IsConstr h2 -> Hstring.equal h1 h2
+    | IsConstr h1, IsConstr h2 -> Uid.equal h1 h2
     | _ -> false
 
   module V = struct
@@ -227,19 +235,19 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
 
   end
 
-  module H = Make(V)
+  module HC = Hconsing.Make(V)
 
   let normalize_eq_bool t1 t2 is_neg =
-    if X.compare t1 (X.bot()) = 0 then Pred(t2, not is_neg)
-    else if X.compare t2 (X.bot()) = 0 then Pred(t1, not is_neg)
-    else if X.compare t1 (X.top()) = 0 then Pred(t2, is_neg)
-    else if X.compare t2 (X.top()) = 0 then Pred(t1, is_neg)
+    if X.compare t1 X.bot = 0 then Pred(t2, not is_neg)
+    else if X.compare t2 X.bot = 0 then Pred(t1, not is_neg)
+    else if X.compare t1 X.top = 0 then Pred(t2, is_neg)
+    else if X.compare t2 X.top = 0 then Pred(t1, is_neg)
     else if is_neg then Distinct (false, [t1;t2]) (* XXX assert ? *)
     else Eq(t1,t2) (* should be translated into iff *)
 
   let normalize_eq t1 t2 is_neg =
     let c = X.compare t1 t2 in
-    if c = 0 then Pred(X.top(), is_neg)
+    if c = 0 then Pred(X.top, is_neg)
     else
       let t1, t2 = if c < 0 then t1, t2 else t2, t1 in
       if X.type_info t1 == Ty.Tbool then normalize_eq_bool t1 t2 is_neg
@@ -255,7 +263,7 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
 
   let make_aux av is_neg =
     let av = {value = av; uid = -1} in
-    let at = H.make av in
+    let at = HC.make av in
     if is_neg then
       {at = at; neg = is_neg; tpos = 2*at.uid+1; tneg = 2*at.uid}
     else
@@ -320,5 +328,12 @@ module Make (X : OrderedType) : S with type elt = X.t = struct
     | EQ(a,b), _ -> [a;b]
     | PR a, _    -> [a]
     | BT (_,l), _ | EQ_LIST l, _ -> l
+
+  let save_cache () =
+    HC.save_cache ()
+
+  let reinit_cache () =
+    HC.reinit_cache ();
+    Labels.clear labels
 
 end

@@ -1,13 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2018-2020 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the license indicated      *)
-(*     in the file 'License.OCamlPro'. If 'License.OCamlPro' is not           *)
-(*     present, please contact us to clarify licensing.                       *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 (** {1 Printer module} *)
 
@@ -72,6 +88,11 @@ val init_output_format : unit -> unit
 
 (** Print list without separator *)
 val pp_list_no_space :
+  (Format.formatter -> 'a -> unit) ->
+  Format.formatter -> 'a list -> unit
+
+(** Print list with separator *)
+val pp_list_space :
   (Format.formatter -> 'a -> unit) ->
   Format.formatter -> 'a list -> unit
 
@@ -150,3 +171,19 @@ val print_status_preprocess :
   ?validity_mode:bool ->
   float option ->
   int option -> unit
+
+(** Print smtlib error message on the regular formatter, accessible with
+    {!val:Options.get_fmt_regular} and set by default to stdout.
+    The regular formatter is flushed after the print if flushed is set. *)
+val print_smtlib_err :
+  ?flushed:bool ->
+  ('a, Format.formatter, unit) format -> 'a
+
+val reporter : Logs.reporter
+(** Recommended reporter used by both the library and the binary.
+
+    All the sources are printed on [Options.Output.get_fmt_diagnostic ()] but:
+    - [Sources.model] is printed on [Options.Output.get_fmt_models ()]
+    - [Sources.default] is printed on [Options.Output.get_fmt_regular ()]
+
+    The library never prints on [Sources.default] or [Sources.model]. *)

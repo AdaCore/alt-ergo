@@ -1,48 +1,44 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
-
-open Format
-open Options
-open Sig
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 module X = Shostak.Combine
 
 module Ac = Shostak.Ac
 module Ex = Explanation
-
 module Sy = Symbols
 module E = Expr
 module ME = Expr.Map
 module SE = Expr.Set
 
-module LX =
-  Xliteral.Make(struct type t = X.r let compare = X.hash_cmp include X end)
+module LX = Shostak.L
 module MapL = Emap.Make(LX)
+
+let src = Logs.Src.create ~doc:"Uf" __MODULE__
+module Log = (val Logs.src_log src : Logs.LOG)
 
 module MapX = struct
   include Shostak.MXH
@@ -51,8 +47,8 @@ end
 module SetX = Shostak.SXH
 
 module SetXX = Set.Make(struct
-    type t = X.r * X.r
-    let compare (r1, r1') (r2, r2') =
+    type t = X.r * X.r * Explanation.t
+    let compare (r1, r1', _) (r2, r2', _) =
       let c = X.hash_cmp r1 r2 in
       if c <> 0 then c
       else  X.hash_cmp r1' r2'
@@ -72,15 +68,94 @@ module RS = struct
   let find k m =
     try find k m with Not_found -> SetRL.empty
 
-  let add_rule (({ h ; _ }, _, _) as rul) mp =
+  let add_rule (({ Sig.h ; _ }, _, _) as rul) mp =
     add h (SetRL.add rul (find h mp)) mp
 
-  let remove_rule (({ h ; _ }, _, _) as rul) mp =
+  let remove_rule (({ Sig.h ; _ }, _, _) as rul) mp =
     add h (SetRL.remove rul (find h mp)) mp
 
 end
 
 type r = X.r
+
+type _ id = ..
+
+module type GlobalDomain = sig
+  type t
+
+  val pp : t Fmt.t
+
+  type _ id += Id : t id
+
+  val empty : t
+
+  val filter_ty : Ty.t -> bool
+
+  val init : X.r -> t -> t
+
+  exception Inconsistent of Explanation.t
+
+  val subst : ex:Explanation.t -> r -> r -> t -> t
+end
+
+type 'a global_domain = (module GlobalDomain with type t = 'a)
+
+module GlobalDomains = struct
+  let[@inline] uid (type a) ((module Doms) : a global_domain) =
+    Obj.Extension_constructor.id (Obj.Extension_constructor.of_val Doms.Id)
+
+  module MapI = Util.MI
+
+  type binding = B : 'a global_domain * 'a -> binding
+
+  type t = binding MapI.t
+
+  let pp : t Fmt.t =
+    let open Fmt in
+    vbox (
+      any "@,=================== UF: Domains ======================@," ++
+      iter
+        ~sep:(any "@,------------------------------------------------------@,")
+        (fun f ->
+           MapI.iter (fun _ (B ((module D), d)) ->
+               f (hvbox (const D.pp d))
+             ))
+        (fun ppf pp -> pp ppf ())
+    ) ++ cut
+
+  let empty = MapI.empty
+
+  let find (type a) ((module D) as k : a global_domain) t : a =
+    match MapI.find (uid k) t with
+    | exception Not_found -> D.empty
+    | B ((module D'), d) ->
+      match D'.Id with
+      | D.Id -> d
+      | _ ->
+        (* Distinct extension constructors cannot have the same uid. *)
+        assert false
+
+  let init r t =
+    let ty = X.type_info r in
+    MapI.map (function B ((module D) as dom, d) as b ->
+        if D.filter_ty ty then B (dom, D.init r d) else b
+      ) t
+
+  let add (type a) ((module D) as dom : a global_domain) v t =
+    MapI.add (uid dom) (B (dom, v)) t
+
+  exception Inconsistent of Ex.t
+
+  let subst ~ex rr nrr t =
+    let ty = X.type_info rr in
+    MapI.map (function B (((module D) as dom), d) as b ->
+        if D.filter_ty ty then
+          try
+            B (dom, D.subst ~ex rr nrr d)
+          with D.Inconsistent ex -> raise (Inconsistent ex)
+        else b
+      ) t
+end
 
 type t = {
 
@@ -89,6 +164,9 @@ type t = {
 
   (* representative table *)
   repr : (r * Ex.t) MapX.t;
+
+  (* domains associated with class representatives (values in repr) only *)
+  domains : GlobalDomains.t;
 
   (* r -> class (of terms) *)
   classes : SE.t MapX.t;
@@ -103,7 +181,6 @@ type t = {
   (*AC rewrite system *)
   ac_rs : SetRL.t RS.t;
 }
-
 
 exception Found_term of E.t
 
@@ -133,7 +210,7 @@ let terms_of_distinct env l = match LX.view l with
 
 
 let cl_extract env =
-  if get_bottom_classes () then
+  if Options.get_bottom_classes () then
     let classes = MapX.fold (fun _ cl acc -> cl :: acc) env.classes [] in
     MapX.fold (fun _ ml acc ->
         MapL.fold (fun l _ acc -> (terms_of_distinct env l) @ acc) ml acc
@@ -150,40 +227,41 @@ module Debug = struct
   *)
 
   let lm_print fmt =
-    MapL.iter (fun k dep -> fprintf fmt "%a %a" LX.print k Ex.print dep)
+    MapL.iter (fun k dep -> Format.fprintf fmt "%a %a" LX.print k Ex.print dep)
 
   let pmake fmt m =
-    fprintf fmt "@[<v 2>map:@,";
-    ME.iter (fun t r -> fprintf fmt "%a -> %a@," E.print t X.print r) m;
-    fprintf fmt "@]@,"
+    Format.fprintf fmt "@[<v 2>map:@,";
+    ME.iter (fun t r ->
+        Format.fprintf fmt "%a -> %a@," E.print t X.print r) m;
+    Format.fprintf fmt "@]@,"
 
   let prepr fmt m =
-    fprintf fmt
+    Format.fprintf fmt
       "@[<v 2>------------- UF: Representatives map ----------------@,";
-    MapX.iter
-      (fun r (rr,dep) ->
-         fprintf fmt "%a --> %a %a@," X.print r X.print rr Ex.print dep) m;
-    fprintf fmt "@]@,"
+    MapX.iter (fun r (rr,dep) ->
+        Format.fprintf fmt "%a --> %a %a@," X.print r X.print rr Ex.print dep
+      ) m;
+    Format.fprintf fmt "@]@,"
 
   let prules fmt s =
-    fprintf fmt
+    Format.fprintf fmt
       "@[<v 2>------------- UF: AC rewrite rules ----------------------@,";
     RS.iter
       (fun _ srl ->
          SetRL.iter
-           (fun (ac,d,dep)-> fprintf fmt "%a ~~> %a %a@,"
+           (fun (ac,d,dep)-> Format.fprintf fmt "%a ~~> %a %a@,"
                X.print (X.ac_embed ac) X.print d Ex.print dep
            )srl
       )s;
-    fprintf fmt "@]@,"
+    Format.fprintf fmt "@]@,"
 
   let pclasses fmt m =
-    fprintf fmt
+    Format.fprintf fmt
       "@[<v 2>------------- UF: Class map --------------------------@,";
     MapX.iter
-      (fun k s -> fprintf fmt "%a -> %a@," X.print k E.print_list
+      (fun k s -> Format.fprintf fmt "%a -> %a@," X.print k E.print_list
           (SE.elements s)) m;
-    fprintf fmt "@]@,"
+    Format.fprintf fmt "@]@,"
 
   (* unused --
      let pgamma fmt m =
@@ -192,23 +270,26 @@ module Debug = struct
   *)
 
   let pneqs fmt m =
-    fprintf fmt
+    Format.fprintf fmt
       "@[<v 2>------------- UF: Disequations map--------------------@ ";
-    MapX.iter (fun k s -> fprintf fmt "%a -> %a@ " X.print k lm_print s) m;
-    fprintf fmt "@]@ "
+    MapX.iter (fun k s ->
+        Format.fprintf fmt "%a -> %a@ " X.print k lm_print s) m;
+    Format.fprintf fmt "@]@ "
 
   let all env =
-    if get_debug_uf () then
+    if Options.get_debug_uf () then
       print_dbg
         ~module_name:"Uf" ~function_name:"all"
         "@[<v 0>-------------------------------------------------@ \
-         %a%a%a%a%a\
+         %a%a%a%a%a%a\
          -------------------------------------------------@]"
         pmake env.make
         prepr env.repr
         prules env.ac_rs
         pclasses env.classes
         pneqs env.neqs
+        (if Options.get_verbose () then GlobalDomains.pp else Fmt.any "")
+        env.domains
 
   let lookup_not_found t env =
     print_err
@@ -217,37 +298,37 @@ module Debug = struct
 
 
   let canon_of r rr =
-    if get_rewriting () && get_verbose () then
+    if Options.(get_rewriting () && get_verbose ()) then
       print_dbg "canon %a = %a" X.print r X.print rr
 
   let init_leaf p =
-    if get_debug_uf () then
+    if Options.get_debug_uf () then
       print_dbg
         ~module_name:"Uf" ~function_name:"init_leaf"
         "init leaf : %a" X.print p
 
   let critical_pair rx ry =
-    if get_debug_uf () then
+    if Options.get_debug_uf () then
       print_dbg
         ~module_name:"Uf" ~function_name:"critical_pair"
         "critical pair : %a = %a@." X.print rx X.print ry
 
   let collapse_mult g2 d2 =
-    if get_debug_ac () then
+    if Options.get_debug_ac () then
       print_dbg
         ~module_name:"Uf" ~function_name:"collapse_mult"
         "collapse *: %a = %a"
         X.print g2 X.print d2
 
   let collapse g2 d2 =
-    if get_debug_ac () then
+    if Options.get_debug_ac () then
       print_dbg
         ~module_name:"Uf" ~function_name:"collapse"
         "collapse: %a = %a"
         X.print g2 X.print d2
 
   let compose p v g d =
-    if get_debug_ac () then
+    if Options.get_debug_ac () then
       print_dbg
         ~module_name:"Uf" ~function_name:"compose"
         "compose : %a -> %a on %a and %a"
@@ -255,38 +336,37 @@ module Debug = struct
         Ac.print g X.print d
 
   let x_solve rr1 rr2 dep =
-    if get_debug_uf () then
+    if Options.get_debug_uf () then
       print_dbg
         ~module_name:"Uf" ~function_name:"x_solve"
         "x-solve: %a = %a %a"
         X.print rr1 X.print rr2 Ex.print dep
 
   let ac_solve p v dep =
-    if get_debug_uf () then
+    if Options.get_debug_uf () then
       print_dbg
         ~module_name:"Uf" ~function_name:"ac_solve"
         "ac-solve: %a |-> %a %a"
         X.print p X.print v Ex.print dep
 
   let ac_x r1 r2 =
-    if get_debug_uf () then
+    if Options.get_debug_uf () then
       print_dbg
         ~module_name:"Uf" ~function_name:"ac_x"
         "ac(x): delta (%a) = delta (%a)"
         X.print r1 X.print r2
 
   let distinct d =
-    if get_debug_uf () then
+    if Options.get_debug_uf () then
       print_dbg
         ~module_name:"Uf" ~function_name:"distinct"
         "distinct %a" LX.print d
 
   let are_distinct t1 t2 =
-    if get_debug_uf () then
+    if Options.get_debug_uf () then
       print_dbg
         ~module_name:"Uf" ~function_name:"are_distinct"
         "are_distinct %a %a" E.print t1 E.print t2
-
 
   let check_inv_repr_normalized =
     let trace orig =
@@ -295,26 +375,25 @@ module Debug = struct
         orig
     in
     fun orig repr ->
-      MapX.iter
+      MapX.for_all
         (fun _ (rr, _) ->
-           List.iter
-             (fun x ->
-                try
-                  if not (X.equal x (fst (MapX.find x repr))) then
-                    let () = trace orig in
-                    assert false
-                with Not_found ->
-                  (* all leaves that are in normal form should be in repr ?
-                     not AC leaves, which can be created dynamically,
-                     not for other, that can be introduced by make and solve*)
-                  ()
-             )(X.leaves rr)
-        )repr
+           try
+             let _ : X.r =
+               List.find
+                 (fun x -> not (X.equal x (fst (MapX.find x repr))))
+                 (X.leaves rr)
+             in
+             let () = trace orig in
+             false
+           with Not_found ->
+             (* all leaves that are in normal form should be in repr ?
+                not AC leaves, which can be created dynamically,
+                not for other, that can be introduced by make and solve*)
+             true
+        ) repr
 
   let check_invariants orig env =
-    if Options.get_enable_assertions() then begin
-      check_inv_repr_normalized orig env.repr;
-    end
+    Options.heavy_assert (fun () -> check_inv_repr_normalized orig env.repr)
 end
 (*BISECT-IGNORE-END*)
 
@@ -506,6 +585,11 @@ module Env = struct
        function again with x == repr_x *)
     MapX.add repr_x mapl (MapX.remove x env.neqs)
 
+  let update_domains ~ex rr nrr env =
+    try GlobalDomains.subst ~ex rr nrr env.domains
+    with GlobalDomains.Inconsistent ex ->
+      raise (Ex.Inconsistent (ex, cl_extract env))
+
   let init_leaf env p =
     Debug.init_leaf p;
     let in_repr = MapX.mem p env.repr in
@@ -525,6 +609,9 @@ module Env = struct
         repr    =
           if in_repr then env.repr
           else MapX.add p (rp, ex_rp) env.repr;
+        domains =
+          if in_repr then env.domains
+          else GlobalDomains.init rp env.domains;
         classes =
           if MapX.mem p env.classes then env.classes
           else update_classes p rp env.classes;
@@ -559,6 +646,7 @@ module Env = struct
       {env with
        make    = ME.add t mkr env.make;
        repr    = MapX.add mkr (rp,ex) env.repr;
+       domains = GlobalDomains.init rp env.domains;
        classes = add_to_classes t rp env.classes;
        gamma   = add_to_gamma mkr rp env.gamma;
        neqs    =
@@ -567,7 +655,7 @@ module Env = struct
     in
     (init_new_ac_leaves env mkr), ctx
 
-  let head_cp eqs env pac ({ h ; _ } as ac) v dep =
+  let head_cp eqs env pac ({ Sig.h ; _ } as ac) v dep =
     try (*if RS.mem h env.ac_rs then*)
       SetRL.iter
         (fun (g, d, dep_rl) ->
@@ -632,12 +720,13 @@ module Env = struct
       head_cp eqs env p r v dep;
       env
 
-  let update_aux dep set env=
+  let update_aux dep set env =
     SetXX.fold
-      (fun (rr, nrr) env ->
+      (fun (rr, nrr, ex) env ->
          { env with
            neqs = update_neqs rr nrr dep env ;
-           classes = update_classes rr nrr env.classes})
+           classes = update_classes rr nrr env.classes ;
+           domains = update_domains ~ex rr nrr env })
       set env
 
   (* Patch modudo AC for CC: if p is a leaf different from r and r is AC
@@ -672,7 +761,7 @@ module Env = struct
                env,
                (r, nrr, ex)::touched_p,
                update_global_tch global_tch p r nrr ex,
-               SetXX.add (rr, nrr) neqs_to_up
+               SetXX.add (rr, nrr, dep) neqs_to_up
           ) use_p (env, [], global_tch, SetXX.empty)
       in
       (* Correction : Do not update neqs twice for the same r *)
@@ -699,7 +788,7 @@ module Env = struct
                  if X.is_a_leaf r then (r,[r, nrr, ex],nrr) :: tch
                  else tch
                in
-               env, tch, SetXX.add (rr, nrr) neqs_to_up
+               env, tch, SetXX.add (rr, nrr, ex_nrr) neqs_to_up
           ) env.repr (env, tch, SetXX.empty)
       in
       (* Correction : Do not update neqs twice for the same r *)
@@ -766,7 +855,7 @@ let rec ac_x eqs env tch =
     Debug.ac_x r1 r2;
     let sbs, dep = x_solve env r1 r2 dep in
     let env, tch = List.fold_left (ac_solve eqs dep) (env, tch) sbs in
-    if get_debug_uf () then Debug.all env;
+    if Options.get_debug_uf () then Debug.all env;
     ac_x eqs env tch
 
 let union env r1 r2 dep =
@@ -778,17 +867,8 @@ let union env r1 r2 dep =
   env, res
 
 let union env r1 r2 dep =
-  if Options.get_timers() then
-    try
-      Timers.exec_timer_start Timers.M_UF Timers.F_union;
-      let res = union env r1 r2 dep in
-      Timers.exec_timer_pause Timers.M_UF Timers.F_union;
-      res
-    with e ->
-      Timers.exec_timer_pause Timers.M_UF Timers.F_union;
-      raise e
-  else union env r1 r2 dep
-
+  Timers.with_timer Timers.M_UF Timers.F_union @@ fun () ->
+  union env r1 r2 dep
 
 let rec distinct env rl dep =
   Debug.all env;
@@ -873,50 +953,6 @@ let already_distinct env lr =
     true
   with Not_found -> false
 
-let mapt_choose m =
-  let r = ref None in
-  (try
-     ME.iter (fun x rx ->
-         r := Some (x, rx); raise Exit
-       ) m
-   with Exit -> ());
-  match !r with Some b -> b | _ -> raise Not_found
-
-let model env =
-  let eqs =
-    MapX.fold (fun r cl acc ->
-        let l, to_rel =
-          List.fold_left (fun (l, to_rel) t ->
-              let rt = ME.find t env.make in
-              if get_complete_model () || E.is_in_model t then
-                if X.equal rt r then l, (t,rt)::to_rel
-                else t::l, (t,rt)::to_rel
-              else l, to_rel
-            ) ([], []) (SE.elements cl) in
-        (r, l, to_rel)::acc
-      ) env.classes []
-  in
-  let rec extract_neqs acc makes =
-    try
-      let x, rx = mapt_choose makes in
-      let makes = ME.remove x makes in
-      let acc =
-        if get_complete_model () || E.is_in_model x then
-          ME.fold (fun y ry acc ->
-              if (get_complete_model () || E.is_in_model y)
-              && (already_distinct env [rx; ry]
-                  || already_distinct env [ry; rx])
-              then [y; x]::acc
-              else acc
-            ) makes acc
-        else acc
-      in extract_neqs acc makes
-    with Not_found -> acc
-  in
-  let neqs = extract_neqs [] env.make in
-  eqs, neqs
-
-
 let find env t =
   Options.tool_req 3 "TR-UFX-Find";
   Env.lookup_by_t t env
@@ -924,6 +960,10 @@ let find env t =
 let find_r =
   Options.tool_req 3 "TR-UFX-Find";
   Env.find_or_normal_form
+
+let domains env = env.domains
+
+let set_domains env domains = { env with domains }
 
 let print = Debug.all
 
@@ -944,12 +984,11 @@ let term_repr uf t =
   try SE.min_elt st
   with Not_found -> t
 
-let class_of env t = SE.elements (class_of env t)
-
-let empty () =
+let empty =
   let env = {
     make  = ME.empty;
     repr = MapX.empty;
+    domains = GlobalDomains.empty;
     classes = MapX.empty;
     gamma = MapX.empty;
     neqs = MapX.empty;
@@ -958,24 +997,15 @@ let empty () =
   in
   let env, _ = add env E.vrai in
   let env, _ = add env E.faux in
-  distinct env [X.top (); X.bot ()] Ex.empty
+  distinct env [X.top; X.bot] Ex.empty
 
 let make uf t = ME.find t uf.make
 
 (*** add wrappers to profile exported functions ***)
 
 let add env t =
-  if Options.get_timers() then
-    try
-      Timers.exec_timer_start Timers.M_UF Timers.F_add_terms;
-      let res = add env t  in
-      Timers.exec_timer_pause Timers.M_UF Timers.F_add_terms;
-      res
-    with e ->
-      Timers.exec_timer_pause Timers.M_UF Timers.F_add_terms;
-      raise e
-  else add env t
-
+  Timers.with_timer Timers.M_UF Timers.F_add_terms @@ fun () ->
+  add env t
 
 let is_normalized env r =
   List.for_all
@@ -1028,7 +1058,7 @@ let assign_next env =
     match !acc with
     | None -> assert false
     | Some (s, rep, is_cs) ->
-      if get_debug_interpretation () then
+      if Options.get_debug_interpretation () then
         Printer.print_dbg
           ~module_name:"Uf" ~function_name:"assign_next"
           "TRY assign-next %a = %a" X.print rep E.print s;
@@ -1045,238 +1075,230 @@ let assign_next env =
   Debug.check_invariants "assign_next" env;
   res, env
 
-module Profile = struct
+let save_cache () =
+  LX.save_cache ()
 
-  module P = Map.Make
-      (struct
-        type t = Sy.t * Ty.t list * Ty.t
+let reinit_cache () =
+  LX.reinit_cache ()
 
-        let (|||) c1 c2 = if c1 <> 0 then c1 else c2
-
-        let compare (a1, b1, c1)  (a2, b2, c2) =
-          let l1_l2 = List.length b1 - List.length b2 in
-          let c = l1_l2 ||| (Ty.compare c1 c2) ||| (Sy.compare a1 a2) in
-          if c <> 0 then c
-          else
-            let c = ref 0 in
-            try
-              List.iter2
-                (fun ty1 ty2 ->
-                   let d = Ty.compare ty1 ty2 in
-                   if d <> 0 then begin c := d; raise Exit end
-                ) b1 b2;
-              0
-            with
-            | Exit -> assert (!c <> 0); !c
-            | Invalid_argument _ -> assert false
-      end)
-
-  module V = Set.Make
-      (struct
-        type t = (E.t * (X.r * string)) list * (X.r * string)
-        let compare (l1, (v1,_)) (l2, (v2,_)) =
-          let c = X.hash_cmp v1 v2 in
-          if c <> 0 then c
-          else
-            let c = ref 0 in
-            try
-              List.iter2
-                (fun (_,(x,_)) (_,(y,_)) ->
-                   let d = X.hash_cmp x y in
-                   if d <> 0 then begin c := d; raise Exit end
-                ) l1 l2;
-              !c
-            with
-            | Exit -> !c
-            | Invalid_argument _ -> List.length l1 - List.length l2
-      end)
-
-  let add p v mp =
-    let prof_p = try P.find p mp with Not_found -> V.empty in
-    if V.mem v prof_p then mp
-    else P.add p (V.add v prof_p) mp
-
-  let iter = P.iter
-
-  let empty = P.empty
-
-  let is_empty = P.is_empty
-end
-
-let assert_has_depth_one (e, _) =
-  match X.term_extract e with
-  | Some t, true -> assert (E.const_term t);
-  | _ -> ()
-
-module SMT2LikeModelOutput = struct
-
-  let x_print fmt (_ , ppr) = fprintf fmt "%s" ppr
-
-  let print_args fmt l =
-    match l with
-    | [] -> assert false
-    | [_,e] ->
-      fprintf fmt "%a" x_print e;
-    | (_,e) :: l ->
-      fprintf fmt "%a" x_print e;
-      List.iter (fun (_, e) -> fprintf fmt " %a" x_print e) l
-
-  let print_symb ty fmt f =
-    match f, ty with
-    | Sy.Op Sy.Record, Ty.Trecord { Ty.name ; _ } ->
-      fprintf fmt "%a__%s" Sy.print f (Hstring.view name)
-
-    | _ -> Sy.print fmt f
-
-  let output_constants_model cprofs =
-    (*printf "; constants:@.";*)
-    Profile.iter
-      (fun (f, _xs_ty, ty) st ->
-         match Profile.V.elements st with
-         | [[], rep] ->
-           (*printf "  (%a %a)  ; %a@."
-             (print_symb ty) f x_print rep Ty.print ty*)
-           Printer.print_fmt ~flushed:false (get_fmt_mdl ())
-             "(%a %a)@ " (print_symb ty) f x_print rep
-         | _ -> assert false
-      )cprofs
-
-  let output_functions_model fprofs =
-    if not (Profile.is_empty fprofs) then begin
-      Printer.print_fmt ~flushed:false (get_fmt_mdl ()) "@[<v 2>@ ";
-      (*printf "@.; functions:@.";*)
-      Profile.iter
-        (fun (f, _xs_ty, ty) st ->
-           (*printf "  ; fun %a : %a -> %a@."
-             (print_symb ty) f Ty.print_list xs_ty Ty.print ty;*)
-           Profile.V.iter
-             (fun (xs, rep) ->
-                Printer.print_fmt ~flushed:false (get_fmt_mdl ())
-                  "((%a %a) %a)@ "
-                  (print_symb ty) f print_args xs x_print rep;
-                List.iter (fun (_,x) -> assert_has_depth_one x) xs;
-             )st;
-           Printer.print_fmt ~flushed:false (get_fmt_mdl ()) "@]@ ";
-        ) fprofs;
-      Printer.print_fmt (get_fmt_mdl ()) "@]";
-    end
-
-  let output_arrays_model arrays =
-    if not (Profile.is_empty arrays) then begin
-      Printer.print_fmt ~flushed:false (get_fmt_mdl ()) "@[<v 2>@ ";
-      (*printf "; arrays:@.";*)
-      Profile.iter
-        (fun (f, xs_ty, ty) st ->
-           match xs_ty with
-             [_] ->
-             (*printf "  ; array %a : %a -> %a@."
-               (print_symb ty) f Ty.print tyi Ty.print ty;*)
-             Profile.V.iter
-               (fun (xs, rep) ->
-                  Printer.print_fmt ~flushed:false (get_fmt_mdl ())
-                    "((%a %a) %a)@ "
-                    (print_symb ty) f print_args xs x_print rep;
-                  List.iter (fun (_,x) -> assert_has_depth_one x) xs;
-               )st;
-             Printer.print_fmt ~flushed:false (get_fmt_mdl ()) "@]@ ";
-           | _ -> assert false
-
-        ) arrays;
-      Printer.print_fmt (get_fmt_mdl ()) "@]";
-    end
-
-end
-(* of module SMT2LikeModelOutput *)
-
-let is_a_good_model_value (x, _) =
-  match X.leaves x with
-    [] -> true
-  | [y] -> X.equal x y
-  | _ -> false
-
+(****************************************************************************)
+(*                      Model generation functions                          *)
+(****************************************************************************)
 
 let model_repr_of_term t env mrepr =
   try ME.find t mrepr, mrepr
   with Not_found ->
     let mk = try ME.find t env.make with Not_found -> assert false in
-    let rep,_ = try MapX.find mk env.repr with Not_found -> assert false in
-    let cls =
-      try SE.elements (MapX.find rep env.classes)
-      with Not_found -> assert false
+    let rep, _ = try MapX.find mk env.repr with Not_found -> assert false in
+    (* We call this function during the model generation only. At this time,
+       we are sure that class representatives are constant semantic values, or
+       uninterpreted names. *)
+    match X.to_model_term rep with
+    | Some v -> v, ME.add t v mrepr
+    | None ->
+      (* [X.to_model_term] cannot fail on constant semantic values. *)
+      assert false
+
+(* A map of expressions to terms, ordered by depth first, and then by
+   [Expr.compare] for expressions with same depth. This structure will
+   be used to build a model, by starting with the inner/smaller terms
+   first. The values associated to the key will be their make *)
+module MED = Map.Make
+    (struct
+      type t = Expr.t
+      let compare a b =
+        let c = Expr.depth a - Expr.depth b in
+        if c <> 0 then c
+        else Expr.compare a b
+    end)
+
+let is_suspicious_name hs =
+  match Hstring.view hs with
+  | "@/" | "@%" | "@*" -> true
+  | _ -> false
+
+(* The model generation is known to be imcomplete for FPA theory. *)
+let is_suspicious_symbol = function
+  | Symbols.Name { hs; _ } when is_suspicious_name hs -> true
+  | _ -> false
+
+let terms env =
+  ME.fold
+    (fun t r ((terms, suspicious) as acc) ->
+       let Expr.{ f; _ } = Expr.term_view t in
+       match f with
+       | Name { defined = true; _ } ->
+         (* We don't store names defined by the user. *)
+         acc
+       | _ ->
+         let suspicious = is_suspicious_symbol f || suspicious in
+         MED.add t r terms, suspicious
+    ) env.make (MED.empty, false)
+
+(* Helper functions used by the caches during the computation of the model. *)
+module Cache = struct
+  let store_array_get arrays_cache (t : E.t) (i : E.t) (v : E.t) =
+    match E.Table.find arrays_cache t with
+    | exception Not_found ->
+      let values = E.Table.create 17 in
+      E.Table.add values i v;
+      E.Table.add arrays_cache t values
+    | values ->
+      E.Table.replace values i v
+
+  let get_abstract_for abstracts_cache env (t : E.t) =
+    let r, _ = find env t in
+    match Shostak.HX.find abstracts_cache r with
+    | exception Not_found ->
+      let abstract = E.mk_abstract (E.type_info t) in
+      Shostak.HX.add abstracts_cache r abstract;
+      abstract
+    | abstract -> abstract
+end
+
+type cache = {
+  array_selects: Expr.t E.Table.t E.Table.t;
+  (** Stores all the get accesses to arrays. *)
+
+  abstracts: Expr.t Shostak.HX.t;
+  (** Stores all the abstract values generated. This cache is necessary
+      to ensure we don't generate twice an abstract value for a given symbol. *)
+}
+
+let is_destructor = function
+  | Sy.Op (Destruct _) -> true
+  | _ -> false
+
+(* The environment of the union-find contains almost a first-order model.
+   There are two situations that require some computations to retrieve an
+   appropriate model value:
+   - As our array theory has no semantic values, there are no value
+     which represents an array in the union-find environment. Instead, the
+     union-find stores the collection of all the access to the array. This
+     function retrieves all these accesses in order to build an expression
+     which defines the approriate array.
+   - If the problem involves declared terms whose the type is abstract,
+     Alt-Ergo cannot produces a constant value for them. This function creates
+     a new abstract value in this case. *)
+let compute_concrete_model_of_val cache =
+  let store_array_select = Cache.store_array_get cache.array_selects
+  and get_abstract_for = Cache.get_abstract_for cache.abstracts
+  in fun env t ((mdl, mrepr) as acc) ->
+    let { E.f; xs; ty; _ } = E.term_view t in
+    (* TODO: We have to filter out destructors here as we don't consider
+       pending destructors as solvable theory symbols of the ADT theory.
+       We should check if these symbols can be defined as solvable to
+       remove this particular case here. *)
+    if X.is_solvable_theory_symbol f || is_destructor f
+       || Sy.is_internal f || E.equal t E.vrai || E.equal t E.faux
+    then
+      (* These terms are built-in interpreted ones and we don't have
+         to produce a definition for them. *)
+      acc
+    else
+      begin
+        let arg_vals, arg_tys, mrepr =
+          List.fold_left
+            (fun (arg_vals, arg_tys, mrepr) arg ->
+               let rep_arg, mrepr = model_repr_of_term arg env mrepr in
+               rep_arg :: arg_vals,
+               (Expr.type_info arg) :: arg_tys,
+               mrepr
+            )
+            ([], [], mrepr) (List.rev xs)
+        in
+        let ret_rep, mrepr = model_repr_of_term t env mrepr in
+        match f, arg_vals, ty with
+        | Sy.Name _, [], Ty.Tfarray _ ->
+          begin
+            match E.Table.find cache.array_selects t with
+            | exception Not_found ->
+              (* We have to add an abstract array in case there is no
+                 constraint on its values. *)
+              E.Table.add cache.array_selects t (E.Table.create 17);
+              acc
+            | _ -> acc
+          end
+
+        | Sy.Op Sy.Set, _, _ -> acc
+
+        | Sy.Op Sy.Get, [a; i], _ ->
+          begin
+            store_array_select a i ret_rep;
+            acc
+          end
+
+        | Sy.Name { hs = id; _ }, _, _ ->
+          let value =
+            match ty with
+            | Ty.Text _ ->
+              (* We cannot produce a concrete value as the type is abstract.
+                 In this case, we produce an abstract value with the appropriate
+                 type. *)
+              get_abstract_for env t
+            | _ -> ret_rep
+          in
+          ModelMap.(add (id, arg_tys, ty) arg_vals value mdl), mrepr
+
+        | _ ->
+          Printer.print_err
+            "Expect a uninterpreted term declared by the user, got %a"
+            E.print t;
+          assert false
+      end
+
+let extract_concrete_model cache =
+  let compute_concrete_model_of_val = compute_concrete_model_of_val cache in
+  let get_abstract_for = Cache.get_abstract_for cache.abstracts
+  in fun ~prop_model ~declared_ids env ->
+    let terms, suspicious = terms env in
+    let model, mrepr =
+      MED.fold (fun t _mk acc -> compute_concrete_model_of_val env t acc)
+        terms (ModelMap.empty ~suspicious declared_ids, ME.empty)
     in
-    let cls =
-      try List.rev_map (fun s -> s, ME.find s env.make) cls
-      with Not_found -> assert false
+    let model =
+      E.Table.fold (fun t vals mdl ->
+          (* We produce a fresh identifiant for abstract value in order to
+             prevent any capture. *)
+          let abstract = get_abstract_for env t in
+          let ty = Expr.type_info t in
+          let arr_val =
+            E.Table.fold (fun i v arr_val ->
+                Expr.ArraysEx.store arr_val i v
+              ) vals abstract
+          in
+          let id, is_user =
+            let Expr.{ f; _ } = Expr.term_view t in
+            match f with
+            | Sy.Name { hs; ns = User; _ } -> hs, true
+            | Sy.Name { hs; _ } -> hs, false
+            | _ ->
+              (* We only store array declarations as keys in the cache
+                 [array_selects]. *)
+              assert false
+          in
+          let mdl =
+            if is_user then
+              ModelMap.add (id, [], ty) [] arr_val mdl
+            else
+              (* Internal identifiers can occur here if we need to generate
+                 a model term for an embedded array but this array isn't itself
+                 declared by the user -- see the [embedded-array] test . *)
+              mdl
+          in
+          (* We need to update the model [mdl] in order to substitute all the
+             occurrences of the array identifier [id] by an appropriate model
+             term. This cannot be performed while computing the model with
+             `compute_concrete_model_of_val` because we need to first iterate
+             on all the union-find environment to collect array values. *)
+          ModelMap.subst id arr_val mdl
+        ) cache.array_selects model
     in
-    let e = X.choose_adequate_model t rep cls in
-    e, ME.add t e mrepr
+    { Models.propositional = prop_model; model; term_values = mrepr }
 
-
-let output_concrete_model ({ make; _ } as env) =
-  let i = get_interpretation () in
-  let abs_i = abs i in
-  if abs_i = 1 || abs_i = 2 || abs_i = 3 then
-    let functions, constants, arrays, _ =
-      ME.fold
-        (fun t _mk ((fprofs, cprofs, carrays, mrepr) as acc) ->
-           let { E.f; xs; ty; _ } =
-             match E.term_view t with
-             | E.Not_a_term _ -> assert false
-             | E.Term tt -> tt
-           in
-           if X.is_solvable_theory_symbol f ty
-           || E.is_fresh t || E.is_fresh_skolem t
-           || E.equal t E.vrai || E.equal t E.faux
-           then
-             acc
-           else
-             let xs, tys, mrepr =
-               List.fold_left
-                 (fun (xs, tys, mrepr) x ->
-                    let rep_x, mrepr = model_repr_of_term x env mrepr in
-                    assert (is_a_good_model_value rep_x);
-                    (x, rep_x)::xs,
-                    (E.type_info x)::tys,
-                    mrepr
-                 ) ([],[], mrepr) (List.rev xs)
-             in
-             let rep, mrepr = model_repr_of_term t env mrepr in
-             assert (is_a_good_model_value rep);
-             match f, xs, ty with
-             | Sy.Op Sy.Set, _, _ -> acc
-
-             | Sy.Op Sy.Get, [(_,(a,_));((_,(i,_)) as e)], _ ->
-               begin
-                 match X.term_extract a with
-                 | Some ta, true ->
-                   let { E.f = f_ta; xs=xs_ta; _ } =
-                     match E.term_view ta with
-                     | E.Not_a_term _ -> assert false
-                     | E.Term tt -> tt
-                   in
-                   assert (xs_ta == []);
-                   fprofs,
-                   cprofs,
-                   Profile.add (f_ta,[X.type_info i], ty) ([e], rep) carrays,
-                   mrepr
-
-                 | _ -> assert false
-               end
-
-             | _ ->
-               if tys == [] then
-                 fprofs, Profile.add (f, tys, ty) (xs, rep) cprofs, carrays,
-                 mrepr
-               else
-                 Profile.add (f, tys, ty) (xs, rep) fprofs, cprofs, carrays,
-                 mrepr
-
-        ) make (Profile.empty, Profile.empty, Profile.empty, ME.empty)
-    in
-    if i > 0 then begin
-      Printer.print_fmt ~flushed:false (get_fmt_mdl ()) "(@ ";
-      SMT2LikeModelOutput.output_constants_model constants;
-      SMT2LikeModelOutput.output_functions_model functions;
-      SMT2LikeModelOutput.output_arrays_model arrays;
-      Printer.print_fmt (get_fmt_mdl ()) ")";
-    end
+let extract_concrete_model ~prop_model ~declared_ids =
+  let cache : cache = {
+    array_selects = E.Table.create 17;
+    abstracts = Shostak.HX.create 17;
+  }
+  in fun env -> extract_concrete_model cache ~prop_model ~declared_ids env

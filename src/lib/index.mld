@@ -145,21 +145,18 @@ Stdlib extensions/replacements/wrappers:
 
 {!modules:
 AltErgoLib.Util
-AltErgoLib.Iheap
+AltErgoLib.Heap
 AltErgoLib.Emap
 AltErgoLib.Hstring
-AltErgoLib.Lists
-AltErgoLib.MyDynlink
+AltErgoLib.Compat
 AltErgoLib.Gc_debug
 AltErgoLib.Timers
 AltErgoLib.Hconsing
 AltErgoLib.Vec
 AltErgoLib.Loc
-AltErgoLib.MyUnix
+AltErgoLib.My_unix
+AltErgoLib.My_list
 AltErgoLib.Numbers
-AltErgoLib.ZarithNumbers
-AltErgoLib.NumsNumbers
-AltErgoLib.NumbersInterface
 }
 
 

@@ -1,16 +1,22 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the license indicated      *)
-(*     in the file 'License.OCamlPro'. If 'License.OCamlPro' is not           *)
-(*     present, please contact us to clarify licensing.                       *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the file LICENSE.md                   *)
+(*                                                                        *)
+(**************************************************************************)
 
 open AltErgoLib
-open Options
 open Format
 open Numbers
 module H = Hashtbl
@@ -373,29 +379,22 @@ module Simplex (C : Coef_Type) = struct
     let z_subst_in_p p s = p.a.(s) <- s, C.zero
 
     let normalize_poly p sbt zsbt =
-      for i = 0 to Vec.size sbt - 1 do subst_in_p p (Vec.get sbt i) done;
-      for i = 0 to Vec.size zsbt - 1 do z_subst_in_p p (Vec.get zsbt i) done
+      Vec.iter (subst_in_p p) sbt;
+      Vec.iter (z_subst_in_p p) zsbt
 
     let normalize_sbt sbt zsbt =
-      for i = 0 to Vec.size sbt - 1 do
-        for j = 0 to Vec.size zsbt - 1 do
-          z_subst_in_p (snd (Vec.get sbt i)) (Vec.get zsbt j)
-        done;
-      done;
+      Vec.iter (fun elt ->
+          Vec.iter (z_subst_in_p (snd elt)) zsbt
+        ) sbt;
       for i = Vec.size sbt - 1 downto 1 do
         for j = i - 1 downto 0 do
           subst_in_p (snd (Vec.get sbt j)) (Vec.get sbt i)
         done;
       done;
-      let l1 = ref [] in
-      let l2 = ref [] in
-      for i = 0 to Vec.size sbt - 1  do l1 := (Vec.get sbt i)  :: !l1 done;
-      for i = 0 to Vec.size zsbt - 1 do l2 := (Vec.get zsbt i) :: !l2 done;
-      !l2, !l1
+      Vec.to_rev_list zsbt, Vec.to_rev_list sbt
 
-
-    let sbt = Vec.make 107 ((0,0),{a=[||]; c=Q.zero, Q.zero})
-    let zsbt = Vec.make 107 (-2)
+    let sbt = Vec.make 107 ~dummy:((0,0),{a=[||]; c=Q.zero, Q.zero})
+    let zsbt = Vec.make 107 ~dummy:(-2)
 
     let solve_zero_arr zsbt zsbt_inv a =
       Array.iter

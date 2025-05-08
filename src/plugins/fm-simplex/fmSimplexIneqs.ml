@@ -1,13 +1,20 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the license indicated      *)
-(*     in the file 'License.OCamlPro'. If 'License.OCamlPro' is not           *)
-(*     present, please contact us to clarify licensing.                       *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the file LICENSE.md                   *)
+(*                                                                        *)
+(**************************************************************************)
 
 open AltErgoLib
 open Format
@@ -15,10 +22,12 @@ open Options
 
 module Q = Numbers.Q
 
+open Inequalities
+
 module Container : Inequalities.Container_SIG = struct
   module Make
       (P : Polynome.T with type r = Shostak.Combine.r)
-    : Inequalities.S with module P = P = struct
+    : Inequalities.S with type p = P.t = struct
 
     module X = Shostak.Combine
     module FM = Inequalities.FM(P)

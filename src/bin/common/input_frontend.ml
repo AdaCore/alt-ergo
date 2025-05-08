@@ -1,13 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2018-2020 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the license indicated      *)
-(*     in the file 'License.OCamlPro'. If 'License.OCamlPro' is not           *)
-(*     present, please contact us to clarify licensing.                       *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 open AltErgoLib
 open AltErgoParsers
@@ -15,7 +31,7 @@ open AltErgoParsers
 (* === LEGACY input method === *)
 
 let register_legacy () =
-  let module M : Input.S = struct
+  let module M : Input.S with type parsed = Parsed.decl = struct
 
     (* Parsing *)
 
@@ -23,11 +39,11 @@ let register_legacy () =
 
     let parse_file ~content ~format =
       let l = Parsers.parse_problem_as_string ~content ~format in
-      Lists.to_seq l
+      List.to_seq l
 
     let parse_files ~filename ~preludes =
       let l = Parsers.parse_problem ~filename ~preludes in
-      Lists.to_seq l
+      List.to_seq l
 
     (* Typechecking *)
 

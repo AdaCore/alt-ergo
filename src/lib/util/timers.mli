@@ -1,33 +1,33 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 type ty_module =
   | M_None
+  | M_Combine
   | M_Typing
   | M_Sat
   | M_Match
@@ -37,10 +37,13 @@ type ty_module =
   | M_Arrays
   | M_Sum
   | M_Records
+  | M_Adt
+  | M_Bitv
   | M_AC
   | M_Expr
   | M_Triggers
   | M_Simplex
+  | M_Ite
 
 type ty_function =
   | F_add
@@ -96,12 +99,6 @@ val string_of_ty_function : ty_function -> string
 
 val get_stack : t -> (ty_module * ty_function * int) list
 
-val get_timers_array : t -> (float array) array
-
-val mtag : ty_module -> int
-
-val ftag : ty_function -> int
-
 val all_modules : ty_module list
 
 val all_functions : ty_function list
@@ -112,5 +109,6 @@ val set_timer_start : (ty_module -> ty_function -> unit) -> unit
 (** This functions assumes (asserts) that timers() yields true **)
 val set_timer_pause : (ty_module -> ty_function -> unit) -> unit
 
-val exec_timer_start : ty_module -> ty_function -> unit
-val exec_timer_pause : ty_module -> ty_function -> unit
+val with_timer : ty_module -> ty_function -> (unit -> 'a) -> 'a
+(** [with_timer mod_ fun_ f] wraps the call [f ()] with the timer
+    [(mod_, fun_)]. *)

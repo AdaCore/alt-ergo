@@ -1,16 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the license indicated      *)
-(*     in the file 'License.OCamlPro'. If 'License.OCamlPro' is not           *)
-(*     present, please contact us to clarify licensing.                       *)
-(*                                                                            *)
-(******************************************************************************)
-
-[@@@ocaml.warning "-33"]
-open Options
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 open Parsed
 
@@ -61,6 +74,9 @@ let mk_logic loc is_ac named_idents ty =
 let mk_function_def loc named_ident args ty expr =
   Function_def (loc, named_ident, args, ty, expr)
 
+let mk_mut_rec_def l =
+  MutRecDefs l
+
 let mk_ground_predicate_def loc named_ident expr =
   Predicate_def (loc, named_ident, [], expr)
 
@@ -70,6 +86,8 @@ let mk_non_ground_predicate_def loc named_ident args expr =
 let mk_goal loc name expr =
   Goal (loc, name, expr)
 
+let mk_check_sat loc name expr =
+  Check_sat (loc, name, expr)
 
 (** Declaration of theories, generic axioms and rewriting rules **)
 
@@ -98,6 +116,11 @@ let mk_push loc n =
 
 let mk_pop loc n =
   Pop (loc, n)
+
+(** Declaration of optimization of objective functions. *)
+
+let mk_optimize loc expr is_max =
+  Optimize (loc, expr, is_max)
 
 (** Making pure and logic types *)
 
@@ -205,9 +228,7 @@ let mk_bitv_const =
     mk_localized loc (PPconst (ConstBitv (check_binary_mode const)))
 
 let mk_bitv_extract loc e i j =
-  let i =  mk_int_const loc i in
-  let j =  mk_int_const loc j in
-  mk_localized loc (PPextract (e, i, j))
+  mk_localized loc (PPextract (e, int_of_string i, int_of_string j))
 
 let mk_bitv_concat loc e1 e2 =
   mk_localized loc (PPconcat(e1, e2))
@@ -310,9 +331,8 @@ let mk_cut loc expr =
 let mk_match loc expr cases =
   mk_localized loc (PPmatch (expr, cases))
 
-let mk_algebraic_test loc expr cstr =
-  mk_localized loc (PPisConstr (expr, cstr))
+let mk_algebraic_test loc expr constr =
+  mk_localized loc (PPisConstr (expr, constr))
 
-let mk_algebraic_project loc ~guarded expr cstr =
-  mk_localized loc (PPproject (guarded, expr, cstr))
-
+let mk_algebraic_project loc expr constr =
+  mk_localized loc (PPproject (expr, constr))

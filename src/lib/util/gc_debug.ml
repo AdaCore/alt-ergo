@@ -1,16 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the license indicated      *)
-(*     in the file 'License.OCamlPro'. If 'License.OCamlPro' is not           *)
-(*     present, please contact us to clarify licensing.                       *)
-(*                                                                            *)
-(******************************************************************************)
-
-open Options
-open Gc
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 (*
  major_collections; (* num of completed major collection cycles *)
@@ -24,14 +37,17 @@ open Gc
  major_words; (* num of alloc words in major heap, since beginning *)
 *)
 
+let src = Logs.Src.create ~doc:"Gc_debug" __MODULE__
+module Log = (val Logs.src_log src : Logs.LOG)
+
 let init () =
-  if get_debug_gc() then
+  if Options.get_debug_gc() then
     begin
-      let tmp = ref (quick_stat ()) in
+      let tmp = ref (Gc.quick_stat ()) in
       ignore
-        (create_alarm
+        (Gc.create_alarm
            (fun () ->
-              let e = quick_stat () in
+              let e = Gc.quick_stat () in
               let d = !tmp in
 
               Printer.print_dbg

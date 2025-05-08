@@ -1,34 +1,34 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 type builtin = Symbols.builtin =
     LE | LT | (* arithmetic *)
-    IsConstr of Hstring.t (* ADT tester *)
+    IsConstr of Uid.term_cst (* ADT tester *)
+  | BVULE (* unsigned bit-vector arithmetic *)
 
 type 'a view = (*private*)
   | Eq of 'a * 'a
@@ -50,8 +50,8 @@ module type OrderedType = sig
   val compare : t -> t -> int
   val hash :  t -> int
   val print : Format.formatter -> t -> unit
-  val top : unit -> t
-  val bot : unit -> t
+  val top : t
+  val bot : t
   val type_info : t -> Ty.t
 end
 
@@ -85,6 +85,12 @@ module type S = sig
   val hash : t -> int
   val uid : t -> int
   val elements : t -> elt list
+
+  val save_cache : unit -> unit
+  (** Saves the modules cache  *)
+
+  val reinit_cache: unit -> unit
+  (** Reinitializes the module's cache *)
 
   module Map : Map.S with type key = t
   module Set : Set.S with type elt = t

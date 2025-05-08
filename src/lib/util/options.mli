@@ -1,30 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 (** {1 Options module used at start-up to parse the command line} *)
 
@@ -34,23 +33,53 @@
     of the program
 *)
 
-(** Type used to describe the type of models wanted *)
-type model = MNone | MDefault | MAll | MComplete
+(** Type used to describe the type of heuristic for instantiation wanted by
+    {!val:set_instantiation_heuristic} *)
+type instantiation_heuristic =
+  | INormal      (** Least costly heuristic for instantiation, instantiate on
+                     a reduced set of term *)
+  | IAuto        (** Default Heuristic that try to do the normal heuristic and
+                     then try a greedier instantiation if no new instance have
+                     been made *)
+  | IGreedy      (** Force instantiation to be the greedier as possible,
+                     use all available ground terms *)
 
-(** Type used to describe the type of heuristic for instantiation wanted *)
-type instantiation_heuristic  = INormal | IAuto | IGreedy
+(** Type used to describe the type of interpretation wanted by
+    {!val:set_interpretation} *)
+type interpretation =
+  | INone        (** Default, No interpretation computed *)
+  | IFirst       (** Compute an interpretation after the first instantiation
+                     and output it at the end of the executionn *)
+  | IEvery       (** Compute an interpretation before every instantiation
+                     and return the last one computed *)
+  | ILast        (** Compute only the last interpretation just before
+                     returning SAT/Unknown *)
+
+type smtlib2_version =
+  [ `Latest
+  (** Latest version of the SMT-LIB standard. *)
+  | `V2_6
+  (** {{: https://smt-lib.org/papers/smt-lib-reference-v2.6-r2021-05-12.pdf }
+      The SMT-LIB standard: Version 2.6} *)
+  | `Poly
+    (** Polymorphic extension of the SMT-LIB standard.
+
+        See the {{: https://inria.hal.science/hal-01960203/document } tool
+        paper} *)
+  ]
+(** Version of the SMT-LIB standard used. *)
 
 (** Type used to describe the type of input wanted by
     {!val:set_input_format} *)
 type input_format =
   | Native                     (** Native Alt-Ergo format  *)
-  | Smtlib2
-  (** {{:
-      http://smtlib.cs.uiowa.edu/papers/smt-lib-reference-v2.6-r2017-07-18.pdf}
-      Smtlib} default format *)
+  | Smtlib2 of smtlib2_version
+  (** {{: https://smt-lib.org/language.shtml} SMT-LIB} default format. *)
   | Why3                       (** Why3 file format *)
   (*   | SZS                        * Not yet implemented SZS format   *)
   | Unknown of string          (** Unknown file format *)
+
+type model_type = Value | Constraints
 
 (** Type used to describe the type of output wanted by
     {!val:set_output_format} *)
@@ -97,7 +126,13 @@ val set_debug_explanations : bool -> unit
 (** Set [debug_fm] accessible with {!val:get_debug_fm} *)
 val set_debug_fm : bool -> unit
 
-(** Set [debug_fpa] accessible with {!val:get_debug_fpa} *)
+(** Set [debug_intervals] accessible with {!val:get_debug_intervals} *)
+val set_debug_intervals : bool -> unit
+
+(** Set [debug_fpa] accessible with {!val:get_debug_fpa}
+
+    Possible values are
+    {ol {- Disabled} {- Light} {- Full}} *)
 val set_debug_fpa : int -> unit
 
 (** Set [debug_gc] accessible with {!val:get_debug_gc} *)
@@ -123,17 +158,11 @@ val set_debug_sat : bool -> unit
 (** Set [debug_split] accessible with {!val:get_debug_split} *)
 val set_debug_split : bool -> unit
 
-(** Set [debug_sum] accessible with {!val:get_debug_sum} *)
-val set_debug_sum : bool -> unit
-
 (** Set [debug_triggers] accessible with {!val:get_debug_triggers} *)
 val set_debug_triggers : bool -> unit
 
 (** Set [debug_types] accessible with {!val:get_debug_types} *)
 val set_debug_types : bool -> unit
-
-(** Set [debug_typing] accessible with {!val:get_debug_typing} *)
-val set_debug_typing : bool -> unit
 
 (** Set [debug_uf] accessible with {!val:get_debug_uf} *)
 val set_debug_uf : bool -> unit
@@ -146,6 +175,12 @@ val set_debug_use : bool -> unit
 
 (** Set [debug_warnings] accessible with {!val:get_debug_warnings} *)
 val set_debug_warnings : bool -> unit
+
+(** Set [debug_commands] accessible with {!val:get_debug_commands} *)
+val set_debug_commands : bool -> unit
+
+(** Set [debug_optimize] accessible with {!val:get_debug_optimize} *)
+val set_debug_optimize : bool -> unit
 
 (** Set [profiling] accessible with {!val:get_profiling} *)
 val set_profiling : bool -> float -> unit
@@ -178,26 +213,33 @@ val set_instantiation_heuristic : instantiation_heuristic -> unit
 val set_inline_lets : bool -> unit
 
 (** Set [input_format] accessible with {!val:get_input_format} *)
-val set_input_format : input_format -> unit
+val set_input_format : input_format option -> unit
 
 (** Set [interpretation] accessible with {!val:get_interpretation}
 
     Possible values are :
-    {ol {- Unknown} {- Before instantiation}
-    {- Before every decision or instantiation}}
+    {ol {- First} {- Before every instantiation}
+     {- Before every decision and instantiation}
+     {- Before end}}
+*)
+val set_interpretation : interpretation -> unit
 
-    A negative value (-1, -2, or -3) will disable interpretation display. *)
-val set_interpretation : int -> unit
+(** Set [strict_mode] accessible with {!val:get_strict_mode}. *)
+val set_strict_mode : bool -> unit
+
+(** [dump_models] accessible with {!val:get_dump_models}. *)
+val set_dump_models : bool -> unit
+
+(** Set [interpretation_use_underscore] accessible with
+    {!val:get_interpretation_use_underscore} *)
+val set_interpretation_use_underscore : bool -> unit
+
+(** Set [objectives_in_interpretation] accessible with
+    {!val:get_objectives_in_interpretation} *)
+val set_objectives_in_interpretation : bool -> unit
 
 (** Set [max_split] accessible with {!val:get_max_split} *)
 val set_max_split : Numbers.Q.t -> unit
-
-(** Set [model] accessible with {!val:get_model}
-
-    Possible values are :
-    {ul {- Default} {- Complete} {- All}}
-*)
-val set_model : model -> unit
 
 (** Set [nb_triggers] accessible with {!val:get_nb_triggers} *)
 val set_nb_triggers : int -> unit
@@ -222,6 +264,9 @@ val set_normalize_instances : bool -> unit
 
 (** Set [output_format] accessible with {!val:get_output_format} *)
 val set_output_format : output_format -> unit
+
+(** Set [model_type] accessible with {!val:get_model_type} *)
+val set_model_type : model_type -> unit
 
 (** Set [parse_only] accessible with {!val:get_parse_only} *)
 val set_parse_only : bool -> unit
@@ -282,6 +327,9 @@ val set_case_split_policy : Util.case_split_policy -> unit
 (** Set [enable_adts_cs] accessible with {!val:get_enable_adts_cs} *)
 val set_enable_adts_cs : bool -> unit
 
+(** Set [enable_sat_cs] accessible with {!val:get_enable_sat_cs} *)
+val set_enable_sat_cs : bool -> unit
+
 (** Set [replay] accessible with {!val:get_replay} *)
 val set_replay : bool -> unit
 
@@ -309,17 +357,14 @@ val set_output_with_formatting : bool -> unit
     {!val:get_output_with_forced_flush} *)
 val set_output_with_forced_flush : bool -> unit
 
-(** Set [infer_input_format] accessible with {!val:get_infer_input_format} *)
-val set_infer_input_format : 'a option -> unit
-
 (** Set [infer_output_format] accessible with {!val:get_infer_output_format} *)
-val set_infer_output_format : 'a option -> unit
-
-(** Set [parsers] accessible with {!val:get_parsers} *)
-val set_parsers : string list -> unit
+val set_infer_output_format : bool -> unit
 
 (** Set [preludes] accessible with {!val:get_preludes} *)
 val set_preludes : string list -> unit
+
+(** Set [theory_preludes] accessible with {!val:get_theory_preludes} *)
+val set_theory_preludes : Theories.prelude list -> unit
 
 (** Set [disable_weaks] accessible with {!val:get_disable_weaks} *)
 val set_disable_weaks : bool -> unit
@@ -329,6 +374,9 @@ val set_enable_assertions : bool -> unit
 
 (** Set [warning_as_error] accessible with {!val:get_warning_as_error} *)
 val set_warning_as_error : bool -> unit
+
+(** Set [exit_on_error] accessible with {!val:get_exit_on_error} *)
+val set_exit_on_error : bool -> unit
 
 (** Set [timelimit_interpretation] accessible with
     {!val:get_timelimit_interpretation} *)
@@ -395,17 +443,11 @@ val set_sat_plugin : string -> unit
 (** Set [sat_solver] accessible with {!val:get_sat_solver} *)
 val set_sat_solver : Util.sat_solver -> unit
 
-(** Set [tableaux_cdcl] accessible with {!val:get_tableaux_cdcl} *)
-val set_tableaux_cdcl : bool -> unit
-
 (** Set [disable_ites] accessible with {!val:get_disable_ites} *)
 val set_disable_ites : bool -> unit
 
 (** Set [disable_adts] accessible with {!val:get_disable_adts} *)
 val set_disable_adts : bool -> unit
-
-(** Set [inequalities_plugin] accessible with {!val:get_inequalities_plugin} *)
-val set_inequalities_plugin : string -> unit
 
 (** Set [no_fm] accessible with {!val:get_no_fm} *)
 val set_no_fm : bool -> unit
@@ -418,9 +460,6 @@ val set_no_theory : bool -> unit
 
 (** Set [tighten_vars] accessible with {!val:get_tighten_vars} *)
 val set_tighten_vars : bool -> unit
-
-(** Set [use_fpa] accessible with {!val:get_use_fpa} *)
-val set_use_fpa : bool -> unit
 
 (** Set [session_file] accessible with {!val:get_session_file} *)
 val set_session_file : string -> unit
@@ -439,6 +478,14 @@ val get_debug : unit -> bool
 (** Get the debugging flag of warnings. *)
 val get_debug_warnings : unit -> bool
 
+(** Get the debugging flag of commands. If enabled, Alt-Ergo will display all
+    the commands that are sent to the solver. *)
+val get_debug_commands : unit -> bool
+
+(** Get the debugging flag of optimize. If enabled, Alt-Ergo will output
+    debugging messages about the optimization of values in models. *)
+val get_debug_optimize : unit -> bool
+
 (** Get the debugging flag of cc. *)
 val get_debug_cc : unit -> bool
 
@@ -454,12 +501,12 @@ val get_debug_uf : unit -> bool
 (** Get the debugging flag of inequalities. *)
 val get_debug_fm : unit -> bool
 
+(** Get the debugging flag of intervals. *)
+val get_debug_intervals : unit -> bool
+
 (** Get the debugging value of floating-point. *)
 val get_debug_fpa : unit -> int
 (** Default to [0]. *)
-
-(** Get the debugging flag of Sum. *)
-val get_debug_sum : unit -> bool
 
 (** Get the debugging flag of ADTs. *)
 val get_debug_adt : unit -> bool
@@ -475,9 +522,6 @@ val get_debug_ac : unit -> bool
 
 (** Get the debugging flag of SAT. *)
 val get_debug_sat : unit -> bool
-
-(** Get the debugging flag of typing. *)
-val get_debug_typing : unit -> bool
 
 (** Get the debugging flag of constructors. *)
 val get_debug_constr : unit -> bool
@@ -534,6 +578,11 @@ val get_case_split_policy : unit -> Util.case_split_policy
 val get_enable_adts_cs : unit -> bool
 (** Default to [false] *)
 
+(** [true] if case-split are performed in the SAT solver rather than the theory
+    solver (only for CDCL solver and for select theories). *)
+val get_enable_sat_cs : unit -> bool
+(** Default to [false] *)
+
 (** Valuget_e specifying the maximum size of case-split. *)
 val get_max_split : unit -> Numbers.Q.t
 (** Default to [1_000_000] *)
@@ -588,26 +637,23 @@ val get_frontend : unit -> string
 (** Value specifying the default input format. Useful when the extension
     does not allow to automatically select a parser (eg. JS mode, GUI
     mode, ...). possible values are
-    {ul {- native} {- smtlib2} {- why3}} *)
-val get_input_format : unit -> input_format
-(** Default to [Native] *)
+    {ul {- native} {- smtlib2} {- why3}}
 
-(** [true] if Alt-Ergo infers automatically the input format according to the
-    file extension. [false] if an input format is set with -i option *)
-val get_infer_input_format : unit -> bool
-(** Default to [true] *)
+    If [None], Alt-Ergo will automatically infer the input format according to
+    the file extension. *)
+val get_input_format : unit -> input_format option
+(** Default to [None] *)
 
 (** [true] if the program shall stop after parsing. *)
 val get_parse_only : unit -> bool
 (** Default to [false] *)
 
-(** List of registered parsers for Alt-Ergo. *)
-val get_parsers : unit -> string list
-(** Default to [false] *)
-
 (** List of files that have be loaded as preludes. *)
 val get_preludes : unit -> string list
 (** Default to [\[\]] *)
+
+(** List of theory preludes to load. *)
+val get_theory_preludes : unit -> Theories.prelude list
 
 (** [true] if the program shall stop after typing. *)
 val get_type_only : unit -> bool
@@ -631,6 +677,10 @@ val get_enable_assertions : unit -> bool
 (** [true] if warning are set as error. *)
 val get_warning_as_error : unit -> bool
 (** Default to [false] *)
+
+(** [true] if alt-ergo exits on all errors. *)
+val get_exit_on_error : unit -> bool
+(** Default to [true] *)
 
 (** {4 Limit options} *)
 
@@ -668,44 +718,77 @@ val get_timelimit_per_goal : unit -> bool
 
 (** {4 Output options} *)
 
-(** Experimental support for models on labeled terms.
-
-    Possible values are
-    {ul {- None} {- Default} {- Complete : shows a complete model}
-    {- All : shows all models}}
-
-    Which are used in the two setters below. This option answers
-    [true] if the model is set to Default or Complete
-*)
-val get_model : unit -> bool
-(** Default to [false] *)
-
-(** [true] if the model is set to complete model *)
-val get_complete_model : unit -> bool
-(** Default to [false] *)
-
-(** [true] if the model is set to all models? *)
-val get_all_models : unit -> bool
-(** Default to [false] *)
-
 (** Experimental support for counter-example generation.
 
     Possible values are :
-    {ol {- Unknown} {- Before instantiation}
-    {- Before every decision or instantiation}}
+     {ol {- First} {- Before every instantiation}
+      {- Before every decision and instantiation}
+      {- Before end}}
 
-    A negative value (-1, -2, or -3) will disable interpretation display.
+    Which are used in the four getters below. This option answers
+    [true] if the interpretation is set to First, Before_end, Before_dec
+    or Before_inst.
 
     Note that {!val:get_max_split} limitation will be ignored in model
     generation phase. *)
-val get_interpretation : unit -> int
-(** Default to [0] *)
+val get_interpretation : unit -> bool
+(** Default to [false] *)
+
+(** [true] if strict mode is enabled. *)
+val get_strict_mode : unit -> bool
+
+(** [true] if the interpretation for each goal or check-sat is
+    printed. *)
+val get_dump_models : unit -> bool
+(** Default to [false]. *)
+
+(** [true] if the interpretation is set to first interpretation *)
+val get_first_interpretation : unit -> bool
+(** Default to [false] *)
+
+(** [true] if the interpretation is set to compute interpretation
+    before every instantiation *)
+val get_every_interpretation : unit -> bool
+(** Default to [false] *)
+
+(** [true] if the interpretation is set to compute interpretation
+    before the solver return unknown *)
+val get_last_interpretation : unit -> bool
+(** Default to [false] *)
+
+(** [true] if the interpretation_use_underscore is set to output _
+    instead of fresh values *)
+val get_interpretation_use_underscore : unit -> bool
+(** Default to [false] *)
+
+(** [true] if the objectives_in_interpretation is set to inline
+    pretty-printing of optimized expressions in the model instead of a
+    dedicated section '(objectives ...)'. Be aware that the model may
+    be shrunk or not accurate if some expressions to optimize are
+    unbounded. *)
+val get_objectives_in_interpretation : unit -> bool
+(** Default to [false] *)
 
 (** Value specifying the default output format. possible values are
     {ul {- native} {- smtlib2} {- why3}}
     . *)
 val get_output_format : unit -> output_format
 (** Default to [Native] *)
+
+(** [true] if the output format is set to smtlib2 or why3 *)
+val get_output_smtlib : unit -> bool
+(** Default to [false] *)
+
+(** Value specifying the default model type. possible values are
+    {ul {- value} {- constraints}}
+    . *)
+val get_model_type : unit -> model_type
+(** Default to [Value] *)
+
+(** [true] if the model kind is set to constraints
+    . *)
+val get_model_type_constraints : unit -> bool
+(** Default to [false] *)
 
 (** [true] if Alt-Ergo infers automatically the output format according to the
     the file extension or the input format if set. *)
@@ -891,11 +974,6 @@ val get_term_like_pp : unit -> bool
 val get_disable_adts : unit -> bool
 (** Default to [false] *)
 
-(** Value specifying which module is used to handle inequalities
-    of linear arithmetic. *)
-val get_inequalities_plugin : unit -> string
-(** Default to [false] *)
-
 (** [true] if the AC (Associative and Commutative) theory is disabled
     for function symbols. *)
 val get_no_ac : unit -> bool
@@ -939,10 +1017,6 @@ val get_restricted : unit -> bool
 
 (** [true] if the best bounds for arithmetic variables is computed. *)
 val get_tighten_vars : unit -> bool
-(** Default to [false] *)
-
-(** [true] if support for floating-point arithmetic is enabled. *)
-val get_use_fpa : unit -> bool
 (** Default to [false] *)
 
 (** Possible values are
@@ -989,10 +1063,27 @@ module Time : sig
   val start : unit -> unit
   val value : unit -> float
 
-  val set_timeout : is_gui:bool -> float -> unit
-  val unset_timeout : is_gui:bool -> unit
+  val set_timeout : float -> unit
+  val unset_timeout : unit -> unit
 
+  (** [with_timeout tm f] calls [f ()] with a timeout of [tm], and
+      unsets the timeout once the call to [f ()] completes or raises an
+      exception.
+
+      @raises Util.Timeout if the timeout is reached before [f ()] completes.
+  *)
+  val with_timeout : float -> (unit -> 'a) -> 'a
 end
+
+(** [with_timelimit_if cond f] is:
+
+    - [Time.with_timeout (get_timeout ()) f] when [cond] is [true]
+    - [f ()] otherwise
+
+    @raises Util.Timeout if the [cond] is [true] and the timeout is reached
+            before the calls to [f ()] completes.
+*)
+val with_timelimit_if : bool -> (unit -> 'a) -> 'a
 
 (** {2 Globals} *)
 (** Global functions used throughout the whole program *)
@@ -1000,86 +1091,97 @@ end
 (** Displays the used rule *)
 val tool_req : int -> string -> unit
 
-(** {3 Monomorphisations}  *)
-(** Since {!module:Options} is opened in every module,
-    definition of binary operators to hide their polymorphic
-    versions {{:https://caml.inria.fr/pub/docs/manual-ocaml/libref/Stdlib.html}
-    [Stdlib]} *)
-
-val (<>) : int -> int -> bool
-val (=) : int -> int -> bool
-val (<) : int -> int -> bool
-val (>) : int -> int -> bool
-val (<=) : int -> int -> bool
-val (>=) : int -> int -> bool
-
-val compare : int -> int -> int
-
 val get_can_decide_on : string -> bool
 val get_no_decisions_on_is_empty : unit -> bool
 
 (** Extra *)
 val match_extension : string -> input_format
 
-val set_is_gui : bool -> unit
-val get_is_gui : unit -> bool
-
-
 (** {3 Printer and formatter } *)
-(** This functions are use to print or set the formatter used to output results
-    debug or error informations *)
+(** This functions are use to print or set the output used to print debug or
+    error informations *)
+
+(** Output channels manager. *)
+module Output : sig
+  type t = private
+    | Stdout
+    | Stderr
+    | Channel of string * out_channel * Format.formatter
+    | Fmt of Format.formatter
+    | Invalid
+
+  val to_string : t -> string
+  (** [to_string] Returns a string representation of the output channel. *)
+
+  val of_formatter : Format.formatter -> t
+  (** [of_formatter fmt] create an out channel of the formatter [fmt]. *)
+
+  val to_formatter : t -> Format.formatter
+  (** [to_formatter fmt] return the underlying formatter. *)
+
+  val create_channel : string -> t
+  (** [create_filename filename] create an out channel to the file [filename].
+      If the argument is "stdout", respectively "stderr", the channel is the
+      standard output, respectively the standard error. If the file does not
+      exist, the procedure creates it. An existant file is truncated to zero
+      length. *)
+
+  val close_all : unit -> unit
+  (** Flushing and closing all the remaining output channels. *)
+
+  val set_regular : t -> unit
+  (** Set the regular output channel used by default to output results,
+      models and unsat cores.
+
+      Default to [Format.std_formatter]. *)
+
+  val set_diagnostic : t -> unit
+  (** Set the diagnostic output channel used by default to output errors,
+      debug and warning informations.
+
+      Default to [Format.err_formatter]. *)
+
+  val set_dump_models : t -> unit
+  (** Set the models output channel used by the option `--dump-models`.
+
+      Default to [Format.err_formatter]. *)
+
+  val get_fmt_regular : unit -> Format.formatter
+  (** Value specifying the formatter used to output results.
+
+      Default to [Format.std_formatter]. *)
+
+  val get_fmt_diagnostic : unit -> Format.formatter
+  (** Value specifying the formatter used to output errors.
+
+      Default to [Format.err_formatter]. *)
+
+  val get_fmt_models : unit -> Format.formatter
+  (** Value specifying the formatter used to output models printed by
+      the `--dump-models` option.
+
+      Default to [Format.err_formatter]. *)
+end
+
+module Sources : sig
+  val constr : Logs.src
+  val fm : Logs.src
+  val fpa : Logs.src
+  val interpretation : Logs.src
+  val model : Logs.src
+  val optimize : Logs.src
+  val split : Logs.src
+  val triggers : Logs.src
+  val types : Logs.src
+  val typing : Logs.src
+  val unsat_core : Logs.src
+end
 
 (** Print message as comment in the corresponding output format *)
-val print_output_format: Format.formatter -> string -> unit
+val pp_comment: Format.formatter -> string -> unit
 
-(** Set the std formatter used by default to output the results [fmt_std],
-    model [fmt_mdl] and unsat core [fmt_usc]. *)
-val set_std_fmt : Format.formatter -> unit
-(** Default to [Format.std_formatter] *)
+val heavy_assert : (unit -> bool) -> unit
+(** [heavy_assert p] checks if the suspended boolean [p] evaluates to [true].
+    No-op if the [Options.get_enable_assertions ()] is [false].
 
-(** Set the err formatter used by default to output error [fmt_err],
-    debug [fmt_dbg] and warning [fmt_wrn] informations. *)
-val set_err_fmt : Format.formatter -> unit
-(** Default to [Format.err_formatter] *)
-
-(** Value specifying the formatter used to output results *)
-val get_fmt_std : unit -> Format.formatter
-(** Default to [Format.std_formatter] *)
-
-(** Value specifying the formatter used to output errors *)
-val get_fmt_err : unit -> Format.formatter
-(** Default to [Format.err_formatter] *)
-
-(** Value specifying the formatter used to output warnings *)
-val get_fmt_wrn : unit -> Format.formatter
-(** Default to [Format.err_formatter] *)
-
-(** Value specifying the formatter used to output debug informations *)
-val get_fmt_dbg : unit -> Format.formatter
-(** Default to [Format.err_formatter] *)
-
-(** Value specifying the formatter used to output model *)
-val get_fmt_mdl : unit -> Format.formatter
-(** Default to [Format.std_formatter] *)
-
-(** Value specifying the formatter used to output unsat core *)
-val get_fmt_usc : unit -> Format.formatter
-(** Default to [Format.std_formatter] *)
-
-(** Set [fmt_std] accessible with {!val:get_fmt_std} *)
-val set_fmt_std : Format.formatter -> unit
-
-(** Set [fmt_err] accessible with {!val:get_fmt_err} *)
-val set_fmt_err : Format.formatter -> unit
-
-(** Set [fmt_wrn] accessible with {!val:get_fmt_wrn} *)
-val set_fmt_wrn : Format.formatter -> unit
-
-(** Set [fmt_dbg] accessible with {!val:get_fmt_dbg} *)
-val set_fmt_dbg : Format.formatter -> unit
-
-(** Set [fmt_mdl] accessible with {!val:get_fmt_mdl} *)
-val set_fmt_mdl : Format.formatter -> unit
-
-(** Set [fmt_usc] accessible with {!val:get_fmt_usc} *)
-val set_fmt_usc : Format.formatter -> unit
+    @raises Assert_failure if [p] evaluates to [false]. *)

@@ -1,13 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2018-2020 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the license indicated      *)
-(*     in the file 'License.OCamlPro'. If 'License.OCamlPro' is not           *)
-(*     present, please contact us to clarify licensing.                       *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 (** {1 Worker interface module} *)
 
@@ -38,6 +54,8 @@ type frontend =
 
 type instantiation_heuristic =  INormal | IAuto | IGreedy
 
+type interpretation = INone | IFirst | IEvery | ILast
+
 (** Record type that contains all options that can be set for the Alt-Ergo's
     worker. *)
 type options = {
@@ -59,10 +77,8 @@ type options = {
   debug_matching : int option;
   debug_sat : bool option;
   debug_split : bool option;
-  debug_sum : bool option;
   debug_triggers : bool option;
   debug_types : bool option;
-  debug_typing : bool option;
   debug_uf : bool option;
   debug_unsat_core : bool option;
   debug_use : bool option;
@@ -82,7 +98,6 @@ type options = {
   frontend : frontend option;
   input_format : input_format option;
   parse_only : bool option;
-  parsers : (string list) option;
   preludes : (string list) option;
   type_only : bool option;
   type_smt2 : bool option;
@@ -94,7 +109,7 @@ type options = {
   fm_cross_limit : int option;
   steps_bound : int option;
 
-  interpretation : int option;
+  interpretation : interpretation option;
 
   output_format : output_format option;
   unsat_core : bool option;
@@ -124,7 +139,6 @@ type options = {
   no_decisions_on : (string list) option;
   no_sat_learning : bool option;
   sat_solver : sat_solver option;
-  tableaux_cdcl : bool option;
 
   disable_ites : bool option;
   inline_lets : bool option;
@@ -140,7 +154,6 @@ type options = {
   no_theory : bool option;
   restricted : bool option;
   tighten_vars : bool option;
-  use_fpa : bool option;
   timers : bool option;
 
   file : string option;
@@ -174,13 +187,9 @@ type status =
 type results = {
   worker_id : int option;
   status : status;
-  results : string list option;
-  errors : string list option;
-  warnings : string list option;
-  debugs : string list option;
+  regular : string list option;
+  diagnostic : string list option;
   statistics : statistics option;
-  model : string list option;
-  unsat_core : string list option;
 }
 
 (** {2 Functions} *)

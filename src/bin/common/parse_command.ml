@@ -1,13 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2018-2020 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the license indicated      *)
-(*     in the file 'License.OCamlPro'. If 'License.OCamlPro' is not           *)
-(*     present, please contact us to clarify licensing.                       *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 open AltErgoLib
 open Options
@@ -17,24 +33,6 @@ exception Error of bool * string
 
 (* Exception used to exit with corresponding retcode *)
 exception Exit_parse_command of int
-
-let model_parser = function
-  | "none" -> Ok MNone
-  | "default" -> Ok MDefault
-  | "complete" -> Ok MComplete
-  | "all" -> Ok MAll
-  | s ->
-    Error (`Msg ("Option --model does not accept the argument \"" ^ s))
-
-let model_to_string = function
-  | MNone -> "none"
-  | MDefault -> "default"
-  | MComplete -> "complete"
-  | MAll -> "all"
-
-let model_printer fmt model = Format.fprintf fmt "%s" (model_to_string model)
-
-let model_conv = Arg.conv ~docv:"MDL" (model_parser, model_printer)
 
 let instantiation_heuristic_parser = function
   | "normal" -> Ok INormal
@@ -63,13 +61,15 @@ let formats_list =
   ["native", Native;
    "altergo", Native;
    "alt-ergo", Native;
-   "smtlib2", Smtlib2;
-   "smt-lib2", Smtlib2;
+   "smtlib2", Smtlib2 `Latest;
+   "smt-lib2", Smtlib2 `Latest;
+   "psmt2", Smtlib2 `Poly;
+   "smtlib2-v2.6", Smtlib2 `V2_6;
    "why3", Why3]
 
 let format_parser s =
   try
-    Ok (List.assoc s formats_list)
+    Ok (My_list.assoc String.equal s formats_list)
   with
     Not_found ->
     Error (`Msg (Format.sprintf
@@ -77,7 +77,9 @@ let format_parser s =
 
 let format_to_string = function
   | Native -> "native"
-  | Smtlib2 -> "smtlib2"
+  | Smtlib2 `V2_6 -> "smtlib2-v2.6"
+  | Smtlib2 `Poly -> "psmt2"
+  | Smtlib2 `Latest -> "smtlib2"
   | Why3 -> "why3"
   | Unknown s -> Format.sprintf "Unknown %s" s
 
@@ -86,107 +88,265 @@ let format_printer fmt format =
 
 let format_conv = Arg.conv ~docv:"FMT" (format_parser, format_printer)
 
-type formatter = Stdout | Stderr | Other of string
-
-let value_of_fmt = function
-  | Stdout -> Format.std_formatter
-  | Stderr -> Format.err_formatter
-  | Other s ->
-    let oc = open_out s in
-    at_exit (fun () -> close_out oc);
-    Format.formatter_of_out_channel oc
-
-let formatter_parser = function
-  | "stdout" -> Ok Stdout
-  | "stderr" -> Ok Stderr
-  | s -> Ok (Other s)
-
-let formatter_to_string = function
-  | Stdout -> "stdout"
-  | Stderr -> "stderr"
-  | Other s -> s
-
-let formatter_printer fmt formatter =
-  Format.fprintf fmt "%s" (formatter_to_string formatter)
-
-let formatter_conv = Arg.conv ~docv:"FMT" (formatter_parser, formatter_printer)
-
-type rule = RParsing | RTyping | RSat | RCC | RArith | RNone
-
-let value_of_rule = function
-  | RParsing -> 0
-  | RTyping -> 1
-  | RSat -> 2
-  | RCC -> 3
-  | RArith -> 4
-  | RNone -> -1
-
-let rule_parser = function
-  | "parsing" -> Ok RParsing
-  | "typing" -> Ok RTyping
-  | "sat" -> Ok RSat
-  | "cc" -> Ok RCC
-  | "arith" -> Ok RArith
-  | "none" -> Ok RNone
+let model_type_parser = function
+  | "value" -> Ok Value
+  | "constraints" -> Ok Constraints
   | s ->
-    Error (`Msg ("Option --rule does not accept the argument \"" ^ s))
+    Error (`Msg (Format.sprintf
+                   "The model kind %s is invalid. Only \"value\" and \
+                    \"constraints\" are allowed" s))
 
-let rule_to_string = function
-  | RParsing -> "parsing"
-  | RTyping -> "typing"
-  | RSat -> "sat"
-  | RCC -> "cc"
-  | RArith -> "arith"
-  | RNone -> "none"
+let model_type_printer fmt format =
+  Format.fprintf fmt "%s"
+    (match format with
+     | Value -> "value"
+     | Constraints -> "constaints")
 
-let rule_printer fmt rule = Format.fprintf fmt "%s" (rule_to_string rule)
+let model_type_conv =
+  Arg.conv ~docv:"MTYP" (model_type_parser, model_type_printer)
 
-let rule_conv = Arg.conv ~docv:"MDL" (rule_parser, rule_printer)
+module Rule = struct
+  type t = RParsing | RTyping | RSat | RCC | RArith | RNone
 
-let mk_dbg_opt_spl1 debug debug_ac debug_adt debug_arith debug_arrays
-    debug_bitv debug_cc debug_combine debug_constr
-  =
-  set_debug debug;
-  set_debug_ac debug_ac;
-  set_debug_adt debug_adt;
-  set_debug_arith debug_arith;
-  set_debug_arrays debug_arrays;
-  set_debug_bitv debug_bitv;
-  set_debug_cc debug_cc;
-  set_debug_combine debug_combine;
-  set_debug_constr debug_constr;
-  `Ok()
+  let all = [RParsing; RTyping; RSat; RCC; RArith; RNone]
 
-let mk_dbg_opt_spl2 debug_explanations debug_fm debug_fpa debug_gc
-    debug_interpretation debug_ite debug_matching debug_sat
-  =
-  set_debug_explanations debug_explanations;
-  set_debug_fm debug_fm;
-  set_debug_fpa debug_fpa;
-  set_debug_gc debug_gc;
-  set_debug_interpretation debug_interpretation;
-  set_debug_ite debug_ite;
-  set_debug_matching debug_matching;
-  set_debug_sat debug_sat;
-  `Ok()
+  let value_of_rule = function
+    | RParsing -> 0
+    | RTyping -> 1
+    | RSat -> 2
+    | RCC -> 3
+    | RArith -> 4
+    | RNone -> -1
 
-let mk_dbg_opt_spl3 debug_split debug_sum debug_triggers debug_types
-    debug_typing debug_uf debug_unsat_core debug_use debug_warnings rule
-  =
-  let rule = value_of_rule rule in
-  set_debug_split debug_split;
-  set_debug_sum debug_sum;
-  set_debug_triggers debug_triggers;
-  set_debug_types debug_types;
-  set_debug_typing debug_typing;
-  set_debug_uf debug_uf;
-  set_debug_unsat_core debug_unsat_core;
-  set_debug_use debug_use;
-  set_debug_warnings debug_warnings;
-  set_rule rule;
-  `Ok()
+  let show = function
+    | RParsing -> "parsing"
+    | RTyping -> "typing"
+    | RSat -> "sat"
+    | RCC -> "cc"
+    | RArith -> "arith"
+    | RNone -> "none"
 
-let mk_case_split_opt case_split_policy enable_adts_cs max_split
+  let mk flag = Options.set_rule (value_of_rule flag)
+
+  let flag_term =
+    let enum_conv =
+      List.map (fun v -> (show v, v)) all
+      |> Arg.enum
+    in
+    let doc =
+      Format.sprintf "Output rule used on stderr, $(docv) must be %s."
+        (Arg.doc_alts (List.map show all))
+    in
+    let docv = "TR" in
+    Arg.(value & opt enum_conv RNone & info ["rule"] ~docv ~doc)
+end
+
+module Debug = struct
+  type t =
+    | Debug
+    | Ac
+    | Adt
+    | Arith
+    | Arrays
+    | Bitv
+    | Sum
+    | Ite
+    | Cc
+    | Combine
+    | Constr
+    | Explanations
+    | Fm
+    | Fpa
+    | Gc
+    | Interpretation
+    | Intervals
+    | Matching
+    | Sat
+    | Split
+    | Triggers
+    | Types
+    | Typing
+    | Uf
+    | Unsat_core
+    | Use
+    | Warnings
+    | Commands
+    | Optimize
+  [@@deriving eq]
+
+  let all = [
+    Debug; Ac; Adt; Arith; Arrays; Bitv; Sum; Ite;
+    Cc; Combine; Constr; Explanations; Fm; Fpa; Gc;
+    Interpretation; Intervals; Matching; Sat; Split; Triggers;
+    Types; Typing; Uf; Unsat_core; Use; Warnings;
+    Commands; Optimize
+  ]
+
+  let show = function
+    | Debug -> "debug"
+    | Ac -> "ac"
+    | Adt -> "adt"
+    | Arith -> "arith"
+    | Arrays -> "arrays"
+    | Bitv -> "bitv"
+    | Sum -> "sum"
+    | Ite -> "ite"
+    | Cc -> "cc"
+    | Combine -> "combine"
+    | Constr -> "constr"
+    | Explanations -> "explanations"
+    | Fm -> "fm"
+    | Fpa -> "fpa"
+    | Gc -> "gc"
+    | Interpretation -> "interpretation"
+    | Intervals -> "intervals"
+    | Matching -> "matching"
+    | Sat -> "sat"
+    | Split -> "split"
+    | Triggers -> "triggers"
+    | Types -> "types"
+    | Typing -> "typing"
+    | Uf -> "uf"
+    | Unsat_core -> "unsat-core"
+    | Use -> "use"
+    | Warnings -> "warnings"
+    | Commands -> "commands"
+    | Optimize -> "optimize"
+
+  let set_level src = Logs.Src.set_level src (Some Debug)
+
+  let mk ~verbosity flags =
+    let module S = Options.Sources in
+    List.concat flags
+    |> List.iter (function
+        | Debug ->
+          Options.set_debug true
+        | Ac ->
+          Options.set_debug_ac true;
+          set_level Ac.src
+        | Adt ->
+          Options.set_debug_adt true;
+          set_level Adt.src;
+          set_level Adt_rel.src
+        | Arith ->
+          Options.set_debug_arith true;
+          set_level Arith.src;
+          set_level IntervalCalculus.src
+        | Arrays ->
+          Options.set_debug_arrays true;
+          set_level Arrays_rel.src
+        | Bitv ->
+          Options.set_debug_bitv true;
+          set_level Bitv.src
+        | Sum ->
+          Printer.print_wrn
+            "The debug flag 'sum' is deprecated and is replaced by 'adt'. \
+             It has the same effect as 'adt' and will be removed in a future \
+             version.";
+          Options.set_debug_adt true;
+          set_level Adt.src;
+          set_level Adt_rel.src
+        | Ite ->
+          Options.set_debug_ite true;
+          set_level Ite_rel.src
+        | Cc ->
+          Options.set_debug_cc true;
+          set_level Ccx.src
+        | Combine ->
+          Options.set_debug_combine true;
+          set_level Shostak.Combine.src
+        | Constr ->
+          Options.set_debug_constr true;
+          set_level S.constr
+        | Explanations ->
+          Options.set_debug_explanations true
+        | Fm ->
+          Options.set_debug_fm true;
+          set_level S.fm
+        | Fpa ->
+          Options.set_debug_fpa verbosity
+        | Gc ->
+          Options.set_debug_gc true;
+          set_level Gc_debug.src
+        | Interpretation ->
+          Options.set_debug_interpretation true;
+          set_level S.interpretation
+        | Intervals ->
+          Options.set_debug_intervals true;
+          set_level Intervals.src
+        | Matching ->
+          Options.set_debug_matching verbosity;
+          set_level Matching.src
+        | Sat ->
+          Options.set_debug_sat true;
+          set_level Satml.src;
+          set_level Satml_frontend.src
+        | Split ->
+          Options.set_debug_split true;
+          set_level S.split
+        | Triggers ->
+          Options.set_debug_triggers true;
+          set_level S.triggers
+        | Types ->
+          Options.set_debug_types true;
+          set_level S.types
+        | Typing ->
+          Printer.print_wrn
+            "The debug flag 'typing' has no effect. It will be removed in a \
+             future version."
+        | Uf ->
+          Options.set_debug_uf true;
+          set_level Uf.src
+        | Unsat_core ->
+          Options.set_debug_unsat_core true;
+          set_level S.unsat_core
+        | Use ->
+          Options.set_debug_use true;
+          set_level Use.src
+        | Warnings ->
+          Printer.print_wrn
+            "The debug flag 'warning' is deprecated and will be removed in a \
+             future version.";
+          Options.set_debug_warnings true
+        | Commands ->
+          Options.set_debug_commands true;
+          set_level Commands.src
+        | Optimize ->
+          Options.set_debug_optimize true;
+          set_level S.optimize
+      )
+
+  let light_flag_term, medium_flag_term, full_flag_term =
+    let enum_conv =
+      List.map (fun v -> (show v, v)) all
+      |> Arg.enum
+      |> Arg.list
+    in
+    let light_doc =
+      Format.sprintf
+        "Set the debugging flags with light verbosity, $(docv) must be %s."
+        (Arg.doc_alts (List.map show all))
+    in
+    let medium_doc =
+      Format.sprintf
+        "Set the debugging flags with medium verbosity, $(docv) must be %s."
+        (Arg.doc_alts (List.map show all))
+    in
+    let full_doc =
+      Format.sprintf
+        "Set the debugging flags with full verbosity, $(docv) must be %s."
+        (Arg.doc_alts (List.map show all))
+    in
+    let docv = "DEBUG" in
+    Arg.(value & opt_all enum_conv [] & info ["d"; "debug"] ~docv
+           ~doc:light_doc),
+    Arg.(value & opt_all enum_conv [] & info ["dd"; "ddebug"] ~docv
+           ~doc:medium_doc),
+    Arg.(value & opt_all enum_conv [] & info ["ddd"; "dddebug"] ~docv
+           ~doc:full_doc)
+end
+
+let mk_case_split_opt case_split_policy enable_adts_cs max_split ()
   =
   let res =
     match case_split_policy with
@@ -214,7 +374,7 @@ let mk_context_opt replay replay_all_used_context replay_used_context
   set_replay_used_context replay_used_context;
   `Ok()
 
-let mk_execution_opt frontend input_format parse_only parsers
+let mk_execution_opt input_format parse_only ()
     preludes no_locs_in_answers colors_in_output no_headers_in_output
     no_formatting_in_output no_forced_flush_in_output pretty_output
     type_only type_smt2
@@ -225,11 +385,6 @@ let mk_execution_opt frontend input_format parse_only parsers
   let output_with_formatting = (not no_formatting_in_output) || pretty_output in
   let output_with_forced_flush =
     (not no_forced_flush_in_output) && (not pretty_output) in
-  set_infer_input_format input_format;
-  let input_format = match input_format with
-    | None -> Native
-    | Some fmt -> fmt
-  in
   set_answers_with_loc answers_with_loc;
   set_output_with_colors output_with_colors;
   set_output_with_headers output_with_headers;
@@ -237,14 +392,13 @@ let mk_execution_opt frontend input_format parse_only parsers
   set_output_with_forced_flush output_with_forced_flush;
   set_input_format input_format;
   set_parse_only parse_only;
-  set_parsers parsers;
-  set_frontend frontend;
   set_type_only type_only;
   set_type_smt2 type_smt2;
   set_preludes preludes;
   `Ok()
 
-let mk_internal_opt disable_weaks enable_assertions warning_as_error gc_policy
+let mk_internal_opt
+    disable_weaks enable_assertions warning_as_error continue_on_error gc_policy
   =
   let gc_policy = match gc_policy with
     | 0 | 1 | 2 -> gc_policy
@@ -255,6 +409,7 @@ let mk_internal_opt disable_weaks enable_assertions warning_as_error gc_policy
   set_disable_weaks disable_weaks;
   set_enable_assertions enable_assertions;
   set_warning_as_error warning_as_error;
+  set_exit_on_error (not continue_on_error);
   `Ok(gc_policy)
 
 let mk_limit_opt age_bound fm_cross_limit timelimit_interpretation
@@ -276,26 +431,35 @@ let mk_limit_opt age_bound fm_cross_limit timelimit_interpretation
   else
     let fm_cross_limit = Numbers.Q.from_string fm_cross_limit in
     let timelimit = set_limit timelimit 0. in
-    let timelimit_interpretation = set_limit timelimit_interpretation 1. in
+    let timelimit_interpretation = set_limit timelimit_interpretation 0. in
     set_age_bound age_bound;
     set_fm_cross_limit fm_cross_limit;
     set_timelimit_interpretation timelimit_interpretation;
     set_steps_bound steps_bound;
+    Steps.set_steps_bound steps_bound;
     set_timelimit timelimit;
     set_timelimit_per_goal timelimit_per_goal;
     `Ok()
 
-let mk_output_opt interpretation model unsat_core output_format
+let mk_output_opt
+    interpretation use_underscore objectives_in_interpretation unsat_core
+    output_format model_type () () () ()
   =
-  set_infer_output_format output_format;
+  set_infer_output_format (Option.is_none output_format);
   let output_format = match output_format with
     | None -> Native
     | Some fmt -> fmt
   in
+  let model_type = match model_type with
+    | None -> Value
+    | Some v -> v
+  in
   set_interpretation interpretation;
-  set_model model;
+  set_interpretation_use_underscore use_underscore;
+  set_objectives_in_interpretation objectives_in_interpretation;
   set_unsat_core unsat_core;
   set_output_format output_format;
+  set_model_type model_type;
   `Ok()
 
 let mk_profiling_opt cumulative_time_profiling profiling
@@ -328,8 +492,7 @@ let mk_quantifiers_opt instantiation_heuristic instantiate_after_backjump
 let mk_sat_opt get_bottom_classes disable_flat_formulas_simplification
     enable_restarts no_arith_matching no_backjumping
     no_backward no_decisions no_decisions_on
-    no_minimal_bj no_sat_learning no_tableaux_cdcl_in_instantiation
-    no_tableaux_cdcl_in_theories sat_plugin sat_solver
+    no_minimal_bj no_sat_learning
   =
   let arith_matching = not no_arith_matching in
   let mk_no_decisions_on ndo =
@@ -343,88 +506,66 @@ let mk_sat_opt get_bottom_classes disable_flat_formulas_simplification
   let no_decisions_on = mk_no_decisions_on no_decisions_on in
   let minimal_bj = not no_minimal_bj in
 
-  let cdcl_tableaux_inst = not no_tableaux_cdcl_in_instantiation in
-  let cdcl_tableaux_th = not no_tableaux_cdcl_in_theories in
-  let res = match sat_solver with
-    | "CDCL" | "satML" ->
-      `Ok(Util.CDCL, false, false, false)
-    | "CDCL-Tableaux" | "satML-Tableaux" | "CDCL-tableaux" | "satML-tableaux" ->
-      `Ok(Util.CDCL_Tableaux, cdcl_tableaux_inst, cdcl_tableaux_th, false)
-    | "tableaux" | "Tableaux" | "tableaux-like" | "Tableaux-like" ->
-      `Ok(Util.Tableaux, false, false, false)
-    | "tableaux-cdcl" | "Tableaux-CDCL" | "tableaux-CDCL" | "Tableaux-cdcl" ->
-      `Ok(Util.Tableaux_CDCL, false, false, true)
-    | _ -> `Error ("Args parsing error: unkown SAT solver " ^ sat_solver)
-  in
-  match res with
-  | `Ok(sat_solver, cdcl_tableaux_inst, cdcl_tableaux_th, tableaux_cdcl) ->
-    set_arith_matching arith_matching;
-    set_bottom_classes get_bottom_classes;
-    set_cdcl_tableaux_inst cdcl_tableaux_inst;
-    set_cdcl_tableaux_th cdcl_tableaux_th;
-    set_disable_flat_formulas_simplification
-      disable_flat_formulas_simplification;
-    set_enable_restarts enable_restarts;
-    set_minimal_bj minimal_bj;
-    set_no_backjumping no_backjumping;
-    set_no_backward no_backward;
-    set_no_decisions no_decisions;
-    set_no_decisions_on no_decisions_on;
-    set_no_sat_learning no_sat_learning;
-    set_sat_plugin sat_plugin;
-    set_sat_solver sat_solver;
-    set_tableaux_cdcl tableaux_cdcl;
-    `Ok()
-  | `Error m -> `Error (false, m)
+  set_arith_matching arith_matching;
+  set_bottom_classes get_bottom_classes;
+  set_disable_flat_formulas_simplification
+    disable_flat_formulas_simplification;
+  set_enable_restarts enable_restarts;
+  set_minimal_bj minimal_bj;
+  set_no_backjumping no_backjumping;
+  set_no_backward no_backward;
+  set_no_decisions no_decisions;
+  set_no_decisions_on no_decisions_on;
+  set_no_sat_learning no_sat_learning;
+  ()
 
-let mk_term_opt disable_ites inline_lets rewriting term_like_pp
+let mk_term_opt disable_ites inline_lets rewriting no_term_like_pp
   =
   set_rewriting rewriting;
-  set_term_like_pp term_like_pp;
+  set_term_like_pp (not no_term_like_pp);
   set_disable_ites disable_ites;
   set_inline_lets inline_lets;
   `Ok()
 
-let mk_theory_opt disable_adts inequalities_plugin no_ac no_contracongru
-    no_fm no_nla no_tcp no_theory restricted tighten_vars use_fpa
+let mk_theory_opt () no_contracongru
+    no_fm no_nla no_tcp no_theory restricted tighten_vars
+    _use_fpa (theories)
   =
-  set_no_ac no_ac;
+  set_no_ac (not (List.exists (Theories.equal Theories.AC) theories));
   set_no_fm no_fm;
   set_no_nla no_nla;
   set_no_tcp no_tcp;
   set_no_theory no_theory;
-  set_use_fpa use_fpa;
-  set_inequalities_plugin inequalities_plugin;
   set_restricted restricted;
-  set_disable_adts disable_adts;
+  set_disable_adts
+    (not (List.exists (Theories.equal Theories.ADT) theories));
   set_tighten_vars tighten_vars;
   set_no_contracongru no_contracongru;
+  set_theory_preludes (Theories.preludes theories);
   `Ok()
 
 let halt_opt version_info where =
   let handle_where w =
     let res = match w with
-      | "lib" -> `Ok Config.libdir
-      | "plugins" -> `Ok Config.pluginsdir
-      | "preludes" -> `Ok Config.preludesdir
-      | "data" -> `Ok Config.datadir
-      | "man" -> `Ok Config.mandir
+      | "plugins" -> `Ok Config.plugins_locations
+      | "preludes" -> `Ok Config.preludes_locations
       | _ -> `Error
                ("Option --where does not accept the argument \"" ^ w ^
-                "\"\nAccepted options are lib, plugins, preludes, data or man")
+                "\"\nAccepted options are plugins or preludes")
     in
     match res with
-    | `Ok path -> Printer.print_std "%s@." path
+    | `Ok paths ->
+      Printer.print_std "@[<v>%a@]@."
+        Format.(pp_print_list ~pp_sep:pp_print_cut pp_print_string)
+        paths
     | `Error m -> raise (Error (false, m))
   in
   let handle_version_info vi =
     if vi then (
       Printer.print_std
         "@[<v 0>Version          = %s@,\
-         Release date     = %s@,\
          Release commit   = %s@]@."
         Version._version
-        Version._release_date
         Version._release_commit;
     )
   in
@@ -433,12 +574,19 @@ let halt_opt version_info where =
     | Some w -> handle_where w; `Ok true
     | None -> if version_info then (handle_version_info version_info; `Ok true)
       else `Ok false
-  with Failure f -> `Error (false, f)
+  with Failure f -> `Error (false, f) (* TODO(Steven): dead code? *)
      | Error (b, m) -> `Error (b, m)
 
-let mk_opts file () () () () () () halt_opt (gc) () () () () () () () ()
-  =
+let get_verbose_t =
+  let doc = "Set the verbose mode." in
+  Arg.(value & flag & info ["v"; "verbose"] ~doc)
 
+let mk_opts file () () debug_flags ddebug_flags dddebug_flags rule () halt_opt
+    (gc) () () () () () () () () =
+  Debug.mk ~verbosity:1 debug_flags;
+  Debug.mk ~verbosity:2 ddebug_flags;
+  Debug.mk ~verbosity:3 dddebug_flags;
+  Rule.mk rule;
   if halt_opt then `Ok false
   (* If save_used_context was invoked as an option it should
        automatically set unsat_core to true *)
@@ -460,10 +608,9 @@ let mk_opts file () () () () () () halt_opt (gc) () () () () () () () ()
     `Ok true
   end
 
-let mk_fmt_opt std_fmt err_fmt
-  =
-  set_std_fmt (value_of_fmt std_fmt);
-  set_err_fmt (value_of_fmt err_fmt);
+let mk_output_channel_opt regular_output diagnostic_output =
+  Options.Output.(create_channel regular_output |> set_regular);
+  Options.Output.(create_channel diagnostic_output |> set_diagnostic);
   `Ok()
 
 (* Custom sections *)
@@ -482,172 +629,10 @@ let s_sat = "SAT OPTIONS"
 let s_term = "TERM OPTIONS"
 let s_theory = "THEORY OPTIONS"
 let s_fmt = "FORMATTER OPTIONS"
+let s_models = "MODEL OPTIONS"
+
 
 (* Parsers *)
-
-let parse_dbg_opt_spl1 =
-
-  let docs = s_debug in
-
-  let debug =
-    let doc = "Set the debugging flag." in
-    Arg.(value & flag & info ["d"; "debug"] ~doc) in
-
-  let debug_ac =
-    let doc = "Set the debugging flag of ac." in
-    Arg.(value & flag & info ["dac"] ~docs ~doc) in
-
-  let debug_adt =
-    let doc = "Set the debugging flag of ADTs." in
-    Arg.(value & flag & info ["dadt"] ~docs ~doc) in
-
-  let debug_arith =
-    let doc = "Set the debugging flag of Arith (without fm)." in
-    Arg.(value & flag & info ["darith"] ~docs ~doc) in
-
-  let debug_arrays =
-    let doc = "Set the debugging flag of arrays." in
-    Arg.(value & flag & info ["darrays"] ~docs ~doc) in
-
-  let debug_bitv =
-    let doc = "Set the debugging flag of bitv." in
-    Arg.(value & flag & info ["dbitv"] ~docs ~doc) in
-
-  let debug_cc =
-    let doc = "Set the debugging flag of cc." in
-    Arg.(value & flag & info ["dcc"] ~docs ~doc) in
-
-  let debug_combine =
-    let doc = "Set the debugging flag of combine." in
-    Arg.(value & flag & info ["dcombine"] ~docs ~doc) in
-
-  let debug_constr =
-    let doc = "Set the debugging flag of constructors." in
-    Arg.(value & flag & info ["dconstr"] ~docs ~doc) in
-
-  Term.(ret (const mk_dbg_opt_spl1 $
-             debug $
-             debug_ac $
-             debug_adt $
-             debug_arith $
-             debug_arrays $
-             debug_bitv $
-             debug_cc $
-             debug_combine $
-             debug_constr
-            ))
-
-let parse_dbg_opt_spl2 =
-
-  let docs = s_debug in
-
-  let debug_explanations =
-    let doc = "Set the debugging flag of explanations." in
-    Arg.(value & flag & info ["dexplanations"] ~docs ~doc) in
-
-  let debug_fm =
-    let doc = "Set the debugging flag of inequalities." in
-    Arg.(value & flag & info ["dfm"] ~docs ~doc) in
-
-  let debug_fpa =
-    let doc = "Set the debugging flag of floating-point." in
-    Arg.(value & opt int (get_debug_fpa ()) & info ["dfpa"] ~docs ~doc) in
-
-  let debug_gc =
-    let doc = "Prints some debug info about the GC's activity." in
-    Arg.(value & flag & info ["dgc"] ~docs ~doc) in
-
-  let debug_interpretation =
-    let doc = "Set debug flag for interpretation generatation." in
-    Arg.(value & flag & info ["debug-interpretation"] ~docs ~doc) in
-
-  let debug_ite =
-    let doc = "Set the debugging flag of ite." in
-    Arg.(value & flag & info ["dite"] ~docs ~doc) in
-
-  let debug_matching =
-    let doc = "Set the debugging flag \
-               of E-matching (0=disabled, 1=light, 2=full)." in
-    let docv = "FLAG" in
-    Arg.(value & opt int (get_debug_matching ()) &
-         info ["dmatching"] ~docv ~docs ~doc) in
-
-  let debug_sat =
-    let doc = "Set the debugging flag of sat." in
-    Arg.(value & flag & info ["dsat"] ~docs ~doc) in
-
-  Term.(ret (const mk_dbg_opt_spl2 $
-
-             debug_explanations $
-             debug_fm $
-             debug_fpa $
-             debug_gc $
-             debug_interpretation $
-             debug_ite $
-             debug_matching $
-             debug_sat
-            ))
-
-let parse_dbg_opt_spl3 =
-
-  let docs = s_debug in
-
-  let debug_split =
-    let doc = "Set the debugging flag of case-split analysis." in
-    Arg.(value & flag & info ["dsplit"] ~docs ~doc) in
-
-  let debug_sum =
-    let doc = "Set the debugging flag of Sum." in
-    Arg.(value & flag & info ["dsum"] ~docs ~doc) in
-
-  let debug_triggers =
-    let doc = "Set the debugging flag of triggers." in
-    Arg.(value & flag & info ["dtriggers"] ~docs ~doc) in
-
-  let debug_types =
-    let doc = "Set the debugging flag of types." in
-    Arg.(value & flag & info ["dtypes"] ~docs ~doc) in
-
-  let debug_typing =
-    let doc = "Set the debugging flag of typing." in
-    Arg.(value & flag & info ["dtyping"] ~docs ~doc) in
-
-  let debug_uf =
-    let doc = "Set the debugging flag of uf." in
-    Arg.(value & flag & info ["duf"] ~docs ~doc) in
-
-  let debug_unsat_core =
-    let doc = "Replay unsat-cores produced by $(b,--unsat-core). \
-               The option implies $(b,--unsat-core)." in
-    Arg.(value & flag & info ["debug-unsat-core"] ~docs ~doc) in
-
-  let debug_use =
-    let doc = "Set the debugging flag of use." in
-    Arg.(value & flag & info ["duse"] ~docs ~doc) in
-
-  let debug_warnings =
-    let doc = "Set the debugging flag of warnings." in
-    Arg.(value & flag & info ["dwarnings"] ~docs ~doc) in
-
-  let rule =
-    let doc =
-      "$(docv) = parsing|typing|sat|cc|arith, output rule used on stderr." in
-    let docv = "TR" in
-    Arg.(value & opt rule_conv RNone & info ["rule"] ~docv ~docs ~doc) in
-
-  Term.(ret (const mk_dbg_opt_spl3 $
-
-             debug_split $
-             debug_sum $
-             debug_triggers $
-             debug_types $
-             debug_typing $
-             debug_uf $
-             debug_unsat_core $
-             debug_use $
-             debug_warnings $
-             rule
-            ))
 
 let parse_case_split_opt =
 
@@ -667,6 +652,14 @@ let parse_case_split_opt =
     let doc = "Enable case-split for Algebraic Datatypes theory." in
     Arg.(value & flag & info ["enable-adts-cs"] ~docs ~doc) in
 
+  let enable_sat_cs =
+    let doc = "Enable case-split in the SAT solver (Experts only)" in
+    Term.(
+      const set_enable_sat_cs $
+      Arg.(value & flag & info ["enable-sat-cs"] ~docs ~doc)
+    )
+  in
+
   let max_split =
     let dv = Numbers.Q.to_string (get_max_split ()) in
     let doc =
@@ -675,7 +668,7 @@ let parse_case_split_opt =
     Arg.(value & opt string dv & info ["max-split"] ~docv ~docs ~doc) in
 
   Term.(ret (const mk_case_split_opt $
-             case_split_policy $ enable_adts_cs $ max_split))
+             case_split_policy $ enable_adts_cs $ max_split $ enable_sat_cs))
 
 let parse_context_opt =
 
@@ -709,12 +702,6 @@ let parse_execution_opt =
 
   let docs = s_execution in
 
-  let frontend =
-    let doc = "Select the parsing and typing frontend." in
-    let docv = "FTD" in
-    Arg.(value & opt string (get_frontend ()) &
-         info ["frontend"] ~docv ~docs ~doc) in
-
   let input_format =
     let doc = Format.sprintf
         "Set the default input format to $(docv) and must be %s. \
@@ -730,15 +717,68 @@ let parse_execution_opt =
     Arg.(value & flag & info ["parse-only"] ~docs ~doc) in
 
   let parsers =
+    let load_parser verbose path =
+      try
+        MyDynlink.load verbose path "parser";
+        Ok ()
+      with
+        Errors.Error e ->
+        Error (Format.asprintf "%a" Errors.report e)
+    in
+    let load_parsers verbose paths =
+      List.fold_left
+        (fun res path ->
+           Result.bind res (fun () -> load_parser verbose path))
+        (Ok ()) paths
+    in
     let doc = "Register a new parser for Alt-Ergo." in
-    Arg.(value & opt_all string (get_parsers ()) &
-         info ["add-parser"] ~docs ~doc) in
+    let arg =
+      Arg.(value & opt_all string [] &
+           info ["add-parser"] ~docs ~doc)
+    in
+    let term = Term.(const load_parsers $ get_verbose_t $ arg) in
+    Term.term_result' term
+  in
 
   let preludes =
+    let parse_prelude p =
+      if Sys.file_exists p then
+        if Sys.is_directory p then
+          Fmt.error "'%s' is a directory" p
+        else
+          Ok p
+      else
+        match Config.lookup_prelude p with
+        | Some p' ->
+          begin if Compat.String.starts_with ~prefix:"b-set-theory" p then
+              Printer.print_wrn ~header:true
+                "Support for the B set theory is deprecated since version \
+                 2.5.0 and may be removed in a future version. If you are \
+                 actively using it, please make yourself known to the Alt-Ergo \
+                 developers by writing to <alt-ergo@ocamlpro.com>."
+            else if Compat.String.starts_with ~prefix:"fpa-theory" p then
+              Printer.print_wrn ~header:true
+                "@[Support for the FPA theory has been integrated as a \
+                 builtin theory prelude in version 2.5.0 and is enabled \
+                 by default.\
+                 This option and the '%s'@ prelude will \ be removed in a \
+                 later version.@]" p
+          end;
+
+          Ok p'
+        | None ->
+          Error (
+            Format.asprintf
+              "cannot load prelude '%s': no such file"
+              p)
+    in
+    let prelude =
+      Arg.(conv' (parse_prelude, conv_printer string))
+    in
     let doc =
       "Add a file that will be loaded as a prelude. The command is \
        cumulative, and the order of successive preludes is preserved." in
-    Arg.(value & opt_all string (get_preludes ()) &
+    Arg.(value & opt_all prelude (get_preludes ()) &
          info ["prelude"] ~docs ~doc) in
 
   let no_locs_in_answers =
@@ -781,7 +821,7 @@ let parse_execution_opt =
 
 
   Term.(ret (const mk_execution_opt $
-             frontend $ input_format $ parse_only $ parsers $ preludes $
+             input_format $ parse_only $ parsers $ preludes $
              no_locs_in_answers $ colors_in_output $ no_headers_in_output $
              no_formatting_in_output $ no_forced_flush_in_output $
              pretty_output $ type_only $ type_smt2
@@ -799,7 +839,7 @@ let parse_halt_opt =
   let where =
     let doc = Format.sprintf
         "Print the directory of $(docv). Possible arguments are \
-         %s." (Arg.doc_alts ["lib"; "plugins"; "preludes"; "data"; "man"]) in
+         %s." (Arg.doc_alts ["plugins"; "preludes"]) in
     let docv = "DIR" in
     Arg.(value & opt (some string) None & info ["where"] ~docv ~docs ~doc) in
 
@@ -825,6 +865,10 @@ let parse_internal_opt =
     let doc = "Enable warning as error" in
     Arg.(value & flag & info ["warning-as-error"] ~docs ~doc) in
 
+  let continue_on_error =
+    let doc = "Sets Alt-ergo's behavior to continue on errors" in
+    Arg.(value & flag & info ["continue-on-error"] ~docs ~doc) in
+
   let gc_policy =
     let doc =
       "Set the gc policy allocation. 0 = next-fit policy, 1 = \
@@ -834,7 +878,8 @@ let parse_internal_opt =
     Arg.(value & opt int 0 & info ["gc-policy"] ~docv ~docs ~doc) in
 
   Term.(ret (const mk_internal_opt $
-             disable_weaks $ enable_assertions $ warning_as_error $ gc_policy
+             disable_weaks $ enable_assertions $
+             warning_as_error $ continue_on_error $ gc_policy
             ))
 
 let parse_limit_opt =
@@ -893,51 +938,266 @@ let parse_output_opt =
 
   let docs = s_output in
 
-  let interpretation =
-    let doc =
-      "Experimental support for counter-example generation. Possible \
-       values are 1, 2, or 3 to compute an interpretation before returning \
-       Unknown, before instantiation (1), or before every decision (2) or \
-       instantiation (3). A negative value (-1, -2, or -3) will disable \
-       interpretation display. Note that $(b, --max-split) limitation will \
-       be ignored in model generation phase." in
-    let docv = "VAL" in
-    Arg.(value & opt int (get_interpretation ()) &
-         info ["interpretation"] ~docv ~docs ~doc) in
+  (* Use the --interpretation and --produce-models (which is equivalent to
+     --interpretation last) to determine the interpretation value. *)
+  let interpretation, dump_models, dump_models_on, frontend =
+    let interpretation =
+      let doc = Format.sprintf
+          "Best effort support for counter-example generation. \
+           $(docv) must be %s. %s shows the first computed interpretation. \
+           %s compute an interpretation before every decision, \
+           and %s only before returning unknown. \
+           Note that $(b, --max-split) limitation will \
+           be ignored in model generation phase."
+          (Arg.doc_alts
+             ["none"; "first"; "every"; "last"])
+          (Arg.doc_quote "first") (Arg.doc_quote "every")
+          (Arg.doc_quote "last") in
+      let docv = "VAL" in
+      let interpretation =
+        Arg.enum
+          [ "none", INone
+          ; "first", IFirst
+          ; "every", IEvery
+          ; "last", ILast
+          ]
+      in
+      Arg.(value & opt interpretation INone &
+           info ["interpretation"] ~docv ~docs:s_models ~doc)
+    in
+    let produce_models =
+      let doc =
+        "Enable model generation (equivalent to --interpretation last)."
+      in
+      Arg.(value & flag & info ["produce-models"] ~doc ~docs:s_models)
+    in
 
-  let model =
+
+    let frontend =
+      let doc =
+        "Select the parsing and typing frontend. Support for non-default \
+         frontends is deprecated and will be removed in the next release."
+      in
+      let docv = "FTD" in
+      let deprecated =
+        "this option is deprecated and will be ignored in the \
+         next version"
+      in
+      Arg.(value & opt string "dolmen" &
+           info ["frontend"] ~docv ~docs:s_execution ~doc ~deprecated)
+    in
+
+    let dump_models =
+      let doc =
+        "Display a model each time the result is unknown (implies \
+         --interpretation last)"
+      in
+      Arg.(value & flag & info ["dump-models"] ~doc ~docs:s_models)
+    in
+
+    let dump_models_on =
+      let doc =
+        "Select a channel to output the models dumped by the option \
+         --dump-model."
+      in
+      let docv = "VAL" in
+      let chan =
+        Arg.conv
+          ~docv
+          (
+            (fun s -> Ok (Output.create_channel s)),
+            (fun fmt f -> Format.pp_print_string fmt (Output.to_string f))
+          )
+      in
+      Arg.(value & opt chan (Output.create_channel "stderr") &
+           info ["dump-models-on"] ~docv ~docs:s_models ~doc)
+    in
+
+    let mk_interpretation interpretation produce_models dump_models =
+      match interpretation with
+      | INone when produce_models || dump_models -> ILast
+      | interpretation -> interpretation
+    in
+    Term.(
+      const mk_interpretation $ interpretation $
+      produce_models $ dump_models
+    ),
+    dump_models,
+    dump_models_on,
+    frontend
+  in
+
+  (* Use the --sat-solver to determine the sat solver. *)
+  let sat_solver =
+    let sat_solver : _ Arg.conv =
+      let parse = function
+        | "CDCL" | "satML" ->
+          Ok Util.CDCL
+        | "CDCL-Tableaux" | "satML-Tableaux"
+        | "CDCL-tableaux" | "satML-tableaux" ->
+          Ok Util.CDCL_Tableaux
+        | "tableaux" | "Tableaux"
+        | "tableaux-like" | "Tableaux-like" ->
+          Ok Util.Tableaux
+        | "tableaux-cdcl" | "Tableaux-CDCL"
+        | "tableaux-CDCL" | "Tableaux-cdcl" ->
+          Ok Util.Tableaux_CDCL
+        | sat_solver ->
+          Error ("Args parsing error: unkown SAT solver " ^ sat_solver)
+
+      in
+      Arg.(conv' (parse, Util.pp_sat_solver))
+    in
+    let default, sum_up = "CDCL-Tableaux", "satML" in
     let doc = Format.sprintf
-        "Experimental support for models on labeled terms. \
-         $(docv) must be %s. %s shows a complete model and %s shows \
-         all models."
-        (Arg.doc_alts ["none"; "default"; "complete"; "all"])
-        (Arg.doc_quote "complete") (Arg.doc_quote "all") in
-    let docv = "VAL" in
-    Arg.(value & opt model_conv MNone & info ["m"; "model"] ~docv ~doc) in
+        "Choose the SAT solver to use. Default value is %s (i.e. %s\
+         solver). Possible options are %s."
+        default sum_up
+        (Arg.doc_alts ["CDCL"; "satML"; "CDCL-Tableaux";
+                       "satML-Tableaux"; "Tableaux-CDCL"])
+    in
+    let docv = "SAT" in
+    Arg.(value & opt sat_solver Util.CDCL_Tableaux &
+         info ["sat-solver"] ~docv ~docs:s_sat ~doc)
+  in
 
+  let cdcl_tableaux_inst =
+    let no_tableaux_cdcl_in_instantiation =
+      let doc = "When satML is used, this disables the use of a tableaux-like \
+                 method for instantiations with the CDCL solver." in
+      Arg.(
+        value & flag &
+        info ["no-tableaux-cdcl-in-instantiation"]
+          ~docs:s_sat ~doc)
+    in
+    Term.(const not $ no_tableaux_cdcl_in_instantiation)
+  in
+
+  let cdcl_tableaux_th =
+    let no_tableaux_cdcl_in_theories =
+      let doc = "When satML is used, this disables the use of a tableaux-like \
+                 method for theories with the CDCL solver." in
+      Arg.(
+        value & flag &
+        info ["no-tableaux-cdcl-in-theories"] ~docs:s_sat ~doc
+      )
+    in
+    Term.(const not $ no_tableaux_cdcl_in_theories)
+  in
+
+  let strict_mode =
+    let strict_mode_arg =
+      let doc =
+        "Enable strict mode (compliance with SMT-LIB standard)"
+      in
+      Arg.(value & flag & info ["strict"] ~doc ~docs:s_models)
+    in
+    Term.(const Options.set_strict_mode $ strict_mode_arg)
+  in
+
+  let set_sat_options =
+    let set_sat_options sat_solver cdcl_tableaux_inst cdcl_tableaux_th () =
+      begin match sat_solver with
+        | Util.CDCL_Tableaux ->
+          set_sat_solver sat_solver;
+          set_cdcl_tableaux_inst cdcl_tableaux_inst;
+          set_cdcl_tableaux_th cdcl_tableaux_th;
+          Ok ()
+        | Util.CDCL ->
+          set_sat_solver sat_solver;
+          set_cdcl_tableaux_inst false;
+          set_cdcl_tableaux_th false;
+          Ok ()
+        | _ ->
+          set_sat_solver sat_solver;
+          set_cdcl_tableaux_inst false;
+          set_cdcl_tableaux_th false;
+          Ok ()
+      end
+    in
+    let term =
+      Term.(
+        const set_sat_options $ sat_solver $ cdcl_tableaux_inst
+        $ cdcl_tableaux_th $ strict_mode
+      )
+    in
+    Term.term_result' term
+  in
+
+  let use_underscore =
+    let doc = "Output \"_\" instead of fresh value in interpretation" in
+    let deprecated =
+      "this option will be removed as it does not produce a \
+       SMTLIB-compliant output."
+    in
+    let docv = "VAL" in
+    Arg.(value & flag & info
+           ["interpretation-use-underscore";"use-underscore"]
+           ~docv ~docs:s_models ~doc ~deprecated)
+  in
+  let objectives_in_interpretation =
+    let doc = " inline pretty-printing of optimized expressions in the \
+               model instead of a dedicated section '(objectives \
+               ...)'. Be aware that a part of the model may be shrunk \
+               or not accurate if some expressions to optimize are \
+               unbounded." in
+    Arg.(value & flag & info
+           ["objectives-in-interpretation";"objectives-in-model";
+            "obj-in-interpretation";"obj-in-model"] ~doc)
+  in
   let unsat_core =
     let doc = "Experimental support for computing and printing unsat-cores." in
-    Arg.(value & flag & info ["u"; "unsat-core"] ~doc) in
-
+    Arg.(value & flag & info ["u"; "unsat-core"] ~doc ~docs)
+  in
   let output_format =
     let doc =
       Format.sprintf
         "Control the output format of the solver, $(docv) must be %s.\
          The alt-ergo native format outputs Valid/Invalid/I don't know.\
-         The smtlib format outputs unsat/sat/unknown.\
+         The smtlib2 format outputs unsat/sat/unknown.\
          If left unspecified, Alt-Ergo will use its heuristics to \
          determine the adequate output format according to the input format.\
          It must be noticed that not specifying an output \
          format will let Alt-Ergo set it according to the input file's \
          extension."
-        (Arg.doc_alts [ "native"; "smtlib" ])
+        (Arg.doc_alts [ "native"; "smtlib2" ])
     in
     let docv = "FMT" in
     Arg.(value & opt (some format_conv) None & info ["o"; "output"] ~docv ~doc)
   in
 
+  let model_type =
+    let doc =
+      Format.sprintf
+        "Control the output model type of the solver, $(docv) must be %s."
+        (Arg.doc_alts [ "value"; "constraints" ])
+    in
+    let docv = "MTYP" in
+    Arg.(
+      value &
+      opt (some model_type_conv) None &
+      info ["mt"; "model-type"] ~docv ~doc ~docs:s_models
+    )
+  in
+
+  let set_dump_models =
+    Term.(const set_dump_models $ dump_models)
+  in
+
+  let set_dump_models_on =
+    Term.(const Output.set_dump_models $ dump_models_on)
+  in
+
+  let set_frontend =
+    Term.(const set_frontend $ frontend)
+  in
+
   Term.(ret (const mk_output_opt $
-             interpretation $ model $ unsat_core $ output_format
+             interpretation $ use_underscore $
+             objectives_in_interpretation $ unsat_core $
+             output_format $ model_type $
+             set_dump_models $ set_dump_models_on $
+             set_sat_options $ set_frontend
             ))
 
 let parse_profiling_opt =
@@ -963,13 +1223,9 @@ let parse_profiling_opt =
     Arg.(value & opt string (get_profiling_plugin ()) &
          info ["profiling-plugin"] ~docv ~docs ~doc) in
 
-  let get_verbose =
-    let doc = "Set the verbose mode." in
-    Arg.(value & flag & info ["v"; "verbose"] ~doc) in
-
   Term.(ret (const mk_profiling_opt $
              cumulative_time_profiling $ profiling $
-             profiling_plugin $ get_verbose
+             profiling_plugin $ get_verbose_t
             ))
 
 let parse_quantifiers_opt =
@@ -1069,7 +1325,6 @@ let parse_sat_opt =
        the default SAT solver before deciding." in
     Arg.(value & flag & info ["no-backward"] ~docs ~doc) in
 
-
   let no_decisions =
     let doc = "Disable decisions at the SAT level." in
     Arg.(value & flag & info ["no-decisions"] ~docs ~doc) in
@@ -1092,42 +1347,11 @@ let parse_sat_opt =
        facts are used to improve bcp." in
     Arg.(value & flag & info ["no-sat-learning"] ~docs ~doc) in
 
-  let no_tableaux_cdcl_in_instantiation =
-    let doc = "When satML is used, this disables the use of a tableaux-like\
-               method for instantiations with the CDCL solver." in
-    Arg.(value & flag &
-         info ["no-tableaux-cdcl-in-instantiation"] ~docs ~doc) in
-
-  let no_tableaux_cdcl_in_theories =
-    let doc = "When satML is used, this disables the use of a tableaux-like\
-               method for theories with the CDCL solver." in
-    Arg.(value & flag & info ["no-tableaux-cdcl-in-theories"] ~docs ~doc) in
-
-  let sat_plugin =
-    let doc =
-      "Use the given SAT-solver instead of the default DFS-based SAT solver." in
-    Arg.(value & opt string (get_sat_plugin ()) &
-         info ["sat-plugin"] ~docs ~doc) in
-
-  let sat_solver =
-    let doc = Format.sprintf
-        "Choose the SAT solver to use. Default value is CDCL (i.e. satML \
-         solver). Possible options are %s."
-        (Arg.doc_alts ["CDCL"; "satML"; "CDCL-Tableaux";
-                       "satML-Tableaux"; "Tableaux-CDCL"])
-    in
-    let docv = "SAT" in
-    Arg.(value & opt string "CDCL-Tableaux" &
-         info ["sat-solver"] ~docv ~docs ~doc) in
-
-  Term.(ret (const mk_sat_opt $
-             get_bottom_classes $ disable_flat_formulas_simplification $
-             enable_restarts $ no_arith_matching $
-             no_backjumping $ no_backward $ no_decisions $ no_decisions_on $
-             no_minimal_bj $ no_sat_learning $
-             no_tableaux_cdcl_in_instantiation $
-             no_tableaux_cdcl_in_theories $ sat_plugin $ sat_solver
-            ))
+  Term.(const mk_sat_opt $
+        get_bottom_classes $ disable_flat_formulas_simplification $
+        enable_restarts $ no_arith_matching $
+        no_backjumping $ no_backward $ no_decisions $ no_decisions_on $
+        no_minimal_bj $ no_sat_learning)
 
 let parse_term_opt =
 
@@ -1148,32 +1372,48 @@ let parse_term_opt =
     let doc = "Use rewriting instead of axiomatic approach." in
     Arg.(value & flag & info ["rwt"; "rewriting"] ~docs ~doc) in
 
-  let term_like_pp =
-    let doc = "Output semantic values as terms." in
-    Arg.(value & flag & info ["term-like-pp"] ~docs ~doc) in
+  let no_term_like_pp =
+    let doc = "Do not output semantic values as terms." in
+    Arg.(value & flag & info ["no-term-like-pp"] ~docs ~doc) in
 
   Term.(ret (const mk_term_opt $
-             disable_ites $ inline_lets $ rewriting $ term_like_pp
+             disable_ites $ inline_lets $ rewriting $ no_term_like_pp
             ))
 
 let parse_theory_opt =
 
   let docs = s_theory in
 
-  let disable_adts =
-    let doc = "Disable Algebraic Datatypes theory." in
-    Arg.(value & flag & info ["disable-adts"] ~docs ~doc) in
-
   let inequalities_plugin =
-    let doc =
-      "Use the given module to handle inequalities of linear arithmetic." in
-    Arg.(value & opt string (get_inequalities_plugin ()) &
-         info ["inequalities-plugin"] ~docs ~doc) in
-
-  let no_ac =
-    let doc = "Disable the AC theory of Associative and \
-               Commutative function symbols." in
-    Arg.(value & flag & info ["no-ac"] ~docs ~doc) in
+    let load_inequalities_plugin debug path =
+      let debug = List.exists (List.exists (Debug.equal Debug.Fm)) debug in
+      match path with
+      | "" ->
+        if debug then
+          Printer.print_dbg
+            "Using the 'FM module' for arithmetic inequalities";
+        Ok ()
+      | path ->
+        try
+          Config.load_plugin path;
+          if debug then
+            Printer.print_dbg
+              "Using the 'inequalities' reasoner (FM module) %S" path;
+          Ok ()
+        with Errors.Error e ->
+          Error (Format.asprintf "%a" Errors.report e)
+    in
+    let arg =
+      let doc =
+        "Use the given module to handle inequalities of linear arithmetic." in
+      Arg.(value & opt string "" &
+           info ["inequalities-plugin"] ~docs ~doc)
+    in
+    let term =
+      Term.(const load_inequalities_plugin $ Debug.light_flag_term $ arg)
+    in
+    Term.term_result' term
+  in
 
   let no_contracongru =
     let doc = "Disable contracongru." in
@@ -1208,49 +1448,135 @@ let parse_theory_opt =
     Arg.(value & flag & info ["tighten-vars"] ~docs ~doc) in
 
   let use_fpa =
-    let doc = "Enable support for floating-point arithmetic." in
-    Arg.(value & flag & info ["use-fpa"] ~docs ~doc) in
+    let doc = "Floating-point builtins are always enabled and this option has
+      no effect anymore. It will be removed in a future version." in
+    let deprecated = "this option is always enabled" in
+    Arg.(value & flag & info ["use-fpa"] ~docs ~doc ~deprecated) in
+
+  let theories =
+    let theory_enum =
+      Theories.all
+      |> List.map (fun t -> Format.asprintf "%a" Theories.pp t, t)
+    in
+    let theory = Arg.enum theory_enum in
+    let enable_theories =
+      let doc =
+        Format.asprintf "Enable builtin theory, multiple comma-separated values
+        are supported. $(docv) must be %s."
+          (Arg.doc_alts_enum theory_enum)
+      in
+      let docv = "THEORY" in
+      Term.(const List.concat $
+            Arg.(
+              value
+              & opt_all (list theory) []
+              & info ["enable-theory"; "enable-theories"] ~docs ~doc ~docv
+            ))
+    and disable_theories =
+      let doc =
+        Format.asprintf "Disable builtin theory, multiple comma-separated
+        values are supported. THEORY must be %s."
+          (Arg.doc_alts_enum theory_enum)
+      in
+      let docv = "THEORY" in
+      let disable_theories =
+        Term.(const List.concat $
+              Arg.(
+                value
+                & opt_all (list theory) []
+                & info ["disable-theory"; "disable-theories"] ~docs ~doc ~docv
+              ))
+      in
+      let disable_adts =
+        let doc = "Disable Algebraic Datatypes theory. Deprecated alias for
+        `--disable-theories adt`." in
+        let deprecated = "use `--disable-theories ac` instead." in
+        Arg.(value & flag & info ["disable-adts"] ~docs ~doc ~deprecated)
+      in
+      let no_ac =
+        let doc = "Disable the AC theory of Associative and \
+                   Commutative function symbols. Deprecated alias for
+                  `--disable-theories ac`." in
+        let deprecated = "use `--disable-theories ac` instead" in
+        Arg.(value & flag & info ["no-ac"] ~docs ~doc ~deprecated)
+      in
+      let mk_disable_theories disable_theories disable_adts no_ac =
+        let open Theories in
+        (if disable_adts then [ ADT ] else []) @
+        (if no_ac then [ AC ] else []) @
+        disable_theories
+      in
+      Term.(const mk_disable_theories $ disable_theories $ disable_adts $ no_ac)
+    in
+    let preludes enable_theories disable_theories =
+      let theories = Theories.Set.of_list Theories.default in
+      let rec aux th en dis =
+        match en, dis with
+        | _ :: _, [] ->
+          aux (List.fold_left (fun th en -> Theories.Set.add en th) th en) [] []
+        | e :: _, d :: _ when e = d ->
+          Fmt.error_msg "theory prelude '%a' cannot be both enabled and
+          disabled" Theories.pp e
+        | e :: en, d :: _ when e < d -> aux (Theories.Set.add e th) en dis
+        | _ , d :: dis -> aux (Theories.Set.filter ((<>) d) th) en dis
+        | [], [] -> Ok (Theories.Set.elements th)
+      in
+      aux
+        theories
+        (List.fast_sort Theories.compare enable_theories)
+        (List.fast_sort Theories.compare disable_theories)
+    in
+    Term.(
+      cli_parse_result (
+        const preludes
+        $ enable_theories
+        $ disable_theories
+      )
+    )
+  in
 
   Term.(ret (const mk_theory_opt $
-             disable_adts $ inequalities_plugin $ no_ac $ no_contracongru $
+             inequalities_plugin $ no_contracongru $
              no_fm $ no_nla $ no_tcp $ no_theory $ restricted $
-             tighten_vars $ use_fpa
+             tighten_vars $ use_fpa $ theories
             )
        )
 
 let parse_fmt_opt =
-
   let docs = s_fmt in
+  let docv = "OUTPUT" in
 
-  let std_formatter =
-    let doc = Format.sprintf
-        "Set the standard formatter used by default to output the results,
-    models and unsat cores. Possible values are %s."
-        (Arg.doc_alts ["stdout"; "stderr"; "<filename>"]) in
-    Arg.(value & opt formatter_conv Stdout & info ["std-formatter"] ~docs ~doc)
+  let regular_output =
+    let doc =
+      Format.sprintf
+        "Set the regular output used by default to print the results,
+          models and unsat cores. Possible values are %s."
+        (Arg.doc_alts ["stdout"; "stderr"; "<filename>"])
+    in
+    Arg.(value & opt string "stdout" & info ["regular-output"] ~docs
+           ~doc ~docv)
   in
-
-  let err_formatter =
-    let doc = Format.sprintf
-        "Set the error formatter used by default to output error, debug and
+  let diagnostic_output =
+    let doc =
+      Format.sprintf
+        "Set the diagnostic output used by default to print error, debug and
          warning informations. Possible values are %s."
-        (Arg.doc_alts ["stdout"; "stderr"; "<filename>"]) in
-    Arg.(value & opt formatter_conv Stderr & info ["err-formatter"] ~docs ~doc)
+        (Arg.doc_alts ["stdout"; "stderr"; "<filename>"])
+    in
+    Arg.(value & opt string "stderr" & info ["diagnostic-output"] ~docs
+           ~doc ~docv)
   in
-
-  Term.(ret (const mk_fmt_opt $
-             std_formatter $ err_formatter
-            ))
+  Term.(ret (const mk_output_channel_opt $ regular_output $ diagnostic_output))
 
 let main =
 
   let file =
     let doc =
       "Source file. Must be suffixed by $(i,.ae), \
-       ($(i,.mlw) and $(i,.why) are depreciated, \
+       ($(i,.mlw) and $(i,.why) are deprecated), \
        $(i,.smt2) or $(i,.psmt2)." in
     let i = Arg.(info [] ~docv:"FILE" ~doc) in
-    Arg.(value & pos ~rev:true 0 (some string) None & i) in
+    Arg.(value & pos ~rev:true 0 (some file) None & i) in
 
   let doc = "Execute Alt-Ergo on the given file." in
   let exits = Cmd.Exit.defaults in
@@ -1277,6 +1603,7 @@ let main =
       `S s_case_split;
       `S s_halt;
       `S s_fmt;
+      `S s_models;
       `S s_debug;
       `P "These options are used to output debug info for the concerned \
           part of the solver.\
@@ -1287,11 +1614,14 @@ let main =
       `Pre "Or you can write to: \n   alt-ergo@ocamlpro.com";
       `S Manpage.s_authors;
       `Pre "CURRENT AUTHORS\n\
-           \   Sylvain Conchon\n\
-           \   Albin Coquereau\n\
            \   Guillaume Bury\n\
+           \   Basile Clément\n\
+           \   Steven de Olivera\n\
+           \   Hichem Rami Ait El Hara\n\
+           \   Pierre Villemot";
+      `Pre "PREVIOUS AUTHORS\n\
+           \   Albin Coquereau\n\
            \   Mattias Roux";
-
       `Pre "ORIGINAL AUTHORS\n\
            \   Sylvain Conchon\n\
            \   Evelyne Contejean\n\
@@ -1305,10 +1635,11 @@ let main =
     Term.(ret (const mk_opts $
                file $
                parse_case_split_opt $ parse_context_opt $
-               parse_dbg_opt_spl1 $ parse_dbg_opt_spl2 $ parse_dbg_opt_spl3 $
-               parse_execution_opt $ parse_halt_opt $ parse_internal_opt $
-               parse_limit_opt $ parse_output_opt $ parse_profiling_opt $
-               parse_quantifiers_opt $ parse_sat_opt $ parse_term_opt $
+               Debug.light_flag_term $ Debug.medium_flag_term $
+               Debug.full_flag_term $ Rule.flag_term $ parse_execution_opt $
+               parse_halt_opt $ parse_internal_opt $ parse_limit_opt $
+               parse_profiling_opt $ parse_quantifiers_opt $ parse_sat_opt $
+               parse_term_opt $ parse_output_opt $
                parse_theory_opt $ parse_fmt_opt
               ))
   in
@@ -1318,6 +1649,7 @@ let main =
   Cmd.v info term
 
 let parse_cmdline_arguments () =
+  at_exit Options.Output.close_all;
   let r = Cmd.eval_value main in
   match r with
   | Ok `Ok true -> ()
@@ -1326,4 +1658,3 @@ let parse_cmdline_arguments () =
   | Error `Parse -> exit Cmd.Exit.cli_error
   | Error `Term -> exit Cmd.Exit.internal_error
   | Error `Exn -> exit Cmd.Exit.internal_error
-

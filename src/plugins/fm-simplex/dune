@@ -1,19 +1,15 @@
 (documentation
-  (package alt-ergo)
-    (mld_files :standard)
-)
+ (package alt-ergo)
+  (mld_files :standard))
 
 (library
-  (name       FmSimplexPlugin)
-  (libraries  alt-ergo-lib)
-  (modules    Simplex Simplex_cache FmSimplexIneqs)
-)
+ (public_name alt-ergo.plugins.fm-simplex)
+ (name FmSimplexPlugin)
+ (libraries alt-ergo-lib)
+ (modules Simplex Simplex_cache FmSimplexIneqs))
 
-(install
-  (package alt-ergo)
-  (section share)
-  (files
-    (FmSimplexPlugin.cma as plugins/fm-simplex-plugin.cma)
-    (FmSimplexPlugin.cmxs as plugins/fm-simplex-plugin.cmxs)
-  )
-)
+(plugin
+ (package alt-ergo)
+ (name fm-simplex)
+ (libraries alt-ergo.plugins.fm-simplex)
+ (site (alt-ergo plugins)))

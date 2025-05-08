@@ -1,51 +1,51 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     The Alt-Ergo theorem prover                                            *)
-(*     Copyright (C) 2006-2013                                                *)
-(*                                                                            *)
-(*     Sylvain Conchon                                                        *)
-(*     Evelyne Contejean                                                      *)
-(*                                                                            *)
-(*     Francois Bobot                                                         *)
-(*     Mohamed Iguernelala                                                    *)
-(*     Stephane Lescuyer                                                      *)
-(*     Alain Mebsout                                                          *)
-(*                                                                            *)
-(*     CNRS - INRIA - Universite Paris Sud                                    *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(*  ------------------------------------------------------------------------  *)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the Apache Software        *)
-(*     License version 2.0                                                    *)
-(*                                                                            *)
-(******************************************************************************)
-
-open Format
-open Options
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 module Z = Numbers.Z
 module Q = Numbers.Q
 
+type 'a t = {
+  ple0 : 'a;
+  is_le : bool;
+  (* int instead of Term.t as a key to prevent us
+     from using it in deductions *)
+  dep : (Q.t * 'a * bool) Util.MI.t;
+  expl : Explanation.t;
+  age : Z.t;
+}
+
 module type S = sig
 
-  module P : Polynome.T with type r = Shostak.Combine.r
-  module MP : Map.S with type key = P.t
+  type p
 
-  type t = {
-    ple0 : P.t;
-    is_le : bool;
-    (* int instead of Term.t as a key to prevent us
-       from using it in deductions *)
-    dep : (Q.t * P.t * bool) Util.MI.t;
-    expl : Explanation.t;
-    age : Z.t;
-  }
+  module P : Polynome.T with type r = Shostak.Combine.r and type t = p
+  module MP : Map.S with type key = p
+
+  type nonrec t = p t
 
   module MINEQS : sig
     type mp = (t * Q.t) MP.t
@@ -79,19 +79,23 @@ module type S = sig
     ('are_eq -> 'acc -> P.r option -> t list -> 'acc) -> 'are_eq -> 'acc ->
     MINEQS.mp -> 'acc
 
+  val reset_age_cpt : unit -> unit
+
 end
 
 module type Container_SIG = sig
   module Make
       (P : Polynome.T with type r = Shostak.Combine.r)
-    : S with module P = P
+    : S with type p = P.t
 
 end
 
 module Container : Container_SIG = struct
   module Make
       (P : Polynome.T with type r = Shostak.Combine.r)
-    : S with module P = P = struct
+    : S with type p = P.t = struct
+
+    type p = P.t
 
     module X = Shostak.Combine
     module P = P
@@ -104,26 +108,20 @@ module Container : Container_SIG = struct
 
     let incr_age () =  age_cpt := Z.add !age_cpt Z.one;
 
-    type t = {
-      ple0 : P.t;
-      is_le : bool;
-      dep : (Q.t * P.t * bool) Util.MI.t;
-      expl : Explanation.t;
-      age : Z.t;
-    }
+    type nonrec t = P.t t
 
     let print_inequation fmt ineq =
-      fprintf fmt "%a %s 0 %a" P.print ineq.ple0
+      Format.fprintf fmt "%a %s 0 %a" P.print ineq.ple0
         (if ineq.is_le then "<=" else "<") Explanation.print ineq.expl
 
     let create_ineq p1 p2 is_le a expl =
       let ple0 = P.sub p1 p2 in
       match P.to_list ple0 with
       | ([], ctt) when is_le && Q.sign ctt > 0->
-        raise (Intervals.NotConsistent expl)
+        raise (Intervals.Legacy.NotConsistent expl)
 
       | ([], ctt) when not is_le  && Q.sign ctt >= 0 ->
-        raise (Intervals.NotConsistent expl)
+        raise (Intervals.Legacy.NotConsistent expl)
 
       | _ ->
         let p,c,d = P.normal_form ple0 in (* ple0 = (p + c) * d, and d > 0 *)
@@ -201,13 +199,14 @@ module Container : Container_SIG = struct
       open Printer
 
       let list_of_ineqs fmt =
-        List.iter (fprintf fmt "%a  " print_inequation)
+        List.iter (Format.fprintf fmt "%a  " print_inequation)
 
       let map_of_ineqs fmt =
-        MINEQS.iter (fun _ (i , _) -> fprintf fmt "%a  " print_inequation i)
+        MINEQS.iter (fun _ (i , _) ->
+            Format.fprintf fmt "%a  " print_inequation i)
 
       let cross x vars cpos cneg others =
-        if get_debug_fm () then
+        if Options.get_debug_fm () then
           print_dbg ~module_name:"Inequalities" ~function_name:"cross"
             "We cross on %a (%d vars remaining)@ \
              with:@. cpos = %a@. cneg = %a@. others = %a"
@@ -215,7 +214,7 @@ module Container : Container_SIG = struct
             list_of_ineqs cpos list_of_ineqs cneg map_of_ineqs others
 
       let cross_result x ninqs =
-        if get_debug_fm () then
+        if Options.get_debug_fm () then
           print_dbg
             ~module_name:"Inequalities" ~function_name:"cross_result"
             "result of eliminating %a: at most %d new ineqs (not printed)"
@@ -321,8 +320,8 @@ module Container : Container_SIG = struct
             let acc = add_ineqs are_eq acc s_x cneg in
             let size_res = Q.from_int (nb_pos * nb_neg) in
             let mp', nb_inqs =
-              if Q.compare size_res (get_fm_cross_limit ()) >= 0 &&
-                 Q.sign (get_fm_cross_limit()) >= 0 then
+              if Q.compare size_res (Options.get_fm_cross_limit ()) >= 0 &&
+                 Q.sign (Options.get_fm_cross_limit()) >= 0 then
                 let u_cpos = List.filter monome_ineq cpos in
                 let u_cneg = List.filter monome_ineq cneg in
                 let mp', nb_inq1 = match u_cpos with
@@ -353,6 +352,9 @@ module Container : Container_SIG = struct
 
     let available = fourierMotzkin
 
+    let reset_age_cpt () =
+      age_cpt := Z.zero
+
   end
 end
 
@@ -360,25 +362,16 @@ module FM = Container.Make
 
 let current = ref (module Container : Container_SIG)
 
-let initialized = ref false
+let accessed = ref false
 
-let set_current mdl = current := mdl
+let set_current mdl =
+  if !accessed then
+    Errors.run_error (Dynlink_error
+                        "Initializing the 'FM module' after it has been used; \
+                         this is an internal Alt-Ergo bug.");
 
-let load_current_inequalities_reasoner () =
-  match Options.get_inequalities_plugin () with
-  | "" ->
-    if Options.get_debug_fm () then
-      Printer.print_dbg
-        "[Dynlink] Using the 'FM module' for arithmetic inequalities"
-
-  | path ->
-    MyDynlink.load (Options.get_debug_fm ()) path
-      "'inequalities' reasoner (FM module)"
+  current := mdl
 
 let get_current () =
-  if not !initialized then
-    begin
-      load_current_inequalities_reasoner ();
-      initialized := true;
-    end;
+  accessed := true;
   !current

@@ -1,13 +1,29 @@
-(******************************************************************************)
-(*                                                                            *)
-(*     Alt-Ergo: The SMT Solver For Software Verification                     *)
-(*     Copyright (C) 2013-2018 --- OCamlPro SAS                               *)
-(*                                                                            *)
-(*     This file is distributed under the terms of the license indicated      *)
-(*     in the file 'License.OCamlPro'. If 'License.OCamlPro' is not           *)
-(*     present, please contact us to clarify licensing.                       *)
-(*                                                                            *)
-(******************************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*     Alt-Ergo: The SMT Solver For Software Verification                 *)
+(*     Copyright (C) --- OCamlPro SAS                                     *)
+(*                                                                        *)
+(*     This file is distributed under the terms of OCamlPro               *)
+(*     Non-Commercial Purpose License, version 1.                         *)
+(*                                                                        *)
+(*     As an exception, Alt-Ergo Club members at the Gold level can       *)
+(*     use this file under the terms of the Apache Software License       *)
+(*     version 2.0.                                                       *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     The Alt-Ergo theorem prover                                        *)
+(*                                                                        *)
+(*     Sylvain Conchon, Evelyne Contejean, Francois Bobot                 *)
+(*     Mohamed Iguernelala, Stephane Lescuyer, Alain Mebsout              *)
+(*                                                                        *)
+(*     CNRS - INRIA - Universite Paris Sud                                *)
+(*                                                                        *)
+(*     ---------------------------------------------------------------    *)
+(*                                                                        *)
+(*     More details can be found in the directory licenses/               *)
+(*                                                                        *)
+(**************************************************************************)
 
 open Parsed
 
@@ -48,8 +64,17 @@ val mk_non_ground_predicate_def :
   string * string ->
   (Loc.t * string * ppure_type) list -> lexpr -> decl
 
+val mk_mut_rec_def :
+  (Loc.t
+   * (string * string)
+   * (Loc.t * string * ppure_type) list
+   * ppure_type option
+   * lexpr
+  ) list -> decl
+
 val mk_goal : Loc.t -> string -> lexpr -> decl
 
+val mk_check_sat : Loc.t -> string -> lexpr -> decl
 
 (** Declaration of theories, generic axioms and rewriting rules **)
 
@@ -71,6 +96,10 @@ val mk_theory_case_split : Loc.t -> string -> lexpr -> decl
 val mk_push : Loc.t -> int -> decl
 
 val mk_pop : Loc.t -> int -> decl
+
+(** Declaration of optimization of objective functions. *)
+
+val mk_optimize : Loc.t -> lexpr -> bool -> decl
 
 (** Making pure and logic types *)
 
@@ -95,7 +124,7 @@ val mk_logic_type : ppure_type list -> ppure_type option -> plogic_type
 
 val mk_int_const  : Loc.t -> string -> lexpr
 
-val mk_real_const : Loc.t -> Num.num -> lexpr
+val mk_real_const : Loc.t -> Numbers.Q.t -> lexpr
 
 val mk_add : Loc.t -> lexpr -> lexpr -> lexpr
 
@@ -226,4 +255,4 @@ val mk_match : Loc.t -> lexpr -> (pattern * lexpr) list -> lexpr
 
 val mk_algebraic_test : Loc.t -> lexpr -> string -> lexpr
 
-val mk_algebraic_project : Loc.t -> guarded:bool -> lexpr -> string -> lexpr
+val mk_algebraic_project : Loc.t -> lexpr -> string -> lexpr
