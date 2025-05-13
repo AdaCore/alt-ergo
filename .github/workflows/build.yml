@@ -23,10 +23,11 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - macos-latest
-          - macos-15-large
-          - ubuntu-latest
-          - windows-latest
+          - macos-13
+          - macos-14
+          - ubuntu-22.04
+          - windows-2019
+          - ubuntu-22.04-arm
         ocaml-compiler:
           - 4.14.2
 
