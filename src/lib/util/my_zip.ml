@@ -28,6 +28,7 @@
 (** A wrapper of the Zip module of CamlZip: we use Zip except when we want to
     generate the.js file for try-Alt-Ergo. *)
 
+(* Commented for SPARK FSF builds
 module ZipWrapper = struct
   include Zip
   let filename e = e.Zip.filename
@@ -59,7 +60,7 @@ let extract_zip_file f =
     close_in cin;
     raise e
 
-(* !! This commented code is used when compiling to javascript !!
+*)
    module DummyZip = struct
    type entry = unit
    type in_file = unit
@@ -72,7 +73,7 @@ let extract_zip_file f =
    let read_entry  _ _  =  failwith s
    let filename  _  =  failwith s
    let is_directory  _  =  failwith s
+   let extract_zip_file f = failwith s
    end
 
    include DummyZip
-*)
